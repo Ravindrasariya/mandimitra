@@ -409,13 +409,13 @@ function ConfirmMerchantAction({ action, onClose }: { action: { type: "toggle" |
 
           {isReset && (
             <div className="space-y-2">
-              <Label>Reset Password (separate from admin password) *</Label>
+              <Label>Reset Password *</Label>
               <Input
                 data-testid="input-reset-password"
                 type="password"
                 value={resetPassword}
                 onChange={(e) => setResetPassword(e.target.value)}
-                placeholder="Enter your dedicated reset password"
+                placeholder="Enter reset password"
                 required
               />
             </div>

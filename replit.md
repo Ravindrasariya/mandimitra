@@ -55,7 +55,7 @@ client/src/
 
 ## Authentication
 - Session-based auth with PostgreSQL session store
-- System admin: username `admin`, password `admin123`
+- System admin: username `admin`, password from ADMIN_PASSWORD env secret (synced on startup)
 - New users: default password `password123`, must change on first login
 - Change password requires registered mobile number verification
 - Business status (active/inactive/archived) checked on every request
@@ -83,10 +83,14 @@ Agar Malwa, Dewas, Dhar, Indore, Jhabua, Khargoan, Mandsaur, Neemuch, Rajgarh, R
 ## Crops Supported
 Garlic, Onion, Potato
 
+## Environment Secrets
+- **ADMIN_PASSWORD**: Admin login password (synced to DB on each server start)
+- **RESET_PASSWORD**: Separate password required for data reset actions (compared directly from env, not stored in DB)
+- **SESSION_SECRET**: Session encryption key
+
 ## Admin Actions
 - **Toggle Status**: Activate/deactivate business (requires admin password)
 - **Archive**: Archive/reinstate business (requires admin password)
-- **Reset**: Wipe all user-entered data for a business (requires admin password + separate reset password). The reset password is different from the admin login password and must be set by the admin first via the "Reset Password" button in the header.
-- **Set Reset Password**: Admin must set a dedicated reset password (separate from login) before using the data reset feature. Accessible via Shield icon in the admin panel header.
+- **Reset**: Wipe all user-entered data for a business (requires admin password + RESET_PASSWORD from env)
 - **Reset User Password**: Reset user password to default (password123)
 - **Delete User**: Remove user account (cannot delete system admin)

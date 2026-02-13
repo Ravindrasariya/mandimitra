@@ -15,13 +15,13 @@ export async function registerRoutes(
   setupAuth(app);
 
   async function seedDefaultBusiness() {
+    const adminPassword = process.env.ADMIN_PASSWORD;
+    if (!adminPassword) {
+      console.log("No ADMIN_PASSWORD env variable set. Please set ADMIN_PASSWORD.");
+      return;
+    }
     const existingUser = await storage.getUserByUsername("admin");
     if (!existingUser) {
-      const adminPassword = process.env.ADMIN_PASSWORD;
-      if (!adminPassword) {
-        console.log("No ADMIN_PASSWORD env variable set. Skipping admin seed. Please set ADMIN_PASSWORD to create the admin account.");
-        return;
-      }
       const merchantId = await storage.getNextMerchantId();
       const biz = await storage.createBusiness({ merchantId, name: "System", address: "", phone: "", status: "active" });
       const hashed = await hashPassword(adminPassword);
@@ -34,6 +34,12 @@ export async function registerRoutes(
         role: "system_admin",
         mustChangePassword: false,
       });
+    } else {
+      const passwordMatch = await comparePasswords(adminPassword, existingUser.password);
+      if (!passwordMatch) {
+        const hashed = await hashPassword(adminPassword);
+        await storage.updateUserPassword(existingUser.id, hashed);
+      }
     }
   }
   await seedDefaultBusiness();

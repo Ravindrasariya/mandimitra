@@ -85,20 +85,20 @@ export default function LoginPage() {
             <Button
               type="submit"
               data-testid="button-login"
-              className="w-full mobile-touch-target bg-green-500 hover:bg-green-600"
+              className="w-full mobile-touch-target bg-green-500"
               disabled={loading || !username || !password}
             >
               {loading ? "Signing in..." : "Login"}
             </Button>
           </form>
           <div className="mt-3 text-center">
-            <Link href="/change-password" className="text-green-500 hover:text-green-600 text-sm font-medium">
+            <Link href="/change-password" data-testid="link-change-password" className="text-green-500 text-sm font-medium">
               Change Password
             </Link>
           </div>
         </CardContent>
       </Card>
-      <p className="mt-6 text-center text-xs text-muted-foreground">
+      <p data-testid="text-help-footer" className="mt-6 text-center text-xs text-muted-foreground">
         Need Help? Please reach out to <span className="text-orange-500 font-semibold">KrashuVed</span> 8882589392
       </p>
     </div>
