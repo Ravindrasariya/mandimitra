@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Package, Eye, EyeOff } from "lucide-react";
+import { Wheat, Eye, EyeOff } from "lucide-react";
 import { Link } from "wouter";
 
 export default function LoginPage() {
@@ -34,14 +34,13 @@ export default function LoginPage() {
       <Card className="w-full max-w-sm shadow-sm">
         <CardHeader className="text-center space-y-2 pb-2">
           <div className="flex justify-center">
-            <div className="w-16 h-16 rounded-2xl bg-green-500 flex items-center justify-center">
-              <Package className="w-8 h-8 text-white" />
+            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+              <Wheat className="w-8 h-8 text-primary" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold text-green-500">Vyapar Vriddhi</CardTitle>
+          <CardTitle className="text-2xl font-bold">Mandi Mitra</CardTitle>
           <p className="text-sm">by <span className="text-orange-500 font-semibold">KrashuVed</span></p>
-          <p className="text-muted-foreground text-sm">Welcome</p>
-          <p className="text-muted-foreground text-xs">Please Enter Your Login Details</p>
+          <p className="text-muted-foreground text-sm">Agricultural Marketplace Manager</p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
