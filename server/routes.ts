@@ -17,9 +17,14 @@ export async function registerRoutes(
   async function seedDefaultBusiness() {
     const existingUser = await storage.getUserByUsername("admin");
     if (!existingUser) {
+      const adminPassword = process.env.ADMIN_PASSWORD;
+      if (!adminPassword) {
+        console.log("No ADMIN_PASSWORD env variable set. Skipping admin seed. Please set ADMIN_PASSWORD to create the admin account.");
+        return;
+      }
       const merchantId = await storage.getNextMerchantId();
       const biz = await storage.createBusiness({ merchantId, name: "System", address: "", phone: "", status: "active" });
-      const hashed = await hashPassword("admin123");
+      const hashed = await hashPassword(adminPassword);
       await storage.createUser({
         username: "admin",
         name: "System Administrator",
@@ -27,7 +32,7 @@ export async function registerRoutes(
         phone: "",
         businessId: biz.id,
         role: "system_admin",
-        mustChangePassword: true,
+        mustChangePassword: false,
       });
     }
   }
@@ -87,27 +92,6 @@ export async function registerRoutes(
     res.json(updated);
   });
 
-  app.get("/api/admin/reset-password-status", requireAdmin, async (req, res) => {
-    const admin = await storage.getUser(req.user!.id);
-    res.json({ hasResetPassword: !!(admin?.resetPasswordHash) });
-  });
-
-  app.post("/api/admin/set-reset-password", requireAdmin, async (req, res) => {
-    const { adminPassword, newResetPassword } = req.body;
-    if (!adminPassword || !newResetPassword) return res.status(400).json({ message: "Both fields are required" });
-    if (newResetPassword.length < 6) return res.status(400).json({ message: "Reset password must be at least 6 characters" });
-
-    const admin = await storage.getUser(req.user!.id);
-    if (!admin) return res.status(404).json({ message: "Admin not found" });
-
-    const isValidAdmin = await comparePasswords(adminPassword, admin.password);
-    if (!isValidAdmin) return res.status(400).json({ message: "Invalid admin password" });
-
-    const hashed = await hashPassword(newResetPassword);
-    await storage.updateUser(admin.id, { resetPasswordHash: hashed });
-    res.json({ message: "Reset password has been set successfully" });
-  });
-
   app.post("/api/admin/businesses/:id/reset", requireAdmin, async (req, res) => {
     const { adminPassword, resetPassword } = req.body;
     const admin = await storage.getUser(req.user!.id);
@@ -116,10 +100,10 @@ export async function registerRoutes(
     const isValidAdmin = await comparePasswords(adminPassword, admin.password);
     if (!isValidAdmin) return res.status(400).json({ message: "Invalid admin password" });
 
-    if (!admin.resetPasswordHash) return res.status(400).json({ message: "Reset password has not been set. Please set it first in Settings." });
+    const envResetPassword = process.env.RESET_PASSWORD;
+    if (!envResetPassword) return res.status(400).json({ message: "RESET_PASSWORD is not configured. Please contact the system administrator." });
 
-    const isValidReset = await comparePasswords(resetPassword, admin.resetPasswordHash);
-    if (!isValidReset) return res.status(400).json({ message: "Invalid reset password" });
+    if (resetPassword !== envResetPassword) return res.status(400).json({ message: "Invalid reset password" });
 
     const biz = await storage.getBusiness(paramId(req.params.id));
     if (!biz) return res.status(404).json({ message: "Business not found" });

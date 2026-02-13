@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import {
   Building2, Users as UsersIcon, Plus, Search, Pencil, Power, Archive, RotateCcw,
-  Trash2, KeyRound, LogOut, AlertTriangle, Settings, Shield,
+  Trash2, KeyRound, LogOut, AlertTriangle,
 } from "lucide-react";
 import type { Business, User } from "@shared/schema";
 
@@ -31,7 +31,6 @@ function StatusBadge({ status }: { status: string }) {
 export default function AdminPage() {
   const { logout } = useAuth();
   const [tab, setTab] = useState<"merchants" | "users">("merchants");
-  const [showResetPwDialog, setShowResetPwDialog] = useState(false);
 
   return (
     <div className="min-h-screen bg-background">
@@ -40,14 +39,9 @@ export default function AdminPage() {
           <h1 className="text-lg font-bold">Admin Panel</h1>
           <p className="text-xs text-muted-foreground">Manage merchants and users</p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" data-testid="button-set-reset-password" onClick={() => setShowResetPwDialog(true)}>
-            <Shield className="w-4 h-4 mr-1" /> Reset Password
-          </Button>
-          <Button variant="outline" size="sm" data-testid="button-admin-logout" onClick={logout}>
-            <LogOut className="w-4 h-4 mr-1" /> Logout
-          </Button>
-        </div>
+        <Button variant="outline" size="sm" data-testid="button-admin-logout" onClick={logout}>
+          <LogOut className="w-4 h-4 mr-1" /> Logout
+        </Button>
       </header>
 
       <div className="px-4 md:px-6 py-4">
@@ -72,8 +66,6 @@ export default function AdminPage() {
 
         {tab === "merchants" ? <MerchantsTab /> : <UsersTab />}
       </div>
-
-      {showResetPwDialog && <SetResetPasswordDialog onClose={() => setShowResetPwDialog(false)} />}
     </div>
   );
 }
@@ -789,100 +781,3 @@ function EditUserDialog({ user, businesses, onClose, onSubmit, isPending }: {
   );
 }
 
-function SetResetPasswordDialog({ onClose }: { onClose: () => void }) {
-  const { toast } = useToast();
-  const [adminPassword, setAdminPassword] = useState("");
-  const [newResetPassword, setNewResetPassword] = useState("");
-  const [confirmResetPassword, setConfirmResetPassword] = useState("");
-
-  const { data: status } = useQuery<{ hasResetPassword: boolean }>({ queryKey: ["/api/admin/reset-password-status"] });
-
-  const mutation = useMutation({
-    mutationFn: async () => {
-      const res = await apiRequest("POST", "/api/admin/set-reset-password", { adminPassword, newResetPassword });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/admin/reset-password-status"] });
-      toast({ title: "Success", description: "Reset password has been set successfully" });
-      onClose();
-    },
-    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
-  });
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (newResetPassword !== confirmResetPassword) {
-      toast({ title: "Error", description: "Reset passwords do not match", variant: "destructive" });
-      return;
-    }
-    if (newResetPassword.length < 6) {
-      toast({ title: "Error", description: "Reset password must be at least 6 characters", variant: "destructive" });
-      return;
-    }
-    mutation.mutate();
-  };
-
-  return (
-    <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2"><Shield className="w-5 h-5" /> {status?.hasResetPassword ? "Change" : "Set"} Reset Password</DialogTitle>
-          <DialogDescription>
-            This is a separate password used only to confirm data reset actions. It is different from your admin login password.
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-md p-3 text-sm text-blue-700 dark:text-blue-400">
-            {status?.hasResetPassword
-              ? "You already have a reset password set. Enter your admin password and a new reset password to change it."
-              : "You have not set a reset password yet. You must set one before you can use the data reset feature on merchants."}
-          </div>
-          <div className="space-y-2">
-            <Label>Admin Password *</Label>
-            <Input
-              data-testid="input-set-reset-admin-password"
-              type="password"
-              value={adminPassword}
-              onChange={(e) => setAdminPassword(e.target.value)}
-              placeholder="Enter your admin login password"
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>New Reset Password *</Label>
-            <Input
-              data-testid="input-set-new-reset-password"
-              type="password"
-              value={newResetPassword}
-              onChange={(e) => setNewResetPassword(e.target.value)}
-              placeholder="Enter new reset password (min 6 characters)"
-              required
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Confirm Reset Password *</Label>
-            <Input
-              data-testid="input-set-confirm-reset-password"
-              type="password"
-              value={confirmResetPassword}
-              onChange={(e) => setConfirmResetPassword(e.target.value)}
-              placeholder="Re-enter the new reset password"
-              required
-            />
-          </div>
-          <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button
-              type="submit"
-              data-testid="button-save-reset-password"
-              disabled={mutation.isPending || !adminPassword || !newResetPassword || !confirmResetPassword}
-            >
-              {mutation.isPending ? "Saving..." : "Save Reset Password"}
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
