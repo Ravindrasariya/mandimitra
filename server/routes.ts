@@ -257,23 +257,21 @@ export async function registerRoutes(
       const dateFormatted = dateStr.replace(/-/g, "");
       const lotId = `${cropPrefix}${dateFormatted}${lotNum}`;
 
-      const avgWeight = req.body.sampleBagWeight1 && req.body.sampleBagWeight2
-        ? ((parseFloat(req.body.sampleBagWeight1) + parseFloat(req.body.sampleBagWeight2)) / 2).toFixed(2)
-        : req.body.sampleBagWeight1 || req.body.sampleBagWeight2 || null;
-
-      const estimatedWeight = avgWeight && req.body.numberOfBags
-        ? (parseFloat(avgWeight) * parseInt(req.body.numberOfBags)).toFixed(2)
-        : null;
-
       const data = {
-        ...req.body,
         businessId,
         lotId,
         serialNumber: serialNum,
         date: dateStr,
-        remainingBags: req.body.numberOfBags,
-        averageBagWeight: avgWeight,
-        estimatedWeight,
+        farmerId: req.body.farmerId,
+        crop,
+        variety: req.body.variety || null,
+        numberOfBags: parseInt(req.body.numberOfBags),
+        remainingBags: parseInt(req.body.numberOfBags),
+        size: req.body.size,
+        bagMarka: req.body.bagMarka || null,
+        vehicleNumber: req.body.vehicleNumber ? req.body.vehicleNumber.toUpperCase() : null,
+        vehicleBhadaRate: req.body.vehicleBhadaRate || null,
+        initialTotalWeight: req.body.initialTotalWeight || null,
       };
 
       const lot = await storage.createLot(data);

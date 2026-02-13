@@ -60,10 +60,11 @@ export const lots = pgTable("lots", {
   variety: text("variety"),
   numberOfBags: integer("number_of_bags").notNull(),
   remainingBags: integer("remaining_bags").notNull(),
-  sampleBagWeight1: decimal("sample_bag_weight_1", { precision: 8, scale: 2 }),
-  sampleBagWeight2: decimal("sample_bag_weight_2", { precision: 8, scale: 2 }),
-  averageBagWeight: decimal("average_bag_weight", { precision: 8, scale: 2 }),
-  estimatedWeight: decimal("estimated_weight", { precision: 12, scale: 2 }),
+  size: text("size").notNull(),
+  bagMarka: text("bag_marka"),
+  vehicleNumber: text("vehicle_number"),
+  vehicleBhadaRate: decimal("vehicle_bhada_rate", { precision: 10, scale: 2 }),
+  initialTotalWeight: decimal("initial_total_weight", { precision: 12, scale: 2 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -74,7 +75,7 @@ export const bids = pgTable("bids", {
   buyerId: integer("buyer_id").notNull().references(() => buyers.id),
   pricePerKg: decimal("price_per_kg", { precision: 10, scale: 2 }).notNull(),
   numberOfBags: integer("number_of_bags").notNull(),
-  grade: text("grade").default("Large/Medium"),
+  grade: text("grade").default("Large"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -151,5 +152,5 @@ export const DISTRICTS = [
 ] as const;
 
 export const CROPS = ["Garlic", "Onion", "Potato"] as const;
-export const GRADES = ["Large/Medium", "Small", "Chhatan"] as const;
+export const SIZES = ["Large", "Medium", "Small", "Chhatan"] as const;
 export const PAYMENT_MODES = ["Cash", "Online", "Cheque"] as const;

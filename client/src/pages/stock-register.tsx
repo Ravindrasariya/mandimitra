@@ -8,7 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { CROPS } from "@shared/schema";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CROPS, SIZES } from "@shared/schema";
 import type { Lot, Farmer } from "@shared/schema";
 import { Search, Edit, Package, Wheat } from "lucide-react";
 import { format } from "date-fns";
@@ -21,8 +22,11 @@ export default function StockRegisterPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [editingLot, setEditingLot] = useState<LotWithFarmer | null>(null);
   const [editVariety, setEditVariety] = useState("");
-  const [editWeight1, setEditWeight1] = useState("");
-  const [editWeight2, setEditWeight2] = useState("");
+  const [editSize, setEditSize] = useState("");
+  const [editBagMarka, setEditBagMarka] = useState("");
+  const [editVehicleNumber, setEditVehicleNumber] = useState("");
+  const [editVehicleBhadaRate, setEditVehicleBhadaRate] = useState("");
+  const [editInitialTotalWeight, setEditInitialTotalWeight] = useState("");
 
   const todayStr = format(new Date(), "yyyy-MM-dd");
 
@@ -54,8 +58,11 @@ export default function StockRegisterPage() {
   const openEdit = (lot: LotWithFarmer) => {
     setEditingLot(lot);
     setEditVariety(lot.variety || "");
-    setEditWeight1(lot.sampleBagWeight1 || "");
-    setEditWeight2(lot.sampleBagWeight2 || "");
+    setEditSize(lot.size || "");
+    setEditBagMarka(lot.bagMarka || "");
+    setEditVehicleNumber(lot.vehicleNumber || "");
+    setEditVehicleBhadaRate(lot.vehicleBhadaRate || "");
+    setEditInitialTotalWeight(lot.initialTotalWeight || "");
   };
 
   const saveEdit = () => {
@@ -64,8 +71,11 @@ export default function StockRegisterPage() {
       id: editingLot.id,
       data: {
         variety: editVariety || null,
-        sampleBagWeight1: editWeight1 || null,
-        sampleBagWeight2: editWeight2 || null,
+        size: editSize,
+        bagMarka: editBagMarka || null,
+        vehicleNumber: editVehicleNumber ? editVehicleNumber.toUpperCase() : null,
+        vehicleBhadaRate: editVehicleBhadaRate || null,
+        initialTotalWeight: editInitialTotalWeight || null,
       },
     });
   };
@@ -134,18 +144,18 @@ export default function StockRegisterPage() {
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                         <span>Date: {lot.date}</span>
                         {lot.variety && <span>Variety: {lot.variety}</span>}
+                        <span>Size: {lot.size}</span>
                       </div>
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
                         <span>Bags: <strong>{lot.numberOfBags}</strong></span>
                         <span>Remaining: <strong className={lot.remainingBags > 0 ? "text-primary" : "text-destructive"}>{lot.remainingBags}</strong></span>
-                        {lot.estimatedWeight && <span>Est. Wt: <strong>{lot.estimatedWeight} kg</strong></span>}
                       </div>
-                      {(lot.sampleBagWeight1 || lot.sampleBagWeight2) && (
-                        <p className="text-xs text-muted-foreground">
-                          Sample: {lot.sampleBagWeight1 || "-"} / {lot.sampleBagWeight2 || "-"} kg
-                          {lot.averageBagWeight && ` (Avg: ${lot.averageBagWeight} kg)`}
-                        </p>
-                      )}
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                        {lot.bagMarka && <span>Marka: {lot.bagMarka}</span>}
+                        {lot.vehicleNumber && <span>Vehicle: {lot.vehicleNumber}</span>}
+                        {lot.vehicleBhadaRate && <span>Bhada: Rs.{lot.vehicleBhadaRate}/bag</span>}
+                        {lot.initialTotalWeight && <span>Init. Wt: {lot.initialTotalWeight} kg</span>}
+                      </div>
                     </div>
                   </div>
                   <Button
@@ -179,26 +189,58 @@ export default function StockRegisterPage() {
               />
             </div>
             <div className="space-y-1">
-              <Label>Sample Weight 1 (kg)</Label>
+              <Label>Size</Label>
+              <Select value={editSize} onValueChange={setEditSize}>
+                <SelectTrigger data-testid="select-edit-size" className="mobile-touch-target">
+                  <SelectValue placeholder="Select size" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SIZES.map((s) => (
+                    <SelectItem key={s} value={s}>{s}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Bag Marka</Label>
               <Input
-                data-testid="input-edit-weight1"
-                type="number"
-                inputMode="decimal"
-                step="0.01"
-                value={editWeight1}
-                onChange={(e) => setEditWeight1(e.target.value)}
+                data-testid="input-edit-bag-marka"
+                value={editBagMarka}
+                onChange={(e) => setEditBagMarka(e.target.value)}
                 className="mobile-touch-target"
               />
             </div>
             <div className="space-y-1">
-              <Label>Sample Weight 2 (kg)</Label>
+              <Label>Vehicle Number</Label>
               <Input
-                data-testid="input-edit-weight2"
-                type="number"
+                data-testid="input-edit-vehicle-number"
+                value={editVehicleNumber}
+                onChange={(e) => setEditVehicleNumber(e.target.value.toUpperCase())}
+                className="mobile-touch-target"
+                style={{ textTransform: 'uppercase' }}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Vehicle Bhada Rate (per bag)</Label>
+              <Input
+                data-testid="input-edit-bhada-rate"
+                type="text"
                 inputMode="decimal"
-                step="0.01"
-                value={editWeight2}
-                onChange={(e) => setEditWeight2(e.target.value)}
+                value={editVehicleBhadaRate}
+                onChange={(e) => setEditVehicleBhadaRate(e.target.value)}
+                placeholder="0.00"
+                className="mobile-touch-target"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Initial Total Weight (kg)</Label>
+              <Input
+                data-testid="input-edit-initial-weight"
+                type="text"
+                inputMode="decimal"
+                value={editInitialTotalWeight}
+                onChange={(e) => setEditInitialTotalWeight(e.target.value)}
+                placeholder="0.00"
                 className="mobile-touch-target"
               />
             </div>

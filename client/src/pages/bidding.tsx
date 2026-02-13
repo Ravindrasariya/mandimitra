@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { CROPS, GRADES } from "@shared/schema";
+import { CROPS, SIZES } from "@shared/schema";
 import type { Lot, Farmer, Buyer, Bid } from "@shared/schema";
 import { Gavel, Plus, Trash2, Search } from "lucide-react";
 
@@ -19,7 +19,7 @@ type BidWithDetails = Bid & { buyer: Buyer; lot: Lot };
 export default function BiddingPage() {
   const { toast } = useToast();
   const [activeCrop, setActiveCrop] = useState("Garlic");
-  const [activeGrade, setActiveGrade] = useState("Large/Medium");
+  const [activeGrade, setActiveGrade] = useState("Large");
   const [selectedLot, setSelectedLot] = useState<LotWithFarmer | null>(null);
   const [bidDialogOpen, setBidDialogOpen] = useState(false);
   const [buyerSearch, setBuyerSearch] = useState("");
@@ -146,16 +146,16 @@ export default function BiddingPage() {
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1">
-        {GRADES.map((grade) => (
+        {SIZES.map((size) => (
           <Button
-            key={grade}
-            variant={activeGrade === grade ? "default" : "secondary"}
+            key={size}
+            variant={activeGrade === size ? "default" : "secondary"}
             size="sm"
-            data-testid={`toggle-grade-${grade.toLowerCase().replace("/", "-")}`}
+            data-testid={`toggle-size-${size.toLowerCase()}`}
             className="mobile-touch-target whitespace-nowrap"
-            onClick={() => setActiveGrade(grade)}
+            onClick={() => setActiveGrade(size)}
           >
-            {grade}
+            {size}
           </Button>
         ))}
       </div>
@@ -180,7 +180,7 @@ export default function BiddingPage() {
                     <p className="text-sm font-medium truncate">{lot.farmer.name}</p>
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground mt-1">
                       <span>Remaining: <strong className="text-foreground">{lot.remainingBags}</strong> / {lot.numberOfBags} bags</span>
-                      {lot.estimatedWeight && <span>Est: {lot.estimatedWeight} kg</span>}
+                      {lot.initialTotalWeight && <span>Init. Wt: {lot.initialTotalWeight} kg</span>}
                     </div>
                   </div>
                   <Button
@@ -210,7 +210,7 @@ export default function BiddingPage() {
             <div className="space-y-4">
               <div className="bg-muted rounded-md p-3 text-sm space-y-1">
                 <p>Remaining Bags: <strong>{selectedLot.remainingBags}</strong></p>
-                <p>Grade: <strong>{activeGrade}</strong></p>
+                <p>Size: <strong>{activeGrade}</strong></p>
               </div>
 
               {lotBids.length > 0 && (

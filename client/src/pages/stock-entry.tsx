@@ -7,17 +7,31 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { DISTRICTS, CROPS } from "@shared/schema";
+import { DISTRICTS, CROPS, SIZES } from "@shared/schema";
 import type { Farmer } from "@shared/schema";
-import { Plus, Trash2, Package, Search } from "lucide-react";
+import { Plus, Trash2, Search, Wheat } from "lucide-react";
 import { format } from "date-fns";
 
 type LotEntry = {
   crop: string;
   variety: string;
   numberOfBags: string;
-  sampleBagWeight1: string;
-  sampleBagWeight2: string;
+  size: string;
+  bagMarka: string;
+  vehicleNumber: string;
+  vehicleBhadaRate: string;
+  initialTotalWeight: string;
+};
+
+const emptyLot: LotEntry = {
+  crop: "",
+  variety: "",
+  numberOfBags: "",
+  size: "",
+  bagMarka: "",
+  vehicleNumber: "",
+  vehicleBhadaRate: "",
+  initialTotalWeight: "",
 };
 
 export default function StockEntryPage() {
@@ -35,9 +49,7 @@ export default function StockEntryPage() {
   const [state] = useState("Madhya Pradesh");
   const [entryDate, setEntryDate] = useState(format(new Date(), "yyyy-MM-dd"));
 
-  const [lots, setLots] = useState<LotEntry[]>([
-    { crop: "", variety: "", numberOfBags: "", sampleBagWeight1: "", sampleBagWeight2: "" }
-  ]);
+  const [lots, setLots] = useState<LotEntry[]>([{ ...emptyLot }]);
 
   const { data: farmerSuggestions = [] } = useQuery<Farmer[]>({
     queryKey: ["/api/farmers", `?search=${farmerSearch}`],
@@ -79,7 +91,7 @@ export default function StockEntryPage() {
   };
 
   const addLot = () => {
-    setLots([...lots, { crop: "", variety: "", numberOfBags: "", sampleBagWeight1: "", sampleBagWeight2: "" }]);
+    setLots([...lots, { ...emptyLot }]);
   };
 
   const removeLot = (index: number) => {
@@ -93,30 +105,15 @@ export default function StockEntryPage() {
     setLots(updated);
   };
 
-  const getAvgWeight = (lot: LotEntry) => {
-    const w1 = parseFloat(lot.sampleBagWeight1) || 0;
-    const w2 = parseFloat(lot.sampleBagWeight2) || 0;
-    if (w1 && w2) return ((w1 + w2) / 2).toFixed(2);
-    if (w1) return w1.toFixed(2);
-    if (w2) return w2.toFixed(2);
-    return "0.00";
-  };
-
-  const getEstWeight = (lot: LotEntry) => {
-    const avg = parseFloat(getAvgWeight(lot));
-    const bags = parseInt(lot.numberOfBags) || 0;
-    return (avg * bags).toFixed(2);
-  };
-
   const handleSubmit = async () => {
     if (!farmerName || !farmerPhone) {
       toast({ title: "Error", description: "Farmer name and phone are required", variant: "destructive" });
       return;
     }
 
-    const invalidLots = lots.filter(l => !l.crop || !l.numberOfBags);
+    const invalidLots = lots.filter(l => !l.crop || !l.numberOfBags || !l.size);
     if (invalidLots.length > 0) {
-      toast({ title: "Error", description: "Each lot needs crop and number of bags", variant: "destructive" });
+      toast({ title: "Error", description: "Each lot needs crop, number of bags, and size", variant: "destructive" });
       return;
     }
 
@@ -142,8 +139,11 @@ export default function StockEntryPage() {
           crop: lot.crop,
           variety: lot.variety || null,
           numberOfBags: parseInt(lot.numberOfBags),
-          sampleBagWeight1: lot.sampleBagWeight1 || null,
-          sampleBagWeight2: lot.sampleBagWeight2 || null,
+          size: lot.size,
+          bagMarka: lot.bagMarka || null,
+          vehicleNumber: lot.vehicleNumber ? lot.vehicleNumber.toUpperCase() : null,
+          vehicleBhadaRate: lot.vehicleBhadaRate || null,
+          initialTotalWeight: lot.initialTotalWeight || null,
         });
       }
 
@@ -156,7 +156,7 @@ export default function StockEntryPage() {
       setTehsil("");
       setDistrict("");
       setShowFarmerForm(false);
-      setLots([{ crop: "", variety: "", numberOfBags: "", sampleBagWeight1: "", sampleBagWeight2: "" }]);
+      setLots([{ ...emptyLot }]);
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
@@ -165,7 +165,7 @@ export default function StockEntryPage() {
   return (
     <div className="p-3 md:p-6 max-w-4xl mx-auto space-y-4">
       <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
-        <Package className="w-6 h-6 text-primary" />
+        <Wheat className="w-6 h-6 text-primary" />
         Stock Entry
       </h1>
 
@@ -339,6 +339,19 @@ export default function StockEntryPage() {
                   </Select>
                 </div>
                 <div className="space-y-1">
+                  <Label>Size *</Label>
+                  <Select value={lot.size} onValueChange={(v) => updateLot(index, "size", v)}>
+                    <SelectTrigger data-testid={`select-size-${index}`} className="mobile-touch-target">
+                      <SelectValue placeholder="Select size" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SIZES.map((s) => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
                   <Label>Variety</Label>
                   <Input
                     data-testid={`input-variety-${index}`}
@@ -348,11 +361,13 @@ export default function StockEntryPage() {
                     className="mobile-touch-target"
                   />
                 </div>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="space-y-1">
                   <Label>No. of Bags *</Label>
                   <Input
                     data-testid={`input-bags-${index}`}
-                    type="number"
+                    type="text"
                     inputMode="numeric"
                     value={lot.numberOfBags}
                     onChange={(e) => updateLot(index, "numberOfBags", e.target.value)}
@@ -360,41 +375,52 @@ export default function StockEntryPage() {
                     className="mobile-touch-target"
                   />
                 </div>
+                <div className="space-y-1">
+                  <Label>Bag Marka</Label>
+                  <Input
+                    data-testid={`input-bag-marka-${index}`}
+                    value={lot.bagMarka}
+                    onChange={(e) => updateLot(index, "bagMarka", e.target.value)}
+                    placeholder="Optional"
+                    className="mobile-touch-target"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Vehicle #</Label>
+                  <Input
+                    data-testid={`input-vehicle-number-${index}`}
+                    value={lot.vehicleNumber}
+                    onChange={(e) => updateLot(index, "vehicleNumber", e.target.value.toUpperCase())}
+                    placeholder="e.g. MP09AB1234"
+                    className="mobile-touch-target"
+                    style={{ textTransform: 'uppercase' }}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Bhada Rate/Bag</Label>
+                  <Input
+                    data-testid={`input-bhada-rate-${index}`}
+                    type="text"
+                    inputMode="decimal"
+                    value={lot.vehicleBhadaRate}
+                    onChange={(e) => updateLot(index, "vehicleBhadaRate", e.target.value)}
+                    placeholder="0.00"
+                    className="mobile-touch-target"
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="space-y-1">
-                  <Label>Sample Wt 1 (kg)</Label>
+                  <Label>Initial Total Weight (kg)</Label>
                   <Input
-                    data-testid={`input-weight1-${index}`}
-                    type="number"
+                    data-testid={`input-initial-weight-${index}`}
+                    type="text"
                     inputMode="decimal"
-                    step="0.01"
-                    value={lot.sampleBagWeight1}
-                    onChange={(e) => updateLot(index, "sampleBagWeight1", e.target.value)}
+                    value={lot.initialTotalWeight}
+                    onChange={(e) => updateLot(index, "initialTotalWeight", e.target.value)}
                     placeholder="0.00"
                     className="mobile-touch-target"
                   />
-                </div>
-                <div className="space-y-1">
-                  <Label>Sample Wt 2 (kg)</Label>
-                  <Input
-                    data-testid={`input-weight2-${index}`}
-                    type="number"
-                    inputMode="decimal"
-                    step="0.01"
-                    value={lot.sampleBagWeight2}
-                    onChange={(e) => updateLot(index, "sampleBagWeight2", e.target.value)}
-                    placeholder="0.00"
-                    className="mobile-touch-target"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>Avg Weight</Label>
-                  <Input value={getAvgWeight(lot)} disabled className="mobile-touch-target bg-muted" />
-                </div>
-                <div className="space-y-1">
-                  <Label>Est. Weight (kg)</Label>
-                  <Input value={getEstWeight(lot)} disabled className="mobile-touch-target bg-muted" />
                 </div>
               </div>
             </CardContent>
