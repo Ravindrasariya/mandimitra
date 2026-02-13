@@ -86,6 +86,7 @@ Garlic, Onion, Potato
 ## Admin Actions
 - **Toggle Status**: Activate/deactivate business (requires admin password)
 - **Archive**: Archive/reinstate business (requires admin password)
-- **Reset**: Wipe all user-entered data for a business (requires admin password entered twice). Preserves business and user accounts.
-- **Reset Password**: Reset user password to default (password123)
+- **Reset**: Wipe all user-entered data for a business (requires admin password + separate reset password). The reset password is different from the admin login password and must be set by the admin first via the "Reset Password" button in the header.
+- **Set Reset Password**: Admin must set a dedicated reset password (separate from login) before using the data reset feature. Accessible via Shield icon in the admin panel header.
+- **Reset User Password**: Reset user password to default (password123)
 - **Delete User**: Remove user account (cannot delete system admin)

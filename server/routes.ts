@@ -87,6 +87,27 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  app.get("/api/admin/reset-password-status", requireAdmin, async (req, res) => {
+    const admin = await storage.getUser(req.user!.id);
+    res.json({ hasResetPassword: !!(admin?.resetPasswordHash) });
+  });
+
+  app.post("/api/admin/set-reset-password", requireAdmin, async (req, res) => {
+    const { adminPassword, newResetPassword } = req.body;
+    if (!adminPassword || !newResetPassword) return res.status(400).json({ message: "Both fields are required" });
+    if (newResetPassword.length < 6) return res.status(400).json({ message: "Reset password must be at least 6 characters" });
+
+    const admin = await storage.getUser(req.user!.id);
+    if (!admin) return res.status(404).json({ message: "Admin not found" });
+
+    const isValidAdmin = await comparePasswords(adminPassword, admin.password);
+    if (!isValidAdmin) return res.status(400).json({ message: "Invalid admin password" });
+
+    const hashed = await hashPassword(newResetPassword);
+    await storage.updateUser(admin.id, { resetPasswordHash: hashed });
+    res.json({ message: "Reset password has been set successfully" });
+  });
+
   app.post("/api/admin/businesses/:id/reset", requireAdmin, async (req, res) => {
     const { adminPassword, resetPassword } = req.body;
     const admin = await storage.getUser(req.user!.id);
@@ -95,8 +116,10 @@ export async function registerRoutes(
     const isValidAdmin = await comparePasswords(adminPassword, admin.password);
     if (!isValidAdmin) return res.status(400).json({ message: "Invalid admin password" });
 
-    const isValidReset = await comparePasswords(resetPassword, admin.password);
-    if (!isValidReset) return res.status(400).json({ message: "Invalid reset confirmation password" });
+    if (!admin.resetPasswordHash) return res.status(400).json({ message: "Reset password has not been set. Please set it first in Settings." });
+
+    const isValidReset = await comparePasswords(resetPassword, admin.resetPasswordHash);
+    if (!isValidReset) return res.status(400).json({ message: "Invalid reset password" });
 
     const biz = await storage.getBusiness(paramId(req.params.id));
     if (!biz) return res.status(404).json({ message: "Business not found" });
@@ -107,7 +130,7 @@ export async function registerRoutes(
 
   app.get("/api/admin/users", requireAdmin, async (_req, res) => {
     const result = await storage.getAllUsers();
-    const safe = result.map(({ password, ...rest }) => rest);
+    const safe = result.map(({ password, resetPasswordHash, ...rest }) => rest);
     res.json(safe);
   });
 

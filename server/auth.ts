@@ -106,7 +106,7 @@ export function setupAuth(app: Express): void {
 
       req.logIn(user, (err) => {
         if (err) return next(err);
-        const { password, ...safeUser } = user;
+        const { password, resetPasswordHash, ...safeUser } = user;
         return res.json(safeUser);
       });
     })(req, res, next);
@@ -121,7 +121,7 @@ export function setupAuth(app: Express): void {
 
   app.get("/api/auth/me", (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
-    const { password, ...safeUser } = req.user!;
+    const { password, resetPasswordHash, ...safeUser } = req.user!;
     res.json(safeUser);
   });
 
