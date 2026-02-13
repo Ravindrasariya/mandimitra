@@ -1,0 +1,426 @@
+import { useState, useEffect } from "react";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { DISTRICTS, CROPS } from "@shared/schema";
+import type { Farmer } from "@shared/schema";
+import { Plus, Trash2, Package, Search } from "lucide-react";
+import { format } from "date-fns";
+
+type LotEntry = {
+  crop: string;
+  variety: string;
+  numberOfBags: string;
+  sampleBagWeight1: string;
+  sampleBagWeight2: string;
+};
+
+export default function StockEntryPage() {
+  const { toast } = useToast();
+  const [farmerSearch, setFarmerSearch] = useState("");
+  const [selectedFarmer, setSelectedFarmer] = useState<Farmer | null>(null);
+  const [showFarmerForm, setShowFarmerForm] = useState(false);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  const [farmerName, setFarmerName] = useState("");
+  const [farmerPhone, setFarmerPhone] = useState("");
+  const [village, setVillage] = useState("");
+  const [tehsil, setTehsil] = useState("");
+  const [district, setDistrict] = useState("");
+  const [state] = useState("Madhya Pradesh");
+  const [entryDate, setEntryDate] = useState(format(new Date(), "yyyy-MM-dd"));
+
+  const [lots, setLots] = useState<LotEntry[]>([
+    { crop: "", variety: "", numberOfBags: "", sampleBagWeight1: "", sampleBagWeight2: "" }
+  ]);
+
+  const { data: farmerSuggestions = [] } = useQuery<Farmer[]>({
+    queryKey: ["/api/farmers", `?search=${farmerSearch}`],
+    enabled: farmerSearch.length >= 2 && !selectedFarmer,
+  });
+
+  const createFarmerMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/farmers", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
+    },
+  });
+
+  const createLotMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/lots", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
+    },
+  });
+
+  const capitalize = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+  const selectFarmer = (farmer: Farmer) => {
+    setSelectedFarmer(farmer);
+    setFarmerName(farmer.name);
+    setFarmerPhone(farmer.phone);
+    setVillage(farmer.village || "");
+    setTehsil(farmer.tehsil || "");
+    setDistrict(farmer.district || "");
+    setFarmerSearch("");
+    setShowSuggestions(false);
+    setShowFarmerForm(true);
+  };
+
+  const addLot = () => {
+    setLots([...lots, { crop: "", variety: "", numberOfBags: "", sampleBagWeight1: "", sampleBagWeight2: "" }]);
+  };
+
+  const removeLot = (index: number) => {
+    if (lots.length === 1) return;
+    setLots(lots.filter((_, i) => i !== index));
+  };
+
+  const updateLot = (index: number, field: keyof LotEntry, value: string) => {
+    const updated = [...lots];
+    updated[index] = { ...updated[index], [field]: value };
+    setLots(updated);
+  };
+
+  const getAvgWeight = (lot: LotEntry) => {
+    const w1 = parseFloat(lot.sampleBagWeight1) || 0;
+    const w2 = parseFloat(lot.sampleBagWeight2) || 0;
+    if (w1 && w2) return ((w1 + w2) / 2).toFixed(2);
+    if (w1) return w1.toFixed(2);
+    if (w2) return w2.toFixed(2);
+    return "0.00";
+  };
+
+  const getEstWeight = (lot: LotEntry) => {
+    const avg = parseFloat(getAvgWeight(lot));
+    const bags = parseInt(lot.numberOfBags) || 0;
+    return (avg * bags).toFixed(2);
+  };
+
+  const handleSubmit = async () => {
+    if (!farmerName || !farmerPhone) {
+      toast({ title: "Error", description: "Farmer name and phone are required", variant: "destructive" });
+      return;
+    }
+
+    const invalidLots = lots.filter(l => !l.crop || !l.numberOfBags);
+    if (invalidLots.length > 0) {
+      toast({ title: "Error", description: "Each lot needs crop and number of bags", variant: "destructive" });
+      return;
+    }
+
+    try {
+      let farmerId = selectedFarmer?.id;
+
+      if (!farmerId) {
+        const farmer = await createFarmerMutation.mutateAsync({
+          name: capitalize(farmerName),
+          phone: farmerPhone,
+          village: capitalize(village),
+          tehsil: capitalize(tehsil),
+          district,
+          state,
+        });
+        farmerId = farmer.id;
+      }
+
+      for (const lot of lots) {
+        await createLotMutation.mutateAsync({
+          farmerId,
+          date: entryDate,
+          crop: lot.crop,
+          variety: lot.variety || null,
+          numberOfBags: parseInt(lot.numberOfBags),
+          sampleBagWeight1: lot.sampleBagWeight1 || null,
+          sampleBagWeight2: lot.sampleBagWeight2 || null,
+        });
+      }
+
+      toast({ title: "Success", description: `${lots.length} lot(s) added to stock register` });
+
+      setSelectedFarmer(null);
+      setFarmerName("");
+      setFarmerPhone("");
+      setVillage("");
+      setTehsil("");
+      setDistrict("");
+      setShowFarmerForm(false);
+      setLots([{ crop: "", variety: "", numberOfBags: "", sampleBagWeight1: "", sampleBagWeight2: "" }]);
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  return (
+    <div className="p-3 md:p-6 max-w-4xl mx-auto space-y-4">
+      <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
+        <Package className="w-6 h-6 text-primary" />
+        Stock Entry
+      </h1>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Farmer Details</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="space-y-2">
+            <Label>Date</Label>
+            <Input
+              type="date"
+              data-testid="input-entry-date"
+              value={entryDate}
+              onChange={(e) => setEntryDate(e.target.value)}
+              className="mobile-touch-target"
+            />
+          </div>
+
+          {!showFarmerForm && (
+            <div className="space-y-2 relative">
+              <Label>Search Farmer (Name, Phone, Village)</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  data-testid="input-farmer-search"
+                  value={farmerSearch}
+                  onChange={(e) => { setFarmerSearch(e.target.value); setShowSuggestions(true); }}
+                  onFocus={() => setShowSuggestions(true)}
+                  placeholder="Start typing farmer name, phone or village..."
+                  className="pl-9 mobile-touch-target"
+                />
+              </div>
+              {showSuggestions && farmerSuggestions.length > 0 && (
+                <div className="absolute z-50 w-full bg-popover border rounded-md shadow-lg max-h-48 overflow-y-auto">
+                  {farmerSuggestions.map((f) => (
+                    <button
+                      key={f.id}
+                      data-testid={`suggestion-farmer-${f.id}`}
+                      className="w-full text-left px-3 py-3 hover-elevate text-sm border-b last:border-b-0"
+                      onClick={() => selectFarmer(f)}
+                    >
+                      <span className="font-medium">{f.name}</span>
+                      <span className="text-muted-foreground"> - {f.phone}</span>
+                      {f.village && <span className="text-muted-foreground"> - {f.village}</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <Button
+                variant="secondary"
+                data-testid="button-new-farmer"
+                className="w-full mobile-touch-target"
+                onClick={() => setShowFarmerForm(true)}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                New Farmer
+              </Button>
+            </div>
+          )}
+
+          {showFarmerForm && (
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>Farmer Name *</Label>
+                  <Input
+                    data-testid="input-farmer-name"
+                    value={farmerName}
+                    onChange={(e) => setFarmerName(e.target.value)}
+                    placeholder="Farmer name"
+                    className="mobile-touch-target capitalize"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Mobile Number *</Label>
+                  <Input
+                    data-testid="input-farmer-phone"
+                    type="tel"
+                    value={farmerPhone}
+                    onChange={(e) => setFarmerPhone(e.target.value)}
+                    placeholder="10-digit mobile"
+                    className="mobile-touch-target"
+                    maxLength={10}
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label>Village</Label>
+                  <Input
+                    data-testid="input-village"
+                    value={village}
+                    onChange={(e) => setVillage(e.target.value)}
+                    placeholder="Village"
+                    className="mobile-touch-target capitalize"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Tehsil</Label>
+                  <Input
+                    data-testid="input-tehsil"
+                    value={tehsil}
+                    onChange={(e) => setTehsil(e.target.value)}
+                    placeholder="Tehsil"
+                    className="mobile-touch-target capitalize"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>District</Label>
+                  <Select value={district} onValueChange={setDistrict}>
+                    <SelectTrigger data-testid="select-district" className="mobile-touch-target">
+                      <SelectValue placeholder="Select district" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DISTRICTS.map((d) => (
+                        <SelectItem key={d} value={d}>{d}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label>State</Label>
+                <Input value={state} disabled className="mobile-touch-target bg-muted" />
+              </div>
+              {selectedFarmer && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => { setSelectedFarmer(null); setShowFarmerForm(false); setFarmerName(""); setFarmerPhone(""); setVillage(""); setTehsil(""); setDistrict(""); }}
+                >
+                  Clear Selection
+                </Button>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <div className="space-y-3">
+        <h2 className="text-base font-semibold">Lot Information</h2>
+        {lots.map((lot, index) => (
+          <Card key={index}>
+            <CardContent className="pt-4 space-y-3">
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-sm font-medium text-muted-foreground">Lot #{index + 1}</span>
+                {lots.length > 1 && (
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    data-testid={`button-remove-lot-${index}`}
+                    onClick={() => removeLot(index)}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                )}
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label>Crop *</Label>
+                  <Select value={lot.crop} onValueChange={(v) => updateLot(index, "crop", v)}>
+                    <SelectTrigger data-testid={`select-crop-${index}`} className="mobile-touch-target">
+                      <SelectValue placeholder="Select crop" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CROPS.map((c) => (
+                        <SelectItem key={c} value={c}>{c}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Variety</Label>
+                  <Input
+                    data-testid={`input-variety-${index}`}
+                    value={lot.variety}
+                    onChange={(e) => updateLot(index, "variety", e.target.value)}
+                    placeholder="Optional"
+                    className="mobile-touch-target"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>No. of Bags *</Label>
+                  <Input
+                    data-testid={`input-bags-${index}`}
+                    type="number"
+                    inputMode="numeric"
+                    value={lot.numberOfBags}
+                    onChange={(e) => updateLot(index, "numberOfBags", e.target.value)}
+                    placeholder="0"
+                    className="mobile-touch-target"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="space-y-1">
+                  <Label>Sample Wt 1 (kg)</Label>
+                  <Input
+                    data-testid={`input-weight1-${index}`}
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    value={lot.sampleBagWeight1}
+                    onChange={(e) => updateLot(index, "sampleBagWeight1", e.target.value)}
+                    placeholder="0.00"
+                    className="mobile-touch-target"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Sample Wt 2 (kg)</Label>
+                  <Input
+                    data-testid={`input-weight2-${index}`}
+                    type="number"
+                    inputMode="decimal"
+                    step="0.01"
+                    value={lot.sampleBagWeight2}
+                    onChange={(e) => updateLot(index, "sampleBagWeight2", e.target.value)}
+                    placeholder="0.00"
+                    className="mobile-touch-target"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Avg Weight</Label>
+                  <Input value={getAvgWeight(lot)} disabled className="mobile-touch-target bg-muted" />
+                </div>
+                <div className="space-y-1">
+                  <Label>Est. Weight (kg)</Label>
+                  <Input value={getEstWeight(lot)} disabled className="mobile-touch-target bg-muted" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <div className="flex flex-col sm:flex-row gap-3">
+        <Button
+          variant="secondary"
+          data-testid="button-add-lot"
+          className="mobile-touch-target"
+          onClick={addLot}
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Add New Lot
+        </Button>
+        <Button
+          data-testid="button-submit-stock"
+          className="mobile-touch-target flex-1 sm:flex-none"
+          onClick={handleSubmit}
+          disabled={createLotMutation.isPending || createFarmerMutation.isPending}
+        >
+          {createLotMutation.isPending ? "Saving..." : "Save to Stock Register"}
+        </Button>
+      </div>
+    </div>
+  );
+}
