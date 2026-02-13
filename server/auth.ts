@@ -29,6 +29,7 @@ declare global {
     interface User {
       id: string;
       username: string;
+      name: string;
       password: string;
       phone: string | null;
       businessId: number;
@@ -70,6 +71,13 @@ export function setupAuth(app: Express): void {
 
         const isValid = await comparePasswords(password, user.password);
         if (!isValid) return done(null, false, { message: "Invalid password" });
+
+        if (user.role !== "system_admin") {
+          const business = await storage.getBusiness(user.businessId);
+          if (!business) return done(null, false, { message: "Business not found" });
+          if (business.status === "inactive") return done(null, false, { message: "Your business account has been deactivated. Please contact the administrator." });
+          if (business.status === "archived") return done(null, false, { message: "Your business account has been archived. Please contact the administrator." });
+        }
 
         return done(null, user as Express.User);
       } catch (err) {
@@ -128,7 +136,11 @@ export function setupAuth(app: Express): void {
     const user = await storage.getUser(req.user!.id);
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    if (!user.mustChangePassword) {
+    if (user.mustChangePassword) {
+      if (phone && phone !== user.phone) {
+        return res.status(400).json({ message: "Mobile number does not match our records" });
+      }
+    } else {
       const isValid = await comparePasswords(currentPassword, user.password);
       if (!isValid) return res.status(400).json({ message: "Current password is incorrect" });
     }
@@ -136,12 +148,29 @@ export function setupAuth(app: Express): void {
     const hashed = await hashPassword(newPassword);
     await storage.updateUserPassword(user.id, hashed);
 
+    if (phone) {
+      await storage.updateUser(user.id, { phone });
+    }
+
     const { password, ...safeUser } = user;
     res.json({ ...safeUser, mustChangePassword: false });
   });
 }
 
-export const requireAuth: RequestHandler = (req, res, next) => {
+export const requireAuth: RequestHandler = async (req, res, next) => {
   if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
+  if (req.user!.role !== "system_admin") {
+    const business = await storage.getBusiness(req.user!.businessId);
+    if (!business || business.status !== "active") {
+      req.logout(() => {});
+      return res.status(403).json({ message: "Your business account has been deactivated or archived. Please contact the administrator." });
+    }
+  }
+  next();
+};
+
+export const requireAdmin: RequestHandler = (req, res, next) => {
+  if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
+  if (req.user!.role !== "system_admin") return res.status(403).json({ message: "Access denied" });
   next();
 };

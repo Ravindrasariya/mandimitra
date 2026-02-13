@@ -5,6 +5,7 @@ import { apiRequest, queryClient, getQueryFn } from "./queryClient";
 type AuthUser = {
   id: string;
   username: string;
+  name: string;
   phone: string | null;
   businessId: number;
   role: string;

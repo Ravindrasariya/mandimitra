@@ -5,17 +5,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Wheat, Lock } from "lucide-react";
+import { Lock } from "lucide-react";
 
 export default function ChangePasswordPage() {
-  const { user, changePassword, logout } = useAuth();
+  const { user, changePassword } = useAuth();
   const { toast } = useToast();
+  const [phone, setPhone] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!phone) {
+      toast({ title: "Error", description: "Please enter your registered mobile number", variant: "destructive" });
+      return;
+    }
     if (newPassword !== confirmPassword) {
       toast({ title: "Error", description: "Passwords do not match", variant: "destructive" });
       return;
@@ -26,7 +31,7 @@ export default function ChangePasswordPage() {
     }
     setLoading(true);
     try {
-      await changePassword("", newPassword);
+      await changePassword("", newPassword, phone);
       toast({ title: "Success", description: "Password changed successfully" });
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -46,11 +51,24 @@ export default function ChangePasswordPage() {
           </div>
           <CardTitle className="text-xl font-bold">Change Password</CardTitle>
           <p className="text-muted-foreground text-sm">
-            Welcome, {user?.username}! Please set a new password for your account.
+            Welcome, {user?.username}! Please verify your mobile number and set a new password.
           </p>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="phone">Registered Mobile Number</Label>
+              <Input
+                id="phone"
+                data-testid="input-phone"
+                type="tel"
+                inputMode="numeric"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="Enter your registered mobile number"
+                className="mobile-touch-target"
+              />
+            </div>
             <div className="space-y-2">
               <Label htmlFor="newPassword">New Password</Label>
               <Input
@@ -79,7 +97,7 @@ export default function ChangePasswordPage() {
               type="submit"
               data-testid="button-change-password"
               className="w-full mobile-touch-target"
-              disabled={loading || !newPassword || !confirmPassword}
+              disabled={loading || !phone || !newPassword || !confirmPassword}
             >
               {loading ? "Changing..." : "Set New Password"}
             </Button>

@@ -10,16 +10,23 @@ import {
   users, businesses, farmers, buyers, lots, bids, transactions, cashEntries,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, ilike, or, sql, desc, asc, gte, lte } from "drizzle-orm";
+import { eq, and, ilike, or, sql, desc, asc, gte, lte, ne } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
   createUser(user: InsertUser): Promise<User>;
   updateUserPassword(id: string, password: string): Promise<void>;
+  updateUser(id: string, data: Partial<InsertUser>): Promise<User | undefined>;
+  deleteUser(id: string): Promise<void>;
+  getAllUsers(): Promise<(User & { business: Business })[]>;
 
   createBusiness(business: InsertBusiness): Promise<Business>;
   getBusiness(id: number): Promise<Business | undefined>;
+  getAllBusinesses(): Promise<Business[]>;
+  updateBusiness(id: number, data: Partial<InsertBusiness>): Promise<Business | undefined>;
+  getNextMerchantId(): Promise<string>;
+  resetBusinessData(businessId: number): Promise<void>;
 
   getFarmers(businessId: number, search?: string): Promise<Farmer[]>;
   getFarmer(id: number, businessId: number): Promise<Farmer | undefined>;
@@ -75,6 +82,25 @@ export class DatabaseStorage implements IStorage {
     await db.update(users).set({ password, mustChangePassword: false }).where(eq(users.id, id));
   }
 
+  async updateUser(id: string, data: Partial<InsertUser>): Promise<User | undefined> {
+    const [updated] = await db.update(users).set(data).where(eq(users.id, id)).returning();
+    return updated;
+  }
+
+  async deleteUser(id: string): Promise<void> {
+    await db.delete(users).where(eq(users.id, id));
+  }
+
+  async getAllUsers(): Promise<(User & { business: Business })[]> {
+    const results = await db.select({
+      user: users,
+      business: businesses,
+    }).from(users)
+      .innerJoin(businesses, eq(users.businessId, businesses.id))
+      .orderBy(asc(users.username));
+    return results.map(r => ({ ...r.user, business: r.business }));
+  }
+
   async createBusiness(business: InsertBusiness): Promise<Business> {
     const [created] = await db.insert(businesses).values(business).returning();
     return created;
@@ -83,6 +109,37 @@ export class DatabaseStorage implements IStorage {
   async getBusiness(id: number): Promise<Business | undefined> {
     const [biz] = await db.select().from(businesses).where(eq(businesses.id, id));
     return biz;
+  }
+
+  async getAllBusinesses(): Promise<Business[]> {
+    return db.select().from(businesses).orderBy(desc(businesses.createdAt));
+  }
+
+  async updateBusiness(id: number, data: Partial<InsertBusiness>): Promise<Business | undefined> {
+    const [updated] = await db.update(businesses).set(data).where(eq(businesses.id, id)).returning();
+    return updated;
+  }
+
+  async getNextMerchantId(): Promise<string> {
+    const today = new Date();
+    const dateStr = today.getFullYear().toString() +
+      (today.getMonth() + 1).toString().padStart(2, "0") +
+      today.getDate().toString().padStart(2, "0");
+    const prefix = `BU${dateStr}`;
+    const [result] = await db.select({ count: sql<string>`count(*)` })
+      .from(businesses)
+      .where(ilike(businesses.merchantId, `${prefix}%`));
+    const seq = parseInt(result?.count || "0", 10) + 1;
+    return `${prefix}${seq}`;
+  }
+
+  async resetBusinessData(businessId: number): Promise<void> {
+    await db.delete(cashEntries).where(eq(cashEntries.businessId, businessId));
+    await db.delete(transactions).where(eq(transactions.businessId, businessId));
+    await db.delete(bids).where(eq(bids.businessId, businessId));
+    await db.delete(lots).where(eq(lots.businessId, businessId));
+    await db.delete(farmers).where(eq(farmers.businessId, businessId));
+    await db.delete(buyers).where(eq(buyers.businessId, businessId));
   }
 
   async getFarmers(businessId: number, search?: string): Promise<Farmer[]> {
@@ -196,17 +253,17 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getNextSerialNumber(businessId: number, crop: string, date: string): Promise<number> {
-    const [result] = await db.select({ max: sql<number>`coalesce(max(${lots.serialNumber}), 0)` })
+    const [result] = await db.select({ max: sql<string>`coalesce(max(${lots.serialNumber}), 0)` })
       .from(lots)
       .where(and(eq(lots.businessId, businessId), eq(lots.crop, crop), eq(lots.date, date)));
-    return (result?.max || 0) + 1;
+    return parseInt(result?.max || "0", 10) + 1;
   }
 
   async getNextLotNumber(businessId: number, date: string): Promise<number> {
-    const [result] = await db.select({ count: sql<number>`count(*)` })
+    const [result] = await db.select({ count: sql<string>`count(*)` })
       .from(lots)
       .where(and(eq(lots.businessId, businessId), eq(lots.date, date)));
-    return (result?.count || 0) + 1;
+    return parseInt(result?.count || "0", 10) + 1;
   }
 
   async getBids(businessId: number, lotId?: number): Promise<(Bid & { buyer: Buyer; lot: Lot })[]> {

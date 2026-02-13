@@ -1,7 +1,7 @@
 # Mandi Mitra - Agricultural Marketplace Manager
 
 ## Overview
-Mandi Mitra is a multi-tenant agricultural commodity trading management system that handles end-to-end processes from stock entry to billing. It covers farmer onboarding, lot management, bidding, transactions, cash management, and ledger tracking.
+Mandi Mitra is a multi-tenant agricultural commodity trading management system that handles end-to-end processes from stock entry to billing. It covers farmer onboarding, lot management, bidding, transactions, cash management, and ledger tracking. The system admin (app owner) can onboard businesses and users through an Admin Panel.
 
 ## Architecture
 - **Frontend**: React + TypeScript with Tailwind CSS and Shadcn UI components
@@ -9,14 +9,24 @@ Mandi Mitra is a multi-tenant agricultural commodity trading management system t
 - **Database**: PostgreSQL with Drizzle ORM
 - **Multi-Tenant**: Data isolation via `businessId` foreign key on all tables
 
+## User Roles
+- **system_admin**: App owner, accesses Admin Panel to manage businesses and users
+- **user**: Business user, accesses Mandi Mitra trading app (stock entry, bidding, etc.)
+
 ## Key Features
-1. **Stock Entry** - Register farmers and create lots with auto-generated Lot IDs (POT/ONI/GAR prefix + YYYYMMDD + sequence)
-2. **Stock Register** - View all lots with card layout, crop toggle, search/filter, edit capability
-3. **Bidding** - Multiple buyers can bid on available lots, grade selection (Large/Medium, Small, Chhatan)
-4. **Transactions** - Calculate net weight, commissions (aadhat + mandi), payable/receivable amounts
-5. **Cash Management** - Track Cash In (from buyers) and Cash Out (to farmers) with payment modes
-6. **Farmer Ledger** - Opening balance, transactions, payments, current dues
-7. **Buyer Ledger** - Same structure for buyer tracking
+1. **Admin Panel** - System admin manages merchants (businesses) and users
+   - Merchants: Add, edit, activate/deactivate, archive, reset (wipe user data)
+   - Users: Add, edit, reset password, delete
+   - Business status controls: inactive/archived prevents user login
+   - Merchant ID format: BU + YYYYMMDD + sequence (e.g., BU202602131)
+   - Default user password: password123
+2. **Stock Entry** - Register farmers and create lots with auto-generated Lot IDs (POT/ONI/GAR prefix + YYYYMMDD + sequence)
+3. **Stock Register** - View all lots with card layout, crop toggle, search/filter, edit capability
+4. **Bidding** - Multiple buyers can bid on available lots, grade selection (Large/Medium, Small, Chhatan)
+5. **Transactions** - Calculate net weight, commissions (aadhat + mandi), payable/receivable amounts
+6. **Cash Management** - Track Cash In (from buyers) and Cash Out (to farmers) with payment modes
+7. **Farmer Ledger** - Opening balance, transactions, payments, current dues
+8. **Buyer Ledger** - Same structure for buyer tracking
 
 ## Project Structure
 ```
@@ -24,15 +34,16 @@ shared/schema.ts       - Database schema, types, and validation schemas
 server/
   index.ts             - Express server setup
   db.ts                - PostgreSQL connection pool
-  auth.ts              - Passport.js authentication setup
-  routes.ts            - All API routes
+  auth.ts              - Passport.js authentication (requireAuth, requireAdmin)
+  routes.ts            - All API routes (admin + user)
   storage.ts           - Database storage interface
 client/src/
   App.tsx              - Main app with routing and responsive layout
   lib/auth.tsx         - Auth context provider
   pages/
     login.tsx          - Login page
-    change-password.tsx - First-time password change
+    change-password.tsx - First-time password change (requires mobile + new password)
+    admin.tsx          - Admin panel (merchants + users tabs)
     stock-entry.tsx    - Stock entry form
     stock-register.tsx - Stock register view
     bidding.tsx        - Bidding interface
@@ -44,9 +55,11 @@ client/src/
 
 ## Authentication
 - Session-based auth with PostgreSQL session store
-- Default admin: username `admin`, password `admin123`
-- Forced password change on first login
-- Multi-tenant: each user belongs to a business
+- System admin: username `admin`, password `admin123`
+- New users: default password `password123`, must change on first login
+- Change password requires registered mobile number verification
+- Business status (active/inactive/archived) checked on every request
+- Inactive/archived business blocks user login and ongoing sessions
 
 ## Mobile-First Design
 - Bottom navigation on mobile/tablet (< 768px)
@@ -58,6 +71,8 @@ client/src/
 - PostgreSQL with Drizzle ORM
 - Schema push: `npm run db:push`
 - Tables: businesses, users, farmers, buyers, lots, bids, transactions, cash_entries
+- Business fields: merchantId (unique), name, phone, address, status (active/inactive/archived)
+- User fields: username, name, phone, password, businessId, role (system_admin/user), mustChangePassword
 
 ## Running
 - `npm run dev` starts both Express backend and Vite frontend on port 5000
@@ -67,3 +82,10 @@ Agar Malwa, Dewas, Dhar, Indore, Jhabua, Khargoan, Mandsaur, Neemuch, Rajgarh, R
 
 ## Crops Supported
 Garlic, Onion, Potato
+
+## Admin Actions
+- **Toggle Status**: Activate/deactivate business (requires admin password)
+- **Archive**: Archive/reinstate business (requires admin password)
+- **Reset**: Wipe all user-entered data for a business (requires admin password entered twice). Preserves business and user accounts.
+- **Reset Password**: Reset user password to default (password123)
+- **Delete User**: Remove user account (cannot delete system admin)

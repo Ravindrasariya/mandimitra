@@ -8,6 +8,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import NotFound from "@/pages/not-found";
 import LoginPage from "@/pages/login";
 import ChangePasswordPage from "@/pages/change-password";
+import AdminPage from "@/pages/admin";
 import StockEntryPage from "@/pages/stock-entry";
 import StockRegisterPage from "@/pages/stock-register";
 import BiddingPage from "@/pages/bidding";
@@ -211,6 +212,7 @@ function AuthGate() {
 
   if (!user) return <LoginPage />;
   if (user.mustChangePassword) return <ChangePasswordPage />;
+  if (user.role === "system_admin") return <AdminPage />;
   return <AppLayout />;
 }
 
