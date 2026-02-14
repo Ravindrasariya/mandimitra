@@ -14,7 +14,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { Bid, Buyer, Lot, Farmer, Transaction } from "@shared/schema";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Receipt, Pencil, Printer, ChevronDown } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Receipt, Pencil, Printer, ChevronDown, Calendar } from "lucide-react";
 import { format } from "date-fns";
 
 type BidWithDetails = Bid & { buyer: Buyer; lot: Lot; farmer: Farmer };
@@ -167,10 +169,15 @@ export default function TransactionsPage() {
   const [reverseConfirmOpen, setReverseConfirmOpen] = useState(false);
   const [reversingTxn, setReversingTxn] = useState<TransactionWithDetails | null>(null);
   const now = new Date();
-  const [yearFilter, setYearFilter] = usePersistedState("txn-yearFilter", String(now.getFullYear()));
-  const [monthFilter, setMonthFilter] = usePersistedState("txn-monthFilter", String(now.getMonth() + 1));
-  const [dayFilter, setDayFilter] = usePersistedState("txn-dayFilter", "all");
+  const currentYear = String(now.getFullYear());
+  const currentMonth = String(now.getMonth() + 1);
+  const currentDay = String(now.getDate());
+  const [yearFilter, setYearFilter] = usePersistedState("txn-yearFilter", currentYear);
+  const [selectedMonths, setSelectedMonths] = usePersistedState<string[]>("txn-selectedMonths", [currentMonth]);
+  const [selectedDays, setSelectedDays] = usePersistedState<string[]>("txn-selectedDays", [currentDay]);
   const [cropFilter, setCropFilter] = usePersistedState("txn-cropFilter", "all");
+  const [monthPopoverOpen, setMonthPopoverOpen] = useState(false);
+  const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
 
   const [totalWeight, setTotalWeight] = useState("");
   const [hammaliPerBag, setHammaliPerBag] = useState("0");
@@ -250,16 +257,62 @@ export default function TransactionsPage() {
     [pendingBids, txns]
   );
 
+  const MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+  const daysInMonths = useMemo(() => {
+    if (selectedMonths.length === 0) return 31;
+    const year = parseInt(yearFilter);
+    return Math.max(...selectedMonths.map(m => new Date(year, parseInt(m), 0).getDate()));
+  }, [selectedMonths, yearFilter]);
+
+  const toggleMonth = (month: string) => {
+    setSelectedMonths(prev => prev.includes(month) ? prev.filter(m => m !== month) : [...prev, month]);
+    setSelectedDays([]);
+  };
+
+  const selectAllMonths = () => {
+    setSelectedMonths([]);
+    setSelectedDays([]);
+    setMonthPopoverOpen(false);
+  };
+
+  const toggleDay = (day: string) => {
+    setSelectedDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
+  };
+
+  const selectAllDays = () => {
+    setSelectedDays([]);
+    setDayPopoverOpen(false);
+  };
+
+  const monthLabel = selectedMonths.length === 0
+    ? t("stockRegister.allMonths")
+    : selectedMonths.length === 1
+      ? MONTH_LABELS[parseInt(selectedMonths[0]) - 1]
+      : `${selectedMonths.length} ${t("stockRegister.nMonths")}`;
+
+  const dayLabel = selectedDays.length === 0
+    ? t("stockRegister.allDays")
+    : selectedDays.length === 1
+      ? selectedDays[0]
+      : `${selectedDays.length} ${t("stockRegister.nDays")}`;
+
   const filteredGroups = useMemo(() => {
     return unifiedGroups.filter(g => {
       if (cropFilter !== "all" && g.lot.crop !== cropFilter) return false;
       const lotDate = new Date(g.lot.createdAt);
       if (lotDate.getFullYear() !== parseInt(yearFilter)) return false;
-      if (monthFilter !== "all" && lotDate.getMonth() + 1 !== parseInt(monthFilter)) return false;
-      if (dayFilter !== "all" && lotDate.getDate() !== parseInt(dayFilter)) return false;
+      if (selectedMonths.length > 0) {
+        const lotMonth = String(lotDate.getMonth() + 1);
+        if (!selectedMonths.includes(lotMonth)) return false;
+      }
+      if (selectedDays.length > 0) {
+        const lotDay = String(lotDate.getDate());
+        if (!selectedDays.includes(lotDay)) return false;
+      }
       return true;
     });
-  }, [unifiedGroups, cropFilter, yearFilter, monthFilter, dayFilter]);
+  }, [unifiedGroups, cropFilter, yearFilter, selectedMonths, selectedDays]);
 
   const bidForTxn = (tx: TransactionWithDetails): BidWithDetails => {
     const found = allBids.find(b => b.id === tx.bidId);
@@ -401,38 +454,6 @@ export default function TransactionsPage() {
           <Receipt className="w-5 h-5 text-primary" />
           {t("transactions.title")}
         </h1>
-        <Select value={yearFilter} onValueChange={(v) => { setYearFilter(v); setDayFilter("all"); }}>
-          <SelectTrigger className="w-[85px]" data-testid="select-year-filter">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {Array.from({ length: 5 }, (_, i) => String(now.getFullYear() - i)).map(y => (
-              <SelectItem key={y} value={y}>{y}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={monthFilter} onValueChange={(v) => { setMonthFilter(v); setDayFilter("all"); }}>
-          <SelectTrigger className="w-[100px]" data-testid="select-month-filter">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("transactions.allMonths")}</SelectItem>
-            {["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"].map((m, i) => (
-              <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select value={dayFilter} onValueChange={setDayFilter}>
-          <SelectTrigger className="w-[90px]" data-testid="select-day-filter">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("transactions.allDays")}</SelectItem>
-            {Array.from({ length: new Date(parseInt(yearFilter), parseInt(monthFilter), 0).getDate() }, (_, i) => String(i + 1)).map(d => (
-              <SelectItem key={d} value={d}>{d}</SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
         <Select value={cropFilter} onValueChange={setCropFilter}>
           <SelectTrigger className="w-[110px]" data-testid="select-crop-filter">
             <SelectValue />
@@ -444,6 +465,80 @@ export default function TransactionsPage() {
             <SelectItem value="Garlic">Garlic</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={yearFilter} onValueChange={(v) => { setYearFilter(v); setSelectedDays([]); }}>
+          <SelectTrigger className="w-[85px]" data-testid="select-year-filter">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {Array.from({ length: 5 }, (_, i) => String(now.getFullYear() - i)).map(y => (
+              <SelectItem key={y} value={y}>{y}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Popover open={monthPopoverOpen} onOpenChange={setMonthPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="h-8 text-xs min-w-[65px] justify-between px-2 shrink-0" data-testid="select-month-filter">
+              {monthLabel}
+              <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56 p-2" align="end">
+            <button
+              className="flex items-center gap-2 px-2 py-1.5 rounded text-sm w-full text-left border-b mb-1"
+              data-testid="month-select-all"
+              onClick={selectAllMonths}
+            >
+              <Checkbox checked={selectedMonths.length === 0} />
+              <span>{t("stockRegister.allMonths")}</span>
+            </button>
+            <div className="grid grid-cols-4 gap-0.5">
+              {MONTH_LABELS.map((m, i) => {
+                const val = String(i + 1);
+                return (
+                  <button
+                    key={val}
+                    className={`flex items-center justify-center rounded text-xs p-1.5 ${selectedMonths.includes(val) ? "bg-primary text-primary-foreground" : ""}`}
+                    data-testid={`month-option-${val}`}
+                    onClick={() => toggleMonth(val)}
+                  >
+                    {m}
+                  </button>
+                );
+              })}
+            </div>
+          </PopoverContent>
+        </Popover>
+        <Popover open={dayPopoverOpen} onOpenChange={setDayPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="h-8 text-xs min-w-[65px] justify-between px-2 shrink-0" data-testid="select-day-filter">
+              <Calendar className="w-3 h-3 mr-1" />
+              {dayLabel}
+              <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56 p-2" align="end">
+            <button
+              className="flex items-center gap-2 px-2 py-1.5 rounded text-sm w-full text-left border-b mb-1"
+              data-testid="day-select-all"
+              onClick={selectAllDays}
+            >
+              <Checkbox checked={selectedDays.length === 0} />
+              <span>{t("stockRegister.allDays")}</span>
+            </button>
+            <div className="grid grid-cols-7 gap-0.5">
+              {Array.from({ length: daysInMonths }, (_, i) => String(i + 1)).map(d => (
+                <button
+                  key={d}
+                  className={`flex items-center justify-center rounded text-xs p-1.5 ${selectedDays.includes(d) ? "bg-primary text-primary-foreground" : ""}`}
+                  data-testid={`day-option-${d}`}
+                  onClick={() => toggleDay(d)}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
 
       {filteredGroups.length > 0 ? (
