@@ -228,7 +228,7 @@ export default function TransactionsPage() {
       if (cropFilter !== "all" && g.lot.crop !== cropFilter) return false;
       const lotDate = new Date(g.lot.createdAt);
       if (lotDate.getFullYear() !== parseInt(yearFilter)) return false;
-      if (lotDate.getMonth() + 1 !== parseInt(monthFilter)) return false;
+      if (monthFilter !== "all" && lotDate.getMonth() + 1 !== parseInt(monthFilter)) return false;
       if (dayFilter !== "all" && lotDate.getDate() !== parseInt(dayFilter)) return false;
       return true;
     });
@@ -388,6 +388,7 @@ export default function TransactionsPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="all">All Months</SelectItem>
             {["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"].map((m, i) => (
               <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
             ))}
