@@ -611,6 +611,7 @@ export default function TransactionsPage() {
                     inputMode="decimal"
                     value={totalWeight}
                     onChange={(e) => setTotalWeight(e.target.value)}
+                    onFocus={(e) => e.target.select()}
                     placeholder="0.00"
                     className="mobile-touch-target"
                   />
@@ -631,6 +632,7 @@ export default function TransactionsPage() {
                     inputMode="decimal"
                     value={hammaliPerBag}
                     onChange={(e) => setHammaliPerBag(e.target.value)}
+                    onFocus={(e) => e.target.select()}
                     className="mobile-touch-target"
                   />
                   <p className="text-xs text-muted-foreground">Total: Rs.{totalHammali.toFixed(2)} ({bags} bags)</p>
@@ -643,6 +645,7 @@ export default function TransactionsPage() {
                     inputMode="decimal"
                     value={gradingCharges}
                     onChange={(e) => setGradingCharges(e.target.value)}
+                    onFocus={(e) => e.target.select()}
                     className="mobile-touch-target"
                   />
                 </div>
@@ -657,6 +660,7 @@ export default function TransactionsPage() {
                     inputMode="decimal"
                     value={aadhatPercent}
                     onChange={(e) => setAadhatPercent(e.target.value)}
+                    onFocus={(e) => e.target.select()}
                     className="mobile-touch-target"
                   />
                 </div>
@@ -668,6 +672,7 @@ export default function TransactionsPage() {
                     inputMode="decimal"
                     value={mandiPercent}
                     onChange={(e) => setMandiPercent(e.target.value)}
+                    onFocus={(e) => e.target.select()}
                     className="mobile-touch-target"
                   />
                 </div>
