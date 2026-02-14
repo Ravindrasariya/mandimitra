@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, decimal, boolean, date, timestamp, serial } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, decimal, boolean, date, timestamp, serial, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -40,7 +40,9 @@ export const farmers = pgTable("farmers", {
   negativeFlag: boolean("negative_flag").notNull().default(false),
   isArchived: boolean("is_archived").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  uniqueFarmerPerBusiness: uniqueIndex("farmers_business_farmer_id_unique").on(table.businessId, table.farmerId),
+}));
 
 export const buyers = pgTable("buyers", {
   id: serial("id").primaryKey(),
@@ -54,7 +56,9 @@ export const buyers = pgTable("buyers", {
   isActive: boolean("is_active").notNull().default(true),
   openingBalance: decimal("opening_balance", { precision: 12, scale: 2 }).default("0"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  uniqueBuyerPerBusiness: uniqueIndex("buyers_business_buyer_id_unique").on(table.businessId, table.buyerId),
+}));
 
 export const farmerEditHistory = pgTable("farmer_edit_history", {
   id: serial("id").primaryKey(),
@@ -96,7 +100,9 @@ export const lots = pgTable("lots", {
   initialTotalWeight: decimal("initial_total_weight", { precision: 12, scale: 2 }),
   isReturned: boolean("is_returned").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  uniqueLotPerBusiness: uniqueIndex("lots_business_lot_id_unique").on(table.businessId, table.lotId),
+}));
 
 export const bids = pgTable("bids", {
   id: serial("id").primaryKey(),
@@ -134,7 +140,9 @@ export const transactions = pgTable("transactions", {
   date: date("date"),
   isReversed: boolean("is_reversed").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  uniqueTransactionPerBusiness: uniqueIndex("transactions_business_transaction_id_unique").on(table.businessId, table.transactionId),
+}));
 
 export const bankAccounts = pgTable("bank_accounts", {
   id: serial("id").primaryKey(),
@@ -173,7 +181,9 @@ export const cashEntries = pgTable("cash_entries", {
   isReversed: boolean("is_reversed").default(false).notNull(),
   reversedAt: timestamp("reversed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  uniqueCashFlowPerBusiness: uniqueIndex("cash_entries_business_cash_flow_id_unique").on(table.businessId, table.cashFlowId),
+}));
 
 export const insertBusinessSchema = createInsertSchema(businesses).omit({ id: true, createdAt: true });
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
