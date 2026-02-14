@@ -21,7 +21,12 @@ Mandi Mitra is a multi-tenant agricultural commodity trading management system t
    - Merchant ID format: BU + YYYYMMDD + sequence (e.g., BU202602131)
    - Default user password: password123
 2. **Stock Entry** - Register farmers and create lots with auto-generated Lot IDs (POT/ONI/GAR prefix + YYYYMMDD + sequence)
-3. **Stock Register** - View all lots with card layout, crop toggle, search/filter, edit capability
+3. **Stock Register** - View all lots with card layout, advanced filters:
+   - Row 1: Crop toggles (left) + Year dropdown + Month multi-select (right)
+   - Row 2: Farmer autocomplete search (left) + Day multi-select grid (right) + Clear Filters
+   - Farmer search shows suggestions from farmer ledger (name, phone, village)
+   - Month/Day support multi-select; defaults: current year/month/day
+   - Edit lot capability with dialog
 4. **Bidding** - Multiple buyers can bid on available lots, grade selection (Large/Medium, Small, Chhatan)
 5. **Transactions** - Calculate net weight, commissions (aadhat + mandi), payable/receivable amounts
 6. **Cash Management** - Track Cash In (from buyers) and Cash Out (to farmers) with payment modes
