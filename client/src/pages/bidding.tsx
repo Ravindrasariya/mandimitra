@@ -133,33 +133,33 @@ export default function BiddingPage() {
         {t("bidding.title")}
       </h1>
 
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {CROPS.map((crop) => (
-          <Button
-            key={crop}
-            variant={activeCrop === crop ? "default" : "secondary"}
-            data-testid={`toggle-bid-crop-${crop.toLowerCase()}`}
-            className="mobile-touch-target whitespace-nowrap"
-            onClick={() => setActiveCrop(crop)}
-          >
-            {crop}
-          </Button>
-        ))}
-      </div>
-
-      <div className="flex gap-2 overflow-x-auto pb-1">
-        {SIZES.map((size) => (
-          <Button
-            key={size}
-            variant={activeGrade === size ? "default" : "secondary"}
-            size="sm"
-            data-testid={`toggle-size-${size.toLowerCase()}`}
-            className="mobile-touch-target whitespace-nowrap"
-            onClick={() => setActiveGrade(size)}
-          >
-            {size}
-          </Button>
-        ))}
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {SIZES.map((size) => (
+            <Button
+              key={size}
+              variant={activeGrade === size ? "default" : "secondary"}
+              size="sm"
+              data-testid={`toggle-size-${size.toLowerCase()}`}
+              className="mobile-touch-target whitespace-nowrap"
+              onClick={() => setActiveGrade(size)}
+            >
+              {size}
+            </Button>
+          ))}
+        </div>
+        <Select value={activeCrop} onValueChange={setActiveCrop}>
+          <SelectTrigger data-testid="select-bid-crop" className="w-[130px] mobile-touch-target flex-shrink-0">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {CROPS.map((crop) => (
+              <SelectItem key={crop} value={crop} data-testid={`toggle-bid-crop-${crop.toLowerCase()}`}>
+                {crop}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {isLoading ? (
