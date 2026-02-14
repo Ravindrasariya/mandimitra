@@ -665,5 +665,46 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/dashboard", requireAuth, async (req, res) => {
+    try {
+      const businessId = req.user!.businessId;
+      const business = await storage.getBusiness(businessId);
+
+      const allLots = await storage.getLots(businessId);
+      const allTxns = await storage.getTransactions(businessId);
+      const farmersWithDues = await storage.getFarmersWithDues(businessId);
+      const buyersWithDues = await storage.getBuyersWithDues(businessId);
+
+      res.json({
+        businessName: business?.name || "Mandi Mitra",
+        lots: allLots.map(l => ({
+          id: l.id, lotId: l.lotId, crop: l.crop, date: l.date,
+          numberOfBags: l.numberOfBags, remainingBags: l.remainingBags,
+          farmerId: l.farmerId, farmerName: l.farmer.name,
+          initialTotalWeight: l.initialTotalWeight,
+        })),
+        transactions: allTxns.map(t => ({
+          id: t.id, transactionId: t.transactionId, date: t.date,
+          crop: t.lot.crop, lotId: t.lot.lotId,
+          farmerId: t.farmerId, farmerName: t.farmer.name,
+          buyerId: t.buyerId, buyerName: t.buyer.name,
+          totalPayableToFarmer: t.totalPayableToFarmer,
+          totalReceivableFromBuyer: t.totalReceivableFromBuyer,
+          mandiCharges: t.mandiCharges, aadhatCharges: t.aadhatCharges,
+          netWeight: t.netWeight, numberOfBags: t.numberOfBags,
+          isReversed: t.isReversed,
+        })),
+        farmersWithDues: farmersWithDues.map(f => ({
+          id: f.id, name: f.name, totalPayable: f.totalPayable, totalDue: f.totalDue,
+        })),
+        buyersWithDues: buyersWithDues.map(b => ({
+          id: b.id, name: b.name, receivableDue: b.receivableDue, overallDue: b.overallDue,
+        })),
+      });
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
   return httpServer;
 }

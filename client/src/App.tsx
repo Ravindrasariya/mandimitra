@@ -10,6 +10,7 @@ import NotFound from "@/pages/not-found";
 import LoginPage from "@/pages/login";
 import ChangePasswordPage from "@/pages/change-password";
 import AdminPage from "@/pages/admin";
+import DashboardPage from "@/pages/dashboard";
 import StockEntryPage from "@/pages/stock-entry";
 import StockRegisterPage from "@/pages/stock-register";
 import BiddingPage from "@/pages/bidding";
@@ -18,14 +19,15 @@ import CashPage from "@/pages/cash";
 import FarmerLedgerPage from "@/pages/farmer-ledger";
 import BuyerLedgerPage from "@/pages/buyer-ledger";
 import {
-  Package, ClipboardList, Gavel, Receipt, Wallet, Users, ShoppingBag, LogOut, Wheat, Menu, ChevronLeft, ChevronRight, Globe,
+  LayoutDashboard, Package, ClipboardList, Gavel, Receipt, Wallet, Users, ShoppingBag, LogOut, Wheat, Menu, ChevronLeft, ChevronRight, Globe,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 const navItems = [
-  { path: "/", labelKey: "nav.stockEntry", icon: Package, shortLabelKey: "nav.entry", testId: "entry" },
+  { path: "/", labelKey: "nav.dashboard", icon: LayoutDashboard, shortLabelKey: "nav.dash", testId: "dashboard" },
+  { path: "/stock-entry", labelKey: "nav.stockEntry", icon: Package, shortLabelKey: "nav.entry", testId: "entry" },
   { path: "/register", labelKey: "nav.stockRegister", icon: ClipboardList, shortLabelKey: "nav.register", testId: "register" },
   { path: "/bidding", labelKey: "nav.bidding", icon: Gavel, shortLabelKey: "nav.bidding", testId: "bidding" },
   { path: "/transactions", labelKey: "nav.transactions", icon: Receipt, shortLabelKey: "nav.txns", testId: "txns" },
@@ -212,7 +214,8 @@ function AppLayout() {
         <MobileHeader />
         <main className={`flex-1 overflow-y-auto ${isMobile ? "pb-20" : ""}`}>
           <Switch>
-            <Route path="/" component={StockEntryPage} />
+            <Route path="/" component={DashboardPage} />
+            <Route path="/stock-entry" component={StockEntryPage} />
             <Route path="/register" component={StockRegisterPage} />
             <Route path="/bidding" component={BiddingPage} />
             <Route path="/transactions" component={TransactionsPage} />

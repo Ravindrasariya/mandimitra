@@ -7,6 +7,8 @@ const translations: Record<string, Record<Language, string>> = {
   "app.tagline": { en: "Agricultural Marketplace Manager", hi: "कृषि बाज़ार प्रबंधक" },
   "app.loading": { en: "Loading...", hi: "लोड हो रहा है..." },
 
+  "nav.dashboard": { en: "Dashboard", hi: "डैशबोर्ड" },
+  "nav.dash": { en: "Dash", hi: "डैश" },
   "nav.stockEntry": { en: "Stock Entry", hi: "स्टॉक एंट्री" },
   "nav.stockRegister": { en: "Stock Register", hi: "स्टॉक रजिस्टर" },
   "nav.bidding": { en: "Bidding", hi: "बोली" },

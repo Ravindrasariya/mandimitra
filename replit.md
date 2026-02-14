@@ -14,7 +14,8 @@ Mandi Mitra is a multi-tenant agricultural commodity trading management system t
 - **user**: Business user, accesses Mandi Mitra trading app (stock entry, bidding, etc.)
 
 ## Key Features
-1. **Admin Panel** - System admin manages merchants (businesses) and users
+1. **Dashboard** - Business overview with summary cards, pie charts (receivables by crop, buyer dues), line charts (farmer dues, buyer dues, avg volume, aadhat value by date), multi-select filters (crop, year, month, day)
+2. **Admin Panel** - System admin manages merchants (businesses) and users
    - Merchants: Add, edit, activate/deactivate, archive, reset (wipe user data)
    - Users: Add, edit, reset password, delete
    - Business status controls: inactive/archived prevents user login
@@ -49,6 +50,7 @@ client/src/
     login.tsx          - Login page
     change-password.tsx - First-time password change (requires mobile + new password)
     admin.tsx          - Admin panel (merchants + users tabs)
+    dashboard.tsx      - Dashboard with charts and summary
     stock-entry.tsx    - Stock entry form
     stock-register.tsx - Stock register view
     bidding.tsx        - Bidding interface
