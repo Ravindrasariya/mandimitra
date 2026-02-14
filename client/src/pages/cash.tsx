@@ -17,7 +17,7 @@ import { Wallet, Settings, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Download
 import { format } from "date-fns";
 
 type BuyerWithDues = Buyer & { receivableDue: string; overallDue: string };
-type FarmerWithDues = Farmer & { totalDue: number };
+type FarmerWithDues = Farmer & { totalPayable: string; totalDue: string; salesCount: number };
 type TransactionAggregates = {
   totalHammali: number; totalGrading: number; totalMandiCommission: number;
   paidHammali: number; paidGrading: number; paidMandiCommission: number;
@@ -103,17 +103,7 @@ export default function CashPage() {
   const { data: cashSettingsData } = useQuery<{ cashInHandOpening: string }>({ queryKey: ["/api/cash-settings"] });
   const { data: txAggregates } = useQuery<TransactionAggregates>({ queryKey: ["/api/transaction-aggregates"] });
 
-  const farmersWithDues: FarmerWithDues[] = useMemo(() => {
-    return farmers.map(f => {
-      const opening = parseFloat(f.openingBalance || "0");
-      const farmerTxEntries = allEntries.filter(e => e.farmerId === f.id && !e.isReversed);
-      const totalPaid = farmerTxEntries.reduce((sum, e) => {
-        if (e.category === "outward") return sum + parseFloat(e.amount || "0");
-        return sum;
-      }, 0);
-      return { ...f, totalDue: opening - totalPaid };
-    });
-  }, [farmers, allEntries]);
+  const { data: farmersWithDues = [] } = useQuery<FarmerWithDues[]>({ queryKey: ["/api/farmers-with-dues"] });
 
   const hasBankAccounts = bankAccountsList.length > 0;
 
@@ -214,6 +204,7 @@ export default function CashPage() {
       return typeof key === "string" && key.startsWith("/api/cash-entries");
     }});
     queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
     queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"] });
     queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
   };
@@ -702,11 +693,6 @@ export default function CashPage() {
                           {b.name} - Due: ₹{parseFloat(b.overallDue).toLocaleString("en-IN")}
                         </SelectItem>
                       ))}
-                      {buyersWithDues.filter(b => parseFloat(b.overallDue) <= 0).map(b => (
-                        <SelectItem key={b.id} value={b.id.toString()}>
-                          {b.name} (No dues)
-                        </SelectItem>
-                      ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -779,7 +765,7 @@ export default function CashPage() {
                     {outwardFarmerId ? (
                       <div className="h-9 text-sm rounded-md border border-input bg-background px-3 flex items-center gap-2">
                         <span className="truncate flex-1">
-                          {(() => { const f = farmersWithDues.find(f => f.id === parseInt(outwardFarmerId)); return f ? `${f.name} - Due: ₹${f.totalDue.toLocaleString("en-IN")}` : ""; })()}
+                          {(() => { const f = farmersWithDues.find(f => f.id === parseInt(outwardFarmerId)); return f ? `${f.name} - Due: ₹${parseFloat(f.totalDue).toLocaleString("en-IN")}` : ""; })()}
                         </span>
                         <button onClick={() => { setOutwardFarmerId(""); setOutwardFarmerSearch(""); }} className="shrink-0" data-testid="button-clear-outward-farmer"><X className="w-3.5 h-3.5" /></button>
                       </div>
@@ -797,18 +783,26 @@ export default function CashPage() {
                         />
                         {outwardFarmerOpen && (
                           <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-[200px] overflow-y-auto">
-                            {(outwardFarmerSearch ? filterFarmerResults(outwardFarmerSearch).map(f => ({ ...f, totalDue: farmersWithDues.find(fw => fw.id === f.id)?.totalDue || 0 })) : farmersWithDues.filter(f => !f.isArchived).sort((a, b) => a.name.localeCompare(b.name)).slice(0, 20)).map(f => (
-                              <button key={f.id} className="flex items-center gap-1.5 px-3 py-2 text-sm w-full text-left hover:bg-accent" data-testid={`outward-farmer-opt-${f.id}`}
-                                onMouseDown={(e) => { e.preventDefault(); setOutwardFarmerId(f.id.toString()); setOutwardFarmerSearch(""); setOutwardFarmerOpen(false); }}>
-                                <span className="font-medium">{f.name}</span>
-                                <span className="text-muted-foreground text-xs">{f.phone}</span>
-                                {f.village && <span className="text-muted-foreground text-xs">({f.village})</span>}
-                                <span className="ml-auto text-xs text-orange-600">Due: ₹{(f as any).totalDue?.toLocaleString("en-IN") || "0"}</span>
-                              </button>
-                            ))}
-                            {outwardFarmerSearch && filterFarmerResults(outwardFarmerSearch).length === 0 && (
-                              <div className="px-3 py-2 text-xs text-muted-foreground">No farmers found</div>
-                            )}
+                            {(() => {
+                              const withDuesOnly = farmersWithDues.filter(f => !f.isArchived && parseFloat(f.totalDue) > 0).sort((a, b) => a.name.localeCompare(b.name));
+                              const list = outwardFarmerSearch
+                                ? withDuesOnly.filter(f => {
+                                    const q = outwardFarmerSearch.toLowerCase();
+                                    return f.name.toLowerCase().includes(q) || f.phone.includes(q) || (f.village || "").toLowerCase().includes(q);
+                                  }).slice(0, 20)
+                                : withDuesOnly.slice(0, 20);
+                              return list.length > 0 ? list.map(f => (
+                                <button key={f.id} className="flex items-center gap-1.5 px-3 py-2 text-sm w-full text-left hover:bg-accent" data-testid={`outward-farmer-opt-${f.id}`}
+                                  onMouseDown={(e) => { e.preventDefault(); setOutwardFarmerId(f.id.toString()); setOutwardFarmerSearch(""); setOutwardFarmerOpen(false); }}>
+                                  <span className="font-medium">{f.name}</span>
+                                  <span className="text-muted-foreground text-xs">{f.phone}</span>
+                                  {f.village && <span className="text-muted-foreground text-xs">({f.village})</span>}
+                                  <span className="ml-auto text-xs text-orange-600">Due: ₹{parseFloat(f.totalDue).toLocaleString("en-IN")}</span>
+                                </button>
+                              )) : (
+                                <div className="px-3 py-2 text-xs text-muted-foreground">{outwardFarmerSearch ? "No farmers found" : "No farmers with dues"}</div>
+                              );
+                            })()}
                           </div>
                         )}
                       </>
