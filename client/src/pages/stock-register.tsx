@@ -306,26 +306,30 @@ export default function StockRegisterPage() {
                 <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-48 p-2" align="end">
+            <PopoverContent className="w-56 p-2" align="end">
               <button
-                className="flex items-center gap-2 px-2 py-1.5 rounded text-sm w-full text-left"
+                className="flex items-center gap-2 px-2 py-1.5 rounded text-sm w-full text-left border-b mb-1"
                 data-testid="month-select-all"
                 onClick={selectAllMonths}
               >
                 <Checkbox checked={selectedMonths.length === 0} />
                 <span>{t("stockRegister.allMonths")}</span>
               </button>
-              {MONTH_LABELS.map((m, i) => (
-                <button
-                  key={i}
-                  className="flex items-center gap-2 px-2 py-1.5 rounded text-sm w-full text-left"
-                  data-testid={`month-option-${i + 1}`}
-                  onClick={() => toggleMonth(String(i + 1))}
-                >
-                  <Checkbox checked={selectedMonths.includes(String(i + 1))} />
-                  <span>{m}</span>
-                </button>
-              ))}
+              <div className="grid grid-cols-4 gap-0.5">
+                {MONTH_LABELS.map((m, i) => {
+                  const val = String(i + 1);
+                  return (
+                    <button
+                      key={val}
+                      className={`flex items-center justify-center rounded text-xs p-1.5 ${selectedMonths.includes(val) ? "bg-primary text-primary-foreground" : ""}`}
+                      data-testid={`month-option-${val}`}
+                      onClick={() => toggleMonth(val)}
+                    >
+                      {m}
+                    </button>
+                  );
+                })}
+              </div>
             </PopoverContent>
           </Popover>
         </div>
