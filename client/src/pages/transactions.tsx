@@ -160,6 +160,7 @@ export default function TransactionsPage() {
   const [dialogItems, setDialogItems] = useState<DialogItem[]>([]);
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [cropFilter, setCropFilter] = useState("all");
 
   const [totalWeight, setTotalWeight] = useState("");
   const [hammaliPerBag, setHammaliPerBag] = useState("0");
@@ -216,6 +217,11 @@ export default function TransactionsPage() {
   const unifiedGroups = useMemo(
     () => buildUnifiedLotGroups(pendingBids, txns),
     [pendingBids, txns]
+  );
+
+  const filteredGroups = useMemo(
+    () => cropFilter === "all" ? unifiedGroups : unifiedGroups.filter(g => g.lot.crop === cropFilter),
+    [unifiedGroups, cropFilter]
   );
 
   const bidForTxn = (tx: TransactionWithDetails): BidWithDetails => {
@@ -352,14 +358,27 @@ export default function TransactionsPage() {
 
   return (
     <div className="p-3 md:p-6 max-w-4xl mx-auto space-y-4">
-      <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
-        <Receipt className="w-6 h-6 text-primary" />
-        Transactions
-      </h1>
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
+          <Receipt className="w-6 h-6 text-primary" />
+          Transactions
+        </h1>
+        <Select value={cropFilter} onValueChange={setCropFilter}>
+          <SelectTrigger className="w-[130px]" data-testid="select-crop-filter">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Crops</SelectItem>
+            <SelectItem value="Potato">Potato</SelectItem>
+            <SelectItem value="Onion">Onion</SelectItem>
+            <SelectItem value="Garlic">Garlic</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
-      {unifiedGroups.length > 0 ? (
+      {filteredGroups.length > 0 ? (
         <div className="space-y-3">
-          {unifiedGroups.map((group) => {
+          {filteredGroups.map((group) => {
             const hasCompleted = group.completedTxns.length > 0;
             const totalFarmerPayable = group.completedTxns.reduce(
               (s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0
