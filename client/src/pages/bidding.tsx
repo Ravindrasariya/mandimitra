@@ -301,6 +301,7 @@ export default function BiddingPage() {
                       step="0.01"
                       value={pricePerKg}
                       onChange={(e) => setPricePerKg(e.target.value)}
+                      onFocus={(e) => e.target.select()}
                       placeholder="0.00"
                       className="mobile-touch-target"
                     />
@@ -313,6 +314,7 @@ export default function BiddingPage() {
                       inputMode="numeric"
                       value={bidBags}
                       onChange={(e) => setBidBags(e.target.value)}
+                      onFocus={(e) => e.target.select()}
                       placeholder="0"
                       className="mobile-touch-target"
                       max={selectedLot.remainingBags}

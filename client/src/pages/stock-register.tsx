@@ -541,6 +541,7 @@ export default function StockRegisterPage() {
                 inputMode="decimal"
                 value={editVehicleBhadaRate}
                 onChange={(e) => setEditVehicleBhadaRate(e.target.value)}
+                onFocus={(e) => e.target.select()}
                 placeholder="0.00"
                 className="mobile-touch-target"
               />
@@ -553,6 +554,7 @@ export default function StockRegisterPage() {
                 inputMode="decimal"
                 value={editInitialTotalWeight}
                 onChange={(e) => setEditInitialTotalWeight(e.target.value)}
+                onFocus={(e) => e.target.select()}
                 placeholder="0.00"
                 className="mobile-touch-target"
               />

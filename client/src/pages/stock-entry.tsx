@@ -376,6 +376,7 @@ export default function StockEntryPage() {
                     inputMode="numeric"
                     value={lot.numberOfBags}
                     onChange={(e) => updateLot(index, "numberOfBags", e.target.value)}
+                    onFocus={(e) => e.target.select()}
                     placeholder="0"
                     className="mobile-touch-target"
                   />
@@ -409,6 +410,7 @@ export default function StockEntryPage() {
                     inputMode="decimal"
                     value={lot.vehicleBhadaRate}
                     onChange={(e) => updateLot(index, "vehicleBhadaRate", e.target.value)}
+                    onFocus={(e) => e.target.select()}
                     placeholder="0.00"
                     className="mobile-touch-target"
                   />
@@ -423,6 +425,7 @@ export default function StockEntryPage() {
                     inputMode="decimal"
                     value={lot.initialTotalWeight}
                     onChange={(e) => updateLot(index, "initialTotalWeight", e.target.value)}
+                    onFocus={(e) => e.target.select()}
                     placeholder="0.00"
                     className="mobile-touch-target"
                   />

@@ -387,6 +387,7 @@ export default function BuyerLedgerPage() {
                 inputMode="decimal"
                 value={editOpeningBalance}
                 onChange={(e) => setEditOpeningBalance(e.target.value)}
+                onFocus={(e) => e.target.select()}
                 className="mobile-touch-target"
               />
             </div>
@@ -495,6 +496,7 @@ export default function BuyerLedgerPage() {
                 inputMode="decimal"
                 value={newOpeningBalance}
                 onChange={(e) => setNewOpeningBalance(e.target.value)}
+                onFocus={(e) => e.target.select()}
                 placeholder="0"
                 className="mobile-touch-target"
               />

@@ -242,6 +242,7 @@ export default function CashPage() {
                 inputMode="decimal"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value)}
+                onFocus={(e) => e.target.select()}
                 placeholder="0.00"
                 className="mobile-touch-target text-lg font-medium"
               />
