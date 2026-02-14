@@ -16,7 +16,7 @@ import type { Bid, Buyer, Lot, Farmer, Transaction } from "@shared/schema";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Receipt, Pencil, Printer, ChevronDown, Calendar, Package, Users, Landmark, HandCoins } from "lucide-react";
+import { Receipt, Pencil, Printer, ChevronDown, Calendar, Package, Users, Landmark, HandCoins, Download } from "lucide-react";
 import { format } from "date-fns";
 
 type BidWithDetails = Bid & { buyer: Buyer; lot: Lot; farmer: Farmer };
@@ -478,6 +478,48 @@ export default function TransactionsPage() {
     openPrintWindow(html);
   };
 
+  const exportCSV = () => {
+    const allTxns = filteredGroups.flatMap(g => g.completedTxns.filter(t => !t.isReversed));
+    if (allTxns.length === 0) return;
+
+    const headers = [
+      "Transaction ID", "Date", "Lot ID", "Serial #", "Crop", "Variety",
+      "Farmer Name", "Farmer Phone", "Farmer Village",
+      "Buyer Name", "Buyer Phone",
+      "Grade", "No. of Bags", "Rate/Kg",
+      "Total Weight", "Hammali/Bag", "Hammali Charges", "Grading Charges", "Net Weight",
+      "Charged To", "Aadhat %", "Aadhat Charges", "Mandi %", "Mandi Charges",
+      "Payable to Farmer", "Receivable from Buyer", "Status"
+    ];
+
+    const escCSV = (val: any) => {
+      const s = String(val ?? "");
+      return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+
+    const rows = allTxns.map(tx => {
+      const bid = bidForTxn(tx);
+      return [
+        tx.transactionId, tx.date, tx.lot.lotId, tx.lot.serialNumber, tx.lot.crop, tx.lot.variety || "",
+        tx.farmer.name, tx.farmer.phone, tx.farmer.village || "",
+        tx.buyer.name, tx.buyer.phone || "",
+        bid.grade || "", tx.numberOfBags, tx.pricePerKg,
+        tx.totalWeight, tx.hammaliPerBag, tx.hammaliCharges, tx.gradingCharges, tx.netWeight,
+        tx.chargedTo || "", tx.aadhatCommissionPercent, tx.aadhatCharges, tx.mandiCommissionPercent, tx.mandiCharges,
+        tx.totalPayableToFarmer, tx.totalReceivableFromBuyer, tx.isReversed ? "Reversed" : "Active"
+      ].map(escCSV).join(",");
+    });
+
+    const csv = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `transactions_${format(new Date(), "yyyy-MM-dd")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="p-3 md:p-6 max-w-4xl mx-auto space-y-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -570,6 +612,17 @@ export default function TransactionsPage() {
             </div>
           </PopoverContent>
         </Popover>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-8 w-8 p-0 shrink-0"
+          data-testid="button-export-csv"
+          onClick={exportCSV}
+          disabled={filteredGroups.flatMap(g => g.completedTxns.filter(t => !t.isReversed)).length === 0}
+          title="Download CSV"
+        >
+          <Download className="w-4 h-4" />
+        </Button>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-2" data-testid="txn-summary-cards">
