@@ -16,7 +16,7 @@ import type { Bid, Buyer, Lot, Farmer, Transaction } from "@shared/schema";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Receipt, Pencil, Printer, ChevronDown, Calendar } from "lucide-react";
+import { Receipt, Pencil, Printer, ChevronDown, Calendar, Package, Users, Landmark, HandCoins } from "lucide-react";
 import { format } from "date-fns";
 
 type BidWithDetails = Bid & { buyer: Buyer; lot: Lot; farmer: Farmer };
@@ -194,6 +194,21 @@ export default function TransactionsPage() {
     queryKey: ["/api/transactions"],
   });
 
+  const { data: farmersWithDues = [] } = useQuery<(Farmer & { totalPayable: string; totalDue: string; salesCount: number })[]>({
+    queryKey: ["/api/farmers-with-dues"],
+  });
+
+  const { data: buyersWithDues = [] } = useQuery<(Buyer & { receivableDue: string; overallDue: string })[]>({
+    queryKey: ["/api/buyers?withDues=true"],
+  });
+
+  const { data: txAggregates } = useQuery<{
+    totalHammali: number; totalGrading: number; totalMandiCommission: number;
+    paidHammali: number; paidGrading: number; paidMandiCommission: number;
+  }>({
+    queryKey: ["/api/transaction-aggregates"],
+  });
+
   const createTxMutation = useMutation({
     mutationFn: async (data: any) => {
       const res = await apiRequest("POST", "/api/transactions", data);
@@ -313,6 +328,22 @@ export default function TransactionsPage() {
       return true;
     });
   }, [unifiedGroups, cropFilter, yearFilter, selectedMonths, selectedDays]);
+
+  const summaryStats = useMemo(() => {
+    const allActiveTxns = filteredGroups.flatMap(g => g.completedTxns.filter(t => !t.isReversed));
+    const lotsCount = filteredGroups.length;
+    const txnCount = allActiveTxns.length;
+    const totalPayableToFarmer = allActiveTxns.reduce((s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0);
+    const totalReceivableFromBuyer = allActiveTxns.reduce((s, t) => s + parseFloat(t.totalReceivableFromBuyer || "0"), 0);
+    const totalMandiCommission = allActiveTxns.reduce((s, t) => s + parseFloat(t.mandiCharges || "0"), 0);
+    const totalAadhatCommission = allActiveTxns.reduce((s, t) => s + parseFloat(t.aadhatCharges || "0"), 0);
+
+    const farmerDue = farmersWithDues.reduce((s, f) => s + parseFloat(f.totalDue || "0"), 0);
+    const buyerDue = buyersWithDues.reduce((s, b) => s + parseFloat(b.overallDue || "0"), 0);
+    const mandiDue = (txAggregates?.totalMandiCommission || 0) - (txAggregates?.paidMandiCommission || 0);
+
+    return { lotsCount, txnCount, totalPayableToFarmer, totalReceivableFromBuyer, totalMandiCommission, totalAadhatCommission, farmerDue, buyerDue, mandiDue };
+  }, [filteredGroups, farmersWithDues, buyersWithDues, txAggregates]);
 
   const bidForTxn = (tx: TransactionWithDetails): BidWithDetails => {
     const found = allBids.find(b => b.id === tx.bidId);
@@ -539,6 +570,76 @@ export default function TransactionsPage() {
             </div>
           </PopoverContent>
         </Popover>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-2" data-testid="txn-summary-cards">
+        <Card className="border-blue-200 dark:border-blue-800">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-1.5 mb-1">
+              <Package className="w-3.5 h-3.5 text-blue-600" />
+              <span className="text-[11px] font-medium text-muted-foreground">Lots / Txns</span>
+            </div>
+            <div className="text-lg font-bold text-blue-700 dark:text-blue-400" data-testid="text-lots-txns">
+              {summaryStats.lotsCount} <span className="text-xs font-normal text-muted-foreground">/</span> {summaryStats.txnCount}
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-orange-200 dark:border-orange-800">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-1.5 mb-1">
+              <Users className="w-3.5 h-3.5 text-orange-600" />
+              <span className="text-[11px] font-medium text-muted-foreground">Farmer Payable</span>
+            </div>
+            <div className="text-sm font-bold text-orange-700 dark:text-orange-400" data-testid="text-farmer-payable">
+              ₹{summaryStats.totalPayableToFarmer.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+            </div>
+            <div className="text-[11px] text-red-600 font-medium" data-testid="text-farmer-due">
+              Due: ₹{summaryStats.farmerDue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-green-200 dark:border-green-800">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-1.5 mb-1">
+              <HandCoins className="w-3.5 h-3.5 text-green-600" />
+              <span className="text-[11px] font-medium text-muted-foreground">Buyer Receivable</span>
+            </div>
+            <div className="text-sm font-bold text-green-700 dark:text-green-400" data-testid="text-buyer-receivable">
+              ₹{summaryStats.totalReceivableFromBuyer.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+            </div>
+            <div className="text-[11px] text-red-600 font-medium" data-testid="text-buyer-due">
+              Due: ₹{summaryStats.buyerDue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="border-purple-200 dark:border-purple-800">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-1.5 mb-1">
+              <Landmark className="w-3.5 h-3.5 text-purple-600" />
+              <span className="text-[11px] font-medium text-muted-foreground">Mandi Comm.</span>
+            </div>
+            <div className="text-sm font-bold text-purple-700 dark:text-purple-400" data-testid="text-mandi-total">
+              ₹{summaryStats.totalMandiCommission.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+            </div>
+            <div className="text-[11px] text-red-600 font-medium" data-testid="text-mandi-due">
+              Due: ₹{summaryStats.mandiDue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="col-span-2 md:col-span-1 border-amber-200 dark:border-amber-800">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-1.5 mb-1">
+              <Receipt className="w-3.5 h-3.5 text-amber-600" />
+              <span className="text-[11px] font-medium text-muted-foreground">Aadhat Comm.</span>
+            </div>
+            <div className="text-sm font-bold text-amber-700 dark:text-amber-400" data-testid="text-aadhat-total">
+              ₹{summaryStats.totalAadhatCommission.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+            </div>
+            <div className="text-[11px] text-green-600 font-medium" data-testid="text-aadhat-earned">
+              Earned (via Buyer Dues)
+            </div>
+          </CardContent>
+        </Card>
       </div>
 
       {filteredGroups.length > 0 ? (
