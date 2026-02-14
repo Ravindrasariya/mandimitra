@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -29,8 +30,8 @@ function formatIndianCurrency(value: string | number): string {
 export default function BuyerLedgerPage() {
   const { toast } = useToast();
   const { t } = useLanguage();
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [searchTerm, setSearchTerm] = usePersistedState("bl-searchTerm", "");
+  const [statusFilter, setStatusFilter] = usePersistedState("bl-statusFilter", "all");
   const [editingBuyer, setEditingBuyer] = useState<BuyerWithDues | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
 

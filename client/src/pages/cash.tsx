@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -18,7 +19,7 @@ import { format } from "date-fns";
 export default function CashPage() {
   const { toast } = useToast();
   const { t } = useLanguage();
-  const [activeTab, setActiveTab] = useState<"in" | "out">("in");
+  const [activeTab, setActiveTab] = usePersistedState<"in" | "out">("cash-activeTab", "in");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [entryDate, setEntryDate] = useState(format(new Date(), "yyyy-MM-dd"));
   const [amount, setAmount] = useState("");

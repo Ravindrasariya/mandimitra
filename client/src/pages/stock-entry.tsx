@@ -1,8 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/lib/language";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -38,20 +39,20 @@ const emptyLot: LotEntry = {
 export default function StockEntryPage() {
   const { toast } = useToast();
   const { t } = useLanguage();
-  const [farmerSearch, setFarmerSearch] = useState("");
-  const [selectedFarmer, setSelectedFarmer] = useState<Farmer | null>(null);
-  const [showFarmerForm, setShowFarmerForm] = useState(false);
+  const [farmerSearch, setFarmerSearch, clearFarmerSearch] = usePersistedState("se-farmerSearch", "");
+  const [selectedFarmer, setSelectedFarmer, clearSelectedFarmer] = usePersistedState<Farmer | null>("se-selectedFarmer", null);
+  const [showFarmerForm, setShowFarmerForm, clearShowFarmerForm] = usePersistedState("se-showFarmerForm", false);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  const [farmerName, setFarmerName] = useState("");
-  const [farmerPhone, setFarmerPhone] = useState("");
-  const [village, setVillage] = useState("");
-  const [tehsil, setTehsil] = useState("");
-  const [district, setDistrict] = useState("");
+  const [farmerName, setFarmerName, clearFarmerName] = usePersistedState("se-farmerName", "");
+  const [farmerPhone, setFarmerPhone, clearFarmerPhone] = usePersistedState("se-farmerPhone", "");
+  const [village, setVillage, clearVillage] = usePersistedState("se-village", "");
+  const [tehsil, setTehsil, clearTehsil] = usePersistedState("se-tehsil", "");
+  const [district, setDistrict, clearDistrict] = usePersistedState("se-district", "");
   const [state] = useState("Madhya Pradesh");
-  const [entryDate, setEntryDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [entryDate, setEntryDate, clearEntryDate] = usePersistedState("se-entryDate", format(new Date(), "yyyy-MM-dd"));
 
-  const [lots, setLots] = useState<LotEntry[]>([{ ...emptyLot }]);
+  const [lots, setLots, clearLots] = usePersistedState<LotEntry[]>("se-lots", [{ ...emptyLot }]);
 
   const { data: farmerSuggestions = [] } = useQuery<Farmer[]>({
     queryKey: ["/api/farmers", `?search=${farmerSearch}`],
@@ -151,14 +152,16 @@ export default function StockEntryPage() {
 
       toast({ title: "Success", description: `${lots.length} lot(s) added to stock register` });
 
-      setSelectedFarmer(null);
-      setFarmerName("");
-      setFarmerPhone("");
-      setVillage("");
-      setTehsil("");
-      setDistrict("");
-      setShowFarmerForm(false);
-      setLots([{ ...emptyLot }]);
+      clearFarmerSearch();
+      clearSelectedFarmer();
+      clearShowFarmerForm();
+      clearFarmerName();
+      clearFarmerPhone();
+      clearVillage();
+      clearTehsil();
+      clearDistrict();
+      clearEntryDate();
+      clearLots();
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
@@ -298,7 +301,7 @@ export default function StockEntryPage() {
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => { setSelectedFarmer(null); setShowFarmerForm(false); setFarmerName(""); setFarmerPhone(""); setVillage(""); setTehsil(""); setDistrict(""); }}
+                  onClick={() => { clearSelectedFarmer(); clearShowFarmerForm(); clearFarmerName(); clearFarmerPhone(); clearVillage(); clearTehsil(); clearDistrict(); }}
                 >
                   {t("stockEntry.clearSelection")}
                 </Button>

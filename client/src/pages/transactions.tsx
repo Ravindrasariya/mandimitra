@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -163,13 +164,13 @@ export default function TransactionsPage() {
   const [dialogItems, setDialogItems] = useState<DialogItem[]>([]);
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [cropFilter, setCropFilter] = useState("all");
   const [reverseConfirmOpen, setReverseConfirmOpen] = useState(false);
   const [reversingTxn, setReversingTxn] = useState<TransactionWithDetails | null>(null);
   const now = new Date();
-  const [yearFilter, setYearFilter] = useState(String(now.getFullYear()));
-  const [monthFilter, setMonthFilter] = useState(String(now.getMonth() + 1));
-  const [dayFilter, setDayFilter] = useState("all");
+  const [yearFilter, setYearFilter] = usePersistedState("txn-yearFilter", String(now.getFullYear()));
+  const [monthFilter, setMonthFilter] = usePersistedState("txn-monthFilter", String(now.getMonth() + 1));
+  const [dayFilter, setDayFilter] = usePersistedState("txn-dayFilter", "all");
+  const [cropFilter, setCropFilter] = usePersistedState("txn-cropFilter", "all");
 
   const [totalWeight, setTotalWeight] = useState("");
   const [hammaliPerBag, setHammaliPerBag] = useState("0");

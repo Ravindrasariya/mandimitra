@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -20,8 +21,8 @@ type BidWithDetails = Bid & { buyer: Buyer; lot: Lot };
 export default function BiddingPage() {
   const { toast } = useToast();
   const { t } = useLanguage();
-  const [activeCrop, setActiveCrop] = useState("Garlic");
-  const [activeGrade, setActiveGrade] = useState("Large");
+  const [activeCrop, setActiveCrop] = usePersistedState("bid-activeCrop", "Garlic");
+  const [activeGrade, setActiveGrade] = usePersistedState("bid-activeGrade", "Large");
   const [selectedLot, setSelectedLot] = useState<LotWithFarmer | null>(null);
   const [bidDialogOpen, setBidDialogOpen] = useState(false);
   const [buyerSearch, setBuyerSearch] = useState("");

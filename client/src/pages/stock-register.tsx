@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from "react";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -31,10 +32,10 @@ export default function StockRegisterPage() {
   const currentMonth = (now.getMonth() + 1).toString();
   const currentDay = now.getDate().toString();
 
-  const [activeCrop, setActiveCrop] = useState("Garlic");
-  const [yearFilter, setYearFilter] = useState(currentYear);
-  const [selectedMonths, setSelectedMonths] = useState<string[]>([currentMonth]);
-  const [selectedDays, setSelectedDays] = useState<string[]>([currentDay]);
+  const [activeCrop, setActiveCrop] = usePersistedState("sr-activeCrop", "Garlic");
+  const [yearFilter, setYearFilter] = usePersistedState("sr-yearFilter", currentYear);
+  const [selectedMonths, setSelectedMonths] = usePersistedState<string[]>("sr-selectedMonths", [currentMonth]);
+  const [selectedDays, setSelectedDays] = usePersistedState<string[]>("sr-selectedDays", [currentDay]);
   const [monthPopoverOpen, setMonthPopoverOpen] = useState(false);
   const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
 

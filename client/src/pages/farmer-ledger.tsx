@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -63,10 +64,10 @@ ${rows}</table>
 export default function FarmerLedgerPage() {
   const { toast } = useToast();
   const { t } = useLanguage();
-  const [searchName, setSearchName] = useState("");
-  const [searchVillage, setSearchVillage] = useState("");
-  const [yearFilter, setYearFilter] = useState("all");
-  const [showArchived, setShowArchived] = useState(false);
+  const [searchName, setSearchName] = usePersistedState("fl-searchName", "");
+  const [searchVillage, setSearchVillage] = usePersistedState("fl-searchVillage", "");
+  const [yearFilter, setYearFilter] = usePersistedState("fl-yearFilter", "all");
+  const [showArchived, setShowArchived] = usePersistedState("fl-showArchived", false);
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingFarmer, setEditingFarmer] = useState<FarmerWithDues | null>(null);
@@ -80,8 +81,8 @@ export default function FarmerLedgerPage() {
 
   const [historyFarmerId, setHistoryFarmerId] = useState<number | null>(null);
 
-  const [sortField, setSortField] = useState<SortField>("totalDue");
-  const [sortDir, setSortDir] = useState<SortDir>("desc");
+  const [sortField, setSortField] = usePersistedState<SortField>("fl-sortField", "totalDue");
+  const [sortDir, setSortDir] = usePersistedState<SortDir>("fl-sortDir", "desc");
 
   const { data: farmersWithDues = [], isLoading } = useQuery<FarmerWithDues[]>({
     queryKey: ["/api/farmers-with-dues"],
