@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import type { Farmer, Buyer, CashEntry, BankAccount } from "@shared/schema";
-import { Wallet, Settings, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Download, RotateCcw, Trash2, Plus, Filter } from "lucide-react";
+import { Wallet, Settings, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Download, RotateCcw, Trash2, Plus, Filter, X } from "lucide-react";
 import { format } from "date-fns";
 
 type BuyerWithDues = Buyer & { receivableDue: string; overallDue: string };
@@ -42,8 +42,11 @@ export default function CashPage() {
   const [reverseConfirmEntry, setReverseConfirmEntry] = useState<CashEntry | null>(null);
   const [deleteAccountId, setDeleteAccountId] = useState<number | null>(null);
 
-  const [filterPartyName, setFilterPartyName] = usePersistedState("cash-filterParty", "all");
   const [filterCategory, setFilterCategory] = usePersistedState("cash-filterCategory", "all");
+  const [filterPaymentMode, setFilterPaymentMode] = usePersistedState("cash-filterPayMode", "all");
+  const [filterOutflowType, setFilterOutflowType] = usePersistedState("cash-filterOutflow", "all");
+  const [filterBuyer, setFilterBuyer] = usePersistedState("cash-filterBuyer", "all");
+  const [filterFarmer, setFilterFarmer] = usePersistedState("cash-filterFarmer", "all");
   const [filterMonth, setFilterMonth] = usePersistedState("cash-filterMonth", "all");
   const [filterYear, setFilterYear] = usePersistedState("cash-filterYear", String(now.getFullYear()));
 
@@ -109,18 +112,38 @@ export default function CashPage() {
 
   const hasBankAccounts = bankAccountsList.length > 0;
 
+  const hasActiveFilters = filterCategory !== "all" || filterPaymentMode !== "all" || filterOutflowType !== "all" || filterBuyer !== "all" || filterFarmer !== "all" || filterMonth !== "all" || filterYear !== String(now.getFullYear());
+
+  const clearAllFilters = () => {
+    setFilterCategory("all");
+    setFilterPaymentMode("all");
+    setFilterOutflowType("all");
+    setFilterBuyer("all");
+    setFilterFarmer("all");
+    setFilterMonth("all");
+    setFilterYear(String(now.getFullYear()));
+  };
+
   const filteredEntries = useMemo(() => {
     let result = allEntries;
-    if (filterPartyName !== "all") {
-      result = result.filter(e => {
-        if (filterPartyName.startsWith("buyer-")) return e.buyerId === parseInt(filterPartyName.replace("buyer-", ""));
-        if (filterPartyName.startsWith("farmer-")) return e.farmerId === parseInt(filterPartyName.replace("farmer-", ""));
-        if (filterPartyName === "others") return !e.buyerId && !e.farmerId;
-        return true;
-      });
+    if (filterPaymentMode !== "all") {
+      result = result.filter(e => e.paymentMode === filterPaymentMode);
+    }
+    if (filterOutflowType !== "all") {
+      if (filterOutflowType === "none") {
+        result = result.filter(e => e.category === "inward" || e.category === "transfer");
+      } else {
+        result = result.filter(e => e.outflowType === filterOutflowType);
+      }
+    }
+    if (filterBuyer !== "all") {
+      result = result.filter(e => e.buyerId === parseInt(filterBuyer));
+    }
+    if (filterFarmer !== "all") {
+      result = result.filter(e => e.farmerId === parseInt(filterFarmer));
     }
     return result;
-  }, [allEntries, filterPartyName]);
+  }, [allEntries, filterPaymentMode, filterOutflowType, filterBuyer, filterFarmer]);
 
   const summaryData = useMemo(() => {
     const opening = parseFloat(cashSettingsData?.cashInHandOpening || "0");
@@ -491,17 +514,31 @@ export default function CashPage() {
         <div className="flex flex-wrap items-center gap-2 text-xs">
           <Filter className="w-3.5 h-3.5 text-muted-foreground" />
           <span className="text-xs font-medium text-muted-foreground">{t("cash.filters")}</span>
-          <select value={filterPartyName} onChange={(e) => setFilterPartyName(e.target.value)} className="h-8 w-[140px] text-xs rounded-md border border-input bg-background px-2" data-testid="filter-party">
-            <option value="all">{t("cash.allParties")}</option>
-            <option value="others">General/Others</option>
-            {buyers.map(b => <option key={`buyer-${b.id}`} value={`buyer-${b.id}`}>{b.name}</option>)}
-            {farmers.map(f => <option key={`farmer-${f.id}`} value={`farmer-${f.id}`}>{f.name}</option>)}
-          </select>
           <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="h-8 w-[130px] text-xs rounded-md border border-input bg-background px-2" data-testid="filter-category">
-            <option value="all">{t("cash.allTypes")}</option>
-            <option value="inward">{t("cash.inward")}</option>
-            <option value="outward">{t("cash.outward")}</option>
+            <option value="all">All</option>
+            <option value="inward">{t("cash.inwardCash")}</option>
+            <option value="outward">{t("cash.outwardCash")}</option>
             <option value="transfer">{t("cash.transfer")}</option>
+          </select>
+          <select value={filterPaymentMode} onChange={(e) => setFilterPaymentMode(e.target.value)} className="h-8 w-[110px] text-xs rounded-md border border-input bg-background px-2" data-testid="filter-payment-mode">
+            <option value="all">Payment: All</option>
+            <option value="Cash">Cash</option>
+            <option value="Online">Account</option>
+          </select>
+          <select value={filterOutflowType} onChange={(e) => setFilterOutflowType(e.target.value)} className="h-8 w-[150px] text-xs rounded-md border border-input bg-background px-2" data-testid="filter-outflow-type">
+            <option value="all">Outflow: All</option>
+            <option value="none">None (Inflow/Transfer)</option>
+            {OUTFLOW_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
+          </select>
+          <select value={filterBuyer} onChange={(e) => setFilterBuyer(e.target.value)} className="h-8 w-[150px] text-xs rounded-md border border-input bg-background px-2" data-testid="filter-buyer">
+            <option value="all">Buyer: All</option>
+            {buyers.map(b => <option key={b.id} value={b.id.toString()}>{b.name}</option>)}
+          </select>
+          <select value={filterFarmer} onChange={(e) => setFilterFarmer(e.target.value)} className="h-8 w-[200px] text-xs rounded-md border border-input bg-background px-2" data-testid="filter-farmer">
+            <option value="all">Farmer: All</option>
+            {farmers.filter(f => !f.isArchived).sort((a, b) => a.name.localeCompare(b.name)).map(f => (
+              <option key={f.id} value={f.id.toString()}>{f.name} • {f.phone} • {f.village}</option>
+            ))}
           </select>
           <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="h-8 w-[90px] text-xs rounded-md border border-input bg-background px-2" data-testid="filter-month">
             <option value="all">All</option>
@@ -512,6 +549,12 @@ export default function CashPage() {
               <option key={y} value={y}>{y}</option>
             ))}
           </select>
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" className="h-8 text-xs text-destructive hover:text-destructive" onClick={clearAllFilters} data-testid="button-remove-filters">
+              <X className="w-3.5 h-3.5 mr-1" />
+              Remove Filter
+            </Button>
+          )}
         </div>
       </div>
 
