@@ -530,7 +530,25 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createTransaction(transaction: InsertTransaction): Promise<Transaction> {
-    const [created] = await db.insert(transactions).values(transaction).returning();
+    const txDate = transaction.date ? new Date(transaction.date + "T00:00:00") : new Date();
+    const dateStr = `${txDate.getFullYear()}${String(txDate.getMonth() + 1).padStart(2, "0")}${String(txDate.getDate()).padStart(2, "0")}`;
+    const prefix = `TX${dateStr}`;
+
+    const [result] = await db.select({ max: sql<string>`coalesce(max(
+      case when ${transactions.transactionId} ~ ${`^${prefix}\\d+$`}
+        then cast(substring(${transactions.transactionId} from ${prefix.length + 1}) as integer)
+        else 0 end
+    ), 0)` })
+      .from(transactions)
+      .where(and(
+        eq(transactions.businessId, transaction.businessId),
+        sql`${transactions.transactionId} like ${prefix + "%"}`
+      ));
+
+    const seq = parseInt(result?.max || "0", 10) + 1;
+    const transactionId = `${prefix}${seq}`;
+
+    const [created] = await db.insert(transactions).values({ ...transaction, transactionId }).returning();
     return created;
   }
 

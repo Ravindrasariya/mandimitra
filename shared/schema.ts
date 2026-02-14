@@ -111,6 +111,7 @@ export const bids = pgTable("bids", {
 
 export const transactions = pgTable("transactions", {
   id: serial("id").primaryKey(),
+  transactionId: text("transaction_id").notNull(),
   businessId: integer("business_id").notNull().references(() => businesses.id),
   lotId: integer("lot_id").notNull().references(() => lots.id),
   bidId: integer("bid_id").notNull().references(() => bids.id),
@@ -160,7 +161,7 @@ export const insertBuyerSchema = createInsertSchema(buyers).omit({ id: true, cre
 export const insertBuyerEditHistorySchema = createInsertSchema(buyerEditHistory).omit({ id: true, createdAt: true });
 export const insertLotSchema = createInsertSchema(lots).omit({ id: true, createdAt: true });
 export const insertBidSchema = createInsertSchema(bids).omit({ id: true, createdAt: true });
-export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true, createdAt: true });
+export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true, transactionId: true, createdAt: true });
 export const insertCashEntrySchema = createInsertSchema(cashEntries).omit({ id: true, createdAt: true });
 
 export type Business = typeof businesses.$inferSelect;
