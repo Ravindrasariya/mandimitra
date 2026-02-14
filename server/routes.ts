@@ -202,6 +202,11 @@ export async function registerRoutes(
 
   app.get("/api/buyers", requireAuth, async (req, res) => {
     const search = req.query.search as string | undefined;
+    const withDues = req.query.withDues === "true";
+    if (withDues) {
+      const result = await storage.getBuyersWithDues(req.user!.businessId, search);
+      return res.json(result);
+    }
     const result = await storage.getBuyers(req.user!.businessId, search);
     res.json(result);
   });
@@ -214,7 +219,13 @@ export async function registerRoutes(
 
   app.post("/api/buyers", requireAuth, async (req, res) => {
     try {
-      const data = { ...req.body, businessId: req.user!.businessId };
+      const businessId = req.user!.businessId;
+      const buyerId = await storage.getNextBuyerId(businessId);
+      const data = {
+        ...req.body,
+        businessId,
+        buyerId,
+      };
       const buyer = await storage.createBuyer(data);
       res.status(201).json(buyer);
     } catch (e: any) {
@@ -223,9 +234,51 @@ export async function registerRoutes(
   });
 
   app.patch("/api/buyers/:id", requireAuth, async (req, res) => {
-    const updated = await storage.updateBuyer(paramId(req.params.id), req.user!.businessId, req.body);
-    if (!updated) return res.status(404).json({ message: "Buyer not found" });
-    res.json(updated);
+    try {
+      const businessId = req.user!.businessId;
+      const buyerDbId = paramId(req.params.id);
+      const existing = await storage.getBuyer(buyerDbId, businessId);
+      if (!existing) return res.status(404).json({ message: "Buyer not found" });
+
+      const fieldsToTrack: Record<string, string> = {
+        name: "Name",
+        phone: "Contact",
+        address: "Address",
+        buyerCode: "Buyer Code",
+        negativeFlag: "Negative Flag",
+        isActive: "Active Status",
+        openingBalance: "Opening Balance",
+      };
+
+      const changedBy = req.user!.name || req.user!.username;
+
+      for (const [field, label] of Object.entries(fieldsToTrack)) {
+        if (req.body[field] !== undefined) {
+          const oldVal = String((existing as any)[field] ?? "");
+          const newVal = String(req.body[field] ?? "");
+          if (oldVal !== newVal) {
+            await storage.createBuyerEditHistory({
+              buyerId: buyerDbId,
+              businessId,
+              fieldChanged: label,
+              oldValue: oldVal,
+              newValue: newVal,
+              changedBy,
+            });
+          }
+        }
+      }
+
+      const updated = await storage.updateBuyer(buyerDbId, businessId, req.body);
+      res.json(updated);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  app.get("/api/buyers/:id/edit-history", requireAuth, async (req, res) => {
+    const result = await storage.getBuyerEditHistory(paramId(req.params.id), req.user!.businessId);
+    res.json(result);
   });
 
   app.get("/api/lots", requireAuth, async (req, res) => {

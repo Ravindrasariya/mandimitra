@@ -42,10 +42,25 @@ export const farmers = pgTable("farmers", {
 export const buyers = pgTable("buyers", {
   id: serial("id").primaryKey(),
   businessId: integer("business_id").notNull().references(() => businesses.id),
+  buyerId: text("buyer_id").notNull(),
   name: text("name").notNull(),
   phone: text("phone"),
   address: text("address"),
+  buyerCode: text("buyer_code"),
+  negativeFlag: boolean("negative_flag").notNull().default(false),
+  isActive: boolean("is_active").notNull().default(true),
   openingBalance: decimal("opening_balance", { precision: 12, scale: 2 }).default("0"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const buyerEditHistory = pgTable("buyer_edit_history", {
+  id: serial("id").primaryKey(),
+  buyerId: integer("buyer_id").notNull().references(() => buyers.id),
+  businessId: integer("business_id").notNull().references(() => businesses.id),
+  fieldChanged: text("field_changed").notNull(),
+  oldValue: text("old_value"),
+  newValue: text("new_value"),
+  changedBy: text("changed_by"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -124,6 +139,7 @@ export const insertBusinessSchema = createInsertSchema(businesses).omit({ id: tr
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
 export const insertFarmerSchema = createInsertSchema(farmers).omit({ id: true, createdAt: true });
 export const insertBuyerSchema = createInsertSchema(buyers).omit({ id: true, createdAt: true });
+export const insertBuyerEditHistorySchema = createInsertSchema(buyerEditHistory).omit({ id: true, createdAt: true });
 export const insertLotSchema = createInsertSchema(lots).omit({ id: true, createdAt: true });
 export const insertBidSchema = createInsertSchema(bids).omit({ id: true, createdAt: true });
 export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true, createdAt: true });
@@ -137,6 +153,8 @@ export type Farmer = typeof farmers.$inferSelect;
 export type InsertFarmer = z.infer<typeof insertFarmerSchema>;
 export type Buyer = typeof buyers.$inferSelect;
 export type InsertBuyer = z.infer<typeof insertBuyerSchema>;
+export type BuyerEditHistory = typeof buyerEditHistory.$inferSelect;
+export type InsertBuyerEditHistory = z.infer<typeof insertBuyerEditHistorySchema>;
 export type Lot = typeof lots.$inferSelect;
 export type InsertLot = z.infer<typeof insertLotSchema>;
 export type Bid = typeof bids.$inferSelect;

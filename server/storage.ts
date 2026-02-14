@@ -3,11 +3,12 @@ import {
   type Business, type InsertBusiness,
   type Farmer, type InsertFarmer,
   type Buyer, type InsertBuyer,
+  type BuyerEditHistory, type InsertBuyerEditHistory,
   type Lot, type InsertLot,
   type Bid, type InsertBid,
   type Transaction, type InsertTransaction,
   type CashEntry, type InsertCashEntry,
-  users, businesses, farmers, buyers, lots, bids, transactions, cashEntries,
+  users, businesses, farmers, buyers, buyerEditHistory, lots, bids, transactions, cashEntries,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, ilike, or, sql, desc, asc, gte, lte, ne } from "drizzle-orm";
@@ -37,6 +38,10 @@ export interface IStorage {
   getBuyer(id: number, businessId: number): Promise<Buyer | undefined>;
   createBuyer(buyer: InsertBuyer): Promise<Buyer>;
   updateBuyer(id: number, businessId: number, data: Partial<InsertBuyer>): Promise<Buyer | undefined>;
+  getNextBuyerId(businessId: number): Promise<string>;
+  getBuyerEditHistory(buyerId: number, businessId: number): Promise<BuyerEditHistory[]>;
+  createBuyerEditHistory(entry: InsertBuyerEditHistory): Promise<BuyerEditHistory>;
+  getBuyersWithDues(businessId: number, search?: string): Promise<(Buyer & { receivableDue: string; overallDue: string })[]>;
 
   getLots(businessId: number, filters?: { crop?: string; date?: string; search?: string }): Promise<(Lot & { farmer: Farmer })[]>;
   getLot(id: number, businessId: number): Promise<(Lot & { farmer: Farmer }) | undefined>;
@@ -139,6 +144,7 @@ export class DatabaseStorage implements IStorage {
     await db.delete(bids).where(eq(bids.businessId, businessId));
     await db.delete(lots).where(eq(lots.businessId, businessId));
     await db.delete(farmers).where(eq(farmers.businessId, businessId));
+    await db.delete(buyerEditHistory).where(eq(buyerEditHistory.businessId, businessId));
     await db.delete(buyers).where(eq(buyers.businessId, businessId));
   }
 
@@ -201,6 +207,68 @@ export class DatabaseStorage implements IStorage {
   async updateBuyer(id: number, businessId: number, data: Partial<InsertBuyer>): Promise<Buyer | undefined> {
     const [updated] = await db.update(buyers).set(data).where(and(eq(buyers.id, id), eq(buyers.businessId, businessId))).returning();
     return updated;
+  }
+
+  async getNextBuyerId(businessId: number): Promise<string> {
+    const today = new Date();
+    const dateStr = today.getFullYear().toString() +
+      (today.getMonth() + 1).toString().padStart(2, "0") +
+      today.getDate().toString().padStart(2, "0");
+    const prefix = `BY${dateStr}`;
+    const [result] = await db.select({ count: sql<string>`count(*)` })
+      .from(buyers)
+      .where(and(eq(buyers.businessId, businessId), ilike(buyers.buyerId, `${prefix}%`)));
+    const seq = parseInt(result?.count || "0", 10) + 1;
+    return `${prefix}${seq}`;
+  }
+
+  async getBuyerEditHistory(buyerId: number, businessId: number): Promise<BuyerEditHistory[]> {
+    return db.select().from(buyerEditHistory)
+      .where(and(eq(buyerEditHistory.buyerId, buyerId), eq(buyerEditHistory.businessId, businessId)))
+      .orderBy(desc(buyerEditHistory.createdAt));
+  }
+
+  async createBuyerEditHistory(entry: InsertBuyerEditHistory): Promise<BuyerEditHistory> {
+    const [created] = await db.insert(buyerEditHistory).values(entry).returning();
+    return created;
+  }
+
+  async getBuyersWithDues(businessId: number, search?: string): Promise<(Buyer & { receivableDue: string; overallDue: string })[]> {
+    let buyerList: Buyer[];
+    if (search) {
+      buyerList = await db.select().from(buyers).where(
+        and(
+          eq(buyers.businessId, businessId),
+          or(
+            ilike(buyers.name, `%${search}%`),
+            ilike(buyers.phone, `%${search}%`),
+            ilike(buyers.buyerId, `%${search}%`)
+          )
+        )
+      ).orderBy(asc(buyers.name));
+    } else {
+      buyerList = await db.select().from(buyers).where(eq(buyers.businessId, businessId)).orderBy(asc(buyers.name));
+    }
+
+    const results: (Buyer & { receivableDue: string; overallDue: string })[] = [];
+    for (const buyer of buyerList) {
+      const [txSum] = await db.select({
+        total: sql<string>`coalesce(sum(cast(${transactions.totalReceivableFromBuyer} as numeric)), 0)`
+      }).from(transactions).where(and(eq(transactions.businessId, businessId), eq(transactions.buyerId, buyer.id)));
+
+      const [cashSum] = await db.select({
+        total: sql<string>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`
+      }).from(cashEntries).where(and(eq(cashEntries.businessId, businessId), eq(cashEntries.buyerId, buyer.id)));
+
+      const totalReceivable = parseFloat(txSum?.total || "0");
+      const totalPaid = parseFloat(cashSum?.total || "0");
+      const openingBal = parseFloat(buyer.openingBalance || "0");
+      const receivableDue = (totalReceivable - totalPaid).toFixed(2);
+      const overallDue = (openingBal + totalReceivable - totalPaid).toFixed(2);
+
+      results.push({ ...buyer, receivableDue, overallDue });
+    }
+    return results;
   }
 
   async getLots(businessId: number, filters?: { crop?: string; date?: string; search?: string }): Promise<(Lot & { farmer: Farmer })[]> {
