@@ -208,6 +208,7 @@ export default function StockEntryPage() {
                       className="w-full text-left px-3 py-3 hover-elevate text-sm border-b last:border-b-0"
                       onClick={() => selectFarmer(f)}
                     >
+                      <span className="font-mono text-xs text-muted-foreground">{f.farmerId}</span>{" "}
                       <span className="font-medium">{f.name}</span>
                       <span className="text-muted-foreground"> - {f.phone}</span>
                       {f.village && <span className="text-muted-foreground"> - {f.village}</span>}

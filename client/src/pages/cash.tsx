@@ -104,7 +104,8 @@ export default function CashPage() {
 
   const getFarmerName = (id: number | null) => {
     if (!id) return "";
-    return farmers.find(f => f.id === id)?.name || `Farmer #${id}`;
+    const f = farmers.find(f => f.id === id);
+    return f ? `${f.farmerId} - ${f.name}` : `Farmer #${id}`;
   };
 
   const getBuyerName = (id: number | null) => {

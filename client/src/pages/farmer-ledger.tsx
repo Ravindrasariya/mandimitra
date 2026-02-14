@@ -11,10 +11,12 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import type { Farmer, FarmerEditHistory } from "@shared/schema";
-import { Users, Search, Pencil, RefreshCw, Printer, Archive, AlertTriangle } from "lucide-react";
+import { Users, Search, Pencil, RefreshCw, Printer, Archive, AlertTriangle, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { format } from "date-fns";
 
 type FarmerWithDues = Farmer & { totalPayable: string; totalDue: string; salesCount: number };
+type SortField = "farmerId" | "totalPayable" | "totalDue";
+type SortDir = "asc" | "desc";
 
 function formatIndianCurrency(value: string | number): string {
   const num = typeof value === "string" ? parseFloat(value) : value;
@@ -27,7 +29,7 @@ function formatIndianCurrency(value: string | number): string {
 function generateFarmerListPrintHtml(farmers: FarmerWithDues[], summary: { total: number; withDues: number; totalPayable: number; totalDue: number }) {
   const rows = farmers.map(f => `
     <tr>
-      <td style="padding:6px;border:1px solid #ddd">FM${f.id}</td>
+      <td style="padding:6px;border:1px solid #ddd">${f.farmerId}</td>
       <td style="padding:6px;border:1px solid #ddd">${f.name}</td>
       <td style="padding:6px;border:1px solid #ddd">${f.village || "-"}</td>
       <td style="padding:6px;border:1px solid #ddd">${f.phone}</td>
@@ -47,7 +49,7 @@ h2{text-align:center}th{background:#f5f5f5;padding:8px;border:1px solid #ddd;tex
 <p style="text-align:center;color:#666">${format(new Date(), "dd MMM yyyy")}</p>
 <div class="summary">
 <div class="summary-card"><div style="font-size:0.8em;color:#666">Total Farmers</div><div style="font-size:1.3em;font-weight:bold">${summary.total}</div></div>
-<div class="summary-card"><div style="font-size:0.8em;color:#666">With Dues</div><div style="font-size:1.3em;font-weight:bold;color:#dc2626">${summary.withDues}</div></div>
+<div class="summary-card"><div style="font-size:0.8em;color:#666">Due Farmers</div><div style="font-size:1.3em;font-weight:bold;color:#dc2626">${summary.withDues}</div></div>
 <div class="summary-card"><div style="font-size:0.8em;color:#666">Total Payable</div><div style="font-size:1.3em;font-weight:bold;color:#2563eb">${formatIndianCurrency(summary.totalPayable)}</div></div>
 <div class="summary-card"><div style="font-size:0.8em;color:#666">Total Dues</div><div style="font-size:1.3em;font-weight:bold;color:#dc2626">${formatIndianCurrency(summary.totalDue)}</div></div>
 </div>
@@ -75,6 +77,9 @@ export default function FarmerLedgerPage() {
   const [duplicateFarmer, setDuplicateFarmer] = useState<Farmer | null>(null);
 
   const [historyFarmerId, setHistoryFarmerId] = useState<number | null>(null);
+
+  const [sortField, setSortField] = useState<SortField>("totalDue");
+  const [sortDir, setSortDir] = useState<SortDir>("desc");
 
   const { data: farmersWithDues = [], isLoading } = useQuery<FarmerWithDues[]>({
     queryKey: ["/api/farmers-with-dues"],
@@ -137,6 +142,22 @@ export default function FarmerLedgerPage() {
     });
   }, [farmersWithDues, showArchived, searchName, searchVillage, yearFilter]);
 
+  const sortedFarmers = useMemo(() => {
+    const sorted = [...filteredFarmers];
+    sorted.sort((a, b) => {
+      let cmp = 0;
+      if (sortField === "farmerId") {
+        cmp = a.farmerId.localeCompare(b.farmerId);
+      } else if (sortField === "totalPayable") {
+        cmp = parseFloat(a.totalPayable) - parseFloat(b.totalPayable);
+      } else if (sortField === "totalDue") {
+        cmp = parseFloat(a.totalDue) - parseFloat(b.totalDue);
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return sorted;
+  }, [filteredFarmers, sortField, sortDir]);
+
   const summary = useMemo(() => {
     const total = filteredFarmers.length;
     const withDues = filteredFarmers.filter(f => parseFloat(f.totalDue) > 0).length;
@@ -144,6 +165,20 @@ export default function FarmerLedgerPage() {
     const totalDue = filteredFarmers.reduce((s, f) => s + parseFloat(f.totalDue), 0);
     return { total, withDues, totalPayable, totalDue };
   }, [filteredFarmers]);
+
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDir(field === "farmerId" ? "asc" : "desc");
+    }
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ArrowUpDown className="w-3 h-3 ml-1 opacity-40" />;
+    return sortDir === "asc" ? <ArrowUp className="w-3 h-3 ml-1" /> : <ArrowDown className="w-3 h-3 ml-1" />;
+  };
 
   const openEditDialog = (farmer: FarmerWithDues) => {
     setEditingFarmer(farmer);
@@ -182,7 +217,6 @@ export default function FarmerLedgerPage() {
         return;
       }
     } catch {
-      // proceed with save if duplicate check fails
     }
 
     saveEdit();
@@ -208,7 +242,7 @@ export default function FarmerLedgerPage() {
   };
 
   const handlePrint = () => {
-    const html = generateFarmerListPrintHtml(filteredFarmers, summary);
+    const html = generateFarmerListPrintHtml(sortedFarmers, summary);
     const w = window.open("", "_blank", "width=800,height=600");
     if (w) {
       w.document.write(html);
@@ -274,32 +308,32 @@ export default function FarmerLedgerPage() {
         <Card className="border-l-4 border-l-blue-500">
           <CardContent className="pt-3 pb-3 text-center">
             <p className="text-xs text-muted-foreground">Total Farmers</p>
-            <p className="text-xl font-bold text-blue-600" data-testid="text-total-farmers">{summary.total}</p>
+            <p className="text-base font-bold text-blue-600" data-testid="text-total-farmers">{summary.total}</p>
           </CardContent>
         </Card>
         <Card className="border-l-4 border-l-orange-500">
           <CardContent className="pt-3 pb-3 text-center">
-            <p className="text-xs text-muted-foreground"># Farmers with Dues</p>
-            <p className="text-xl font-bold text-orange-600" data-testid="text-farmers-with-dues">{summary.withDues}</p>
+            <p className="text-xs text-muted-foreground"># Due Farmers</p>
+            <p className="text-base font-bold text-orange-600" data-testid="text-farmers-with-dues">{summary.withDues}</p>
           </CardContent>
         </Card>
         <Card className="border-l-4 border-l-green-500">
           <CardContent className="pt-3 pb-3 text-center">
             <p className="text-xs text-muted-foreground">Total Payable</p>
-            <p className="text-xl font-bold text-green-600" data-testid="text-total-payable">{formatIndianCurrency(summary.totalPayable)}</p>
+            <p className="text-base font-bold text-green-600" data-testid="text-total-payable">{formatIndianCurrency(summary.totalPayable)}</p>
           </CardContent>
         </Card>
         <Card className="border-l-4 border-l-red-500">
           <CardContent className="pt-3 pb-3 text-center">
             <p className="text-xs text-muted-foreground">Total Dues</p>
-            <p className="text-xl font-bold text-red-600" data-testid="text-total-dues">{formatIndianCurrency(summary.totalDue)}</p>
+            <p className="text-base font-bold text-red-600" data-testid="text-total-dues">{formatIndianCurrency(summary.totalDue)}</p>
           </CardContent>
         </Card>
       </div>
 
       {isLoading ? (
         <div className="text-center py-8 text-muted-foreground">Loading farmers...</div>
-      ) : filteredFarmers.length === 0 ? (
+      ) : sortedFarmers.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">
           {showArchived ? "No archived farmers found" : "No farmers found"}
         </div>
@@ -309,18 +343,36 @@ export default function FarmerLedgerPage() {
             <thead>
               <tr className="border-b bg-muted/50">
                 <th className="text-left p-2 font-medium text-muted-foreground"></th>
-                <th className="text-left p-2 font-medium text-muted-foreground">Farmer ID</th>
+                <th
+                  className="text-left p-2 font-medium text-muted-foreground cursor-pointer select-none"
+                  onClick={() => toggleSort("farmerId")}
+                  data-testid="sort-farmer-id"
+                >
+                  <span className="inline-flex items-center">Farmer ID <SortIcon field="farmerId" /></span>
+                </th>
                 <th className="text-left p-2 font-medium text-muted-foreground">Name</th>
                 <th className="text-left p-2 font-medium text-muted-foreground">Village</th>
                 <th className="text-left p-2 font-medium text-muted-foreground">Contact</th>
-                <th className="text-right p-2 font-medium text-muted-foreground">Total Payable</th>
-                <th className="text-right p-2 font-medium text-muted-foreground">Total Due</th>
+                <th
+                  className="text-right p-2 font-medium text-muted-foreground cursor-pointer select-none"
+                  onClick={() => toggleSort("totalPayable")}
+                  data-testid="sort-total-payable"
+                >
+                  <span className="inline-flex items-center justify-end">Total Payable <SortIcon field="totalPayable" /></span>
+                </th>
+                <th
+                  className="text-right p-2 font-medium text-muted-foreground cursor-pointer select-none"
+                  onClick={() => toggleSort("totalDue")}
+                  data-testid="sort-total-due"
+                >
+                  <span className="inline-flex items-center justify-end">Total Due <SortIcon field="totalDue" /></span>
+                </th>
                 <th className="text-center p-2 font-medium text-muted-foreground">Flag</th>
                 <th className="text-center p-2 font-medium text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredFarmers.map((farmer) => {
+              {sortedFarmers.map((farmer) => {
                 const due = parseFloat(farmer.totalDue);
                 return (
                   <tr key={farmer.id} className="border-b hover:bg-muted/30 transition-colors" data-testid={`row-farmer-${farmer.id}`}>
@@ -335,7 +387,7 @@ export default function FarmerLedgerPage() {
                         <Pencil className="w-3.5 h-3.5" />
                       </Button>
                     </td>
-                    <td className="p-2 font-mono text-xs text-muted-foreground">FM{farmer.id}</td>
+                    <td className="p-2 font-mono text-xs text-muted-foreground">{farmer.farmerId}</td>
                     <td className="p-2 font-medium">{farmer.name}</td>
                     <td className="p-2 text-muted-foreground">{farmer.village || "-"}</td>
                     <td className="p-2 text-muted-foreground">{farmer.phone}</td>
@@ -379,6 +431,7 @@ export default function FarmerLedgerPage() {
           </DialogHeader>
           {editingFarmer && (
             <div className="space-y-3">
+              <div className="text-xs text-muted-foreground font-mono">ID: {editingFarmer.farmerId}</div>
               <div className="space-y-1">
                 <Label className="text-xs">Name</Label>
                 <Input
@@ -461,11 +514,10 @@ export default function FarmerLedgerPage() {
             <div className="space-y-3">
               <p className="text-sm">
                 <strong>{duplicateFarmer.name}</strong> ({duplicateFarmer.phone}) from{" "}
-                {duplicateFarmer.village || "unknown village"} already exists as FM{duplicateFarmer.id}.
+                {duplicateFarmer.village || "unknown village"} already exists as {duplicateFarmer.farmerId}.
               </p>
               <p className="text-sm text-muted-foreground">
-                Do you want to merge? All dues and records will be moved to the older farmer ID
-                (FM{Math.min(editingFarmer.id, duplicateFarmer.id)}).
+                Do you want to merge? All dues and records will be moved to the older farmer ID.
               </p>
               <div className="flex flex-col gap-2">
                 <Button

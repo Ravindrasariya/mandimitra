@@ -177,7 +177,7 @@ export default function BiddingPage() {
                       <Badge variant="secondary" className="text-xs">SR #{lot.serialNumber}</Badge>
                       <Badge className="text-xs">{lot.lotId}</Badge>
                     </div>
-                    <p className="text-sm font-medium truncate">{lot.farmer.name}</p>
+                    <p className="text-sm font-medium truncate"><span className="font-mono text-xs text-muted-foreground mr-1">{lot.farmer.farmerId}</span>{lot.farmer.name}</p>
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground mt-1">
                       <span>Remaining: <strong className="text-foreground">{lot.remainingBags}</strong> / {lot.numberOfBags} bags</span>
                       {lot.initialTotalWeight && <span>Init. Wt: {lot.initialTotalWeight} kg</span>}
@@ -202,7 +202,7 @@ export default function BiddingPage() {
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              Bid on {selectedLot?.lotId} - {selectedLot?.farmer.name}
+              Bid on {selectedLot?.lotId} - {selectedLot?.farmer.farmerId} {selectedLot?.farmer.name}
             </DialogTitle>
           </DialogHeader>
 

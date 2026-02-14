@@ -137,7 +137,7 @@ export default function StockRegisterPage() {
                       )}
                     </div>
                     <div className="text-sm space-y-1">
-                      <p className="font-medium truncate">{lot.farmer.name} - {lot.farmer.phone}</p>
+                      <p className="font-medium truncate"><span className="font-mono text-xs text-muted-foreground mr-1">{lot.farmer.farmerId}</span>{lot.farmer.name} - {lot.farmer.phone}</p>
                       {lot.farmer.village && (
                         <p className="text-muted-foreground text-xs">{lot.farmer.village}</p>
                       )}

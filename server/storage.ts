@@ -39,6 +39,8 @@ export interface IStorage {
   createFarmerEditHistory(entry: InsertFarmerEditHistory): Promise<FarmerEditHistory>;
   mergeFarmers(businessId: number, keepId: number, mergeId: number, changedBy: string): Promise<Farmer>;
 
+  getNextFarmerId(businessId: number): Promise<string>;
+
   getBuyers(businessId: number, search?: string): Promise<Buyer[]>;
   getBuyer(id: number, businessId: number): Promise<Buyer | undefined>;
   createBuyer(buyer: InsertBuyer): Promise<Buyer>;
@@ -162,7 +164,8 @@ export class DatabaseStorage implements IStorage {
           or(
             ilike(farmers.name, `%${search}%`),
             ilike(farmers.phone, `%${search}%`),
-            ilike(farmers.village, `%${search}%`)
+            ilike(farmers.village, `%${search}%`),
+            ilike(farmers.farmerId, `%${search}%`)
           )
         )
       ).orderBy(asc(farmers.name));
@@ -175,8 +178,22 @@ export class DatabaseStorage implements IStorage {
     return farmer;
   }
 
+  async getNextFarmerId(businessId: number): Promise<string> {
+    const today = new Date();
+    const dateStr = today.getFullYear().toString() +
+      (today.getMonth() + 1).toString().padStart(2, "0") +
+      today.getDate().toString().padStart(2, "0");
+    const prefix = `FM${dateStr}`;
+    const [result] = await db.select({ count: sql<string>`count(*)` })
+      .from(farmers)
+      .where(and(eq(farmers.businessId, businessId), ilike(farmers.farmerId, `${prefix}%`)));
+    const seq = parseInt(result?.count || "0", 10) + 1;
+    return `${prefix}${seq}`;
+  }
+
   async createFarmer(farmer: InsertFarmer): Promise<Farmer> {
-    const [created] = await db.insert(farmers).values(farmer).returning();
+    const farmerId = await this.getNextFarmerId(farmer.businessId);
+    const [created] = await db.insert(farmers).values({ ...farmer, farmerId }).returning();
     return created;
   }
 
@@ -194,7 +211,8 @@ export class DatabaseStorage implements IStorage {
           or(
             ilike(farmers.name, `%${search}%`),
             ilike(farmers.phone, `%${search}%`),
-            ilike(farmers.village, `%${search}%`)
+            ilike(farmers.village, `%${search}%`),
+            ilike(farmers.farmerId, `%${search}%`)
           )
         )
       ).orderBy(asc(farmers.id));

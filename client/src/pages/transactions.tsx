@@ -84,7 +84,7 @@ h2{text-align:center;margin-bottom:5px}
 </div>
 <table>
 <tr><td><strong>लॉट नं:</strong> ${lot.lotId}</td><td><strong>दिनांक:</strong> ${dateStr}</td></tr>
-<tr><td><strong>किसान:</strong> ${farmer.name}</td><td><strong>फोन:</strong> ${farmer.phone || "-"}</td></tr>
+<tr><td><strong>किसान:</strong> ${farmer.farmerId} - ${farmer.name}</td><td><strong>फोन:</strong> ${farmer.phone || "-"}</td></tr>
 <tr><td><strong>फसल:</strong> ${lot.crop}</td><td><strong>किस्म:</strong> ${lot.variety || "-"}</td></tr>
 <tr><td><strong>थैले:</strong> ${lot.numberOfBags}</td><td><strong>वज़न:</strong> ${totalNetWeight.toFixed(2)} kg</td></tr>
 </table>
@@ -122,7 +122,7 @@ h2{text-align:center;margin-bottom:5px}
 <table class="detail-table">
 <tr><td><strong>Lot No:</strong> ${lot.lotId}</td><td><strong>Date:</strong> ${dateStr}</td></tr>
 <tr><td><strong>Buyer:</strong> ${tx.buyer.name}</td><td><strong>Buyer Code:</strong> ${tx.buyer.buyerCode || "-"}</td></tr>
-<tr><td><strong>Farmer:</strong> ${farmer.name}</td><td><strong>Crop:</strong> ${lot.crop}</td></tr>
+<tr><td><strong>Farmer:</strong> ${farmer.farmerId} - ${farmer.name}</td><td><strong>Crop:</strong> ${lot.crop}</td></tr>
 <tr><td><strong>Size:</strong> ${lot.size || "-"}</td><td></td></tr>
 </table>
 <table style="margin-top:15px">
@@ -435,7 +435,7 @@ export default function TransactionsPage() {
                         <Badge variant="secondary" className="text-xs">{group.lotId}</Badge>
                         <Badge variant="outline" className="text-xs">{group.lot.crop}</Badge>
                       </div>
-                      <p className="text-sm">Farmer: <strong>{group.farmer.name}</strong></p>
+                      <p className="text-sm">Farmer: <span className="font-mono text-xs text-muted-foreground mr-1">{group.farmer.farmerId}</span><strong>{group.farmer.name}</strong></p>
                       <p className="text-xs text-muted-foreground">{group.lot.numberOfBags} bags total</p>
                     </div>
                     <div className="flex items-center gap-1">
@@ -540,7 +540,7 @@ export default function TransactionsPage() {
             <div className="space-y-4">
               <div className="bg-muted rounded-md p-3 text-sm space-y-1">
                 <p>Lot: <strong>{selectedBid.lot.lotId}</strong></p>
-                <p>Farmer: <strong>{selectedBid.farmer.name}</strong></p>
+                <p>Farmer: <span className="font-mono text-xs text-muted-foreground mr-1">{selectedBid.farmer.farmerId}</span><strong>{selectedBid.farmer.name}</strong></p>
               </div>
 
               {dialogItems.length > 1 && (

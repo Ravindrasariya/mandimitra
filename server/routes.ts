@@ -45,6 +45,28 @@ export async function registerRoutes(
   }
   await seedDefaultBusiness();
 
+  async function backfillFarmerIds() {
+    const { db } = await import("./db");
+    const { farmers } = await import("@shared/schema");
+    const { eq, and, ilike, sql } = await import("drizzle-orm");
+    const missing = await db.select().from(farmers).where(eq(farmers.farmerId, ""));
+    for (const farmer of missing) {
+      const today = farmer.createdAt || new Date();
+      const dateStr = today.getFullYear().toString() +
+        (today.getMonth() + 1).toString().padStart(2, "0") +
+        today.getDate().toString().padStart(2, "0");
+      const prefix = `FM${dateStr}`;
+      const [result] = await db.select({ count: sql<string>`count(*)` })
+        .from(farmers)
+        .where(and(eq(farmers.businessId, farmer.businessId), ilike(farmers.farmerId, `${prefix}%`)));
+      const seq = parseInt(result?.count || "0", 10) + 1;
+      const farmerId = `${prefix}${seq}`;
+      await db.update(farmers).set({ farmerId }).where(eq(farmers.id, farmer.id));
+      console.log(`Backfilled farmer ${farmer.id} with ID ${farmerId}`);
+    }
+  }
+  await backfillFarmerIds();
+
   app.get("/api/admin/businesses", requireAdmin, async (_req, res) => {
     const result = await storage.getAllBusinesses();
     res.json(result);

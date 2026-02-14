@@ -29,6 +29,7 @@ export const users = pgTable("users", {
 export const farmers = pgTable("farmers", {
   id: serial("id").primaryKey(),
   businessId: integer("business_id").notNull().references(() => businesses.id),
+  farmerId: text("farmer_id").notNull().default(""),
   name: text("name").notNull(),
   phone: text("phone").notNull(),
   village: text("village"),
