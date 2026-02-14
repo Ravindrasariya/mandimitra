@@ -88,6 +88,10 @@ export default function BuyerLedgerPage() {
         const key = query.queryKey[0];
         return typeof key === "string" && key.startsWith("/api/buyers");
       }});
+      queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bids"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash-entries"] });
       setEditingBuyer(null);
       toast({ title: "Updated", description: "Buyer details updated" });
     },
@@ -106,6 +110,10 @@ export default function BuyerLedgerPage() {
         const key = query.queryKey[0];
         return typeof key === "string" && key.startsWith("/api/buyers");
       }});
+      queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bids"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash-entries"] });
     },
   });
 
