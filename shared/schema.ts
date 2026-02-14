@@ -103,6 +103,7 @@ export const transactions = pgTable("transactions", {
   farmerId: integer("farmer_id").notNull().references(() => farmers.id),
   totalWeight: decimal("total_weight", { precision: 12, scale: 2 }),
   numberOfBags: integer("number_of_bags"),
+  hammaliPerBag: decimal("hammali_per_bag", { precision: 10, scale: 2 }).default("0"),
   hammaliCharges: decimal("hammali_charges", { precision: 10, scale: 2 }).default("0"),
   gradingCharges: decimal("grading_charges", { precision: 10, scale: 2 }).default("0"),
   netWeight: decimal("net_weight", { precision: 12, scale: 2 }),

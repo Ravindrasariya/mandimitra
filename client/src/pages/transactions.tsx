@@ -1,28 +1,169 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { Bid, Buyer, Lot, Farmer, Transaction } from "@shared/schema";
-import { Receipt, Calculator, ArrowRight } from "lucide-react";
+import { Receipt, Calculator, Printer, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
 
-type BidWithDetails = Bid & { buyer: Buyer; lot: Lot };
+type BidWithDetails = Bid & { buyer: Buyer; lot: Lot; farmer: Farmer };
 type TransactionWithDetails = Transaction & { farmer: Farmer; buyer: Buyer; lot: Lot; bid: Bid };
+
+type LotGroup<T> = {
+  lotId: string;
+  lot: Lot;
+  farmer: Farmer;
+  items: T[];
+};
+
+function groupByLot<T extends { lot: Lot; farmer?: Farmer }>(items: T[], getFarmer: (item: T) => Farmer): LotGroup<T>[] {
+  const map = new Map<number, LotGroup<T>>();
+  for (const item of items) {
+    const key = item.lot.id;
+    if (!map.has(key)) {
+      map.set(key, { lotId: item.lot.lotId, lot: item.lot, farmer: getFarmer(item), items: [] });
+    }
+    map.get(key)!.items.push(item);
+  }
+  return Array.from(map.values());
+}
+
+function generateFarmerReceiptHtml(lot: Lot, farmer: Farmer, txns: TransactionWithDetails[], businessName?: string) {
+  const totalBags = txns.reduce((s, t) => s + (t.numberOfBags || 0), 0);
+  const totalNetWeight = txns.reduce((s, t) => s + parseFloat(t.netWeight || "0"), 0);
+  const totalHammali = txns.reduce((s, t) => s + parseFloat(t.hammaliCharges || "0"), 0);
+  const totalGrading = txns.reduce((s, t) => s + parseFloat(t.gradingCharges || "0"), 0);
+  const totalAadhat = txns.reduce((s, t) => s + parseFloat(t.aadhatCharges || "0"), 0);
+  const totalMandi = txns.reduce((s, t) => s + parseFloat(t.mandiCharges || "0"), 0);
+  const totalPayable = txns.reduce((s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0);
+  const totalGross = txns.reduce((s, t) => s + (parseFloat(t.netWeight || "0") * parseFloat(t.pricePerKg || "0")), 0);
+  const dateStr = txns[0]?.date || format(new Date(), "yyyy-MM-dd");
+
+  const buyerRows = txns.map(tx => `
+    <tr>
+      <td style="padding:6px;border:1px solid #ccc;">${tx.buyer.name}</td>
+      <td style="padding:6px;border:1px solid #ccc;text-align:center;">${tx.numberOfBags}</td>
+      <td style="padding:6px;border:1px solid #ccc;text-align:right;">${parseFloat(tx.netWeight || "0").toFixed(2)}</td>
+      <td style="padding:6px;border:1px solid #ccc;text-align:right;">₹${parseFloat(tx.pricePerKg || "0").toFixed(2)}</td>
+      <td style="padding:6px;border:1px solid #ccc;text-align:right;">₹${(parseFloat(tx.netWeight || "0") * parseFloat(tx.pricePerKg || "0")).toFixed(2)}</td>
+    </tr>
+  `).join("");
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>किसान रसीद</title>
+<style>body{font-family:'Noto Sans Devanagari',sans-serif;margin:20px;color:#333}
+table{width:100%;border-collapse:collapse;margin:10px 0}
+h2{text-align:center;margin-bottom:5px}
+.header{text-align:center;margin-bottom:15px}
+.summary{margin-top:15px;border-top:2px solid #333;padding-top:10px}
+.summary-row{display:flex;justify-content:space-between;padding:3px 0}
+.total{font-weight:bold;font-size:1.1em;color:#16a34a;border-top:2px solid #333;padding-top:8px;margin-top:8px}
+@media print{body{margin:10mm}}
+</style></head><body>
+<div class="header">
+<h2>किसान रसीद / Farmer Receipt</h2>
+<p style="font-size:0.9em;color:#666">${businessName || "Mandi Mitra"}</p>
+</div>
+<table>
+<tr><td><strong>लॉट नं:</strong> ${lot.lotId}</td><td><strong>दिनांक:</strong> ${dateStr}</td></tr>
+<tr><td><strong>किसान:</strong> ${farmer.name}</td><td><strong>फोन:</strong> ${farmer.phone || "-"}</td></tr>
+<tr><td><strong>फसल:</strong> ${lot.crop}</td><td><strong>किस्म:</strong> ${lot.variety || "-"}</td></tr>
+<tr><td><strong>थैले:</strong> ${lot.numberOfBags}</td><td><strong>साइज़:</strong> ${lot.size || "-"}</td></tr>
+</table>
+<h3 style="margin-top:15px">खरीदार विवरण (Buyer Details)</h3>
+<table>
+<tr style="background:#f5f5f5">
+<th style="padding:6px;border:1px solid #ccc;text-align:left">खरीदार</th>
+<th style="padding:6px;border:1px solid #ccc;text-align:center">थैले</th>
+<th style="padding:6px;border:1px solid #ccc;text-align:right">वज़न (kg)</th>
+<th style="padding:6px;border:1px solid #ccc;text-align:right">दर/kg</th>
+<th style="padding:6px;border:1px solid #ccc;text-align:right">राशि</th>
+</tr>
+${buyerRows}
+</table>
+<div class="summary">
+<div class="summary-row"><span>कुल राशि (Gross):</span><span>₹${totalGross.toFixed(2)}</span></div>
+<div class="summary-row"><span>हम्माली (${totalBags} थैले):</span><span>₹${totalHammali.toFixed(2)}</span></div>
+<div class="summary-row"><span>ग्रेडिंग:</span><span>₹${totalGrading.toFixed(2)}</span></div>
+<div class="summary-row"><span>आढ़त:</span><span>₹${totalAadhat.toFixed(2)}</span></div>
+<div class="summary-row"><span>मण्डी शुल्क:</span><span>₹${totalMandi.toFixed(2)}</span></div>
+<div class="summary-row total"><span>किसान को देय राशि:</span><span>₹${totalPayable.toFixed(2)}</span></div>
+</div>
+<script>window.onload=function(){window.print()}</script>
+</body></html>`;
+}
+
+function generateBuyerReceiptHtml(lot: Lot, farmer: Farmer, tx: TransactionWithDetails, businessName?: string) {
+  const grossAmount = parseFloat(tx.netWeight || "0") * parseFloat(tx.pricePerKg || "0");
+  const dateStr = tx.date || format(new Date(), "yyyy-MM-dd");
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Buyer Receipt</title>
+<style>body{font-family:Arial,sans-serif;margin:20px;color:#333}
+table{width:100%;border-collapse:collapse;margin:10px 0}
+h2{text-align:center;margin-bottom:5px}
+.header{text-align:center;margin-bottom:15px}
+.detail-table td{padding:6px;border:1px solid #ccc}
+.summary{margin-top:15px;border-top:2px solid #333;padding-top:10px}
+.summary-row{display:flex;justify-content:space-between;padding:3px 0}
+.total{font-weight:bold;font-size:1.1em;color:#dc2626;border-top:2px solid #333;padding-top:8px;margin-top:8px}
+@media print{body{margin:10mm}}
+</style></head><body>
+<div class="header">
+<h2>Buyer Receipt</h2>
+<p style="font-size:0.9em;color:#666">${businessName || "Mandi Mitra"}</p>
+</div>
+<table class="detail-table">
+<tr><td><strong>Lot No:</strong> ${lot.lotId}</td><td><strong>Date:</strong> ${dateStr}</td></tr>
+<tr><td><strong>Buyer:</strong> ${tx.buyer.name}</td><td><strong>Buyer Code:</strong> ${tx.buyer.buyerCode || "-"}</td></tr>
+<tr><td><strong>Farmer:</strong> ${farmer.name}</td><td><strong>Crop:</strong> ${lot.crop}</td></tr>
+<tr><td><strong>Grade:</strong> ${tx.bid.grade || "-"}</td><td><strong>Size:</strong> ${lot.size || "-"}</td></tr>
+</table>
+<table style="margin-top:15px">
+<tr style="background:#f5f5f5">
+<th style="padding:8px;border:1px solid #ccc;text-align:left">Description</th>
+<th style="padding:8px;border:1px solid #ccc;text-align:right">Amount</th>
+</tr>
+<tr><td style="padding:6px;border:1px solid #ccc">Bags</td><td style="padding:6px;border:1px solid #ccc;text-align:right">${tx.numberOfBags}</td></tr>
+<tr><td style="padding:6px;border:1px solid #ccc">Total Weight</td><td style="padding:6px;border:1px solid #ccc;text-align:right">${parseFloat(tx.totalWeight || "0").toFixed(2)} kg</td></tr>
+<tr><td style="padding:6px;border:1px solid #ccc">Net Weight</td><td style="padding:6px;border:1px solid #ccc;text-align:right">${parseFloat(tx.netWeight || "0").toFixed(2)} kg</td></tr>
+<tr><td style="padding:6px;border:1px solid #ccc">Rate</td><td style="padding:6px;border:1px solid #ccc;text-align:right">Rs.${parseFloat(tx.pricePerKg || "0").toFixed(2)}/kg</td></tr>
+<tr style="background:#f9f9f9"><td style="padding:6px;border:1px solid #ccc"><strong>Gross Amount</strong></td><td style="padding:6px;border:1px solid #ccc;text-align:right"><strong>Rs.${grossAmount.toFixed(2)}</strong></td></tr>
+</table>
+<div class="summary">
+<div class="summary-row"><span>Hammali (${tx.numberOfBags} bags × Rs.${parseFloat(tx.hammaliPerBag || "0").toFixed(2)}):</span><span>Rs.${parseFloat(tx.hammaliCharges || "0").toFixed(2)}</span></div>
+<div class="summary-row"><span>Grading:</span><span>Rs.${parseFloat(tx.gradingCharges || "0").toFixed(2)}</span></div>
+<div class="summary-row"><span>Aadhat (${tx.aadhatCommissionPercent}%):</span><span>Rs.${parseFloat(tx.aadhatCharges || "0").toFixed(2)}</span></div>
+<div class="summary-row"><span>Mandi (${tx.mandiCommissionPercent}%):</span><span>Rs.${parseFloat(tx.mandiCharges || "0").toFixed(2)}</span></div>
+<div class="summary-row"><span>Charges Applied To:</span><span>${tx.chargedTo}</span></div>
+<div class="summary-row total"><span>Total Receivable from Buyer:</span><span>Rs.${parseFloat(tx.totalReceivableFromBuyer || "0").toFixed(2)}</span></div>
+</div>
+<script>window.onload=function(){window.print()}</script>
+</body></html>`;
+}
+
+function openPrintWindow(html: string) {
+  const w = window.open("", "_blank", "width=800,height=600");
+  if (w) {
+    w.document.write(html);
+    w.document.close();
+  }
+}
 
 export default function TransactionsPage() {
   const { toast } = useToast();
-  const [selectedBid, setSelectedBid] = useState<BidWithDetails | null>(null);
+  const [selectedLotBids, setSelectedLotBids] = useState<BidWithDetails[]>([]);
+  const [selectedBuyerIdx, setSelectedBuyerIdx] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const [totalWeight, setTotalWeight] = useState("");
-  const [hammaliCharges, setHammaliCharges] = useState("0");
+  const [hammaliPerBag, setHammaliPerBag] = useState("0");
   const [gradingCharges, setGradingCharges] = useState("0");
   const [aadhatPercent, setAadhatPercent] = useState("2");
   const [mandiPercent, setMandiPercent] = useState("1");
@@ -32,7 +173,7 @@ export default function TransactionsPage() {
     queryKey: ["/api/bids"],
   });
 
-  const { data: txns = [], isLoading } = useQuery<TransactionWithDetails[]>({
+  const { data: txns = [] } = useQuery<TransactionWithDetails[]>({
     queryKey: ["/api/transactions"],
   });
 
@@ -45,7 +186,7 @@ export default function TransactionsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/bids"] });
       setDialogOpen(false);
-      setSelectedBid(null);
+      setSelectedLotBids([]);
       toast({ title: "Transaction Created", description: "Transaction recorded successfully" });
     },
     onError: (err: any) => {
@@ -56,10 +197,14 @@ export default function TransactionsPage() {
   const existingBidIds = new Set(txns.map(t => t.bidId));
   const pendingBids = allBids.filter(b => !existingBidIds.has(b.id));
 
-  const openTransaction = (bid: BidWithDetails) => {
-    setSelectedBid(bid);
+  const pendingLotGroups = useMemo(() => groupByLot(pendingBids, (b) => b.farmer), [pendingBids]);
+  const completedLotGroups = useMemo(() => groupByLot(txns, (t) => t.farmer), [txns]);
+
+  const openTransaction = (lotBids: BidWithDetails[]) => {
+    setSelectedLotBids(lotBids);
+    setSelectedBuyerIdx(0);
     setTotalWeight("");
-    setHammaliCharges("0");
+    setHammaliPerBag("0");
     setGradingCharges("0");
     setAadhatPercent("2");
     setMandiPercent("1");
@@ -67,20 +212,23 @@ export default function TransactionsPage() {
     setDialogOpen(true);
   };
 
+  const selectedBid = selectedLotBids[selectedBuyerIdx] || null;
+
   const tw = parseFloat(totalWeight) || 0;
   const bags = selectedBid?.numberOfBags || 0;
   const netWeight = tw > 0 ? (tw - bags).toFixed(2) : "0.00";
   const nw = parseFloat(netWeight);
   const price = parseFloat(selectedBid?.pricePerKg || "0");
   const grossAmount = nw * price;
-  const hammali = parseFloat(hammaliCharges) || 0;
+  const hammaliRate = parseFloat(hammaliPerBag) || 0;
+  const totalHammali = hammaliRate * bags;
   const grading = parseFloat(gradingCharges) || 0;
   const aadhat = (grossAmount * (parseFloat(aadhatPercent) || 0)) / 100;
   const mandi = (grossAmount * (parseFloat(mandiPercent) || 0)) / 100;
   const totalCommission = aadhat + mandi;
 
-  const farmerPayable = grossAmount - hammali - grading - (chargedTo === "Seller" ? totalCommission : 0);
-  const buyerReceivable = grossAmount + (chargedTo === "Buyer" ? totalCommission : 0) + hammali + grading;
+  const farmerPayable = grossAmount - totalHammali - grading - (chargedTo === "Seller" ? totalCommission : 0);
+  const buyerReceivable = grossAmount + (chargedTo === "Buyer" ? totalCommission : 0) + totalHammali + grading;
 
   const submitTransaction = () => {
     if (!selectedBid || !totalWeight) {
@@ -95,7 +243,8 @@ export default function TransactionsPage() {
       farmerId: selectedBid.lot.farmerId,
       totalWeight,
       numberOfBags: bags,
-      hammaliCharges: hammali.toString(),
+      hammaliPerBag: hammaliRate.toString(),
+      hammaliCharges: totalHammali.toString(),
       gradingCharges: grading.toString(),
       netWeight,
       pricePerKg: selectedBid.pricePerKg,
@@ -110,6 +259,16 @@ export default function TransactionsPage() {
     });
   };
 
+  const handlePrintFarmerReceipt = (group: LotGroup<TransactionWithDetails>) => {
+    const html = generateFarmerReceiptHtml(group.lot, group.farmer, group.items);
+    openPrintWindow(html);
+  };
+
+  const handlePrintBuyerReceipt = (tx: TransactionWithDetails) => {
+    const html = generateBuyerReceiptHtml(tx.lot, tx.farmer, tx);
+    openPrintWindow(html);
+  };
+
   return (
     <div className="p-3 md:p-6 max-w-4xl mx-auto space-y-4">
       <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
@@ -117,64 +276,134 @@ export default function TransactionsPage() {
         Transactions
       </h1>
 
-      {pendingBids.length > 0 && (
-        <div className="space-y-2">
+      {pendingLotGroups.length > 0 && (
+        <div className="space-y-3">
           <h2 className="text-sm font-semibold text-muted-foreground">Pending Bids (Ready for Transaction)</h2>
-          {pendingBids.map((bid) => (
-            <Card key={bid.id}>
+          {pendingLotGroups.map((group) => (
+            <Card key={group.lot.id} data-testid={`card-pending-lot-${group.lot.id}`}>
               <CardContent className="pt-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0 text-sm space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="secondary" className="text-xs">{bid.lot.lotId}</Badge>
-                      <Badge className="text-xs">Rs.{bid.pricePerKg}/kg</Badge>
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-1">
+                      <Badge variant="secondary" className="text-xs">{group.lotId}</Badge>
+                      <Badge variant="outline" className="text-xs">{group.lot.crop}</Badge>
                     </div>
-                    <p>Buyer: <strong>{bid.buyer.name}</strong></p>
-                    <p className="text-muted-foreground text-xs">{bid.numberOfBags} bags | Grade: {bid.grade || "N/A"}</p>
+                    <p className="text-sm">Farmer: <strong>{group.farmer.name}</strong></p>
+                    <p className="text-xs text-muted-foreground">{group.lot.numberOfBags} bags total | Size: {group.lot.size}</p>
                   </div>
                   <Button
-                    data-testid={`button-create-tx-${bid.id}`}
+                    data-testid={`button-bill-lot-${group.lot.id}`}
                     size="sm"
                     className="mobile-touch-target"
-                    onClick={() => openTransaction(bid)}
+                    onClick={() => openTransaction(group.items)}
                   >
                     <Calculator className="w-4 h-4 mr-1" />
                     Bill
                   </Button>
                 </div>
+                <div className="border-t pt-2 space-y-1">
+                  {group.items.map((bid) => (
+                    <div key={bid.id} className="flex items-center justify-between text-sm py-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted-foreground">Buyer:</span>
+                        <strong>{bid.buyer.name}</strong>
+                      </div>
+                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                        <Badge className="text-xs">Rs.{bid.pricePerKg}/kg</Badge>
+                        <span>{bid.numberOfBags} bags</span>
+                        <span>{bid.grade || "N/A"}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
           ))}
         </div>
       )}
 
-      {txns.length > 0 && (
-        <div className="space-y-2">
+      {completedLotGroups.length > 0 && (
+        <div className="space-y-3">
           <h2 className="text-sm font-semibold text-muted-foreground mt-6">Completed Transactions</h2>
-          {txns.map((tx) => (
-            <Card key={tx.id}>
-              <CardContent className="pt-4 text-sm space-y-1">
-                <div className="flex flex-wrap items-center gap-2 mb-1">
-                  <Badge variant="secondary" className="text-xs">{tx.lot.lotId}</Badge>
-                  <Badge className="text-xs">{tx.date}</Badge>
-                </div>
-                <p>Farmer: <strong>{tx.farmer.name}</strong> <ArrowRight className="inline w-3 h-3" /> Buyer: <strong>{tx.buyer.name}</strong></p>
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                  <span>Net Wt: {tx.netWeight} kg</span>
-                  <span>Rate: Rs.{tx.pricePerKg}/kg</span>
-                  <span>{tx.numberOfBags} bags</span>
-                </div>
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs mt-1">
-                  <span className="text-primary">Farmer: Rs.{tx.totalPayableToFarmer}</span>
-                  <span className="text-chart-2">Buyer: Rs.{tx.totalReceivableFromBuyer}</span>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+          {completedLotGroups.map((group) => {
+            const totalFarmerPayable = group.items.reduce((s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0);
+            return (
+              <Card key={group.lot.id} data-testid={`card-completed-lot-${group.lot.id}`}>
+                <CardContent className="pt-4 text-sm space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <Badge variant="secondary" className="text-xs">{group.lotId}</Badge>
+                        <Badge variant="outline" className="text-xs">{group.lot.crop}</Badge>
+                        <Badge className="text-xs">{group.items[0]?.date}</Badge>
+                      </div>
+                      <p>Farmer: <strong>{group.farmer.name}</strong></p>
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          data-testid={`button-print-lot-${group.lot.id}`}
+                          variant="outline"
+                          size="sm"
+                          className="mobile-touch-target"
+                        >
+                          <Printer className="w-4 h-4 mr-1" />
+                          Print Bill
+                          <ChevronDown className="w-3 h-3 ml-1" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          data-testid={`button-print-farmer-${group.lot.id}`}
+                          onClick={() => handlePrintFarmerReceipt(group)}
+                        >
+                          किसान रसीद (Farmer Receipt - Hindi)
+                        </DropdownMenuItem>
+                        {group.items.map((tx) => (
+                          <DropdownMenuItem
+                            key={tx.id}
+                            data-testid={`button-print-buyer-${tx.id}`}
+                            onClick={() => handlePrintBuyerReceipt(tx)}
+                          >
+                            Buyer Receipt - {tx.buyer.name}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+
+                  <div className="border-t pt-2 flex justify-between font-medium text-primary">
+                    <span>Total Payable to Farmer:</span>
+                    <span>Rs.{totalFarmerPayable.toFixed(2)}</span>
+                  </div>
+
+                  <div className="border-t pt-2 space-y-2">
+                    <p className="text-xs font-semibold text-muted-foreground">Buyer-wise Details:</p>
+                    {group.items.map((tx) => (
+                      <div key={tx.id} className="bg-muted/50 rounded-md p-2 space-y-1">
+                        <div className="flex justify-between items-center">
+                          <strong>{tx.buyer.name}</strong>
+                          <Badge className="text-xs">Rs.{tx.pricePerKg}/kg</Badge>
+                        </div>
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                          <span>Net Wt: {tx.netWeight} kg</span>
+                          <span>{tx.numberOfBags} bags</span>
+                          <span>Hammali: Rs.{tx.hammaliCharges}</span>
+                        </div>
+                        <div className="text-xs font-medium">
+                          Receivable: <span className="text-chart-2">Rs.{tx.totalReceivableFromBuyer}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
-      {pendingBids.length === 0 && txns.length === 0 && (
+      {pendingLotGroups.length === 0 && completedLotGroups.length === 0 && (
         <div className="text-center py-8 text-muted-foreground">
           No bids or transactions yet. Complete bidding first.
         </div>
@@ -189,8 +418,37 @@ export default function TransactionsPage() {
             <div className="space-y-4">
               <div className="bg-muted rounded-md p-3 text-sm space-y-1">
                 <p>Lot: <strong>{selectedBid.lot.lotId}</strong></p>
+                <p>Farmer: <strong>{selectedBid.farmer.name}</strong></p>
+              </div>
+
+              {selectedLotBids.length > 1 && (
+                <div className="space-y-1">
+                  <Label>Select Buyer</Label>
+                  <Select
+                    data-testid="select-buyer-bid"
+                    value={selectedBuyerIdx.toString()}
+                    onValueChange={(val) => {
+                      setSelectedBuyerIdx(parseInt(val));
+                      setTotalWeight("");
+                    }}
+                  >
+                    <SelectTrigger className="mobile-touch-target">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {selectedLotBids.map((bid, idx) => (
+                        <SelectItem key={bid.id} value={idx.toString()}>
+                          {bid.buyer.name} - Rs.{bid.pricePerKg}/kg ({bid.numberOfBags} bags)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              <div className="bg-muted/50 rounded-md p-2 text-sm">
                 <p>Buyer: <strong>{selectedBid.buyer.name}</strong></p>
-                <p>Price: <strong>Rs.{selectedBid.pricePerKg}/kg</strong> | Bags: <strong>{selectedBid.numberOfBags}</strong></p>
+                <p>Price: <strong>Rs.{selectedBid.pricePerKg}/kg</strong> | Bags: <strong>{selectedBid.numberOfBags}</strong> | Grade: <strong>{selectedBid.grade || "N/A"}</strong></p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -198,9 +456,8 @@ export default function TransactionsPage() {
                   <Label>Total Weight (kg)</Label>
                   <Input
                     data-testid="input-total-weight"
-                    type="number"
+                    type="text"
                     inputMode="decimal"
-                    step="0.01"
                     value={totalWeight}
                     onChange={(e) => setTotalWeight(e.target.value)}
                     placeholder="0.00"
@@ -216,21 +473,22 @@ export default function TransactionsPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label>Hammali (Rs.)</Label>
+                  <Label>Hammali (Rs./Bag)</Label>
                   <Input
-                    data-testid="input-hammali"
-                    type="number"
+                    data-testid="input-hammali-per-bag"
+                    type="text"
                     inputMode="decimal"
-                    value={hammaliCharges}
-                    onChange={(e) => setHammaliCharges(e.target.value)}
+                    value={hammaliPerBag}
+                    onChange={(e) => setHammaliPerBag(e.target.value)}
                     className="mobile-touch-target"
                   />
+                  <p className="text-xs text-muted-foreground">Total: Rs.{totalHammali.toFixed(2)} ({bags} bags)</p>
                 </div>
                 <div className="space-y-1">
                   <Label>Grading (Rs.)</Label>
                   <Input
                     data-testid="input-grading"
-                    type="number"
+                    type="text"
                     inputMode="decimal"
                     value={gradingCharges}
                     onChange={(e) => setGradingCharges(e.target.value)}
@@ -244,9 +502,8 @@ export default function TransactionsPage() {
                   <Label>Aadhat %</Label>
                   <Input
                     data-testid="input-aadhat"
-                    type="number"
+                    type="text"
                     inputMode="decimal"
-                    step="0.01"
                     value={aadhatPercent}
                     onChange={(e) => setAadhatPercent(e.target.value)}
                     className="mobile-touch-target"
@@ -256,9 +513,8 @@ export default function TransactionsPage() {
                   <Label>Mandi %</Label>
                   <Input
                     data-testid="input-mandi"
-                    type="number"
+                    type="text"
                     inputMode="decimal"
-                    step="0.01"
                     value={mandiPercent}
                     onChange={(e) => setMandiPercent(e.target.value)}
                     className="mobile-touch-target"
@@ -283,6 +539,14 @@ export default function TransactionsPage() {
                 <div className="flex justify-between">
                   <span>Gross Amount:</span>
                   <span className="font-medium">Rs.{grossAmount.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Hammali ({bags} bags × Rs.{hammaliRate.toFixed(2)}):</span>
+                  <span>Rs.{totalHammali.toFixed(2)}</span>
+                </div>
+                <div className="flex justify-between text-muted-foreground">
+                  <span>Grading:</span>
+                  <span>Rs.{grading.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-muted-foreground">
                   <span>Aadhat ({aadhatPercent}%):</span>

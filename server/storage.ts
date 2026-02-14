@@ -50,7 +50,7 @@ export interface IStorage {
   getNextSerialNumber(businessId: number, crop: string, date: string): Promise<number>;
   getNextLotNumber(businessId: number, date: string): Promise<number>;
 
-  getBids(businessId: number, lotId?: number): Promise<(Bid & { buyer: Buyer; lot: Lot })[]>;
+  getBids(businessId: number, lotId?: number): Promise<(Bid & { buyer: Buyer; lot: Lot; farmer: Farmer })[]>;
   createBid(bid: InsertBid): Promise<Bid>;
   updateBid(id: number, businessId: number, data: Partial<InsertBid>): Promise<Bid | undefined>;
   deleteBid(id: number, businessId: number): Promise<void>;
@@ -334,7 +334,7 @@ export class DatabaseStorage implements IStorage {
     return parseInt(result?.count || "0", 10) + 1;
   }
 
-  async getBids(businessId: number, lotId?: number): Promise<(Bid & { buyer: Buyer; lot: Lot })[]> {
+  async getBids(businessId: number, lotId?: number): Promise<(Bid & { buyer: Buyer; lot: Lot; farmer: Farmer })[]> {
     let conditions = [eq(bids.businessId, businessId)];
     if (lotId) conditions.push(eq(bids.lotId, lotId));
 
@@ -342,13 +342,15 @@ export class DatabaseStorage implements IStorage {
       bid: bids,
       buyer: buyers,
       lot: lots,
+      farmer: farmers,
     }).from(bids)
       .innerJoin(buyers, eq(bids.buyerId, buyers.id))
       .innerJoin(lots, eq(bids.lotId, lots.id))
+      .innerJoin(farmers, eq(lots.farmerId, farmers.id))
       .where(and(...conditions))
       .orderBy(desc(bids.createdAt));
 
-    return results.map(r => ({ ...r.bid, buyer: r.buyer, lot: r.lot }));
+    return results.map(r => ({ ...r.bid, buyer: r.buyer, lot: r.lot, farmer: r.farmer }));
   }
 
   async createBid(bid: InsertBid): Promise<Bid> {
