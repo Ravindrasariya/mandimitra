@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -11,34 +11,47 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { Bid, Buyer, Lot, Farmer, Transaction } from "@shared/schema";
-import { Receipt, Calculator, Printer, ChevronDown } from "lucide-react";
+import { Receipt, Pencil, Printer, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
 
 type BidWithDetails = Bid & { buyer: Buyer; lot: Lot; farmer: Farmer };
 type TransactionWithDetails = Transaction & { farmer: Farmer; buyer: Buyer; lot: Lot; bid: Bid };
 
-type LotGroup<T> = {
+type UnifiedLotGroup = {
   lotId: string;
   lot: Lot;
   farmer: Farmer;
-  items: T[];
+  pendingBids: BidWithDetails[];
+  completedTxns: TransactionWithDetails[];
 };
 
-function groupByLot<T extends { lot: Lot; farmer?: Farmer }>(items: T[], getFarmer: (item: T) => Farmer): LotGroup<T>[] {
-  const map = new Map<number, LotGroup<T>>();
-  for (const item of items) {
-    const key = item.lot.id;
+function buildUnifiedLotGroups(
+  pendingBids: BidWithDetails[],
+  completedTxns: TransactionWithDetails[]
+): UnifiedLotGroup[] {
+  const map = new Map<number, UnifiedLotGroup>();
+
+  for (const bid of pendingBids) {
+    const key = bid.lot.id;
     if (!map.has(key)) {
-      map.set(key, { lotId: item.lot.lotId, lot: item.lot, farmer: getFarmer(item), items: [] });
+      map.set(key, { lotId: bid.lot.lotId, lot: bid.lot, farmer: bid.farmer, pendingBids: [], completedTxns: [] });
     }
-    map.get(key)!.items.push(item);
+    map.get(key)!.pendingBids.push(bid);
   }
+
+  for (const tx of completedTxns) {
+    const key = tx.lot.id;
+    if (!map.has(key)) {
+      map.set(key, { lotId: tx.lot.lotId, lot: tx.lot, farmer: tx.farmer, pendingBids: [], completedTxns: [] });
+    }
+    map.get(key)!.completedTxns.push(tx);
+  }
+
   return Array.from(map.values());
 }
 
 function generateFarmerReceiptHtml(lot: Lot, farmer: Farmer, txns: TransactionWithDetails[], businessName?: string) {
   const totalBags = txns.reduce((s, t) => s + (t.numberOfBags || 0), 0);
-  const totalNetWeight = txns.reduce((s, t) => s + parseFloat(t.netWeight || "0"), 0);
   const totalHammali = txns.reduce((s, t) => s + parseFloat(t.hammaliCharges || "0"), 0);
   const totalGrading = txns.reduce((s, t) => s + parseFloat(t.gradingCharges || "0"), 0);
   const totalAadhat = txns.reduce((s, t) => s + parseFloat(t.aadhatCharges || "0"), 0);
@@ -197,8 +210,10 @@ export default function TransactionsPage() {
   const existingBidIds = new Set(txns.map(t => t.bidId));
   const pendingBids = allBids.filter(b => !existingBidIds.has(b.id));
 
-  const pendingLotGroups = useMemo(() => groupByLot(pendingBids, (b) => b.farmer), [pendingBids]);
-  const completedLotGroups = useMemo(() => groupByLot(txns, (t) => t.farmer), [txns]);
+  const unifiedGroups = useMemo(
+    () => buildUnifiedLotGroups(pendingBids, txns),
+    [pendingBids, txns]
+  );
 
   const openTransaction = (lotBids: BidWithDetails[]) => {
     setSelectedLotBids(lotBids);
@@ -259,13 +274,13 @@ export default function TransactionsPage() {
     });
   };
 
-  const handlePrintFarmerReceipt = (group: LotGroup<TransactionWithDetails>) => {
-    const html = generateFarmerReceiptHtml(group.lot, group.farmer, group.items);
+  const handlePrintFarmerReceipt = (group: UnifiedLotGroup) => {
+    const html = generateFarmerReceiptHtml(group.lot, group.farmer, group.completedTxns);
     openPrintWindow(html);
   };
 
-  const handlePrintBuyerReceipt = (tx: TransactionWithDetails) => {
-    const html = generateBuyerReceiptHtml(tx.lot, tx.farmer, tx);
+  const handlePrintBuyerReceipt = (tx: TransactionWithDetails, group: UnifiedLotGroup) => {
+    const html = generateBuyerReceiptHtml(group.lot, group.farmer, tx);
     openPrintWindow(html);
   };
 
@@ -276,122 +291,105 @@ export default function TransactionsPage() {
         Transactions
       </h1>
 
-      {pendingLotGroups.length > 0 && (
+      {unifiedGroups.length > 0 ? (
         <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-muted-foreground">Pending Bids (Ready for Transaction)</h2>
-          {pendingLotGroups.map((group) => (
-            <Card key={group.lot.id} data-testid={`card-pending-lot-${group.lot.id}`}>
-              <CardContent className="pt-4">
-                <div className="flex items-start justify-between gap-2 mb-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2 mb-1">
-                      <Badge variant="secondary" className="text-xs">{group.lotId}</Badge>
-                      <Badge variant="outline" className="text-xs">{group.lot.crop}</Badge>
-                    </div>
-                    <p className="text-sm">Farmer: <strong>{group.farmer.name}</strong></p>
-                    <p className="text-xs text-muted-foreground">{group.lot.numberOfBags} bags total | Size: {group.lot.size}</p>
-                  </div>
-                  <Button
-                    data-testid={`button-bill-lot-${group.lot.id}`}
-                    size="sm"
-                    className="mobile-touch-target"
-                    onClick={() => openTransaction(group.items)}
-                  >
-                    <Calculator className="w-4 h-4 mr-1" />
-                    Bill
-                  </Button>
-                </div>
-                <div className="border-t pt-2 space-y-1">
-                  {group.items.map((bid) => (
-                    <div key={bid.id} className="flex items-center justify-between text-sm py-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted-foreground">Buyer:</span>
-                        <strong>{bid.buyer.name}</strong>
-                      </div>
-                      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                        <Badge className="text-xs">Rs.{bid.pricePerKg}/kg</Badge>
-                        <span>{bid.numberOfBags} bags</span>
-                        <span>{bid.grade || "N/A"}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+          {unifiedGroups.map((group) => {
+            const hasPending = group.pendingBids.length > 0;
+            const hasCompleted = group.completedTxns.length > 0;
+            const totalFarmerPayable = group.completedTxns.reduce(
+              (s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0
+            );
 
-      {completedLotGroups.length > 0 && (
-        <div className="space-y-3">
-          <h2 className="text-sm font-semibold text-muted-foreground mt-6">Completed Transactions</h2>
-          {completedLotGroups.map((group) => {
-            const totalFarmerPayable = group.items.reduce((s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0);
             return (
-              <Card key={group.lot.id} data-testid={`card-completed-lot-${group.lot.id}`}>
-                <CardContent className="pt-4 text-sm space-y-2">
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
+              <Card key={group.lot.id} data-testid={`card-lot-${group.lot.id}`}>
+                <CardContent className="pt-4">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <div className="flex-1 min-w-0">
                       <div className="flex flex-wrap items-center gap-2 mb-1">
                         <Badge variant="secondary" className="text-xs">{group.lotId}</Badge>
                         <Badge variant="outline" className="text-xs">{group.lot.crop}</Badge>
-                        <Badge className="text-xs">{group.items[0]?.date}</Badge>
                       </div>
-                      <p>Farmer: <strong>{group.farmer.name}</strong></p>
+                      <p className="text-sm">Farmer: <strong>{group.farmer.name}</strong></p>
+                      <p className="text-xs text-muted-foreground">{group.lot.numberOfBags} bags total | Size: {group.lot.size}</p>
                     </div>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
+                    <div className="flex items-center gap-1">
+                      {hasPending && (
                         <Button
-                          data-testid={`button-print-lot-${group.lot.id}`}
-                          variant="outline"
+                          data-testid={`button-edit-lot-${group.lot.id}`}
                           size="sm"
                           className="mobile-touch-target"
+                          onClick={() => openTransaction(group.pendingBids)}
                         >
-                          <Printer className="w-4 h-4 mr-1" />
-                          Print Bill
-                          <ChevronDown className="w-3 h-3 ml-1" />
+                          <Pencil className="w-4 h-4 mr-1" />
+                          Edit
                         </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          data-testid={`button-print-farmer-${group.lot.id}`}
-                          onClick={() => handlePrintFarmerReceipt(group)}
-                        >
-                          किसान रसीद (Farmer Receipt - Hindi)
-                        </DropdownMenuItem>
-                        {group.items.map((tx) => (
-                          <DropdownMenuItem
-                            key={tx.id}
-                            data-testid={`button-print-buyer-${tx.id}`}
-                            onClick={() => handlePrintBuyerReceipt(tx)}
-                          >
-                            Buyer Receipt - {tx.buyer.name}
-                          </DropdownMenuItem>
-                        ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+                      )}
+                      {hasCompleted && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              data-testid={`button-print-lot-${group.lot.id}`}
+                              variant="outline"
+                              size="sm"
+                              className="mobile-touch-target"
+                            >
+                              <Printer className="w-4 h-4" />
+                              <ChevronDown className="w-3 h-3 ml-1" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              data-testid={`button-print-farmer-${group.lot.id}`}
+                              onClick={() => handlePrintFarmerReceipt(group)}
+                            >
+                              किसान रसीद (Farmer Receipt - Hindi)
+                            </DropdownMenuItem>
+                            {group.completedTxns.map((tx) => (
+                              <DropdownMenuItem
+                                key={tx.id}
+                                data-testid={`button-print-buyer-${tx.id}`}
+                                onClick={() => handlePrintBuyerReceipt(tx, group)}
+                              >
+                                Buyer Receipt - {tx.buyer.name}
+                              </DropdownMenuItem>
+                            ))}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="border-t pt-2 flex justify-between font-medium text-primary">
-                    <span>Total Payable to Farmer:</span>
-                    <span>Rs.{totalFarmerPayable.toFixed(2)}</span>
-                  </div>
+                  {hasCompleted && (
+                    <div className="border-t pt-2 mb-2 flex justify-between font-medium text-sm text-primary">
+                      <span>Payable to Farmer:</span>
+                      <span>Rs.{totalFarmerPayable.toFixed(2)}</span>
+                    </div>
+                  )}
 
-                  <div className="border-t pt-2 space-y-2">
-                    <p className="text-xs font-semibold text-muted-foreground">Buyer-wise Details:</p>
-                    {group.items.map((tx) => (
-                      <div key={tx.id} className="bg-muted/50 rounded-md p-2 space-y-1">
-                        <div className="flex justify-between items-center">
+                  <div className={`${hasCompleted ? "border-t pt-2" : "border-t pt-2"} space-y-1`}>
+                    {group.completedTxns.map((tx) => (
+                      <div key={tx.id} className="flex items-center justify-between text-sm py-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">Buyer:</span>
                           <strong>{tx.buyer.name}</strong>
+                        </div>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
                           <Badge className="text-xs">Rs.{tx.pricePerKg}/kg</Badge>
+                          <span>Net: {tx.netWeight}kg</span>
+                          <span className="text-chart-2 font-medium">Rs.{tx.totalReceivableFromBuyer}</span>
                         </div>
-                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                          <span>Net Wt: {tx.netWeight} kg</span>
-                          <span>{tx.numberOfBags} bags</span>
-                          <span>Hammali: Rs.{tx.hammaliCharges}</span>
+                      </div>
+                    ))}
+                    {group.pendingBids.map((bid) => (
+                      <div key={bid.id} className="flex items-center justify-between text-sm py-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-muted-foreground">Buyer:</span>
+                          <strong>{bid.buyer.name}</strong>
                         </div>
-                        <div className="text-xs font-medium">
-                          Receivable: <span className="text-chart-2">Rs.{tx.totalReceivableFromBuyer}</span>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          <Badge className="text-xs">Rs.{bid.pricePerKg}/kg</Badge>
+                          <span>{bid.numberOfBags} bags</span>
+                          <span>{bid.grade || "N/A"}</span>
                         </div>
                       </div>
                     ))}
@@ -401,9 +399,7 @@ export default function TransactionsPage() {
             );
           })}
         </div>
-      )}
-
-      {pendingLotGroups.length === 0 && completedLotGroups.length === 0 && (
+      ) : (
         <div className="text-center py-8 text-muted-foreground">
           No bids or transactions yet. Complete bidding first.
         </div>
