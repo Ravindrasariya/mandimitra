@@ -8,8 +8,10 @@ import {
   type Lot, type InsertLot,
   type Bid, type InsertBid,
   type Transaction, type InsertTransaction,
+  type BankAccount, type InsertBankAccount,
+  type CashSettings, type InsertCashSettings,
   type CashEntry, type InsertCashEntry,
-  users, businesses, farmers, farmerEditHistory, buyers, buyerEditHistory, lots, bids, transactions, cashEntries,
+  users, businesses, farmers, farmerEditHistory, buyers, buyerEditHistory, lots, bids, transactions, bankAccounts, cashSettings, cashEntries,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, ilike, or, sql, desc, asc, gte, lte, ne } from "drizzle-orm";
@@ -65,8 +67,17 @@ export interface IStorage {
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   updateTransaction(id: number, businessId: number, data: Partial<InsertTransaction>): Promise<Transaction | undefined>;
 
-  getCashEntries(businessId: number, filters?: { type?: string; farmerId?: number; buyerId?: number; dateFrom?: string; dateTo?: string }): Promise<CashEntry[]>;
+  getBankAccounts(businessId: number): Promise<BankAccount[]>;
+  createBankAccount(account: InsertBankAccount): Promise<BankAccount>;
+  updateBankAccount(id: number, businessId: number, data: Partial<InsertBankAccount>): Promise<BankAccount | undefined>;
+  deleteBankAccount(id: number, businessId: number): Promise<void>;
+
+  getCashSettings(businessId: number): Promise<CashSettings | undefined>;
+  upsertCashSettings(businessId: number, cashInHandOpening: string): Promise<CashSettings>;
+
+  getCashEntries(businessId: number, filters?: { category?: string; partyType?: string; farmerId?: number; buyerId?: number; month?: string; year?: string }): Promise<CashEntry[]>;
   createCashEntry(entry: InsertCashEntry): Promise<CashEntry>;
+  reverseCashEntry(id: number, businessId: number): Promise<CashEntry | undefined>;
 
   getFarmerLedger(businessId: number, farmerId: number, dateFrom?: string, dateTo?: string): Promise<{ transactions: Transaction[]; cashEntries: CashEntry[]; farmer: Farmer }>;
   getBuyerLedger(businessId: number, buyerId: number, dateFrom?: string, dateTo?: string): Promise<{ transactions: Transaction[]; cashEntries: CashEntry[]; buyer: Buyer }>;
@@ -557,20 +568,91 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async getCashEntries(businessId: number, filters?: { type?: string; farmerId?: number; buyerId?: number; dateFrom?: string; dateTo?: string }): Promise<CashEntry[]> {
+  async getBankAccounts(businessId: number): Promise<BankAccount[]> {
+    return db.select().from(bankAccounts).where(eq(bankAccounts.businessId, businessId)).orderBy(asc(bankAccounts.createdAt));
+  }
+
+  async createBankAccount(account: InsertBankAccount): Promise<BankAccount> {
+    const [created] = await db.insert(bankAccounts).values(account).returning();
+    return created;
+  }
+
+  async updateBankAccount(id: number, businessId: number, data: Partial<InsertBankAccount>): Promise<BankAccount | undefined> {
+    const [updated] = await db.update(bankAccounts).set(data).where(and(eq(bankAccounts.id, id), eq(bankAccounts.businessId, businessId))).returning();
+    return updated;
+  }
+
+  async deleteBankAccount(id: number, businessId: number): Promise<void> {
+    await db.delete(bankAccounts).where(and(eq(bankAccounts.id, id), eq(bankAccounts.businessId, businessId)));
+  }
+
+  async getCashSettings(businessId: number): Promise<CashSettings | undefined> {
+    const [settings] = await db.select().from(cashSettings).where(eq(cashSettings.businessId, businessId));
+    return settings;
+  }
+
+  async upsertCashSettings(businessId: number, cashInHandOpening: string): Promise<CashSettings> {
+    const existing = await this.getCashSettings(businessId);
+    if (existing) {
+      const [updated] = await db.update(cashSettings).set({ cashInHandOpening }).where(eq(cashSettings.businessId, businessId)).returning();
+      return updated;
+    }
+    const [created] = await db.insert(cashSettings).values({ businessId, cashInHandOpening }).returning();
+    return created;
+  }
+
+  async getCashEntries(businessId: number, filters?: { category?: string; partyType?: string; farmerId?: number; buyerId?: number; month?: string; year?: string }): Promise<CashEntry[]> {
     let conditions = [eq(cashEntries.businessId, businessId)];
-    if (filters?.type) conditions.push(eq(cashEntries.type, filters.type));
+    if (filters?.category) conditions.push(eq(cashEntries.category, filters.category));
+    if (filters?.partyType) conditions.push(eq(cashEntries.partyType, filters.partyType));
     if (filters?.farmerId) conditions.push(eq(cashEntries.farmerId, filters.farmerId));
     if (filters?.buyerId) conditions.push(eq(cashEntries.buyerId, filters.buyerId));
-    if (filters?.dateFrom) conditions.push(gte(cashEntries.date, filters.dateFrom));
-    if (filters?.dateTo) conditions.push(lte(cashEntries.date, filters.dateTo));
+    if (filters?.year) {
+      const yearNum = parseInt(filters.year);
+      if (filters?.month) {
+        const monthNum = parseInt(filters.month);
+        const startDate = `${yearNum}-${String(monthNum).padStart(2, "0")}-01`;
+        const endDate = `${yearNum}-${String(monthNum).padStart(2, "0")}-${new Date(yearNum, monthNum, 0).getDate()}`;
+        conditions.push(gte(cashEntries.date, startDate));
+        conditions.push(lte(cashEntries.date, endDate));
+      } else {
+        conditions.push(gte(cashEntries.date, `${yearNum}-01-01`));
+        conditions.push(lte(cashEntries.date, `${yearNum}-12-31`));
+      }
+    }
 
     return db.select().from(cashEntries).where(and(...conditions)).orderBy(desc(cashEntries.createdAt));
   }
 
   async createCashEntry(entry: InsertCashEntry): Promise<CashEntry> {
-    const [created] = await db.insert(cashEntries).values(entry).returning();
+    const txDate = entry.date ? new Date(entry.date + "T00:00:00") : new Date();
+    const dateStr = `${txDate.getFullYear()}${String(txDate.getMonth() + 1).padStart(2, "0")}${String(txDate.getDate()).padStart(2, "0")}`;
+    const prefix = `CF${dateStr}`;
+
+    const [result] = await db.select({ max: sql<string>`coalesce(max(
+      case when ${cashEntries.cashFlowId} ~ ${`^${prefix}\\d+$`}
+        then cast(substring(${cashEntries.cashFlowId} from ${prefix.length + 1}) as integer)
+        else 0 end
+    ), 0)` })
+      .from(cashEntries)
+      .where(and(
+        eq(cashEntries.businessId, entry.businessId),
+        sql`${cashEntries.cashFlowId} like ${prefix + "%"}`
+      ));
+
+    const seq = parseInt(result?.max || "0", 10) + 1;
+    const cashFlowId = `${prefix}${seq}`;
+
+    const [created] = await db.insert(cashEntries).values({ ...entry, cashFlowId }).returning();
     return created;
+  }
+
+  async reverseCashEntry(id: number, businessId: number): Promise<CashEntry | undefined> {
+    const [updated] = await db.update(cashEntries)
+      .set({ isReversed: true, reversedAt: new Date() })
+      .where(and(eq(cashEntries.id, id), eq(cashEntries.businessId, businessId)))
+      .returning();
+    return updated;
   }
 
   async getFarmerLedger(businessId: number, farmerId: number, dateFrom?: string, dateTo?: string) {

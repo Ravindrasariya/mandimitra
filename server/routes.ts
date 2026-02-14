@@ -548,13 +548,61 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/bank-accounts", requireAuth, async (req, res) => {
+    const result = await storage.getBankAccounts(req.user!.businessId);
+    res.json(result);
+  });
+
+  app.post("/api/bank-accounts", requireAuth, async (req, res) => {
+    try {
+      const data = { ...req.body, businessId: req.user!.businessId };
+      const account = await storage.createBankAccount(data);
+      res.status(201).json(account);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  app.patch("/api/bank-accounts/:id", requireAuth, async (req, res) => {
+    try {
+      const result = await storage.updateBankAccount(paramId(req.params.id), req.user!.businessId, req.body);
+      res.json(result);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  app.delete("/api/bank-accounts/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteBankAccount(paramId(req.params.id), req.user!.businessId);
+      res.json({ success: true });
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  app.get("/api/cash-settings", requireAuth, async (req, res) => {
+    const result = await storage.getCashSettings(req.user!.businessId);
+    res.json(result || { cashInHandOpening: "0" });
+  });
+
+  app.post("/api/cash-settings", requireAuth, async (req, res) => {
+    try {
+      const result = await storage.upsertCashSettings(req.user!.businessId, req.body.cashInHandOpening || "0");
+      res.json(result);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
   app.get("/api/cash-entries", requireAuth, async (req, res) => {
     const filters = {
-      type: req.query.type as string | undefined,
+      category: req.query.category as string | undefined,
+      partyType: req.query.partyType as string | undefined,
       farmerId: req.query.farmerId ? parseInt(req.query.farmerId as string) : undefined,
       buyerId: req.query.buyerId ? parseInt(req.query.buyerId as string) : undefined,
-      dateFrom: req.query.dateFrom as string | undefined,
-      dateTo: req.query.dateTo as string | undefined,
+      month: req.query.month as string | undefined,
+      year: req.query.year as string | undefined,
     };
     const result = await storage.getCashEntries(req.user!.businessId, filters);
     res.json(result);
@@ -565,6 +613,16 @@ export async function registerRoutes(
       const data = { ...req.body, businessId: req.user!.businessId };
       const entry = await storage.createCashEntry(data);
       res.status(201).json(entry);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  app.patch("/api/cash-entries/:id/reverse", requireAuth, async (req, res) => {
+    try {
+      const result = await storage.reverseCashEntry(paramId(req.params.id), req.user!.businessId);
+      if (!result) return res.status(404).json({ message: "Entry not found" });
+      res.json(result);
     } catch (e: any) {
       res.status(400).json({ message: e.message });
     }

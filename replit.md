@@ -75,7 +75,7 @@ client/src/
 ## Database
 - PostgreSQL with Drizzle ORM
 - Schema push: `npm run db:push`
-- Tables: businesses, users, farmers, farmer_edit_history, buyers, buyer_edit_history, lots, bids, transactions, cash_entries
+- Tables: businesses, users, farmers, farmer_edit_history, buyers, buyer_edit_history, lots, bids, transactions, bank_accounts, cash_settings, cash_entries
 - Farmer fields: farmerId (auto-generated FM+YYYYMMDD+seq, unique per business), name, phone, village, tehsil, district, state, openingBalance, negativeFlag, isArchived
 - Business fields: merchantId (unique), name, phone, address, status (active/inactive/archived)
 - User fields: username, name, phone, password, businessId, role (system_admin/user), mustChangePassword
@@ -85,6 +85,10 @@ client/src/
 - Transaction fields: transactionId (auto-generated TX+YYYYMMDD+seq, unique per business+date, not displayed in UI), includes hammaliPerBag (per-bag rate), hammaliCharges (total = perBag × bags), chargedTo (Buyer/Seller)
 - Transactions grouped by lot: pending bids and completed transactions are grouped by lot
 - Print receipts: Farmer Receipt in Hindi, Buyer Receipt in English (opens in print window)
+- BankAccount fields: name, accountType (Limit/Current/Saving), openingBalance
+- CashSettings: cashInHandOpening (per business, upserted)
+- CashEntry fields: cashFlowId (auto-generated CF+YYYYMMDD+seq, unique per business+date), category (inward/expense/transfer), type, partyType (Buyer/Farmer/Others/Transfer), bankAccountId, isReversed, reversedAt
+- Cash Management: 3-tab layout (Inward/Expense/Transfer), summary cards, filter bar, cash flow history with CSV export
 
 ## Running
 - `npm run dev` starts both Express backend and Vite frontend on port 5000

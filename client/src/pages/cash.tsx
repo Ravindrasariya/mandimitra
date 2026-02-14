@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -11,37 +11,135 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { PAYMENT_MODES } from "@shared/schema";
-import type { Farmer, Buyer, CashEntry } from "@shared/schema";
-import { Wallet, ArrowDownCircle, ArrowUpCircle, Plus } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import type { Farmer, Buyer, CashEntry, BankAccount } from "@shared/schema";
+import { Wallet, Settings, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Download, RotateCcw, Trash2, Plus, Filter } from "lucide-react";
 import { format } from "date-fns";
+
+type BuyerWithDues = Buyer & { receivableDue: string; overallDue: string };
 
 export default function CashPage() {
   const { toast } = useToast();
   const { t } = useLanguage();
-  const [activeTab, setActiveTab] = usePersistedState<"in" | "out">("cash-activeTab", "in");
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [entryDate, setEntryDate] = useState(format(new Date(), "yyyy-MM-dd"));
-  const [amount, setAmount] = useState("");
-  const [paymentMode, setPaymentMode] = useState("Cash");
-  const [chequeNumber, setChequeNumber] = useState("");
-  const [chequeDate, setChequeDate] = useState("");
-  const [bankName, setBankName] = useState("");
-  const [notes, setNotes] = useState("");
-  const [selectedFarmerId, setSelectedFarmerId] = useState<number | null>(null);
-  const [selectedBuyerId, setSelectedBuyerId] = useState<number | null>(null);
+  const now = new Date();
+  const [activeTab, setActiveTab] = usePersistedState<"inward" | "expense" | "transfer">("cash-activeTab", "inward");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [detailEntry, setDetailEntry] = useState<CashEntry | null>(null);
+  const [reverseConfirmEntry, setReverseConfirmEntry] = useState<CashEntry | null>(null);
+  const [deleteAccountId, setDeleteAccountId] = useState<number | null>(null);
 
-  const { data: cashEntries = [], isLoading } = useQuery<CashEntry[]>({
-    queryKey: ["/api/cash-entries", `?type=${activeTab === "in" ? "cash_in" : "cash_out"}`],
+  const [filterPartyName, setFilterPartyName] = usePersistedState("cash-filterParty", "all");
+  const [filterCategory, setFilterCategory] = usePersistedState("cash-filterCategory", "all");
+  const [filterMonth, setFilterMonth] = usePersistedState("cash-filterMonth", "all");
+  const [filterYear, setFilterYear] = usePersistedState("cash-filterYear", String(now.getFullYear()));
+
+  const [inwardPartyType, setInwardPartyType] = useState("Buyer");
+  const [inwardBuyerId, setInwardBuyerId] = useState("");
+  const [inwardAmount, setInwardAmount] = useState("");
+  const [inwardDate, setInwardDate] = useState(format(now, "yyyy-MM-dd"));
+  const [inwardPaymentMode, setInwardPaymentMode] = useState("Cash");
+  const [inwardBankAccountId, setInwardBankAccountId] = useState("");
+  const [inwardNotes, setInwardNotes] = useState("");
+
+  const [expensePartyType, setExpensePartyType] = useState("Farmer");
+  const [expenseFarmerId, setExpenseFarmerId] = useState("");
+  const [expenseAmount, setExpenseAmount] = useState("");
+  const [expenseDate, setExpenseDate] = useState(format(now, "yyyy-MM-dd"));
+  const [expensePaymentMode, setExpensePaymentMode] = useState("Cash");
+  const [expenseBankAccountId, setExpenseBankAccountId] = useState("");
+  const [expenseNotes, setExpenseNotes] = useState("");
+
+  const [transferFromType, setTransferFromType] = useState("cash");
+  const [transferFromAccountId, setTransferFromAccountId] = useState("");
+  const [transferToType, setTransferToType] = useState("account");
+  const [transferToAccountId, setTransferToAccountId] = useState("");
+  const [transferAmount, setTransferAmount] = useState("");
+  const [transferDate, setTransferDate] = useState(format(now, "yyyy-MM-dd"));
+  const [transferNotes, setTransferNotes] = useState("");
+
+  const [cashInHandOpening, setCashInHandOpening] = useState("");
+  const [newBankName, setNewBankName] = useState("");
+  const [newBankType, setNewBankType] = useState("Current");
+  const [newBankBalance, setNewBankBalance] = useState("0");
+
+  const queryParams = useMemo(() => {
+    const params = new URLSearchParams();
+    if (filterCategory !== "all") params.set("category", filterCategory);
+    if (filterMonth !== "all") params.set("month", filterMonth);
+    if (filterYear !== "all") params.set("year", filterYear);
+    return params.toString() ? `?${params.toString()}` : "";
+  }, [filterCategory, filterMonth, filterYear]);
+
+  const { data: allEntries = [], isLoading } = useQuery<CashEntry[]>({
+    queryKey: [`/api/cash-entries${queryParams}`],
   });
 
-  const { data: farmers = [] } = useQuery<Farmer[]>({
-    queryKey: ["/api/farmers"],
-  });
+  const { data: farmers = [] } = useQuery<Farmer[]>({ queryKey: ["/api/farmers"] });
+  const { data: buyersWithDues = [] } = useQuery<BuyerWithDues[]>({ queryKey: ["/api/buyers?withDues=true"] });
+  const { data: buyers = [] } = useQuery<Buyer[]>({ queryKey: ["/api/buyers"] });
+  const { data: bankAccountsList = [] } = useQuery<BankAccount[]>({ queryKey: ["/api/bank-accounts"] });
+  const { data: cashSettingsData } = useQuery<{ cashInHandOpening: string }>({ queryKey: ["/api/cash-settings"] });
 
-  const { data: buyers = [] } = useQuery<Buyer[]>({
-    queryKey: ["/api/buyers"],
-  });
+  const filteredEntries = useMemo(() => {
+    let result = allEntries;
+    if (filterPartyName !== "all") {
+      result = result.filter(e => {
+        if (filterPartyName.startsWith("buyer-")) return e.buyerId === parseInt(filterPartyName.replace("buyer-", ""));
+        if (filterPartyName.startsWith("farmer-")) return e.farmerId === parseInt(filterPartyName.replace("farmer-", ""));
+        if (filterPartyName === "others") return e.partyType === "Others" || e.partyType === "General";
+        return true;
+      });
+    }
+    return result;
+  }, [allEntries, filterPartyName]);
+
+  const summaryData = useMemo(() => {
+    const opening = parseFloat(cashSettingsData?.cashInHandOpening || "0");
+    let cashReceived = 0, cashExpense = 0;
+    const acctReceived: Record<number, number> = {};
+    const acctExpense: Record<number, number> = {};
+
+    filteredEntries.filter(e => !e.isReversed).forEach(e => {
+      const amt = parseFloat(e.amount || "0");
+      if (e.category === "inward") {
+        if (e.paymentMode === "Cash") cashReceived += amt;
+        else if (e.bankAccountId) {
+          acctReceived[e.bankAccountId] = (acctReceived[e.bankAccountId] || 0) + amt;
+        }
+      } else if (e.category === "expense") {
+        if (e.paymentMode === "Cash") cashExpense += amt;
+        else if (e.bankAccountId) {
+          acctExpense[e.bankAccountId] = (acctExpense[e.bankAccountId] || 0) + amt;
+        }
+      } else if (e.category === "transfer") {
+        if (e.type === "cash_to_account" && e.bankAccountId) {
+          cashExpense += amt;
+          acctReceived[e.bankAccountId] = (acctReceived[e.bankAccountId] || 0) + amt;
+        } else if (e.type === "account_to_cash" && e.bankAccountId) {
+          cashReceived += amt;
+          acctExpense[e.bankAccountId] = (acctExpense[e.bankAccountId] || 0) + amt;
+        }
+      }
+    });
+
+    const totalAccountReceived = Object.values(acctReceived).reduce((s, v) => s + v, 0);
+    const totalAccountExpense = Object.values(acctExpense).reduce((s, v) => s + v, 0);
+
+    const accountBreakdowns: { name: string; received: number; expense: number; balance: number }[] = bankAccountsList.map(a => ({
+      name: a.name,
+      received: acctReceived[a.id] || 0,
+      expense: acctExpense[a.id] || 0,
+      balance: parseFloat(a.openingBalance || "0") + (acctReceived[a.id] || 0) - (acctExpense[a.id] || 0),
+    }));
+
+    const totalAccountBalance = accountBreakdowns.reduce((s, a) => s + a.balance, 0);
+
+    return {
+      cashReceived, cashExpense, netCashInHand: opening + cashReceived - cashExpense,
+      totalAccountReceived, totalAccountExpense, totalAccountBalance,
+      accountBreakdowns,
+    };
+  }, [filteredEntries, cashSettingsData, bankAccountsList]);
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -49,274 +147,712 @@ export default function CashPage() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/cash-entries"] });
-      setDialogOpen(false);
-      resetForm();
-      toast({ title: "Saved", description: "Cash entry recorded" });
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === "string" && key.startsWith("/api/cash-entries");
+      }});
+      queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
+      toast({ title: t("common.saved") });
     },
     onError: (err: any) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: err.message, variant: "destructive" });
     },
   });
 
-  const resetForm = () => {
-    setAmount("");
-    setPaymentMode("Cash");
-    setChequeNumber("");
-    setChequeDate("");
-    setBankName("");
-    setNotes("");
-    setSelectedFarmerId(null);
-    setSelectedBuyerId(null);
-    setEntryDate(format(new Date(), "yyyy-MM-dd"));
-  };
+  const reverseMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("PATCH", `/api/cash-entries/${id}/reverse`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === "string" && key.startsWith("/api/cash-entries");
+      }});
+      queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
+      setReverseConfirmEntry(null);
+      toast({ title: t("common.saved"), description: "Entry reversed" });
+    },
+  });
 
-  const openDialog = () => {
-    resetForm();
-    setDialogOpen(true);
-  };
+  const saveCashSettingsMutation = useMutation({
+    mutationFn: async (val: string) => {
+      const res = await apiRequest("POST", "/api/cash-settings", { cashInHandOpening: val });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/cash-settings"] });
+      toast({ title: t("common.saved") });
+    },
+  });
 
-  const submit = () => {
-    if (!amount || parseFloat(amount) <= 0) {
-      toast({ title: "Error", description: "Enter a valid amount", variant: "destructive" });
+  const createBankMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/bank-accounts", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
+      setNewBankName("");
+      setNewBankType("Current");
+      setNewBankBalance("0");
+      toast({ title: t("common.saved") });
+    },
+  });
+
+  const deleteBankMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/bank-accounts/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
+      setDeleteAccountId(null);
+      toast({ title: "Deleted" });
+    },
+  });
+
+  const submitInward = () => {
+    if (!inwardAmount || parseFloat(inwardAmount) <= 0) {
+      toast({ title: t("common.error"), description: "Enter valid amount", variant: "destructive" });
       return;
     }
-
-    if (activeTab === "in" && !selectedBuyerId) {
-      toast({ title: "Error", description: "Select a buyer", variant: "destructive" });
+    if (inwardPartyType === "Buyer" && !inwardBuyerId) {
+      toast({ title: t("common.error"), description: "Select a buyer", variant: "destructive" });
       return;
     }
-    if (activeTab === "out" && !selectedFarmerId) {
-      toast({ title: "Error", description: "Select a farmer", variant: "destructive" });
+    if (inwardPaymentMode !== "Cash" && !inwardBankAccountId) {
+      toast({ title: t("common.error"), description: "Select bank account", variant: "destructive" });
       return;
     }
-
     createMutation.mutate({
-      type: activeTab === "in" ? "cash_in" : "cash_out",
-      amount,
-      date: entryDate,
-      paymentMode,
-      chequeNumber: paymentMode === "Cheque" ? chequeNumber : null,
-      chequeDate: paymentMode === "Cheque" ? chequeDate : null,
-      bankName: paymentMode === "Cheque" ? bankName : null,
-      notes: notes || null,
-      farmerId: activeTab === "out" ? selectedFarmerId : null,
-      buyerId: activeTab === "in" ? selectedBuyerId : null,
+      category: "inward",
+      type: "cash_in",
+      partyType: inwardPartyType,
+      buyerId: inwardPartyType === "Buyer" ? parseInt(inwardBuyerId) : null,
+      amount: inwardAmount,
+      date: inwardDate,
+      paymentMode: inwardPaymentMode,
+      bankAccountId: inwardPaymentMode !== "Cash" ? parseInt(inwardBankAccountId) : null,
+      notes: inwardNotes || null,
     });
+    setInwardAmount("");
+    setInwardNotes("");
+    setInwardBuyerId("");
+  };
+
+  const submitExpense = () => {
+    if (!expenseAmount || parseFloat(expenseAmount) <= 0) {
+      toast({ title: t("common.error"), description: "Enter valid amount", variant: "destructive" });
+      return;
+    }
+    if (expensePartyType === "Farmer" && !expenseFarmerId) {
+      toast({ title: t("common.error"), description: "Select a farmer", variant: "destructive" });
+      return;
+    }
+    if (expensePaymentMode !== "Cash" && !expenseBankAccountId) {
+      toast({ title: t("common.error"), description: "Select bank account", variant: "destructive" });
+      return;
+    }
+    createMutation.mutate({
+      category: "expense",
+      type: "cash_out",
+      partyType: expensePartyType,
+      farmerId: expensePartyType === "Farmer" ? parseInt(expenseFarmerId) : null,
+      amount: expenseAmount,
+      date: expenseDate,
+      paymentMode: expensePaymentMode,
+      bankAccountId: expensePaymentMode !== "Cash" ? parseInt(expenseBankAccountId) : null,
+      notes: expenseNotes || null,
+    });
+    setExpenseAmount("");
+    setExpenseNotes("");
+    setExpenseFarmerId("");
+  };
+
+  const submitTransfer = () => {
+    if (!transferAmount || parseFloat(transferAmount) <= 0) {
+      toast({ title: t("common.error"), description: "Enter valid amount", variant: "destructive" });
+      return;
+    }
+    const isCashToAccount = transferFromType === "cash";
+    const accountId = isCashToAccount ? transferToAccountId : transferFromAccountId;
+    if (!accountId) {
+      toast({ title: t("common.error"), description: "Select bank account", variant: "destructive" });
+      return;
+    }
+    createMutation.mutate({
+      category: "transfer",
+      type: isCashToAccount ? "cash_to_account" : "account_to_cash",
+      partyType: "Transfer",
+      bankAccountId: parseInt(accountId),
+      amount: transferAmount,
+      date: transferDate,
+      paymentMode: isCashToAccount ? "Online" : "Cash",
+      notes: transferNotes || null,
+    });
+    setTransferAmount("");
+    setTransferNotes("");
   };
 
   const getFarmerName = (id: number | null) => {
-    if (!id) return "";
-    const f = farmers.find(f => f.id === id);
-    return f ? f.name : `Farmer #${id}`;
+    if (!id) return "N/A";
+    return farmers.find(f => f.id === id)?.name || `#${id}`;
   };
 
   const getBuyerName = (id: number | null) => {
-    if (!id) return "";
-    return buyers.find(b => b.id === id)?.name || `Buyer #${id}`;
+    if (!id) return "N/A";
+    return buyers.find(b => b.id === id)?.name || `#${id}`;
   };
 
-  return (
-    <div className="p-3 md:p-6 max-w-4xl mx-auto space-y-4">
-      <h1 className="text-base md:text-lg font-bold flex items-center gap-2">
-        <Wallet className="w-5 h-5 text-primary" />
-        {t("cash.title")}
-      </h1>
+  const getAccountName = (id: number | null) => {
+    if (!id) return "";
+    return bankAccountsList.find(a => a.id === id)?.name || `#${id}`;
+  };
 
-      <div className="flex gap-2">
-        <Button
-          variant={activeTab === "in" ? "default" : "secondary"}
-          size="sm"
-          data-testid="toggle-cash-in"
-          className="mobile-touch-target flex-1"
-          onClick={() => setActiveTab("in")}
-        >
-          <ArrowDownCircle className="w-4 h-4 mr-2" />
-          {t("cash.cashIn")}
-        </Button>
-        <Button
-          variant={activeTab === "out" ? "default" : "secondary"}
-          size="sm"
-          data-testid="toggle-cash-out"
-          className="mobile-touch-target flex-1"
-          onClick={() => setActiveTab("out")}
-        >
-          <ArrowUpCircle className="w-4 h-4 mr-2" />
-          {t("cash.cashOut")}
+  const getEntryLabel = (e: CashEntry) => {
+    if (e.category === "transfer") return "Transfer";
+    if (e.partyType === "Buyer" && e.buyerId) return getBuyerName(e.buyerId);
+    if (e.partyType === "Farmer" && e.farmerId) return getFarmerName(e.farmerId);
+    if (e.partyType === "Others") return "General";
+    return e.partyType || "Entry";
+  };
+
+  const getCategoryBadge = (e: CashEntry) => {
+    if (e.category === "inward") return <Badge className="text-[10px] bg-green-500">{t("cash.inward")}</Badge>;
+    if (e.category === "expense") return <Badge className="text-[10px] bg-orange-500">{t("cash.expense")}</Badge>;
+    return <Badge className="text-[10px] bg-blue-500">{t("cash.transfer")}</Badge>;
+  };
+
+  const downloadCSV = () => {
+    const rows = filteredEntries.map(e => ({
+      "Cash Flow ID": e.cashFlowId || "",
+      "Date": e.date,
+      "Category": e.category,
+      "Party Type": e.partyType || "",
+      "Buyer": e.buyerId ? getBuyerName(e.buyerId) : "",
+      "Farmer": e.farmerId ? getFarmerName(e.farmerId) : "",
+      "Amount": e.amount,
+      "Payment Mode": e.paymentMode,
+      "Bank Account": e.bankAccountId ? getAccountName(e.bankAccountId) : "",
+      "Notes": e.notes || "",
+      "Status": e.isReversed ? "Reversed" : "Active",
+    }));
+    const headers = Object.keys(rows[0] || {});
+    const csv = [headers.join(","), ...rows.map(r => headers.map(h => `"${(r as any)[h]}"`).join(","))].join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `cash-flow-${format(now, "yyyy-MM-dd")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+  return (
+    <div className="p-3 md:p-6 max-w-6xl mx-auto space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-base md:text-lg font-bold flex items-center gap-2">
+            <Wallet className="w-5 h-5 text-primary" />
+            {t("cash.title")}
+          </h1>
+          <p className="text-xs text-muted-foreground">{t("cash.subtitle")}</p>
+        </div>
+        <Button variant="ghost" size="icon" onClick={() => {
+          setCashInHandOpening(cashSettingsData?.cashInHandOpening || "0");
+          setSettingsOpen(true);
+        }} data-testid="button-cash-settings">
+          <Settings className="w-5 h-5" />
         </Button>
       </div>
 
-      <Button
-        data-testid="button-add-cash"
-        className="w-full mobile-touch-target"
-        onClick={openDialog}
-      >
-        <Plus className="w-4 h-4 mr-2" />
-        {activeTab === "in" ? t("cash.recordFromBuyer") : t("cash.recordToFarmer")}
-      </Button>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+        <Card className="border-green-200">
+          <CardContent className="p-3">
+            <p className="text-[10px] text-green-600 font-medium">{t("cash.cashReceived")}</p>
+            <p className="text-sm font-bold text-green-700" data-testid="text-cash-received">₹{summaryData.cashReceived.toLocaleString("en-IN")}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-orange-200">
+          <CardContent className="p-3">
+            <p className="text-[10px] text-orange-600 font-medium">{t("cash.cashExpense")}</p>
+            <p className="text-sm font-bold text-orange-700" data-testid="text-cash-expense">₹{summaryData.cashExpense.toLocaleString("en-IN")}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-emerald-200">
+          <CardContent className="p-3">
+            <p className="text-[10px] text-emerald-600 font-medium">{t("cash.netCashInHand")}</p>
+            <p className="text-sm font-bold text-emerald-700" data-testid="text-net-cash">₹{summaryData.netCashInHand.toLocaleString("en-IN")}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-green-200">
+          <CardContent className="p-3">
+            <p className="text-[10px] text-green-600 font-medium">{t("cash.accountReceived")}</p>
+            <p className="text-sm font-bold text-green-700" data-testid="text-account-received">₹{summaryData.totalAccountReceived.toLocaleString("en-IN")}</p>
+            {summaryData.accountBreakdowns.filter(a => a.received > 0).map(a => (
+              <p key={a.name} className="text-[10px] text-muted-foreground truncate">{a.name} ₹{a.received.toLocaleString("en-IN")}</p>
+            ))}
+          </CardContent>
+        </Card>
+        <Card className="border-orange-200">
+          <CardContent className="p-3">
+            <p className="text-[10px] text-orange-600 font-medium">{t("cash.accountExpense")}</p>
+            <p className="text-sm font-bold text-orange-700" data-testid="text-account-expense">₹{summaryData.totalAccountExpense.toLocaleString("en-IN")}</p>
+            {summaryData.accountBreakdowns.filter(a => a.expense > 0).map(a => (
+              <p key={a.name} className="text-[10px] text-muted-foreground truncate">{a.name} ₹{a.expense.toLocaleString("en-IN")}</p>
+            ))}
+          </CardContent>
+        </Card>
+        <Card className="border-purple-200">
+          <CardContent className="p-3">
+            <p className="text-[10px] text-purple-600 font-medium">{t("cash.netInAccounts")}</p>
+            <p className="text-sm font-bold text-purple-700" data-testid="text-net-accounts">₹{summaryData.totalAccountBalance.toLocaleString("en-IN")}</p>
+            {summaryData.accountBreakdowns.map(a => (
+              <p key={a.name} className="text-[10px] text-muted-foreground truncate">{a.name} ₹{a.balance.toLocaleString("en-IN")}</p>
+            ))}
+          </CardContent>
+        </Card>
+      </div>
 
-      {isLoading ? (
-        <div className="text-center py-8 text-muted-foreground">{t("app.loading")}</div>
-      ) : cashEntries.length === 0 ? (
-        <div className="text-center py-8 text-muted-foreground">
-          {t("cash.noEntries")} {activeTab === "in" ? t("cash.cashIn") : t("cash.cashOut")}
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {cashEntries.map((entry) => (
-            <Card key={entry.id}>
-              <CardContent className="pt-4 text-sm">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <Badge className="text-xs">Rs.{entry.amount}</Badge>
-                      <Badge variant="secondary" className="text-xs">{entry.paymentMode}</Badge>
-                    </div>
-                    <p className="text-muted-foreground text-xs">{entry.date}</p>
-                    {entry.buyerId && <p>{t("cash.buyer")}: {getBuyerName(entry.buyerId)}</p>}
-                    {entry.farmerId && <p>{t("cash.farmer")}: {getFarmerName(entry.farmerId)}</p>}
-                    {entry.chequeNumber && <p className="text-xs text-muted-foreground">Cheque: {entry.chequeNumber}</p>}
-                    {entry.notes && <p className="text-xs text-muted-foreground">{entry.notes}</p>}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <Filter className="w-3.5 h-3.5 text-muted-foreground" />
+        <select value={filterPartyName} onChange={(e) => setFilterPartyName(e.target.value)} className="h-8 w-[140px] text-xs rounded-md border border-input bg-background px-2" data-testid="filter-party">
+          <option value="all">{t("cash.allParties")}</option>
+          <option value="others">General/Others</option>
+          {buyers.map(b => <option key={`buyer-${b.id}`} value={`buyer-${b.id}`}>{b.name}</option>)}
+          {farmers.map(f => <option key={`farmer-${f.id}`} value={`farmer-${f.id}`}>{f.name}</option>)}
+        </select>
+        <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)} className="h-8 w-[120px] text-xs rounded-md border border-input bg-background px-2" data-testid="filter-category">
+          <option value="all">{t("cash.allTypes")}</option>
+          <option value="inward">{t("cash.inward")}</option>
+          <option value="expense">{t("cash.expense")}</option>
+          <option value="transfer">{t("cash.transfer")}</option>
+        </select>
+        <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="h-8 w-[90px] text-xs rounded-md border border-input bg-background px-2" data-testid="filter-month">
+          <option value="all">All</option>
+          {MONTHS.map((m, i) => <option key={i} value={String(i + 1)}>{m}</option>)}
+        </select>
+        <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="h-8 w-[80px] text-xs rounded-md border border-input bg-background px-2" data-testid="filter-year">
+          {Array.from({ length: 5 }, (_, i) => String(now.getFullYear() - i)).map(y => (
+            <option key={y} value={y}>{y}</option>
           ))}
-        </div>
-      )}
+        </select>
+      </div>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-sm max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>
-              {activeTab === "in" ? t("cash.cashInTitle") : t("cash.cashOutTitle")}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="space-y-3">
-            <div className="space-y-1">
-              <Label>{t("common.date")}</Label>
-              <Input
-                data-testid="input-cash-date"
-                type="date"
-                value={entryDate}
-                onChange={(e) => setEntryDate(e.target.value)}
-                className="mobile-touch-target"
-              />
-            </div>
-
-            {activeTab === "in" ? (
-              <div className="space-y-1">
-                <Label>{t("cash.buyer")}</Label>
-                <Select value={selectedBuyerId?.toString() || ""} onValueChange={(v) => setSelectedBuyerId(parseInt(v))}>
-                  <SelectTrigger data-testid="select-cash-buyer" className="mobile-touch-target">
-                    <SelectValue placeholder={t("cash.selectBuyer")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {buyers.map((b) => (
-                      <SelectItem key={b.id} value={b.id.toString()}>{b.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            ) : (
-              <div className="space-y-1">
-                <Label>{t("cash.farmer")}</Label>
-                <Select value={selectedFarmerId?.toString() || ""} onValueChange={(v) => setSelectedFarmerId(parseInt(v))}>
-                  <SelectTrigger data-testid="select-cash-farmer" className="mobile-touch-target">
-                    <SelectValue placeholder={t("cash.selectFarmer")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {farmers.map((f) => (
-                      <SelectItem key={f.id} value={f.id.toString()}>{f.name} - {f.phone}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-
-            <div className="space-y-1">
-              <Label>{t("cash.amount")}</Label>
-              <Input
-                data-testid="input-cash-amount"
-                type="number"
-                inputMode="decimal"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                onFocus={(e) => e.target.select()}
-                placeholder="0.00"
-                className="mobile-touch-target text-lg font-medium"
-              />
-            </div>
-
-            <div className="space-y-1">
-              <Label>{t("cash.paymentMode")}</Label>
-              <Select value={paymentMode} onValueChange={setPaymentMode}>
-                <SelectTrigger data-testid="select-payment-mode" className="mobile-touch-target">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PAYMENT_MODES.map((m) => (
-                    <SelectItem key={m} value={m}>{m}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {paymentMode === "Cheque" && (
-              <div className="space-y-3 bg-muted/50 rounded-md p-3">
-                <div className="space-y-1">
-                  <Label>{t("cash.chequeNumber")}</Label>
-                  <Input
-                    data-testid="input-cheque-number"
-                    value={chequeNumber}
-                    onChange={(e) => setChequeNumber(e.target.value)}
-                    className="mobile-touch-target"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>{t("cash.chequeDate")}</Label>
-                  <Input
-                    data-testid="input-cheque-date"
-                    type="date"
-                    value={chequeDate}
-                    onChange={(e) => setChequeDate(e.target.value)}
-                    className="mobile-touch-target"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>{t("cash.bankName")}</Label>
-                  <Input
-                    data-testid="input-bank-name"
-                    value={bankName}
-                    onChange={(e) => setBankName(e.target.value)}
-                    className="mobile-touch-target"
-                  />
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-1">
-              <Label>{t("cash.notesOptional")}</Label>
-              <Input
-                data-testid="input-cash-notes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder={t("cash.notesPlaceholder")}
-                className="mobile-touch-target"
-              />
-            </div>
-
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="space-y-3">
+          <div className="flex gap-1 border-b pb-2">
             <Button
-              data-testid="button-submit-cash"
-              className="w-full mobile-touch-target"
-              onClick={submit}
-              disabled={createMutation.isPending}
+              variant={activeTab === "inward" ? "default" : "ghost"}
+              size="sm" className="text-xs h-8 flex-1"
+              onClick={() => setActiveTab("inward")}
+              data-testid="tab-inward"
             >
-              {createMutation.isPending ? t("common.saving") : t("cash.saveEntry")}
+              <ArrowDownLeft className="w-3.5 h-3.5 mr-1" />
+              {t("cash.inwardCash")}
             </Button>
+            <Button
+              variant={activeTab === "expense" ? "default" : "ghost"}
+              size="sm" className="text-xs h-8 flex-1"
+              onClick={() => setActiveTab("expense")}
+              data-testid="tab-expense"
+            >
+              <ArrowUpRight className="w-3.5 h-3.5 mr-1" />
+              {t("cash.expense")}
+            </Button>
+            <Button
+              variant={activeTab === "transfer" ? "default" : "ghost"}
+              size="sm" className="text-xs h-8 flex-1"
+              onClick={() => setActiveTab("transfer")}
+              data-testid="tab-transfer"
+            >
+              <ArrowLeftRight className="w-3.5 h-3.5 mr-1" />
+              {t("cash.transfer")}
+            </Button>
+          </div>
+
+          {activeTab === "inward" && (
+            <div className="space-y-3 p-3 bg-muted/30 rounded-lg">
+              <div className="space-y-1">
+                <Label className="text-xs">{t("cash.partyType")}</Label>
+                <Select value={inwardPartyType} onValueChange={setInwardPartyType}>
+                  <SelectTrigger className="h-9 text-sm" data-testid="inward-party-type"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Buyer">{t("cash.buyer")}</SelectItem>
+                    <SelectItem value="Others">{t("cash.others")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {inwardPartyType === "Buyer" && (
+                <div className="space-y-1">
+                  <Label className="text-xs">{t("cash.buyerWithDues")}</Label>
+                  <Select value={inwardBuyerId} onValueChange={setInwardBuyerId}>
+                    <SelectTrigger className="h-9 text-sm" data-testid="inward-buyer"><SelectValue placeholder={t("cash.selectBuyer")} /></SelectTrigger>
+                    <SelectContent>
+                      {buyersWithDues.filter(b => parseFloat(b.overallDue) > 0).map(b => (
+                        <SelectItem key={b.id} value={b.id.toString()}>
+                          {b.name} - Due: ₹{parseFloat(b.overallDue).toLocaleString("en-IN")}
+                        </SelectItem>
+                      ))}
+                      {buyersWithDues.filter(b => parseFloat(b.overallDue) <= 0).map(b => (
+                        <SelectItem key={b.id} value={b.id.toString()}>
+                          {b.name} (No dues)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <div className="space-y-1">
+                <Label className="text-xs">{t("cash.amount")}</Label>
+                <Input type="number" inputMode="decimal" value={inwardAmount} onChange={e => setInwardAmount(e.target.value)} onFocus={e => e.target.select()} placeholder="0" className="h-9 text-sm" data-testid="inward-amount" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">{t("cash.paymentMode")}</Label>
+                <Select value={inwardPaymentMode} onValueChange={setInwardPaymentMode}>
+                  <SelectTrigger className="h-9 text-sm" data-testid="inward-payment-mode"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Cash">Cash</SelectItem>
+                    <SelectItem value="Online">Account/Online</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {inwardPaymentMode !== "Cash" && (
+                <div className="space-y-1">
+                  <Label className="text-xs">{t("cash.selectAccount")}</Label>
+                  <Select value={inwardBankAccountId} onValueChange={setInwardBankAccountId}>
+                    <SelectTrigger className="h-9 text-sm" data-testid="inward-bank-account"><SelectValue placeholder={t("cash.selectAccount")} /></SelectTrigger>
+                    <SelectContent>
+                      {bankAccountsList.map(a => <SelectItem key={a.id} value={a.id.toString()}>{a.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <div className="space-y-1">
+                <Label className="text-xs">{t("cash.paidOn")}</Label>
+                <Input type="date" value={inwardDate} onChange={e => setInwardDate(e.target.value)} className="h-9 text-sm" data-testid="inward-date" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">{t("cash.remarks")}</Label>
+                <Input value={inwardNotes} onChange={e => setInwardNotes(e.target.value)} placeholder={t("cash.remarksPlaceholder")} className="h-9 text-sm" data-testid="inward-notes" />
+              </div>
+              <Button className="w-full h-9 text-sm" onClick={submitInward} disabled={createMutation.isPending} data-testid="button-submit-inward">
+                {createMutation.isPending ? t("common.saving") : t("cash.submit")}
+              </Button>
+            </div>
+          )}
+
+          {activeTab === "expense" && (
+            <div className="space-y-3 p-3 bg-muted/30 rounded-lg">
+              <div className="space-y-1">
+                <Label className="text-xs">{t("cash.partyType")}</Label>
+                <Select value={expensePartyType} onValueChange={setExpensePartyType}>
+                  <SelectTrigger className="h-9 text-sm" data-testid="expense-party-type"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Farmer">{t("cash.farmer")}</SelectItem>
+                    <SelectItem value="Others">{t("cash.others")}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {expensePartyType === "Farmer" && (
+                <div className="space-y-1">
+                  <Label className="text-xs">{t("cash.farmer")}</Label>
+                  <Select value={expenseFarmerId} onValueChange={setExpenseFarmerId}>
+                    <SelectTrigger className="h-9 text-sm" data-testid="expense-farmer"><SelectValue placeholder={t("cash.selectFarmer")} /></SelectTrigger>
+                    <SelectContent>
+                      {farmers.map(f => <SelectItem key={f.id} value={f.id.toString()}>{f.name} - {f.phone}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <div className="space-y-1">
+                <Label className="text-xs">{t("cash.amount")}</Label>
+                <Input type="number" inputMode="decimal" value={expenseAmount} onChange={e => setExpenseAmount(e.target.value)} onFocus={e => e.target.select()} placeholder="0" className="h-9 text-sm" data-testid="expense-amount" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">{t("cash.paymentMode")}</Label>
+                <Select value={expensePaymentMode} onValueChange={setExpensePaymentMode}>
+                  <SelectTrigger className="h-9 text-sm" data-testid="expense-payment-mode"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Cash">Cash</SelectItem>
+                    <SelectItem value="Online">Account/Online</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {expensePaymentMode !== "Cash" && (
+                <div className="space-y-1">
+                  <Label className="text-xs">{t("cash.selectAccount")}</Label>
+                  <Select value={expenseBankAccountId} onValueChange={setExpenseBankAccountId}>
+                    <SelectTrigger className="h-9 text-sm" data-testid="expense-bank-account"><SelectValue placeholder={t("cash.selectAccount")} /></SelectTrigger>
+                    <SelectContent>
+                      {bankAccountsList.map(a => <SelectItem key={a.id} value={a.id.toString()}>{a.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <div className="space-y-1">
+                <Label className="text-xs">{t("cash.paidOn")}</Label>
+                <Input type="date" value={expenseDate} onChange={e => setExpenseDate(e.target.value)} className="h-9 text-sm" data-testid="expense-date" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">{t("cash.remarks")}</Label>
+                <Input value={expenseNotes} onChange={e => setExpenseNotes(e.target.value)} placeholder={t("cash.remarksPlaceholder")} className="h-9 text-sm" data-testid="expense-notes" />
+              </div>
+              <Button className="w-full h-9 text-sm" onClick={submitExpense} disabled={createMutation.isPending} data-testid="button-submit-expense">
+                {createMutation.isPending ? t("common.saving") : t("cash.submit")}
+              </Button>
+            </div>
+          )}
+
+          {activeTab === "transfer" && (
+            <div className="space-y-3 p-3 bg-muted/30 rounded-lg">
+              <div className="space-y-1">
+                <Label className="text-xs">{t("cash.from")}</Label>
+                <Select value={transferFromType} onValueChange={(v) => { setTransferFromType(v); setTransferToType(v === "cash" ? "account" : "cash"); }}>
+                  <SelectTrigger className="h-9 text-sm" data-testid="transfer-from-type"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="account">Bank Account</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {transferFromType === "account" && (
+                <div className="space-y-1">
+                  <Label className="text-xs">{t("cash.fromAccount")}</Label>
+                  <Select value={transferFromAccountId} onValueChange={setTransferFromAccountId}>
+                    <SelectTrigger className="h-9 text-sm" data-testid="transfer-from-account"><SelectValue placeholder={t("cash.selectAccount")} /></SelectTrigger>
+                    <SelectContent>
+                      {bankAccountsList.map(a => <SelectItem key={a.id} value={a.id.toString()}>{a.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <div className="space-y-1">
+                <Label className="text-xs">{t("cash.to")}</Label>
+                <Input value={transferToType === "cash" ? "Cash" : "Bank Account"} readOnly className="h-9 text-sm bg-muted" />
+              </div>
+              {transferToType === "account" && (
+                <div className="space-y-1">
+                  <Label className="text-xs">{t("cash.toAccount")}</Label>
+                  <Select value={transferToAccountId} onValueChange={setTransferToAccountId}>
+                    <SelectTrigger className="h-9 text-sm" data-testid="transfer-to-account"><SelectValue placeholder={t("cash.selectAccount")} /></SelectTrigger>
+                    <SelectContent>
+                      {bankAccountsList.map(a => <SelectItem key={a.id} value={a.id.toString()}>{a.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <div className="space-y-1">
+                <Label className="text-xs">{t("cash.amount")}</Label>
+                <Input type="number" inputMode="decimal" value={transferAmount} onChange={e => setTransferAmount(e.target.value)} onFocus={e => e.target.select()} placeholder="0" className="h-9 text-sm" data-testid="transfer-amount" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">{t("common.date")}</Label>
+                <Input type="date" value={transferDate} onChange={e => setTransferDate(e.target.value)} className="h-9 text-sm" data-testid="transfer-date" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">{t("cash.remarks")}</Label>
+                <Input value={transferNotes} onChange={e => setTransferNotes(e.target.value)} placeholder={t("cash.remarksPlaceholder")} className="h-9 text-sm" data-testid="transfer-notes" />
+              </div>
+              <Button className="w-full h-9 text-sm" onClick={submitTransfer} disabled={createMutation.isPending} data-testid="button-submit-transfer">
+                {createMutation.isPending ? t("common.saving") : t("cash.submit")}
+              </Button>
+            </div>
+          )}
+        </div>
+
+        <div className="space-y-3">
+          <div className="flex items-center justify-between border-b pb-2">
+            <h2 className="text-sm font-semibold">{t("cash.cashFlowHistory")}</h2>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={downloadCSV} data-testid="button-download-csv">
+              <Download className="w-4 h-4" />
+            </Button>
+          </div>
+
+          {isLoading ? (
+            <div className="text-center py-8 text-muted-foreground text-sm">{t("app.loading")}</div>
+          ) : filteredEntries.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground text-sm">{t("cash.noEntries")}</div>
+          ) : (
+            <div className="space-y-2 max-h-[60vh] overflow-y-auto">
+              {filteredEntries.map(entry => (
+                <Card
+                  key={entry.id}
+                  className={`cursor-pointer transition-opacity ${entry.isReversed ? "opacity-40" : ""}`}
+                  onClick={() => setDetailEntry(entry)}
+                  data-testid={`cash-entry-${entry.id}`}
+                >
+                  <CardContent className="p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                          <span className={`text-sm font-medium ${entry.category === "inward" ? "" : ""}`}>
+                            {entry.category === "inward" ? "↙" : entry.category === "expense" ? "↗" : "⇄"} {getEntryLabel(entry)}
+                          </span>
+                          {getCategoryBadge(entry)}
+                          {entry.isReversed && <Badge variant="destructive" className="text-[10px]">Reversed</Badge>}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
+                          <span>{entry.date}</span>
+                          <Badge variant="outline" className="text-[10px] h-4">{entry.paymentMode}</Badge>
+                          {entry.isReversed && entry.reversedAt && (
+                            <span>Reversed on {format(new Date(entry.reversedAt), "dd/MM/yyyy")}</span>
+                          )}
+                          {entry.notes && <span className="truncate max-w-[150px]">{entry.notes}</span>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`text-sm font-bold whitespace-nowrap ${entry.category === "expense" || entry.category === "transfer" ? "text-orange-600" : "text-green-600"}`}>
+                          {entry.category === "expense" ? "-" : entry.category === "inward" ? "+" : ""}₹{parseFloat(entry.amount).toLocaleString("en-IN")}
+                        </span>
+                        {!entry.isReversed && (
+                          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={(ev) => { ev.stopPropagation(); setReverseConfirmEntry(entry); }} data-testid={`reverse-entry-${entry.id}`}>
+                            <RotateCcw className="w-3 h-3" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <Dialog open={!!detailEntry} onOpenChange={() => setDetailEntry(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{t("cash.entryDetails")}</DialogTitle>
+          </DialogHeader>
+          {detailEntry && (
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between"><span className="text-muted-foreground">Cash Flow ID</span><span className="font-medium">{detailEntry.cashFlowId || "N/A"}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">{t("common.date")}</span><span>{detailEntry.date}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.category")}</span>{getCategoryBadge(detailEntry)}</div>
+              <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.amount")}</span><span className="font-bold">₹{parseFloat(detailEntry.amount).toLocaleString("en-IN")}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.paymentMode")}</span><span>{detailEntry.paymentMode}</span></div>
+              {detailEntry.bankAccountId && <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.bankAccount")}</span><span>{getAccountName(detailEntry.bankAccountId)}</span></div>}
+              {detailEntry.buyerId && <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.buyer")}</span><span>{getBuyerName(detailEntry.buyerId)}</span></div>}
+              {detailEntry.farmerId && <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.farmer")}</span><span>{getFarmerName(detailEntry.farmerId)}</span></div>}
+              {detailEntry.notes && <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.remarks")}</span><span>{detailEntry.notes}</span></div>}
+              <div className="flex justify-between"><span className="text-muted-foreground">Status</span><span>{detailEntry.isReversed ? "Reversed" : "Active"}</span></div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={!!reverseConfirmEntry} onOpenChange={() => setReverseConfirmEntry(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("cash.reverseEntry")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("cash.reverseConfirm")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={() => reverseConfirmEntry && reverseMutation.mutate(reverseConfirmEntry.id)}>
+              {t("cash.reverse")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t("cash.settings")}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">{t("cash.cashInHandOpening")}</Label>
+              <div className="flex gap-2">
+                <Input
+                  type="number" inputMode="decimal"
+                  value={cashInHandOpening}
+                  onChange={e => setCashInHandOpening(e.target.value)}
+                  onFocus={e => e.target.select()}
+                  placeholder="0"
+                  className="h-9 text-sm"
+                  data-testid="input-cash-opening"
+                />
+                <Button size="sm" className="h-9" onClick={() => saveCashSettingsMutation.mutate(cashInHandOpening)} data-testid="button-save-opening">
+                  {t("common.save")}
+                </Button>
+              </div>
+            </div>
+
+            <div className="border-t pt-3 space-y-3">
+              <Label className="text-sm font-medium">{t("cash.bankAccounts")}</Label>
+              {bankAccountsList.map(account => (
+                <div key={account.id} className="flex items-center gap-2 p-2 bg-muted/30 rounded text-sm">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium truncate">{account.name}</p>
+                    <p className="text-xs text-muted-foreground">{account.accountType} • Opening: ₹{parseFloat(account.openingBalance || "0").toLocaleString("en-IN")}</p>
+                  </div>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive shrink-0" onClick={() => setDeleteAccountId(account.id)} data-testid={`delete-bank-${account.id}`}>
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              ))}
+
+              <div className="space-y-2 border rounded-lg p-3">
+                <p className="text-xs font-medium">{t("cash.addBankAccount")}</p>
+                <Input
+                  value={newBankName}
+                  onChange={e => setNewBankName(e.target.value)}
+                  placeholder="e.g. SBI-Limit-#3545643843"
+                  className="h-9 text-sm"
+                  data-testid="input-bank-name"
+                />
+                <Select value={newBankType} onValueChange={setNewBankType}>
+                  <SelectTrigger className="h-9 text-sm" data-testid="select-bank-type"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Limit">Limit</SelectItem>
+                    <SelectItem value="Current">Current</SelectItem>
+                    <SelectItem value="Saving">Saving</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input
+                  type="number" inputMode="decimal"
+                  value={newBankBalance}
+                  onChange={e => setNewBankBalance(e.target.value)}
+                  onFocus={e => e.target.select()}
+                  placeholder="Opening Balance"
+                  className="h-9 text-sm"
+                  data-testid="input-bank-opening"
+                />
+                <Button
+                  size="sm" className="w-full h-9"
+                  disabled={!newBankName || createBankMutation.isPending}
+                  onClick={() => createBankMutation.mutate({ name: newBankName, accountType: newBankType, openingBalance: newBankBalance || "0" })}
+                  data-testid="button-add-bank"
+                >
+                  <Plus className="w-3.5 h-3.5 mr-1" />
+                  {t("cash.addAccount")}
+                </Button>
+              </div>
+            </div>
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deleteAccountId} onOpenChange={() => setDeleteAccountId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("cash.deleteAccount")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("cash.deleteAccountConfirm")}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground" onClick={() => deleteAccountId && deleteBankMutation.mutate(deleteAccountId)}>
+              {t("common.delete")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -136,13 +136,33 @@ export const transactions = pgTable("transactions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-export const cashEntries = pgTable("cash_entries", {
+export const bankAccounts = pgTable("bank_accounts", {
   id: serial("id").primaryKey(),
   businessId: integer("business_id").notNull().references(() => businesses.id),
+  name: text("name").notNull(),
+  accountType: text("account_type").notNull().default("Current"),
+  openingBalance: decimal("opening_balance", { precision: 12, scale: 2 }).default("0"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const cashSettings = pgTable("cash_settings", {
+  id: serial("id").primaryKey(),
+  businessId: integer("business_id").notNull().references(() => businesses.id).unique(),
+  cashInHandOpening: decimal("cash_in_hand_opening", { precision: 12, scale: 2 }).default("0"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const cashEntries = pgTable("cash_entries", {
+  id: serial("id").primaryKey(),
+  cashFlowId: text("cash_flow_id"),
+  businessId: integer("business_id").notNull().references(() => businesses.id),
+  category: text("category").notNull().default("inward"),
   type: text("type").notNull(),
+  partyType: text("party_type"),
   farmerId: integer("farmer_id").references(() => farmers.id),
   buyerId: integer("buyer_id").references(() => buyers.id),
   transactionId: integer("transaction_id").references(() => transactions.id),
+  bankAccountId: integer("bank_account_id").references(() => bankAccounts.id),
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
   paymentMode: text("payment_mode").notNull().default("Cash"),
   chequeNumber: text("cheque_number"),
@@ -150,6 +170,8 @@ export const cashEntries = pgTable("cash_entries", {
   bankName: text("bank_name"),
   date: date("date").notNull(),
   notes: text("notes"),
+  isReversed: boolean("is_reversed").default(false).notNull(),
+  reversedAt: timestamp("reversed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -162,7 +184,9 @@ export const insertBuyerEditHistorySchema = createInsertSchema(buyerEditHistory)
 export const insertLotSchema = createInsertSchema(lots).omit({ id: true, createdAt: true });
 export const insertBidSchema = createInsertSchema(bids).omit({ id: true, createdAt: true });
 export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true, transactionId: true, createdAt: true });
-export const insertCashEntrySchema = createInsertSchema(cashEntries).omit({ id: true, createdAt: true });
+export const insertBankAccountSchema = createInsertSchema(bankAccounts).omit({ id: true, createdAt: true });
+export const insertCashSettingsSchema = createInsertSchema(cashSettings).omit({ id: true, createdAt: true });
+export const insertCashEntrySchema = createInsertSchema(cashEntries).omit({ id: true, cashFlowId: true, createdAt: true });
 
 export type Business = typeof businesses.$inferSelect;
 export type InsertBusiness = z.infer<typeof insertBusinessSchema>;
@@ -182,6 +206,10 @@ export type Bid = typeof bids.$inferSelect;
 export type InsertBid = z.infer<typeof insertBidSchema>;
 export type Transaction = typeof transactions.$inferSelect;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
+export type BankAccount = typeof bankAccounts.$inferSelect;
+export type InsertBankAccount = z.infer<typeof insertBankAccountSchema>;
+export type CashSettings = typeof cashSettings.$inferSelect;
+export type InsertCashSettings = z.infer<typeof insertCashSettingsSchema>;
 export type CashEntry = typeof cashEntries.$inferSelect;
 export type InsertCashEntry = z.infer<typeof insertCashEntrySchema>;
 
