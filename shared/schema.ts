@@ -94,6 +94,7 @@ export const lots = pgTable("lots", {
   vehicleNumber: text("vehicle_number"),
   vehicleBhadaRate: decimal("vehicle_bhada_rate", { precision: 10, scale: 2 }),
   initialTotalWeight: decimal("initial_total_weight", { precision: 12, scale: 2 }),
+  isReturned: boolean("is_returned").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

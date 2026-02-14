@@ -31,7 +31,7 @@ export default function BiddingPage() {
     queryKey: ["/api/lots", `?crop=${activeCrop}`],
   });
 
-  const availableLots = lots.filter(l => l.remainingBags > 0);
+  const availableLots = lots.filter(l => l.remainingBags > 0 && !l.isReturned);
 
   const { data: buyers = [] } = useQuery<Buyer[]>({
     queryKey: ["/api/buyers", buyerSearch ? `?search=${buyerSearch}` : ""],

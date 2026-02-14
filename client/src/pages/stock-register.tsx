@@ -7,11 +7,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CROPS, SIZES } from "@shared/schema";
 import type { Lot, Farmer } from "@shared/schema";
-import { Search, Edit, Package, Wheat } from "lucide-react";
+import { Search, Edit, Package, Wheat, Undo2 } from "lucide-react";
 import { format } from "date-fns";
 
 type LotWithFarmer = Lot & { farmer: Farmer };
@@ -27,6 +28,7 @@ export default function StockRegisterPage() {
   const [editVehicleNumber, setEditVehicleNumber] = useState("");
   const [editVehicleBhadaRate, setEditVehicleBhadaRate] = useState("");
   const [editInitialTotalWeight, setEditInitialTotalWeight] = useState("");
+  const [returnConfirmOpen, setReturnConfirmOpen] = useState(false);
 
   const todayStr = format(new Date(), "yyyy-MM-dd");
 
@@ -43,6 +45,28 @@ export default function StockRegisterPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
       setEditingLot(null);
       toast({ title: "Updated", description: "Lot details updated" });
+    },
+  });
+
+  const returnLotMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("POST", `/api/lots/${id}/return`);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bids"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      setReturnConfirmOpen(false);
+      setEditingLot(null);
+      if (data.soldBags > 0) {
+        toast({ title: "Lot Returned", description: `Partially sold lot adjusted to ${data.soldBags} bags and marked as sold` });
+      } else {
+        toast({ title: "Lot Returned", description: "Lot marked as returned to farmer" });
+      }
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
 
@@ -78,6 +102,27 @@ export default function StockRegisterPage() {
         initialTotalWeight: editInitialTotalWeight || null,
       },
     });
+  };
+
+  const getLotStatus = (lot: LotWithFarmer) => {
+    if (lot.isReturned) return "Returned";
+    if (lot.remainingBags === 0) return "Sold Out";
+    if (lot.remainingBags < lot.numberOfBags) return "Partially Sold";
+    return "Unsold";
+  };
+
+  const getStatusBadge = (lot: LotWithFarmer) => {
+    const status = getLotStatus(lot);
+    switch (status) {
+      case "Returned":
+        return <Badge variant="outline" className="text-xs border-orange-400 text-orange-600 bg-orange-50">Returned</Badge>;
+      case "Sold Out":
+        return <Badge variant="destructive" className="text-xs">Sold Out</Badge>;
+      case "Partially Sold":
+        return <Badge variant="secondary" className="text-xs border-blue-400 text-blue-600 bg-blue-50">Partially Sold</Badge>;
+      case "Unsold":
+        return <Badge variant="outline" className="text-xs border-green-400 text-green-600 bg-green-50">Unsold</Badge>;
+    }
   };
 
   const cropIcon = (crop: string) => {
@@ -125,16 +170,14 @@ export default function StockRegisterPage() {
       ) : (
         <div className="space-y-3">
           {filtered.map((lot) => (
-            <Card key={lot.id}>
+            <Card key={lot.id} className={lot.isReturned ? "opacity-50" : ""}>
               <CardContent className="pt-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2 mb-2">
                       <Badge variant="secondary" className="text-xs">SR #{lot.serialNumber}</Badge>
                       <Badge className="text-xs">{lot.lotId}</Badge>
-                      {lot.remainingBags === 0 && (
-                        <Badge variant="destructive" className="text-xs">Sold Out</Badge>
-                      )}
+                      {getStatusBadge(lot)}
                     </div>
                     <div className="text-sm space-y-1">
                       <p className="font-medium truncate">{lot.farmer.name} - {lot.farmer.phone}</p>
@@ -158,14 +201,16 @@ export default function StockRegisterPage() {
                       </div>
                     </div>
                   </div>
-                  <Button
-                    variant="secondary"
-                    size="icon"
-                    data-testid={`button-edit-lot-${lot.id}`}
-                    onClick={() => openEdit(lot)}
-                  >
-                    <Edit className="w-4 h-4" />
-                  </Button>
+                  {!lot.isReturned && (
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      data-testid={`button-edit-lot-${lot.id}`}
+                      onClick={() => openEdit(lot)}
+                    >
+                      <Edit className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -176,7 +221,19 @@ export default function StockRegisterPage() {
       <Dialog open={!!editingLot} onOpenChange={(open) => !open && setEditingLot(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Edit Lot - {editingLot?.lotId}</DialogTitle>
+            <div className="flex items-center justify-between">
+              <DialogTitle>Edit Lot - {editingLot?.lotId}</DialogTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                data-testid="button-return-lot"
+                className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 -mr-2"
+                onClick={() => setReturnConfirmOpen(true)}
+                title="Return to Farmer"
+              >
+                <Undo2 className="w-5 h-5" />
+              </Button>
+            </div>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
@@ -255,6 +312,37 @@ export default function StockRegisterPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={returnConfirmOpen} onOpenChange={setReturnConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Return Lot to Farmer?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to return this lot back to farmer?
+              {editingLot && editingLot.remainingBags < editingLot.numberOfBags ? (
+                <span className="block mt-2 text-orange-600 font-medium">
+                  This lot is partially sold ({editingLot.numberOfBags - editingLot.remainingBags} bags sold). The bag count will be adjusted to the sold amount and marked as sold out.
+                </span>
+              ) : (
+                <span className="block mt-2">
+                  This lot has no sales. It will be marked as returned.
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-return">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="button-confirm-return"
+              className="bg-destructive text-destructive-foreground"
+              onClick={() => editingLot && returnLotMutation.mutate(editingLot.id)}
+              disabled={returnLotMutation.isPending}
+            >
+              {returnLotMutation.isPending ? "Returning..." : "Yes, Return"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

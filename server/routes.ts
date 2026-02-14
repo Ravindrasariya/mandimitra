@@ -436,6 +436,34 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  app.post("/api/lots/:id/return", requireAuth, async (req, res) => {
+    try {
+      const lotId = paramId(req.params.id);
+      const businessId = req.user!.businessId;
+      const lot = await storage.getLot(lotId, businessId);
+      if (!lot) return res.status(404).json({ message: "Lot not found" });
+      if (lot.isReturned) return res.status(400).json({ message: "Lot is already returned" });
+
+      const soldBags = lot.numberOfBags - lot.remainingBags;
+
+      if (soldBags > 0) {
+        await storage.updateLot(lotId, businessId, {
+          numberOfBags: soldBags,
+          remainingBags: 0,
+          isReturned: true,
+        } as any);
+      } else {
+        await storage.updateLot(lotId, businessId, {
+          isReturned: true,
+        } as any);
+      }
+
+      res.json({ message: "Lot returned successfully", soldBags });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   app.get("/api/bids", requireAuth, async (req, res) => {
     const lotId = req.query.lotId ? parseInt(req.query.lotId as string) : undefined;
     const result = await storage.getBids(req.user!.businessId, lotId);
