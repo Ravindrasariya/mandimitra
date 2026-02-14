@@ -60,8 +60,9 @@ function generateFarmerReceiptHtml(lot: Lot, farmer: Farmer, txns: TransactionWi
   const totalBags = txns.reduce((s, t) => s + (t.numberOfBags || 0), 0);
   const totalHammali = txns.reduce((s, t) => s + parseFloat(t.hammaliCharges || "0"), 0);
   const totalGrading = txns.reduce((s, t) => s + parseFloat(t.gradingCharges || "0"), 0);
-  const totalAadhat = txns.reduce((s, t) => s + parseFloat(t.aadhatCharges || "0"), 0);
-  const totalMandi = txns.reduce((s, t) => s + parseFloat(t.mandiCharges || "0"), 0);
+  const sellerChargedTxns = txns.filter(t => t.chargedTo === "Seller");
+  const totalAadhat = sellerChargedTxns.reduce((s, t) => s + parseFloat(t.aadhatCharges || "0"), 0);
+  const totalMandi = sellerChargedTxns.reduce((s, t) => s + parseFloat(t.mandiCharges || "0"), 0);
   const totalPayable = txns.reduce((s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0);
   const totalGross = txns.reduce((s, t) => s + (parseFloat(t.netWeight || "0") * parseFloat(t.pricePerKg || "0")), 0);
   const dateStr = txns[0]?.date || format(new Date(), "yyyy-MM-dd");
@@ -91,8 +92,8 @@ h2{text-align:center;margin-bottom:5px}
 <div class="summary-row"><span>कुल राशि (Gross):</span><span>₹${totalGross.toFixed(2)}</span></div>
 <div class="summary-row"><span>हम्माली (${totalBags} थैले):</span><span>₹${totalHammali.toFixed(2)}</span></div>
 <div class="summary-row"><span>ग्रेडिंग:</span><span>₹${totalGrading.toFixed(2)}</span></div>
-<div class="summary-row"><span>आढ़त:</span><span>₹${totalAadhat.toFixed(2)}</span></div>
-<div class="summary-row"><span>मण्डी शुल्क:</span><span>₹${totalMandi.toFixed(2)}</span></div>
+${sellerChargedTxns.length > 0 ? `<div class="summary-row"><span>आढ़त:</span><span>₹${totalAadhat.toFixed(2)}</span></div>
+<div class="summary-row"><span>मण्डी शुल्क:</span><span>₹${totalMandi.toFixed(2)}</span></div>` : ""}
 <div class="summary-row total"><span>किसान को देय राशि:</span><span>₹${totalPayable.toFixed(2)}</span></div>
 </div>
 <script>window.onload=function(){window.print()}</script>
@@ -122,7 +123,7 @@ h2{text-align:center;margin-bottom:5px}
 <tr><td><strong>Lot No:</strong> ${lot.lotId}</td><td><strong>Date:</strong> ${dateStr}</td></tr>
 <tr><td><strong>Buyer:</strong> ${tx.buyer.name}</td><td><strong>Buyer Code:</strong> ${tx.buyer.buyerCode || "-"}</td></tr>
 <tr><td><strong>Farmer:</strong> ${farmer.name}</td><td><strong>Crop:</strong> ${lot.crop}</td></tr>
-<tr><td><strong>Grade:</strong> ${tx.bid.grade || "-"}</td><td><strong>Size:</strong> ${lot.size || "-"}</td></tr>
+<tr><td><strong>Size:</strong> ${lot.size || "-"}</td><td></td></tr>
 </table>
 <table style="margin-top:15px">
 <tr style="background:#f5f5f5">
@@ -138,9 +139,8 @@ h2{text-align:center;margin-bottom:5px}
 <div class="summary">
 <div class="summary-row"><span>Hammali (${tx.numberOfBags} bags × Rs.${parseFloat(tx.hammaliPerBag || "0").toFixed(2)}):</span><span>Rs.${parseFloat(tx.hammaliCharges || "0").toFixed(2)}</span></div>
 <div class="summary-row"><span>Grading:</span><span>Rs.${parseFloat(tx.gradingCharges || "0").toFixed(2)}</span></div>
-<div class="summary-row"><span>Aadhat (${tx.aadhatCommissionPercent}%):</span><span>Rs.${parseFloat(tx.aadhatCharges || "0").toFixed(2)}</span></div>
-<div class="summary-row"><span>Mandi (${tx.mandiCommissionPercent}%):</span><span>Rs.${parseFloat(tx.mandiCharges || "0").toFixed(2)}</span></div>
-<div class="summary-row"><span>Charges Applied To:</span><span>${tx.chargedTo}</span></div>
+${tx.chargedTo === "Buyer" ? `<div class="summary-row"><span>Aadhat (${tx.aadhatCommissionPercent}%):</span><span>Rs.${parseFloat(tx.aadhatCharges || "0").toFixed(2)}</span></div>
+<div class="summary-row"><span>Mandi (${tx.mandiCommissionPercent}%):</span><span>Rs.${parseFloat(tx.mandiCharges || "0").toFixed(2)}</span></div>` : ""}
 <div class="summary-row total"><span>Total Receivable from Buyer:</span><span>Rs.${parseFloat(tx.totalReceivableFromBuyer || "0").toFixed(2)}</span></div>
 </div>
 <script>window.onload=function(){window.print()}</script>
