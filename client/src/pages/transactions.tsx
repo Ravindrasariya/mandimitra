@@ -17,6 +17,12 @@ import { format } from "date-fns";
 type BidWithDetails = Bid & { buyer: Buyer; lot: Lot; farmer: Farmer };
 type TransactionWithDetails = Transaction & { farmer: Farmer; buyer: Buyer; lot: Lot; bid: Bid };
 
+type DialogItem = {
+  type: "pending" | "completed";
+  bid: BidWithDetails;
+  txn?: TransactionWithDetails;
+};
+
 type UnifiedLotGroup = {
   lotId: string;
   lot: Lot;
@@ -171,8 +177,8 @@ function openPrintWindow(html: string) {
 
 export default function TransactionsPage() {
   const { toast } = useToast();
-  const [selectedLotBids, setSelectedLotBids] = useState<BidWithDetails[]>([]);
-  const [selectedBuyerIdx, setSelectedBuyerIdx] = useState(0);
+  const [dialogItems, setDialogItems] = useState<DialogItem[]>([]);
+  const [selectedIdx, setSelectedIdx] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
 
   const [totalWeight, setTotalWeight] = useState("");
@@ -199,8 +205,25 @@ export default function TransactionsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/bids"] });
       setDialogOpen(false);
-      setSelectedLotBids([]);
+      setDialogItems([]);
       toast({ title: "Transaction Created", description: "Transaction recorded successfully" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const updateTxMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+      const res = await apiRequest("PATCH", `/api/transactions/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bids"] });
+      setDialogOpen(false);
+      setDialogItems([]);
+      toast({ title: "Transaction Updated", description: "Transaction updated successfully" });
     },
     onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -215,19 +238,73 @@ export default function TransactionsPage() {
     [pendingBids, txns]
   );
 
-  const openTransaction = (lotBids: BidWithDetails[]) => {
-    setSelectedLotBids(lotBids);
-    setSelectedBuyerIdx(0);
+  const bidForTxn = (tx: TransactionWithDetails): BidWithDetails => {
+    const found = allBids.find(b => b.id === tx.bidId);
+    if (found) return found;
+    return {
+      ...tx.bid,
+      buyer: tx.buyer,
+      lot: tx.lot,
+      farmer: tx.farmer,
+    } as BidWithDetails;
+  };
+
+  const openEditDialog = (group: UnifiedLotGroup) => {
+    const items: DialogItem[] = [];
+
+    for (const bid of group.pendingBids) {
+      items.push({ type: "pending", bid });
+    }
+
+    for (const tx of group.completedTxns) {
+      items.push({ type: "completed", bid: bidForTxn(tx), txn: tx });
+    }
+
+    setDialogItems(items);
+    setSelectedIdx(0);
+
+    const firstItem = items[0];
+    if (firstItem?.type === "completed" && firstItem.txn) {
+      prefillFromTxn(firstItem.txn);
+    } else {
+      resetFormDefaults();
+    }
+
+    setDialogOpen(true);
+  };
+
+  const prefillFromTxn = (tx: TransactionWithDetails) => {
+    setTotalWeight(tx.totalWeight || "");
+    setHammaliPerBag(tx.hammaliPerBag || "0");
+    setGradingCharges(tx.gradingCharges || "0");
+    setAadhatPercent(tx.aadhatCommissionPercent || "2");
+    setMandiPercent(tx.mandiCommissionPercent || "1");
+    setChargedTo(tx.chargedTo || "Buyer");
+  };
+
+  const resetFormDefaults = () => {
     setTotalWeight("");
     setHammaliPerBag("0");
     setGradingCharges("0");
     setAadhatPercent("2");
     setMandiPercent("1");
     setChargedTo("Buyer");
-    setDialogOpen(true);
   };
 
-  const selectedBid = selectedLotBids[selectedBuyerIdx] || null;
+  const handleBuyerChange = (val: string) => {
+    const idx = parseInt(val);
+    setSelectedIdx(idx);
+    const item = dialogItems[idx];
+    if (item?.type === "completed" && item.txn) {
+      prefillFromTxn(item.txn);
+    } else {
+      resetFormDefaults();
+    }
+  };
+
+  const currentItem = dialogItems[selectedIdx] || null;
+  const selectedBid = currentItem?.bid || null;
+  const isEditing = currentItem?.type === "completed";
 
   const tw = parseFloat(totalWeight) || 0;
   const bags = selectedBid?.numberOfBags || 0;
@@ -251,7 +328,7 @@ export default function TransactionsPage() {
       return;
     }
 
-    createTxMutation.mutate({
+    const payload = {
       lotId: selectedBid.lot.id,
       bidId: selectedBid.id,
       buyerId: selectedBid.buyerId,
@@ -271,8 +348,17 @@ export default function TransactionsPage() {
       totalPayableToFarmer: farmerPayable.toFixed(2),
       totalReceivableFromBuyer: buyerReceivable.toFixed(2),
       date: format(new Date(), "yyyy-MM-dd"),
-    });
+    };
+
+    if (isEditing && currentItem.txn) {
+      payload.date = currentItem.txn.date || payload.date;
+      updateTxMutation.mutate({ id: currentItem.txn.id, data: payload });
+    } else {
+      createTxMutation.mutate(payload);
+    }
   };
+
+  const isSaving = createTxMutation.isPending || updateTxMutation.isPending;
 
   const handlePrintFarmerReceipt = (group: UnifiedLotGroup) => {
     const html = generateFarmerReceiptHtml(group.lot, group.farmer, group.completedTxns);
@@ -294,7 +380,6 @@ export default function TransactionsPage() {
       {unifiedGroups.length > 0 ? (
         <div className="space-y-3">
           {unifiedGroups.map((group) => {
-            const hasPending = group.pendingBids.length > 0;
             const hasCompleted = group.completedTxns.length > 0;
             const totalFarmerPayable = group.completedTxns.reduce(
               (s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0
@@ -310,20 +395,18 @@ export default function TransactionsPage() {
                         <Badge variant="outline" className="text-xs">{group.lot.crop}</Badge>
                       </div>
                       <p className="text-sm">Farmer: <strong>{group.farmer.name}</strong></p>
-                      <p className="text-xs text-muted-foreground">{group.lot.numberOfBags} bags total | Size: {group.lot.size}</p>
+                      <p className="text-xs text-muted-foreground">{group.lot.numberOfBags} bags total</p>
                     </div>
                     <div className="flex items-center gap-1">
-                      {hasPending && (
-                        <Button
-                          data-testid={`button-edit-lot-${group.lot.id}`}
-                          size="sm"
-                          className="mobile-touch-target"
-                          onClick={() => openTransaction(group.pendingBids)}
-                        >
-                          <Pencil className="w-4 h-4 mr-1" />
-                          Edit
-                        </Button>
-                      )}
+                      <Button
+                        data-testid={`button-edit-lot-${group.lot.id}`}
+                        size="sm"
+                        className="mobile-touch-target"
+                        onClick={() => openEditDialog(group)}
+                      >
+                        <Pencil className="w-4 h-4 mr-1" />
+                        Edit
+                      </Button>
                       {hasCompleted && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -366,7 +449,7 @@ export default function TransactionsPage() {
                     </div>
                   )}
 
-                  <div className={`${hasCompleted ? "border-t pt-2" : "border-t pt-2"} space-y-1`}>
+                  <div className="border-t pt-2 space-y-1">
                     {group.completedTxns.map((tx) => (
                       <div key={tx.id} className="flex items-center justify-between text-sm py-1">
                         <div className="flex items-center gap-2">
@@ -375,6 +458,8 @@ export default function TransactionsPage() {
                         </div>
                         <div className="flex items-center gap-3 text-xs text-muted-foreground">
                           <Badge className="text-xs">Rs.{tx.pricePerKg}/kg</Badge>
+                          <span>{tx.numberOfBags} bags</span>
+                          <span>{tx.lot.size || ""}</span>
                           <span>Net: {tx.netWeight}kg</span>
                           <span className="text-chart-2 font-medium">Rs.{tx.totalReceivableFromBuyer}</span>
                         </div>
@@ -408,7 +493,7 @@ export default function TransactionsPage() {
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Create Transaction</DialogTitle>
+            <DialogTitle>{isEditing ? "Edit Transaction" : "Create Transaction"}</DialogTitle>
           </DialogHeader>
           {selectedBid && (
             <div className="space-y-4">
@@ -417,24 +502,22 @@ export default function TransactionsPage() {
                 <p>Farmer: <strong>{selectedBid.farmer.name}</strong></p>
               </div>
 
-              {selectedLotBids.length > 1 && (
+              {dialogItems.length > 1 && (
                 <div className="space-y-1">
                   <Label>Select Buyer</Label>
                   <Select
                     data-testid="select-buyer-bid"
-                    value={selectedBuyerIdx.toString()}
-                    onValueChange={(val) => {
-                      setSelectedBuyerIdx(parseInt(val));
-                      setTotalWeight("");
-                    }}
+                    value={selectedIdx.toString()}
+                    onValueChange={handleBuyerChange}
                   >
                     <SelectTrigger className="mobile-touch-target">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {selectedLotBids.map((bid, idx) => (
-                        <SelectItem key={bid.id} value={idx.toString()}>
-                          {bid.buyer.name} - Rs.{bid.pricePerKg}/kg ({bid.numberOfBags} bags)
+                      {dialogItems.map((item, idx) => (
+                        <SelectItem key={item.bid.id} value={idx.toString()}>
+                          {item.bid.buyer.name} - Rs.{item.bid.pricePerKg}/kg ({item.bid.numberOfBags} bags)
+                          {item.type === "completed" ? " ✓" : ""}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -566,9 +649,9 @@ export default function TransactionsPage() {
                 data-testid="button-submit-transaction"
                 className="w-full mobile-touch-target"
                 onClick={submitTransaction}
-                disabled={createTxMutation.isPending}
+                disabled={isSaving}
               >
-                {createTxMutation.isPending ? "Saving..." : "Create Transaction"}
+                {isSaving ? "Saving..." : isEditing ? "Update Transaction" : "Create Transaction"}
               </Button>
             </div>
           )}
