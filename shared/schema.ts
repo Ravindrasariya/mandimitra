@@ -131,6 +131,7 @@ export const transactions = pgTable("transactions", {
   totalPayableToFarmer: decimal("total_payable_to_farmer", { precision: 12, scale: 2 }).default("0"),
   totalReceivableFromBuyer: decimal("total_receivable_from_buyer", { precision: 12, scale: 2 }).default("0"),
   date: date("date"),
+  isReversed: boolean("is_reversed").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

@@ -524,6 +524,31 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  app.post("/api/transactions/:id/reverse", requireAuth, async (req, res) => {
+    try {
+      const txId = paramId(req.params.id);
+      const businessId = req.user!.businessId;
+      const tx = await storage.getTransaction(txId, businessId);
+      if (!tx) return res.status(404).json({ message: "Transaction not found" });
+      if (tx.isReversed) return res.status(400).json({ message: "Transaction is already reversed" });
+
+      const bagsToReturn = tx.numberOfBags || 0;
+
+      const lot = await storage.getLot(tx.lotId, businessId);
+      if (!lot) return res.status(404).json({ message: "Lot not found" });
+
+      const newNumberOfBags = lot.isReturned ? lot.numberOfBags + bagsToReturn : lot.numberOfBags;
+      const newRemaining = Math.min(lot.remainingBags + bagsToReturn, newNumberOfBags);
+      const updateData: any = { remainingBags: newRemaining, numberOfBags: newNumberOfBags };
+      await storage.updateLot(lot.id, businessId, updateData);
+      await storage.updateTransaction(txId, businessId, { isReversed: true } as any);
+
+      res.json({ message: "Transaction reversed successfully", bagsReturned: bagsToReturn });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   app.get("/api/cash-entries", requireAuth, async (req, res) => {
     const filters = {
       type: req.query.type as string | undefined,

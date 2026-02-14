@@ -11,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { Bid, Buyer, Lot, Farmer, Transaction } from "@shared/schema";
-import { Receipt, Pencil, Printer, ChevronDown } from "lucide-react";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Receipt, Pencil, Printer, ChevronDown, Undo2 } from "lucide-react";
 import { format } from "date-fns";
 
 type BidWithDetails = Bid & { buyer: Buyer; lot: Lot; farmer: Farmer };
@@ -161,6 +162,8 @@ export default function TransactionsPage() {
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [cropFilter, setCropFilter] = useState("all");
+  const [reverseConfirmOpen, setReverseConfirmOpen] = useState(false);
+  const [reversingTxn, setReversingTxn] = useState<TransactionWithDetails | null>(null);
   const now = new Date();
   const [yearFilter, setYearFilter] = useState(String(now.getFullYear()));
   const [monthFilter, setMonthFilter] = useState(String(now.getMonth() + 1));
@@ -209,6 +212,26 @@ export default function TransactionsPage() {
       setDialogOpen(false);
       setDialogItems([]);
       toast({ title: "Transaction Updated", description: "Transaction updated successfully" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const reverseTxMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const res = await apiRequest("POST", `/api/transactions/${id}/reverse`);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bids"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash-entries"] });
+      setReverseConfirmOpen(false);
+      setReversingTxn(null);
+      toast({ title: "Transaction Reversed", description: `${data.bagsReturned} bags returned to stock` });
     },
     onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -357,7 +380,8 @@ export default function TransactionsPage() {
   const isSaving = createTxMutation.isPending || updateTxMutation.isPending;
 
   const handlePrintFarmerReceipt = (group: UnifiedLotGroup) => {
-    const html = generateFarmerReceiptHtml(group.lot, group.farmer, group.completedTxns);
+    const activeTxns = group.completedTxns.filter(t => !t.isReversed);
+    const html = generateFarmerReceiptHtml(group.lot, group.farmer, activeTxns);
     openPrintWindow(html);
   };
 
@@ -421,8 +445,9 @@ export default function TransactionsPage() {
       {filteredGroups.length > 0 ? (
         <div className="space-y-3">
           {filteredGroups.map((group) => {
-            const hasCompleted = group.completedTxns.length > 0;
-            const totalFarmerPayable = group.completedTxns.reduce(
+            const activeTxns = group.completedTxns.filter(t => !t.isReversed);
+            const hasCompleted = activeTxns.length > 0;
+            const totalFarmerPayable = activeTxns.reduce(
               (s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0
             );
 
@@ -468,7 +493,7 @@ export default function TransactionsPage() {
                             >
                               किसान रसीद (Farmer Receipt - Hindi)
                             </DropdownMenuItem>
-                            {group.completedTxns.map((tx) => (
+                            {group.completedTxns.filter(t => !t.isReversed).map((tx) => (
                               <DropdownMenuItem
                                 key={tx.id}
                                 data-testid={`button-print-buyer-${tx.id}`}
@@ -492,10 +517,11 @@ export default function TransactionsPage() {
 
                   <div className="border-t pt-2 space-y-1">
                     {group.completedTxns.map((tx) => (
-                      <div key={tx.id} className="flex items-center justify-between text-sm py-1">
+                      <div key={tx.id} className={`flex items-center justify-between text-sm py-1 ${tx.isReversed ? "opacity-40" : ""}`}>
                         <div className="flex items-center gap-2">
                           <span className="text-muted-foreground">Buyer:</span>
                           <strong>{tx.buyer.name}</strong>
+                          {tx.isReversed && <Badge variant="outline" className="text-xs border-orange-400 text-orange-600 bg-orange-50">Reversed</Badge>}
                         </div>
                         <div className="flex items-center gap-3 text-xs text-muted-foreground">
                           <Badge className="text-xs">Rs.{tx.pricePerKg}/kg</Badge>
@@ -503,6 +529,19 @@ export default function TransactionsPage() {
                           <span>{tx.lot.size || ""}</span>
                           <span>Net: {tx.netWeight}kg</span>
                           <span className="text-chart-2 font-medium">Rs.{tx.totalReceivableFromBuyer}</span>
+                          {!tx.isReversed && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              data-testid={`button-reverse-tx-${tx.id}`}
+                              className="h-6 w-6 text-orange-600"
+                              onClick={(e) => { e.stopPropagation(); setReversingTxn(tx); setReverseConfirmOpen(true); }}
+                              disabled={reverseTxMutation.isPending}
+                              title="Return to Stock"
+                            >
+                              <Undo2 className="w-4 h-4" />
+                            </Button>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -698,6 +737,33 @@ export default function TransactionsPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={reverseConfirmOpen} onOpenChange={(open) => { setReverseConfirmOpen(open); if (!open) setReversingTxn(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Return to Stock?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to reverse this transaction?
+              {reversingTxn && (
+                <span className="block mt-2 text-orange-600 font-medium">
+                  Buyer: {reversingTxn.buyer.name} — {reversingTxn.numberOfBags} bags will be returned to stock and become available for bidding again.
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-reverse">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="button-confirm-reverse"
+              className="bg-destructive text-destructive-foreground"
+              onClick={() => reversingTxn && reverseTxMutation.mutate(reversingTxn.id)}
+              disabled={reverseTxMutation.isPending}
+            >
+              {reverseTxMutation.isPending ? "Reversing..." : "Yes, Reverse"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
