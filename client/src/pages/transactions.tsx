@@ -161,6 +161,10 @@ export default function TransactionsPage() {
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [cropFilter, setCropFilter] = useState("all");
+  const now = new Date();
+  const [yearFilter, setYearFilter] = useState(String(now.getFullYear()));
+  const [monthFilter, setMonthFilter] = useState(String(now.getMonth() + 1));
+  const [dayFilter, setDayFilter] = useState("all");
 
   const [totalWeight, setTotalWeight] = useState("");
   const [hammaliPerBag, setHammaliPerBag] = useState("0");
@@ -219,10 +223,16 @@ export default function TransactionsPage() {
     [pendingBids, txns]
   );
 
-  const filteredGroups = useMemo(
-    () => cropFilter === "all" ? unifiedGroups : unifiedGroups.filter(g => g.lot.crop === cropFilter),
-    [unifiedGroups, cropFilter]
-  );
+  const filteredGroups = useMemo(() => {
+    return unifiedGroups.filter(g => {
+      if (cropFilter !== "all" && g.lot.crop !== cropFilter) return false;
+      const lotDate = new Date(g.lot.createdAt);
+      if (lotDate.getFullYear() !== parseInt(yearFilter)) return false;
+      if (lotDate.getMonth() + 1 !== parseInt(monthFilter)) return false;
+      if (dayFilter !== "all" && lotDate.getDate() !== parseInt(dayFilter)) return false;
+      return true;
+    });
+  }, [unifiedGroups, cropFilter, yearFilter, monthFilter, dayFilter]);
 
   const bidForTxn = (tx: TransactionWithDetails): BidWithDetails => {
     const found = allBids.find(b => b.id === tx.bidId);
@@ -358,13 +368,44 @@ export default function TransactionsPage() {
 
   return (
     <div className="p-3 md:p-6 max-w-4xl mx-auto space-y-4">
-      <div className="flex items-center justify-between gap-2">
-        <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2 mr-auto">
           <Receipt className="w-6 h-6 text-primary" />
           Transactions
         </h1>
+        <Select value={yearFilter} onValueChange={(v) => { setYearFilter(v); setDayFilter("all"); }}>
+          <SelectTrigger className="w-[85px]" data-testid="select-year-filter">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {Array.from({ length: 5 }, (_, i) => String(now.getFullYear() - i)).map(y => (
+              <SelectItem key={y} value={y}>{y}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={monthFilter} onValueChange={(v) => { setMonthFilter(v); setDayFilter("all"); }}>
+          <SelectTrigger className="w-[100px]" data-testid="select-month-filter">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"].map((m, i) => (
+              <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={dayFilter} onValueChange={setDayFilter}>
+          <SelectTrigger className="w-[90px]" data-testid="select-day-filter">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Days</SelectItem>
+            {Array.from({ length: new Date(parseInt(yearFilter), parseInt(monthFilter), 0).getDate() }, (_, i) => String(i + 1)).map(d => (
+              <SelectItem key={d} value={d}>{d}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select value={cropFilter} onValueChange={setCropFilter}>
-          <SelectTrigger className="w-[130px]" data-testid="select-crop-filter">
+          <SelectTrigger className="w-[110px]" data-testid="select-crop-filter">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
