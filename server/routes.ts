@@ -399,12 +399,11 @@ export async function registerRoutes(
       const dateStr = req.body.date || format(new Date(), "yyyy-MM-dd");
       const crop = req.body.crop;
 
-      const lotNum = await storage.getNextLotNumber(businessId, dateStr);
       const serialNum = await storage.getNextSerialNumber(businessId, crop, dateStr);
 
       const cropPrefix = crop === "Potato" ? "POT" : crop === "Onion" ? "ONI" : "GAR";
       const dateFormatted = dateStr.replace(/-/g, "");
-      const lotId = `${cropPrefix}${dateFormatted}${lotNum}`;
+      const lotId = `${cropPrefix}${dateFormatted}${serialNum}`;
 
       const data = {
         businessId,

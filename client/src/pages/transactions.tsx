@@ -461,6 +461,7 @@ export default function TransactionsPage() {
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="flex-1 min-w-0">
                       <div className="flex flex-wrap items-center gap-2 mb-1">
+                        <Badge variant="secondary" className="text-xs">#{group.lot.serialNumber}</Badge>
                         <Badge variant="secondary" className="text-xs">{group.lotId}</Badge>
                         <Badge variant="outline" className="text-xs">{group.lot.crop}</Badge>
                       </div>
@@ -570,7 +571,7 @@ export default function TransactionsPage() {
           {selectedBid && (
             <div className="space-y-4">
               <div className="bg-muted rounded-md p-3 text-sm space-y-1">
-                <p>{t("transactions.lot")}: <strong>{selectedBid.lot.lotId}</strong></p>
+                <p>{t("transactions.lot")}: <strong>#{selectedBid.lot.serialNumber} - {selectedBid.lot.lotId}</strong></p>
                 <p>{t("transactions.farmer")}: <strong>{selectedBid.farmer.name}</strong></p>
               </div>
 
