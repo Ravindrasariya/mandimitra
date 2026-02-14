@@ -344,6 +344,20 @@ export default function CashPage() {
     return bankAccountsList.find(a => a.id === id)?.name || `#${id}`;
   };
 
+  const truncateAccountName = (name: string, maxLen = 20) => {
+    if (name.length <= maxLen) return name;
+    const hashIdx = name.indexOf("#");
+    if (hashIdx >= 0) {
+      const prefix = name.substring(0, hashIdx + 1);
+      const num = name.substring(hashIdx + 1);
+      const availLen = maxLen - prefix.length - 2;
+      if (availLen > 0 && num.length > availLen) {
+        return prefix + num.substring(0, availLen) + "..";
+      }
+    }
+    return name.substring(0, maxLen - 2) + "..";
+  };
+
   const getEntryLabel = (e: CashEntry) => {
     if (e.category === "transfer") return "Transfer";
     if (e.outflowType === "Buyer" && e.buyerId) return getBuyerName(e.buyerId);
@@ -439,7 +453,10 @@ export default function CashPage() {
               <p className="text-[10px] text-green-600 font-medium">{t("cash.accountReceived")}</p>
               <p className="text-sm font-bold text-green-700" data-testid="text-account-received">₹{summaryData.totalAccountReceived.toLocaleString("en-IN")}</p>
               {summaryData.accountBreakdowns.filter(a => a.received > 0).map(a => (
-                <p key={a.name} className="text-[10px] text-muted-foreground truncate">{a.name} ₹{a.received.toLocaleString("en-IN")}</p>
+                <div key={a.name} className="flex items-baseline justify-between gap-1 mt-0.5">
+                  <span className="text-[10px] text-green-600/70 truncate">{truncateAccountName(a.name)}</span>
+                  <span className="text-xs font-semibold text-green-700 whitespace-nowrap">₹{a.received.toLocaleString("en-IN")}</span>
+                </div>
               ))}
             </CardContent>
           </Card>
@@ -448,7 +465,10 @@ export default function CashPage() {
               <p className="text-[10px] text-orange-600 font-medium">{t("cash.accountExpense")}</p>
               <p className="text-sm font-bold text-orange-700" data-testid="text-account-expense">₹{summaryData.totalAccountExpense.toLocaleString("en-IN")}</p>
               {summaryData.accountBreakdowns.filter(a => a.expense > 0).map(a => (
-                <p key={a.name} className="text-[10px] text-muted-foreground truncate">{a.name} ₹{a.expense.toLocaleString("en-IN")}</p>
+                <div key={a.name} className="flex items-baseline justify-between gap-1 mt-0.5">
+                  <span className="text-[10px] text-orange-600/70 truncate">{truncateAccountName(a.name)}</span>
+                  <span className="text-xs font-semibold text-orange-700 whitespace-nowrap">₹{a.expense.toLocaleString("en-IN")}</span>
+                </div>
               ))}
             </CardContent>
           </Card>
@@ -457,7 +477,10 @@ export default function CashPage() {
               <p className="text-[10px] text-purple-600 font-medium">{t("cash.netInAccounts")}</p>
               <p className="text-sm font-bold text-purple-700" data-testid="text-net-accounts">₹{summaryData.totalAccountBalance.toLocaleString("en-IN")}</p>
               {summaryData.accountBreakdowns.map(a => (
-                <p key={a.name} className="text-[10px] text-muted-foreground truncate">{a.name} ₹{a.balance.toLocaleString("en-IN")}</p>
+                <div key={a.name} className="flex items-baseline justify-between gap-1 mt-0.5">
+                  <span className="text-[10px] text-purple-600/70 truncate">{truncateAccountName(a.name)}</span>
+                  <span className="text-xs font-semibold text-purple-700 whitespace-nowrap">₹{a.balance.toLocaleString("en-IN")}</span>
+                </div>
               ))}
             </CardContent>
           </Card>
