@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/lib/language";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -61,6 +62,7 @@ ${rows}</table>
 
 export default function FarmerLedgerPage() {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [searchName, setSearchName] = useState("");
   const [searchVillage, setSearchVillage] = useState("");
   const [yearFilter, setYearFilter] = useState("all");
@@ -263,14 +265,14 @@ export default function FarmerLedgerPage() {
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2 mr-auto">
           <Users className="w-6 h-6 text-primary" />
-          Farmer Ledger
+          {t("farmerLedger.title")}
         </h1>
         <Select value={yearFilter} onValueChange={setYearFilter}>
           <SelectTrigger className="w-[100px]" data-testid="select-year-filter">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Years</SelectItem>
+            <SelectItem value="all">{t("farmerLedger.allYears")}</SelectItem>
             {years.map(y => (
               <SelectItem key={y} value={y}>{y}</SelectItem>
             ))}
@@ -282,7 +284,7 @@ export default function FarmerLedgerPage() {
             data-testid="input-search-name"
             value={searchName}
             onChange={(e) => setSearchName(e.target.value)}
-            placeholder="Search By Name..."
+            placeholder={t("farmerLedger.searchByName")}
             className="pl-8 w-[160px] h-9"
           />
         </div>
@@ -292,7 +294,7 @@ export default function FarmerLedgerPage() {
             data-testid="input-search-village"
             value={searchVillage}
             onChange={(e) => setSearchVillage(e.target.value)}
-            placeholder="Search By Village..."
+            placeholder={t("farmerLedger.searchByVillage")}
             className="pl-8 w-[160px] h-9"
           />
         </div>
@@ -302,7 +304,7 @@ export default function FarmerLedgerPage() {
             checked={showArchived}
             onCheckedChange={setShowArchived}
           />
-          <span className="text-xs text-muted-foreground whitespace-nowrap">Show Archived</span>
+          <span className="text-xs text-muted-foreground whitespace-nowrap">{t("farmerLedger.showArchived")}</span>
         </div>
         <Button variant="outline" size="sm" onClick={handleSync} data-testid="button-sync">
           <RefreshCw className="w-4 h-4" />
@@ -315,35 +317,35 @@ export default function FarmerLedgerPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <Card className="border-l-4 border-l-blue-500">
           <CardContent className="pt-3 pb-3 text-center">
-            <p className="text-xs text-muted-foreground">Total Farmers</p>
+            <p className="text-xs text-muted-foreground">{t("farmerLedger.totalFarmers")}</p>
             <p className="text-base font-bold text-blue-600" data-testid="text-total-farmers">{summary.total}</p>
           </CardContent>
         </Card>
         <Card className="border-l-4 border-l-orange-500">
           <CardContent className="pt-3 pb-3 text-center">
-            <p className="text-xs text-muted-foreground"># Due Farmers</p>
+            <p className="text-xs text-muted-foreground">{t("farmerLedger.dueFarmers")}</p>
             <p className="text-base font-bold text-orange-600" data-testid="text-farmers-with-dues">{summary.withDues}</p>
           </CardContent>
         </Card>
         <Card className="border-l-4 border-l-green-500">
           <CardContent className="pt-3 pb-3 text-center">
-            <p className="text-xs text-muted-foreground">Total Payable</p>
+            <p className="text-xs text-muted-foreground">{t("farmerLedger.totalPayable")}</p>
             <p className="text-base font-bold text-green-600" data-testid="text-total-payable">{formatIndianCurrency(summary.totalPayable)}</p>
           </CardContent>
         </Card>
         <Card className="border-l-4 border-l-red-500">
           <CardContent className="pt-3 pb-3 text-center">
-            <p className="text-xs text-muted-foreground">Total Dues</p>
+            <p className="text-xs text-muted-foreground">{t("farmerLedger.totalDues")}</p>
             <p className="text-base font-bold text-red-600" data-testid="text-total-dues">{formatIndianCurrency(summary.totalDue)}</p>
           </CardContent>
         </Card>
       </div>
 
       {isLoading ? (
-        <div className="text-center py-8 text-muted-foreground">Loading farmers...</div>
+        <div className="text-center py-8 text-muted-foreground">{t("farmerLedger.loadingFarmers")}</div>
       ) : sortedFarmers.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">
-          {showArchived ? "No archived farmers found" : "No farmers found"}
+          {showArchived ? t("farmerLedger.noArchived") : t("farmerLedger.noFarmers")}
         </div>
       ) : (
         <div className="overflow-x-auto">
@@ -356,27 +358,27 @@ export default function FarmerLedgerPage() {
                   onClick={() => toggleSort("farmerId")}
                   data-testid="sort-farmer-id"
                 >
-                  <span className="inline-flex items-center">Farmer ID <SortIcon field="farmerId" /></span>
+                  <span className="inline-flex items-center">{t("farmerLedger.farmerId")} <SortIcon field="farmerId" /></span>
                 </th>
-                <th className="text-left p-2 font-medium text-muted-foreground">Name</th>
-                <th className="text-left p-2 font-medium text-muted-foreground">Village</th>
-                <th className="text-left p-2 font-medium text-muted-foreground">Contact</th>
+                <th className="text-left p-2 font-medium text-muted-foreground">{t("common.name")}</th>
+                <th className="text-left p-2 font-medium text-muted-foreground">{t("common.village")}</th>
+                <th className="text-left p-2 font-medium text-muted-foreground">{t("common.contact")}</th>
                 <th
                   className="text-right p-2 font-medium text-muted-foreground cursor-pointer select-none"
                   onClick={() => toggleSort("totalPayable")}
                   data-testid="sort-total-payable"
                 >
-                  <span className="inline-flex items-center justify-end">Total Payable <SortIcon field="totalPayable" /></span>
+                  <span className="inline-flex items-center justify-end">{t("farmerLedger.totalPayable")} <SortIcon field="totalPayable" /></span>
                 </th>
                 <th
                   className="text-right p-2 font-medium text-muted-foreground cursor-pointer select-none"
                   onClick={() => toggleSort("totalDue")}
                   data-testid="sort-total-due"
                 >
-                  <span className="inline-flex items-center justify-end">Total Due <SortIcon field="totalDue" /></span>
+                  <span className="inline-flex items-center justify-end">{t("farmerLedger.totalDue")} <SortIcon field="totalDue" /></span>
                 </th>
-                <th className="text-center p-2 font-medium text-muted-foreground">Flag</th>
-                <th className="text-center p-2 font-medium text-muted-foreground">Actions</th>
+                <th className="text-center p-2 font-medium text-muted-foreground">{t("common.flag")}</th>
+                <th className="text-center p-2 font-medium text-muted-foreground">{t("common.actions")}</th>
               </tr>
             </thead>
             <tbody>
@@ -417,7 +419,7 @@ export default function FarmerLedgerPage() {
                         size="sm"
                         className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
                         onClick={() => handleToggleArchive(farmer)}
-                        title={farmer.isArchived ? "Reinstate" : "Archive"}
+                        title={farmer.isArchived ? t("farmerLedger.reinstate") : t("farmerLedger.archive")}
                         data-testid={`button-archive-farmer-${farmer.id}`}
                       >
                         <Archive className="w-3.5 h-3.5" />
@@ -434,14 +436,14 @@ export default function FarmerLedgerPage() {
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Edit Farmer</DialogTitle>
-            <DialogDescription>Update farmer details. Duplicate detection will trigger merge if a match is found.</DialogDescription>
+            <DialogTitle>{t("farmerLedger.editFarmer")}</DialogTitle>
+            <DialogDescription>{t("farmerLedger.editDesc")}</DialogDescription>
           </DialogHeader>
           {editingFarmer && (
             <div className="space-y-3">
               <div className="text-xs text-muted-foreground font-mono">ID: {editingFarmer.farmerId}</div>
               <div className="space-y-1">
-                <Label className="text-xs">Name</Label>
+                <Label className="text-xs">{t("common.name")}</Label>
                 <Input
                   data-testid="input-edit-farmer-name"
                   value={editName}
@@ -449,7 +451,7 @@ export default function FarmerLedgerPage() {
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Contact</Label>
+                <Label className="text-xs">{t("common.contact")}</Label>
                 <Input
                   data-testid="input-edit-farmer-phone"
                   value={editPhone}
@@ -458,7 +460,7 @@ export default function FarmerLedgerPage() {
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Village</Label>
+                <Label className="text-xs">{t("common.village")}</Label>
                 <Input
                   data-testid="input-edit-farmer-village"
                   value={editVillage}
@@ -466,14 +468,14 @@ export default function FarmerLedgerPage() {
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">Negative Flag</Label>
+                <Label className="text-xs">{t("farmerLedger.negativeFlag")}</Label>
                 <Select value={editNegativeFlag} onValueChange={setEditNegativeFlag}>
                   <SelectTrigger data-testid="select-edit-negative-flag">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="false">No</SelectItem>
-                    <SelectItem value="true">Yes</SelectItem>
+                    <SelectItem value="false">{t("common.no")}</SelectItem>
+                    <SelectItem value="true">{t("common.yes")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -484,12 +486,12 @@ export default function FarmerLedgerPage() {
                 disabled={updateFarmerMutation.isPending}
                 data-testid="button-save-farmer-edit"
               >
-                {updateFarmerMutation.isPending ? "Saving..." : "Save Changes"}
+                {updateFarmerMutation.isPending ? t("common.saving") : t("common.saveChanges")}
               </Button>
 
               {editHistory.length > 0 && (
                 <div className="mt-3">
-                  <p className="text-xs font-semibold text-muted-foreground mb-2">Edit History</p>
+                  <p className="text-xs font-semibold text-muted-foreground mb-2">{t("farmerLedger.editHistory")}</p>
                   <div className="max-h-40 overflow-y-auto space-y-1.5">
                     {editHistory.map((h) => (
                       <div key={h.id} className="text-xs bg-muted/50 rounded p-2">

@@ -1,0 +1,312 @@
+import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+
+export type Language = "en" | "hi";
+
+const translations: Record<string, Record<Language, string>> = {
+  "app.name": { en: "Mandi Mitra", hi: "मंडी मित्र" },
+  "app.tagline": { en: "Agricultural Marketplace Manager", hi: "कृषि बाज़ार प्रबंधक" },
+  "app.loading": { en: "Loading...", hi: "लोड हो रहा है..." },
+
+  "nav.stockEntry": { en: "Stock Entry", hi: "स्टॉक एंट्री" },
+  "nav.stockRegister": { en: "Stock Register", hi: "स्टॉक रजिस्टर" },
+  "nav.bidding": { en: "Bidding", hi: "बोली" },
+  "nav.transactions": { en: "Transactions", hi: "लेनदेन" },
+  "nav.cash": { en: "Cash", hi: "नकद" },
+  "nav.farmerLedger": { en: "Farmer Ledger", hi: "किसान खाता" },
+  "nav.buyerLedger": { en: "Buyer Ledger", hi: "खरीदार खाता" },
+  "nav.entry": { en: "Entry", hi: "एंट्री" },
+  "nav.register": { en: "Register", hi: "रजिस्टर" },
+  "nav.txns": { en: "Txns", hi: "लेनदेन" },
+  "nav.farmers": { en: "Farmers", hi: "किसान" },
+  "nav.buyers": { en: "Buyers", hi: "खरीदार" },
+  "nav.more": { en: "More", hi: "और" },
+  "nav.logout": { en: "Logout", hi: "लॉगआउट" },
+
+  "common.save": { en: "Save", hi: "सहेजें" },
+  "common.cancel": { en: "Cancel", hi: "रद्द करें" },
+  "common.edit": { en: "Edit", hi: "संपादन" },
+  "common.delete": { en: "Delete", hi: "हटाएं" },
+  "common.search": { en: "Search", hi: "खोजें" },
+  "common.saving": { en: "Saving...", hi: "सहेज रहे हैं..." },
+  "common.date": { en: "Date", hi: "दिनांक" },
+  "common.name": { en: "Name", hi: "नाम" },
+  "common.phone": { en: "Phone", hi: "फ़ोन" },
+  "common.contact": { en: "Contact", hi: "संपर्क" },
+  "common.address": { en: "Address", hi: "पता" },
+  "common.village": { en: "Village", hi: "गाँव" },
+  "common.tehsil": { en: "Tehsil", hi: "तहसील" },
+  "common.district": { en: "District", hi: "जिला" },
+  "common.state": { en: "State", hi: "राज्य" },
+  "common.yes": { en: "Yes", hi: "हाँ" },
+  "common.no": { en: "No", hi: "नहीं" },
+  "common.all": { en: "All", hi: "सभी" },
+  "common.active": { en: "Active", hi: "सक्रिय" },
+  "common.inactive": { en: "Inactive", hi: "निष्क्रिय" },
+  "common.notes": { en: "Notes", hi: "नोट्स" },
+  "common.optional": { en: "Optional", hi: "वैकल्पिक" },
+  "common.saveChanges": { en: "Save Changes", hi: "बदलाव सहेजें" },
+  "common.actions": { en: "Actions", hi: "कार्रवाई" },
+  "common.flag": { en: "Flag", hi: "फ्लैग" },
+  "common.bags": { en: "bags", hi: "थैले" },
+  "common.remaining": { en: "Remaining", hi: "शेष" },
+
+  "stockEntry.title": { en: "Stock Entry", hi: "स्टॉक एंट्री" },
+  "stockEntry.farmerDetails": { en: "Farmer Details", hi: "किसान विवरण" },
+  "stockEntry.searchFarmer": { en: "Search Farmer (Name, Phone, Village)", hi: "किसान खोजें (नाम, फ़ोन, गाँव)" },
+  "stockEntry.searchPlaceholder": { en: "Start typing farmer name, phone or village...", hi: "किसान का नाम, फ़ोन या गाँव टाइप करें..." },
+  "stockEntry.newFarmer": { en: "New Farmer", hi: "नया किसान" },
+  "stockEntry.farmerName": { en: "Farmer Name *", hi: "किसान का नाम *" },
+  "stockEntry.mobileNumber": { en: "Mobile Number *", hi: "मोबाइल नंबर *" },
+  "stockEntry.clearSelection": { en: "Clear Selection", hi: "चयन हटाएं" },
+  "stockEntry.lotInfo": { en: "Lot Information", hi: "लॉट जानकारी" },
+  "stockEntry.crop": { en: "Crop *", hi: "फसल *" },
+  "stockEntry.size": { en: "Size *", hi: "साइज़ *" },
+  "stockEntry.variety": { en: "Variety", hi: "किस्म" },
+  "stockEntry.numberOfBags": { en: "No. of Bags *", hi: "थैलों की संख्या *" },
+  "stockEntry.bagMarka": { en: "Bag Marka", hi: "बैग मार्का" },
+  "stockEntry.vehicleNumber": { en: "Vehicle #", hi: "वाहन नं." },
+  "stockEntry.bhadaRate": { en: "Bhada Rate/Bag", hi: "भाड़ा दर/थैला" },
+  "stockEntry.initialWeight": { en: "Initial Total Weight (kg)", hi: "प्रारंभिक कुल वजन (किलो)" },
+  "stockEntry.addLot": { en: "Add New Lot", hi: "नया लॉट जोड़ें" },
+  "stockEntry.saveToRegister": { en: "Save to Stock Register", hi: "स्टॉक रजिस्टर में सहेजें" },
+  "stockEntry.lot": { en: "Lot", hi: "लॉट" },
+  "stockEntry.selectCrop": { en: "Select crop", hi: "फसल चुनें" },
+  "stockEntry.selectSize": { en: "Select size", hi: "साइज़ चुनें" },
+  "stockEntry.selectDistrict": { en: "Select district", hi: "जिला चुनें" },
+  "stockEntry.mobilePlaceholder": { en: "10-digit mobile", hi: "10 अंक का मोबाइल" },
+  "stockEntry.farmerNamePlaceholder": { en: "Farmer name", hi: "किसान का नाम" },
+
+  "stockRegister.title": { en: "Stock Register", hi: "स्टॉक रजिस्टर" },
+  "stockRegister.editLot": { en: "Edit Lot", hi: "लॉट संपादित करें" },
+  "stockRegister.variety": { en: "Variety", hi: "किस्म" },
+  "stockRegister.size": { en: "Size", hi: "साइज़" },
+  "stockRegister.bagMarka": { en: "Bag Marka", hi: "बैग मार्का" },
+  "stockRegister.vehicleNumber": { en: "Vehicle Number", hi: "वाहन नंबर" },
+  "stockRegister.vehicleBhadaRate": { en: "Vehicle Bhada Rate (per bag)", hi: "वाहन भाड़ा दर (प्रति थैला)" },
+  "stockRegister.initialWeight": { en: "Initial Total Weight (kg)", hi: "प्रारंभिक कुल वजन (किलो)" },
+  "stockRegister.returnToFarmer": { en: "Return to Farmer", hi: "किसान को वापसी" },
+  "stockRegister.returnConfirmTitle": { en: "Return Lot to Farmer?", hi: "लॉट किसान को वापस करें?" },
+  "stockRegister.returnConfirmMsg": { en: "Are you sure you want to return this lot back to farmer?", hi: "क्या आप इस लॉट को किसान को वापस करना चाहते हैं?" },
+  "stockRegister.returnPartialMsg": { en: "This lot is partially sold", hi: "यह लॉट आंशिक रूप से बिका है" },
+  "stockRegister.returnUnsoldMsg": { en: "This lot has no sales. It will be marked as returned.", hi: "इस लॉट की कोई बिक्री नहीं है। इसे वापसी के रूप में चिह्नित किया जाएगा।" },
+  "stockRegister.yesReturn": { en: "Yes, Return", hi: "हाँ, वापस करें" },
+  "stockRegister.returning": { en: "Returning...", hi: "वापस कर रहे हैं..." },
+  "stockRegister.searchPlaceholder": { en: "Search by farmer name, phone, Lot ID, SR#...", hi: "किसान नाम, फ़ोन, लॉट ID, SR# से खोजें..." },
+  "stockRegister.noLots": { en: "No lots found for", hi: "कोई लॉट नहीं मिला" },
+  "stockRegister.unsold": { en: "Unsold", hi: "बिना बिका" },
+  "stockRegister.soldOut": { en: "Sold Out", hi: "बिक गया" },
+  "stockRegister.partiallySold": { en: "Partially Sold", hi: "आंशिक बिक्री" },
+  "stockRegister.returned": { en: "Returned", hi: "वापसी" },
+  "stockRegister.marka": { en: "Marka", hi: "मार्का" },
+  "stockRegister.vehicle": { en: "Vehicle", hi: "वाहन" },
+  "stockRegister.bhada": { en: "Bhada", hi: "भाड़ा" },
+  "stockRegister.initWt": { en: "Init. Wt", hi: "प्रा. वजन" },
+
+  "bidding.title": { en: "Bidding", hi: "बोली" },
+  "bidding.bid": { en: "Bid", hi: "बोली" },
+  "bidding.remainingBags": { en: "Remaining Bags", hi: "शेष थैले" },
+  "bidding.existingBids": { en: "Existing Bids", hi: "मौजूदा बोलियाँ" },
+  "bidding.newBid": { en: "New Bid", hi: "नई बोली" },
+  "bidding.buyer": { en: "Buyer", hi: "खरीदार" },
+  "bidding.selectBuyer": { en: "Select buyer", hi: "खरीदार चुनें" },
+  "bidding.newBuyer": { en: "New Buyer", hi: "नया खरीदार" },
+  "bidding.pricePerKg": { en: "Price/kg (Rs.)", hi: "दर/किलो (रु.)" },
+  "bidding.numberOfBags": { en: "No. of Bags", hi: "थैलों की संख्या" },
+  "bidding.addBid": { en: "Add Bid", hi: "बोली जोड़ें" },
+  "bidding.noLots": { en: "No available lots for", hi: "कोई उपलब्ध लॉट नहीं" },
+  "bidding.buyerName": { en: "Buyer name", hi: "खरीदार का नाम" },
+  "bidding.phoneOptional": { en: "Phone (optional)", hi: "फ़ोन (वैकल्पिक)" },
+
+  "transactions.title": { en: "Transactions", hi: "लेनदेन" },
+  "transactions.editTransaction": { en: "Edit Transaction", hi: "लेनदेन संपादित करें" },
+  "transactions.createTransaction": { en: "Create Transaction", hi: "लेनदेन बनाएं" },
+  "transactions.selectBuyer": { en: "Select Buyer", hi: "खरीदार चुनें" },
+  "transactions.totalWeight": { en: "Total Weight (kg)", hi: "कुल वजन (किलो)" },
+  "transactions.netWeight": { en: "Net Weight (kg)", hi: "शुद्ध वजन (किलो)" },
+  "transactions.hammali": { en: "Hammali (Rs./Bag)", hi: "हम्माली (रु./थैला)" },
+  "transactions.grading": { en: "Grading (Rs.)", hi: "ग्रेडिंग (रु.)" },
+  "transactions.aadhat": { en: "Aadhat %", hi: "आढ़त %" },
+  "transactions.mandi": { en: "Mandi %", hi: "मण्डी %" },
+  "transactions.chargedTo": { en: "Charges Applied To", hi: "शुल्क लागू" },
+  "transactions.buyer": { en: "Buyer", hi: "खरीदार" },
+  "transactions.sellerFarmer": { en: "Seller (Farmer)", hi: "विक्रेता (किसान)" },
+  "transactions.grossAmount": { en: "Gross Amount", hi: "कुल राशि" },
+  "transactions.payableToFarmer": { en: "Payable to Farmer", hi: "किसान को देय" },
+  "transactions.receivableFromBuyer": { en: "Receivable from Buyer", hi: "खरीदार से प्राप्य" },
+  "transactions.updateTransaction": { en: "Update Transaction", hi: "लेनदेन अपडेट करें" },
+  "transactions.returnToStockRegister": { en: "Return to Stock Register", hi: "स्टॉक रजिस्टर में वापसी" },
+  "transactions.returnConfirmTitle": { en: "Return to Stock?", hi: "स्टॉक में वापस करें?" },
+  "transactions.returnConfirmMsg": { en: "Are you sure you want to reverse this transaction?", hi: "क्या आप यह लेनदेन रद्द करना चाहते हैं?" },
+  "transactions.yesReverse": { en: "Yes, Reverse", hi: "हाँ, रद्द करें" },
+  "transactions.reversing": { en: "Reversing...", hi: "रद्द कर रहे हैं..." },
+  "transactions.reversed": { en: "Reversed", hi: "रद्द" },
+  "transactions.allMonths": { en: "All Months", hi: "सभी महीने" },
+  "transactions.allDays": { en: "All Days", hi: "सभी दिन" },
+  "transactions.allCrops": { en: "All Crops", hi: "सभी फसलें" },
+  "transactions.farmer": { en: "Farmer", hi: "किसान" },
+  "transactions.bagsTotal": { en: "bags total", hi: "कुल थैले" },
+  "transactions.noBids": { en: "No bids or transactions yet. Complete bidding first.", hi: "अभी कोई बोली या लेनदेन नहीं। पहले बोली पूरी करें।" },
+  "transactions.lot": { en: "Lot", hi: "लॉट" },
+
+  "cash.title": { en: "Cash Management", hi: "नकद प्रबंधन" },
+  "cash.cashIn": { en: "Cash In (Buyers)", hi: "नकद प्राप्ति (खरीदार)" },
+  "cash.cashOut": { en: "Cash Out (Farmers)", hi: "नकद भुगतान (किसान)" },
+  "cash.recordFromBuyer": { en: "Record Payment from Buyer", hi: "खरीदार से भुगतान दर्ज करें" },
+  "cash.recordToFarmer": { en: "Record Payment to Farmer", hi: "किसान को भुगतान दर्ज करें" },
+  "cash.cashInTitle": { en: "Cash In - Payment from Buyer", hi: "नकद प्राप्ति - खरीदार से भुगतान" },
+  "cash.cashOutTitle": { en: "Cash Out - Payment to Farmer", hi: "नकद भुगतान - किसान को भुगतान" },
+  "cash.buyer": { en: "Buyer", hi: "खरीदार" },
+  "cash.farmer": { en: "Farmer", hi: "किसान" },
+  "cash.amount": { en: "Amount (Rs.)", hi: "राशि (रु.)" },
+  "cash.paymentMode": { en: "Payment Mode", hi: "भुगतान विधि" },
+  "cash.chequeNumber": { en: "Cheque Number", hi: "चेक नंबर" },
+  "cash.chequeDate": { en: "Cheque Date", hi: "चेक दिनांक" },
+  "cash.bankName": { en: "Bank Name", hi: "बैंक नाम" },
+  "cash.notesOptional": { en: "Notes (Optional)", hi: "नोट्स (वैकल्पिक)" },
+  "cash.notesPlaceholder": { en: "Any additional notes", hi: "अतिरिक्त नोट्स" },
+  "cash.saveEntry": { en: "Save Entry", hi: "एंट्री सहेजें" },
+  "cash.noEntries": { en: "entries yet", hi: "अभी तक कोई एंट्री नहीं" },
+  "cash.selectBuyer": { en: "Select buyer", hi: "खरीदार चुनें" },
+  "cash.selectFarmer": { en: "Select farmer", hi: "किसान चुनें" },
+
+  "farmerLedger.title": { en: "Farmer Ledger", hi: "किसान खाता" },
+  "farmerLedger.allYears": { en: "All Years", hi: "सभी वर्ष" },
+  "farmerLedger.searchByName": { en: "Search By Name...", hi: "नाम से खोजें..." },
+  "farmerLedger.searchByVillage": { en: "Search By Village...", hi: "गाँव से खोजें..." },
+  "farmerLedger.showArchived": { en: "Show Archived", hi: "अभिलेख दिखाएं" },
+  "farmerLedger.totalFarmers": { en: "Total Farmers", hi: "कुल किसान" },
+  "farmerLedger.dueFarmers": { en: "# Due Farmers", hi: "बकाया किसान" },
+  "farmerLedger.totalPayable": { en: "Total Payable", hi: "कुल देय" },
+  "farmerLedger.totalDues": { en: "Total Dues", hi: "कुल बकाया" },
+  "farmerLedger.farmerId": { en: "Farmer ID", hi: "किसान ID" },
+  "farmerLedger.totalDue": { en: "Total Due", hi: "कुल बकाया" },
+  "farmerLedger.editFarmer": { en: "Edit Farmer", hi: "किसान संपादित करें" },
+  "farmerLedger.editDesc": { en: "Update farmer details. Duplicate detection will trigger merge if a match is found.", hi: "किसान विवरण अपडेट करें। डुप्लिकेट पाए जाने पर मर्ज होगा।" },
+  "farmerLedger.negativeFlag": { en: "Negative Flag", hi: "नकारात्मक फ्लैग" },
+  "farmerLedger.editHistory": { en: "Edit History", hi: "संपादन इतिहास" },
+  "farmerLedger.noFarmers": { en: "No farmers found", hi: "कोई किसान नहीं मिला" },
+  "farmerLedger.noArchived": { en: "No archived farmers found", hi: "कोई अभिलेख किसान नहीं मिला" },
+  "farmerLedger.loadingFarmers": { en: "Loading farmers...", hi: "किसान लोड हो रहे हैं..." },
+  "farmerLedger.reinstate": { en: "Reinstate", hi: "बहाल करें" },
+  "farmerLedger.archive": { en: "Archive", hi: "अभिलेख" },
+
+  "buyerLedger.title": { en: "Buyer Ledger", hi: "खरीदार खाता" },
+  "buyerLedger.subtitle": { en: "Manage buyers and track dues", hi: "खरीदारों का प्रबंधन और बकाया ट्रैक करें" },
+  "buyerLedger.buyerManagement": { en: "Buyer Management", hi: "खरीदार प्रबंधन" },
+  "buyerLedger.searchName": { en: "Search Name...", hi: "नाम खोजें..." },
+  "buyerLedger.addBuyer": { en: "Add Buyer", hi: "खरीदार जोड़ें" },
+  "buyerLedger.buyerId": { en: "Buyer ID", hi: "खरीदार ID" },
+  "buyerLedger.mandiCode": { en: "Mandi Code", hi: "मंडी कोड" },
+  "buyerLedger.negative": { en: "Negative", hi: "नकारात्मक" },
+  "buyerLedger.overallDue": { en: "Overall Due", hi: "कुल बकाया" },
+  "buyerLedger.receivables": { en: "Receivables", hi: "प्राप्य" },
+  "buyerLedger.editBuyer": { en: "Edit Buyer", hi: "खरीदार संपादित करें" },
+  "buyerLedger.buyerCode": { en: "Buyer Code", hi: "खरीदार कोड" },
+  "buyerLedger.openingBalance": { en: "Opening Balance", hi: "शुरुआती शेष" },
+  "buyerLedger.negativeFlag": { en: "Negative Flag", hi: "नकारात्मक फ्लैग" },
+  "buyerLedger.editHistory": { en: "Edit History", hi: "संपादन इतिहास" },
+  "buyerLedger.addNewBuyer": { en: "Add New Buyer", hi: "नया खरीदार जोड़ें" },
+  "buyerLedger.noBuyers": { en: "No buyers found", hi: "कोई खरीदार नहीं मिला" },
+  "buyerLedger.overall": { en: "Overall", hi: "कुल" },
+  "buyerLedger.receivable": { en: "Receivable", hi: "प्राप्य" },
+  "buyerLedger.adding": { en: "Adding...", hi: "जोड़ रहे हैं..." },
+
+  "login.title": { en: "Mandi Mitra", hi: "मंडी मित्र" },
+  "login.userName": { en: "User Name", hi: "उपयोगकर्ता नाम" },
+  "login.password": { en: "Password", hi: "पासवर्ड" },
+  "login.login": { en: "Login", hi: "लॉगिन" },
+  "login.signingIn": { en: "Signing in...", hi: "लॉगिन हो रहा है..." },
+  "login.changePassword": { en: "Change Password", hi: "पासवर्ड बदलें" },
+  "login.needHelp": { en: "Need Help? Please reach out to", hi: "मदद चाहिए? कृपया संपर्क करें" },
+  "login.enterUsername": { en: "Enter Your Username", hi: "अपना उपयोगकर्ता नाम दर्ज करें" },
+  "login.enterPassword": { en: "Enter password", hi: "पासवर्ड दर्ज करें" },
+
+  "changePassword.title": { en: "Change Password", hi: "पासवर्ड बदलें" },
+  "changePassword.registeredMobile": { en: "Registered Mobile Number", hi: "पंजीकृत मोबाइल नंबर" },
+  "changePassword.currentPassword": { en: "Current Password", hi: "वर्तमान पासवर्ड" },
+  "changePassword.newPassword": { en: "New Password", hi: "नया पासवर्ड" },
+  "changePassword.confirmPassword": { en: "Confirm Password", hi: "पासवर्ड पुष्टि करें" },
+  "changePassword.setNew": { en: "Set New Password", hi: "नया पासवर्ड सेट करें" },
+  "changePassword.changing": { en: "Changing...", hi: "बदल रहे हैं..." },
+  "changePassword.backToLogin": { en: "Back to Login", hi: "लॉगिन पर वापस जाएं" },
+  "changePassword.forgotPassword": { en: "Forgot your password? Please contact", hi: "पासवर्ड भूल गए? कृपया संपर्क करें" },
+  "changePassword.enterMobile": { en: "Enter your registered mobile number", hi: "अपना पंजीकृत मोबाइल नंबर दर्ज करें" },
+  "changePassword.enterCurrent": { en: "Enter your current password", hi: "अपना वर्तमान पासवर्ड दर्ज करें" },
+  "changePassword.enterNew": { en: "Enter new password", hi: "नया पासवर्ड दर्ज करें" },
+  "changePassword.confirmNew": { en: "Confirm new password", hi: "नया पासवर्ड पुष्टि करें" },
+  "changePassword.enterUsername": { en: "Enter your username", hi: "अपना उपयोगकर्ता नाम दर्ज करें" },
+
+  "admin.title": { en: "Admin Panel", hi: "एडमिन पैनल" },
+  "admin.subtitle": { en: "Manage merchants and users", hi: "व्यापारी और उपयोगकर्ता प्रबंधित करें" },
+  "admin.merchants": { en: "Merchants", hi: "व्यापारी" },
+  "admin.users": { en: "Users", hi: "उपयोगकर्ता" },
+  "admin.addMerchant": { en: "Add Merchant", hi: "व्यापारी जोड़ें" },
+  "admin.searchMerchants": { en: "Search Merchants...", hi: "व्यापारी खोजें..." },
+  "admin.merchantId": { en: "Merchant ID", hi: "व्यापारी ID" },
+  "admin.businessName": { en: "Business Name *", hi: "व्यापार का नाम *" },
+  "admin.contactNumber": { en: "Contact Number", hi: "संपर्क नंबर" },
+  "admin.status": { en: "Status", hi: "स्थिति" },
+  "admin.editMerchant": { en: "Edit Merchant", hi: "व्यापारी संपादित करें" },
+  "admin.createMerchant": { en: "Create a new merchant/business account", hi: "नया व्यापारी/व्यापार खाता बनाएं" },
+  "admin.updateMerchant": { en: "Update merchant details for", hi: "व्यापारी विवरण अपडेट करें" },
+  "admin.update": { en: "Update", hi: "अपडेट" },
+  "admin.confirm": { en: "Confirm", hi: "पुष्टि करें" },
+  "admin.processing": { en: "Processing...", hi: "प्रक्रिया में..." },
+  "admin.adminPassword": { en: "Admin Password *", hi: "एडमिन पासवर्ड *" },
+  "admin.resetPassword": { en: "Reset Password *", hi: "रीसेट पासवर्ड *" },
+  "admin.searchUsers": { en: "Search Users...", hi: "उपयोगकर्ता खोजें..." },
+  "admin.addUser": { en: "Add User", hi: "उपयोगकर्ता जोड़ें" },
+  "admin.noMerchants": { en: "No merchants found", hi: "कोई व्यापारी नहीं मिला" },
+  "admin.noUsers": { en: "No users found", hi: "कोई उपयोगकर्ता नहीं मिला" },
+  "admin.manageMerchants": { en: "Manage all registered merchants/businesses", hi: "सभी पंजीकृत व्यापारी/व्यापार प्रबंधित करें" },
+  "admin.manageUsers": { en: "Manage all user accounts", hi: "सभी उपयोगकर्ता खाते प्रबंधित करें" },
+
+  "language.english": { en: "English", hi: "English" },
+  "language.hindi": { en: "हिंदी", hi: "हिंदी" },
+};
+
+type LanguageContextType = {
+  language: Language;
+  setLanguage: (lang: Language) => void;
+  t: (key: string) => string;
+};
+
+const LanguageContext = createContext<LanguageContextType>({
+  language: "en",
+  setLanguage: () => {},
+  t: (key: string) => key,
+});
+
+export function LanguageProvider({ children }: { children: ReactNode }) {
+  const [language, setLanguageState] = useState<Language>(() => {
+    try {
+      const saved = localStorage.getItem("mandi-mitra-lang");
+      return (saved === "hi" ? "hi" : "en") as Language;
+    } catch {
+      return "en";
+    }
+  });
+
+  const setLanguage = useCallback((lang: Language) => {
+    setLanguageState(lang);
+    try {
+      localStorage.setItem("mandi-mitra-lang", lang);
+    } catch {}
+  }, []);
+
+  const t = useCallback((key: string): string => {
+    const entry = translations[key];
+    if (!entry) return key;
+    return entry[language] || entry["en"] || key;
+  }, [language]);
+
+  return (
+    <LanguageContext.Provider value={{ language, setLanguage, t }}>
+      {children}
+    </LanguageContext.Provider>
+  );
+}
+
+export function useLanguage() {
+  return useContext(LanguageContext);
+}

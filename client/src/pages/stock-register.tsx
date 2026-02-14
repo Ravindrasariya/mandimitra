@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/lib/language";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,6 +20,7 @@ type LotWithFarmer = Lot & { farmer: Farmer };
 
 export default function StockRegisterPage() {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [activeCrop, setActiveCrop] = useState("Garlic");
   const [searchTerm, setSearchTerm] = useState("");
   const [editingLot, setEditingLot] = useState<LotWithFarmer | null>(null);
@@ -115,13 +117,13 @@ export default function StockRegisterPage() {
     const status = getLotStatus(lot);
     switch (status) {
       case "Returned":
-        return <Badge variant="outline" className="text-xs border-orange-400 text-orange-600 bg-orange-50">Returned</Badge>;
+        return <Badge variant="outline" className="text-xs border-orange-400 text-orange-600 bg-orange-50">{t("stockRegister.returned")}</Badge>;
       case "Sold Out":
-        return <Badge variant="destructive" className="text-xs">Sold Out</Badge>;
+        return <Badge variant="destructive" className="text-xs">{t("stockRegister.soldOut")}</Badge>;
       case "Partially Sold":
-        return <Badge variant="secondary" className="text-xs border-blue-400 text-blue-600 bg-blue-50">Partially Sold</Badge>;
+        return <Badge variant="secondary" className="text-xs border-blue-400 text-blue-600 bg-blue-50">{t("stockRegister.partiallySold")}</Badge>;
       case "Unsold":
-        return <Badge variant="outline" className="text-xs border-green-400 text-green-600 bg-green-50">Unsold</Badge>;
+        return <Badge variant="outline" className="text-xs border-green-400 text-green-600 bg-green-50">{t("stockRegister.unsold")}</Badge>;
     }
   };
 
@@ -133,7 +135,7 @@ export default function StockRegisterPage() {
     <div className="p-3 md:p-6 max-w-4xl mx-auto space-y-4">
       <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
         <Package className="w-6 h-6 text-primary" />
-        Stock Register
+        {t("stockRegister.title")}
       </h1>
 
       <div className="flex gap-2 overflow-x-auto pb-1">
@@ -156,16 +158,16 @@ export default function StockRegisterPage() {
           data-testid="input-stock-search"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          placeholder="Search by farmer name, phone, Lot ID, SR#..."
+          placeholder={t("stockRegister.searchPlaceholder")}
           className="pl-9 mobile-touch-target"
         />
       </div>
 
       {isLoading ? (
-        <div className="text-center py-8 text-muted-foreground">Loading...</div>
+        <div className="text-center py-8 text-muted-foreground">{t("app.loading")}</div>
       ) : filtered.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">
-          No lots found for {activeCrop}
+          {t("stockRegister.noLots")} {activeCrop}
         </div>
       ) : (
         <div className="space-y-3">
@@ -185,19 +187,19 @@ export default function StockRegisterPage() {
                         <p className="text-muted-foreground text-xs">{lot.farmer.village}</p>
                       )}
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                        <span>Date: {lot.date}</span>
-                        {lot.variety && <span>Variety: {lot.variety}</span>}
-                        <span>Size: {lot.size}</span>
+                        <span>{t("common.date")}: {lot.date}</span>
+                        {lot.variety && <span>{t("stockRegister.variety")}: {lot.variety}</span>}
+                        <span>{t("stockRegister.size")}: {lot.size}</span>
                       </div>
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
                         <span>Bags: <strong>{lot.numberOfBags}</strong></span>
-                        <span>Remaining: <strong className={lot.remainingBags > 0 ? "text-primary" : "text-destructive"}>{lot.remainingBags}</strong></span>
+                        <span>{t("common.remaining")}: <strong className={lot.remainingBags > 0 ? "text-primary" : "text-destructive"}>{lot.remainingBags}</strong></span>
                       </div>
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                        {lot.bagMarka && <span>Marka: {lot.bagMarka}</span>}
-                        {lot.vehicleNumber && <span>Vehicle: {lot.vehicleNumber}</span>}
-                        {lot.vehicleBhadaRate && <span>Bhada: Rs.{lot.vehicleBhadaRate}/bag</span>}
-                        {lot.initialTotalWeight && <span>Init. Wt: {lot.initialTotalWeight} kg</span>}
+                        {lot.bagMarka && <span>{t("stockRegister.marka")}: {lot.bagMarka}</span>}
+                        {lot.vehicleNumber && <span>{t("stockRegister.vehicle")}: {lot.vehicleNumber}</span>}
+                        {lot.vehicleBhadaRate && <span>{t("stockRegister.bhada")}: Rs.{lot.vehicleBhadaRate}/bag</span>}
+                        {lot.initialTotalWeight && <span>{t("stockRegister.initWt")}: {lot.initialTotalWeight} kg</span>}
                       </div>
                     </div>
                   </div>
@@ -221,11 +223,11 @@ export default function StockRegisterPage() {
       <Dialog open={!!editingLot} onOpenChange={(open) => !open && setEditingLot(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Edit Lot - {editingLot?.lotId}</DialogTitle>
+            <DialogTitle>{t("stockRegister.editLot")} - {editingLot?.lotId}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label>Variety</Label>
+              <Label>{t("stockRegister.variety")}</Label>
               <Input
                 data-testid="input-edit-variety"
                 value={editVariety}
@@ -234,10 +236,10 @@ export default function StockRegisterPage() {
               />
             </div>
             <div className="space-y-1">
-              <Label>Size</Label>
+              <Label>{t("stockRegister.size")}</Label>
               <Select value={editSize} onValueChange={setEditSize}>
                 <SelectTrigger data-testid="select-edit-size" className="mobile-touch-target">
-                  <SelectValue placeholder="Select size" />
+                  <SelectValue placeholder={t("stockEntry.selectSize")} />
                 </SelectTrigger>
                 <SelectContent>
                   {SIZES.map((s) => (
@@ -247,7 +249,7 @@ export default function StockRegisterPage() {
               </Select>
             </div>
             <div className="space-y-1">
-              <Label>Bag Marka</Label>
+              <Label>{t("stockRegister.bagMarka")}</Label>
               <Input
                 data-testid="input-edit-bag-marka"
                 value={editBagMarka}
@@ -256,7 +258,7 @@ export default function StockRegisterPage() {
               />
             </div>
             <div className="space-y-1">
-              <Label>Vehicle Number</Label>
+              <Label>{t("stockRegister.vehicleNumber")}</Label>
               <Input
                 data-testid="input-edit-vehicle-number"
                 value={editVehicleNumber}
@@ -266,7 +268,7 @@ export default function StockRegisterPage() {
               />
             </div>
             <div className="space-y-1">
-              <Label>Vehicle Bhada Rate (per bag)</Label>
+              <Label>{t("stockRegister.vehicleBhadaRate")}</Label>
               <Input
                 data-testid="input-edit-bhada-rate"
                 type="text"
@@ -278,7 +280,7 @@ export default function StockRegisterPage() {
               />
             </div>
             <div className="space-y-1">
-              <Label>Initial Total Weight (kg)</Label>
+              <Label>{t("stockRegister.initialWeight")}</Label>
               <Input
                 data-testid="input-edit-initial-weight"
                 type="text"
@@ -295,7 +297,7 @@ export default function StockRegisterPage() {
               onClick={saveEdit}
               disabled={updateLotMutation.isPending}
             >
-              {updateLotMutation.isPending ? "Saving..." : "Save Changes"}
+              {updateLotMutation.isPending ? t("common.saving") : t("common.saveChanges")}
             </Button>
             <Button
               variant="destructive"
@@ -304,7 +306,7 @@ export default function StockRegisterPage() {
               onClick={() => setReturnConfirmOpen(true)}
               disabled={returnLotMutation.isPending}
             >
-              Return to Farmer
+              {t("stockRegister.returnToFarmer")}
             </Button>
           </div>
         </DialogContent>
@@ -313,29 +315,29 @@ export default function StockRegisterPage() {
       <AlertDialog open={returnConfirmOpen} onOpenChange={setReturnConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Return Lot to Farmer?</AlertDialogTitle>
+            <AlertDialogTitle>{t("stockRegister.returnConfirmTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to return this lot back to farmer?
+              {t("stockRegister.returnConfirmMsg")}
               {editingLot && editingLot.remainingBags < editingLot.numberOfBags ? (
                 <span className="block mt-2 text-orange-600 font-medium">
-                  This lot is partially sold ({editingLot.numberOfBags - editingLot.remainingBags} bags sold). The bag count will be adjusted to the sold amount and marked as sold out.
+                  {t("stockRegister.returnPartialMsg")} ({editingLot.numberOfBags - editingLot.remainingBags} bags sold). The bag count will be adjusted to the sold amount and marked as sold out.
                 </span>
               ) : (
                 <span className="block mt-2">
-                  This lot has no sales. It will be marked as returned.
+                  {t("stockRegister.returnUnsoldMsg")}
                 </span>
               )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-return">Cancel</AlertDialogCancel>
+            <AlertDialogCancel data-testid="button-cancel-return">{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               data-testid="button-confirm-return"
               className="bg-destructive text-destructive-foreground"
               onClick={() => editingLot && returnLotMutation.mutate(editingLot.id)}
               disabled={returnLotMutation.isPending}
             >
-              {returnLotMutation.isPending ? "Returning..." : "Yes, Return"}
+              {returnLotMutation.isPending ? t("stockRegister.returning") : t("stockRegister.yesReturn")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

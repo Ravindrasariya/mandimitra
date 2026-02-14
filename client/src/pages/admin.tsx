@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useAuth } from "@/lib/auth";
+import { useLanguage } from "@/lib/language";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,24 +24,26 @@ import type { Business, User } from "@shared/schema";
 type SafeUser = Omit<User, "password"> & { business: Business };
 
 function StatusBadge({ status }: { status: string }) {
-  if (status === "active") return <Badge data-testid="badge-status-active" className="bg-green-500 hover:bg-green-600">Active</Badge>;
-  if (status === "inactive") return <Badge data-testid="badge-status-inactive" variant="secondary">Inactive</Badge>;
+  const { t } = useLanguage();
+  if (status === "active") return <Badge data-testid="badge-status-active" className="bg-green-500 hover:bg-green-600">{t("common.active")}</Badge>;
+  if (status === "inactive") return <Badge data-testid="badge-status-inactive" variant="secondary">{t("common.inactive")}</Badge>;
   return <Badge data-testid="badge-status-archived" variant="outline">Archived</Badge>;
 }
 
 export default function AdminPage() {
   const { logout } = useAuth();
+  const { t } = useLanguage();
   const [tab, setTab] = useState<"merchants" | "users">("merchants");
 
   return (
     <div className="min-h-screen bg-background">
       <header className="flex items-center justify-between px-4 md:px-6 py-3 border-b bg-card sticky top-0 z-30">
         <div>
-          <h1 className="text-lg font-bold">Admin Panel</h1>
-          <p className="text-xs text-muted-foreground">Manage merchants and users</p>
+          <h1 className="text-lg font-bold">{t("admin.title")}</h1>
+          <p className="text-xs text-muted-foreground">{t("admin.subtitle")}</p>
         </div>
         <Button variant="outline" size="sm" data-testid="button-admin-logout" onClick={logout}>
-          <LogOut className="w-4 h-4 mr-1" /> Logout
+          <LogOut className="w-4 h-4 mr-1" /> {t("nav.logout")}
         </Button>
       </header>
 
@@ -52,7 +55,7 @@ export default function AdminPage() {
             data-testid="tab-merchants"
             onClick={() => setTab("merchants")}
           >
-            <Building2 className="w-4 h-4 mr-1" /> Merchants
+            <Building2 className="w-4 h-4 mr-1" /> {t("admin.merchants")}
           </Button>
           <Button
             variant={tab === "users" ? "default" : "outline"}
@@ -60,7 +63,7 @@ export default function AdminPage() {
             data-testid="tab-users"
             onClick={() => setTab("users")}
           >
-            <UsersIcon className="w-4 h-4 mr-1" /> Users
+            <UsersIcon className="w-4 h-4 mr-1" /> {t("admin.users")}
           </Button>
         </div>
 
@@ -72,6 +75,7 @@ export default function AdminPage() {
 
 function MerchantsTab() {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [editBiz, setEditBiz] = useState<Business | null>(null);
@@ -119,42 +123,42 @@ function MerchantsTab() {
         <CardHeader className="pb-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <CardTitle className="text-lg">Merchants</CardTitle>
-              <p className="text-xs text-muted-foreground">Manage all registered merchants/businesses</p>
+              <CardTitle className="text-lg">{t("admin.merchants")}</CardTitle>
+              <p className="text-xs text-muted-foreground">{t("admin.manageMerchants")}</p>
             </div>
             <div className="flex gap-2">
               <div className="relative flex-1 sm:w-60">
                 <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
                 <Input
                   data-testid="input-search-merchants"
-                  placeholder="Search Merchants..."
+                  placeholder={t("admin.searchMerchants")}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="pl-8"
                 />
               </div>
               <Button data-testid="button-add-merchant" onClick={() => setShowAdd(true)}>
-                <Plus className="w-4 h-4 mr-1" /> Add Merchant
+                <Plus className="w-4 h-4 mr-1" /> {t("admin.addMerchant")}
               </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">Loading...</div>
+            <div className="text-center py-8 text-muted-foreground">{t("app.loading")}</div>
           ) : filtered.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">No merchants found</div>
+            <div className="text-center py-8 text-muted-foreground">{t("admin.noMerchants")}</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-left text-muted-foreground">
-                    <th className="py-2 px-2 font-medium">Merchant ID</th>
-                    <th className="py-2 px-2 font-medium">Name</th>
-                    <th className="py-2 px-2 font-medium">Status</th>
-                    <th className="py-2 px-2 font-medium">Contact</th>
-                    <th className="py-2 px-2 font-medium">Address</th>
-                    <th className="py-2 px-2 font-medium text-right">Actions</th>
+                    <th className="py-2 px-2 font-medium">{t("admin.merchantId")}</th>
+                    <th className="py-2 px-2 font-medium">{t("common.name")}</th>
+                    <th className="py-2 px-2 font-medium">{t("admin.status")}</th>
+                    <th className="py-2 px-2 font-medium">{t("common.contact")}</th>
+                    <th className="py-2 px-2 font-medium">{t("common.address")}</th>
+                    <th className="py-2 px-2 font-medium text-right">{t("common.actions")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -170,7 +174,7 @@ function MerchantsTab() {
                           <Button
                             variant="ghost" size="icon"
                             data-testid={`button-edit-merchant-${biz.id}`}
-                            title="Edit"
+                            title={t("common.edit")}
                             onClick={() => setEditBiz(biz)}
                           >
                             <Pencil className="w-4 h-4" />
@@ -218,6 +222,7 @@ function MerchantsTab() {
 }
 
 function AddMerchantDialog({ open, onClose, onSubmit, isPending }: { open: boolean; onClose: () => void; onSubmit: (data: { name: string; phone: string; address: string }) => void; isPending: boolean }) {
+  const { t } = useLanguage();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
@@ -231,25 +236,25 @@ function AddMerchantDialog({ open, onClose, onSubmit, isPending }: { open: boole
     <Dialog open={open} onOpenChange={(v) => { if (!v) { onClose(); setName(""); setPhone(""); setAddress(""); } }}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add Merchant</DialogTitle>
-          <DialogDescription>Create a new merchant/business account</DialogDescription>
+          <DialogTitle>{t("admin.addMerchant")}</DialogTitle>
+          <DialogDescription>{t("admin.createMerchant")}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label>Business Name *</Label>
+            <Label>{t("admin.businessName")}</Label>
             <Input data-testid="input-merchant-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter business name" required />
           </div>
           <div className="space-y-2">
-            <Label>Contact Number</Label>
+            <Label>{t("admin.contactNumber")}</Label>
             <Input data-testid="input-merchant-phone" type="tel" inputMode="numeric" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Enter contact number" />
           </div>
           <div className="space-y-2">
-            <Label>Address</Label>
+            <Label>{t("common.address")}</Label>
             <Input data-testid="input-merchant-address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Enter address" />
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit" data-testid="button-save-merchant" disabled={isPending || !name}>{isPending ? "Saving..." : "Save"}</Button>
+            <Button type="button" variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
+            <Button type="submit" data-testid="button-save-merchant" disabled={isPending || !name}>{isPending ? t("common.saving") : t("common.save")}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -258,6 +263,7 @@ function AddMerchantDialog({ open, onClose, onSubmit, isPending }: { open: boole
 }
 
 function EditMerchantDialog({ biz, onClose, onSubmit, isPending }: { biz: Business; onClose: () => void; onSubmit: (data: Partial<Business>) => void; isPending: boolean }) {
+  const { t } = useLanguage();
   const [name, setName] = useState(biz.name);
   const [phone, setPhone] = useState(biz.phone || "");
   const [address, setAddress] = useState(biz.address || "");
@@ -271,25 +277,25 @@ function EditMerchantDialog({ biz, onClose, onSubmit, isPending }: { biz: Busine
     <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Edit Merchant</DialogTitle>
-          <DialogDescription>Update merchant details for {biz.merchantId}</DialogDescription>
+          <DialogTitle>{t("admin.editMerchant")}</DialogTitle>
+          <DialogDescription>{t("admin.updateMerchant")} {biz.merchantId}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label>Business Name *</Label>
+            <Label>{t("admin.businessName")}</Label>
             <Input data-testid="input-edit-merchant-name" value={name} onChange={(e) => setName(e.target.value)} required />
           </div>
           <div className="space-y-2">
-            <Label>Contact Number</Label>
+            <Label>{t("admin.contactNumber")}</Label>
             <Input data-testid="input-edit-merchant-phone" type="tel" inputMode="numeric" value={phone} onChange={(e) => setPhone(e.target.value)} />
           </div>
           <div className="space-y-2">
-            <Label>Address</Label>
+            <Label>{t("common.address")}</Label>
             <Input data-testid="input-edit-merchant-address" value={address} onChange={(e) => setAddress(e.target.value)} />
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit" data-testid="button-update-merchant" disabled={isPending || !name}>{isPending ? "Updating..." : "Update"}</Button>
+            <Button type="button" variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
+            <Button type="submit" data-testid="button-update-merchant" disabled={isPending || !name}>{isPending ? "Updating..." : t("admin.update")}</Button>
           </DialogFooter>
         </form>
       </DialogContent>
@@ -299,6 +305,7 @@ function EditMerchantDialog({ biz, onClose, onSubmit, isPending }: { biz: Busine
 
 function ConfirmMerchantAction({ action, onClose }: { action: { type: "toggle" | "archive" | "reset"; biz: Business }; onClose: () => void }) {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [adminPassword, setAdminPassword] = useState("");
   const [resetPassword, setResetPassword] = useState("");
 
@@ -396,7 +403,7 @@ function ConfirmMerchantAction({ action, onClose }: { action: { type: "toggle" |
           )}
 
           <div className="space-y-2">
-            <Label>Admin Password *</Label>
+            <Label>{t("admin.adminPassword")}</Label>
             <Input
               data-testid="input-admin-password"
               type="password"
@@ -409,7 +416,7 @@ function ConfirmMerchantAction({ action, onClose }: { action: { type: "toggle" |
 
           {isReset && (
             <div className="space-y-2">
-              <Label>Reset Password *</Label>
+              <Label>{t("admin.resetPassword")}</Label>
               <Input
                 data-testid="input-reset-password"
                 type="password"
@@ -422,14 +429,14 @@ function ConfirmMerchantAction({ action, onClose }: { action: { type: "toggle" |
           )}
 
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
             <Button
               type="submit"
               variant={isReset ? "destructive" : "default"}
               data-testid="button-confirm-action"
               disabled={isPending || !adminPassword || (isReset && !resetPassword)}
             >
-              {isPending ? "Processing..." : "Confirm"}
+              {isPending ? t("admin.processing") : t("admin.confirm")}
             </Button>
           </DialogFooter>
         </form>
@@ -440,6 +447,7 @@ function ConfirmMerchantAction({ action, onClose }: { action: { type: "toggle" |
 
 function UsersTab() {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [editUser, setEditUser] = useState<SafeUser | null>(null);
@@ -514,31 +522,31 @@ function UsersTab() {
         <CardHeader className="pb-3">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>
-              <CardTitle className="text-lg">Users</CardTitle>
-              <p className="text-xs text-muted-foreground">Manage all user accounts</p>
+              <CardTitle className="text-lg">{t("admin.users")}</CardTitle>
+              <p className="text-xs text-muted-foreground">{t("admin.manageUsers")}</p>
             </div>
             <div className="flex gap-2">
               <div className="relative flex-1 sm:w-60">
                 <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-muted-foreground" />
                 <Input
                   data-testid="input-search-users"
-                  placeholder="Search Users..."
+                  placeholder={t("admin.searchUsers")}
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   className="pl-8"
                 />
               </div>
               <Button data-testid="button-add-user" onClick={() => setShowAdd(true)}>
-                <Plus className="w-4 h-4 mr-1" /> Add User
+                <Plus className="w-4 h-4 mr-1" /> {t("admin.addUser")}
               </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent>
           {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">Loading...</div>
+            <div className="text-center py-8 text-muted-foreground">{t("app.loading")}</div>
           ) : filtered.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">No users found</div>
+            <div className="text-center py-8 text-muted-foreground">{t("admin.noUsers")}</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -662,6 +670,7 @@ function AddUserDialog({ open, onClose, businesses, onSubmit, isPending }: {
   onSubmit: (data: { username: string; name: string; phone: string; businessId: number }) => void;
   isPending: boolean;
 }) {
+  const { t } = useLanguage();
   const [username, setUsername] = useState("");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -678,12 +687,12 @@ function AddUserDialog({ open, onClose, businesses, onSubmit, isPending }: {
     <Dialog open={open} onOpenChange={(v) => { if (!v) { onClose(); setUsername(""); setName(""); setPhone(""); setBusinessId(""); } }}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add User</DialogTitle>
+          <DialogTitle>{t("admin.addUser")}</DialogTitle>
           <DialogDescription>Create a new user with default password: password123</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label>Name *</Label>
+            <Label>{t("common.name")} *</Label>
             <Input data-testid="input-user-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter full name" required />
           </div>
           <div className="space-y-2">
@@ -708,9 +717,9 @@ function AddUserDialog({ open, onClose, businesses, onSubmit, isPending }: {
             </Select>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
+            <Button type="button" variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
             <Button type="submit" data-testid="button-save-user" disabled={isPending || !username || !name || !phone || !businessId}>
-              {isPending ? "Saving..." : "Save"}
+              {isPending ? t("common.saving") : t("common.save")}
             </Button>
           </DialogFooter>
         </form>
@@ -726,6 +735,7 @@ function EditUserDialog({ user, businesses, onClose, onSubmit, isPending }: {
   onSubmit: (data: any) => void;
   isPending: boolean;
 }) {
+  const { t } = useLanguage();
   const [username, setUsername] = useState(user.username);
   const [name, setName] = useState(user.name);
   const [phone, setPhone] = useState(user.phone || "");
@@ -747,7 +757,7 @@ function EditUserDialog({ user, businesses, onClose, onSubmit, isPending }: {
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
-            <Label>Name *</Label>
+            <Label>{t("common.name")} *</Label>
             <Input data-testid="input-edit-user-name" value={name} onChange={(e) => setName(e.target.value)} required />
           </div>
           <div className="space-y-2">
@@ -772,8 +782,8 @@ function EditUserDialog({ user, businesses, onClose, onSubmit, isPending }: {
             </Select>
           </div>
           <DialogFooter>
-            <Button type="button" variant="outline" onClick={onClose}>Cancel</Button>
-            <Button type="submit" data-testid="button-update-user" disabled={isPending || !username || !name}>{isPending ? "Updating..." : "Update"}</Button>
+            <Button type="button" variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
+            <Button type="submit" data-testid="button-update-user" disabled={isPending || !username || !name}>{isPending ? "Updating..." : t("admin.update")}</Button>
           </DialogFooter>
         </form>
       </DialogContent>

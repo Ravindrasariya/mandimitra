@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/lib/language";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -16,6 +17,7 @@ import { format } from "date-fns";
 
 export default function CashPage() {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState<"in" | "out">("in");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [entryDate, setEntryDate] = useState(format(new Date(), "yyyy-MM-dd"));
@@ -117,7 +119,7 @@ export default function CashPage() {
     <div className="p-3 md:p-6 max-w-4xl mx-auto space-y-4">
       <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
         <Wallet className="w-6 h-6 text-primary" />
-        Cash Management
+        {t("cash.title")}
       </h1>
 
       <div className="flex gap-2">
@@ -128,7 +130,7 @@ export default function CashPage() {
           onClick={() => setActiveTab("in")}
         >
           <ArrowDownCircle className="w-4 h-4 mr-2" />
-          Cash In (Buyers)
+          {t("cash.cashIn")}
         </Button>
         <Button
           variant={activeTab === "out" ? "default" : "secondary"}
@@ -137,7 +139,7 @@ export default function CashPage() {
           onClick={() => setActiveTab("out")}
         >
           <ArrowUpCircle className="w-4 h-4 mr-2" />
-          Cash Out (Farmers)
+          {t("cash.cashOut")}
         </Button>
       </div>
 
@@ -147,14 +149,14 @@ export default function CashPage() {
         onClick={openDialog}
       >
         <Plus className="w-4 h-4 mr-2" />
-        {activeTab === "in" ? "Record Payment from Buyer" : "Record Payment to Farmer"}
+        {activeTab === "in" ? t("cash.recordFromBuyer") : t("cash.recordToFarmer")}
       </Button>
 
       {isLoading ? (
-        <div className="text-center py-8 text-muted-foreground">Loading...</div>
+        <div className="text-center py-8 text-muted-foreground">{t("app.loading")}</div>
       ) : cashEntries.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">
-          No {activeTab === "in" ? "cash in" : "cash out"} entries yet
+          {t("cash.noEntries")} {activeTab === "in" ? t("cash.cashIn") : t("cash.cashOut")}
         </div>
       ) : (
         <div className="space-y-3">
@@ -168,8 +170,8 @@ export default function CashPage() {
                       <Badge variant="secondary" className="text-xs">{entry.paymentMode}</Badge>
                     </div>
                     <p className="text-muted-foreground text-xs">{entry.date}</p>
-                    {entry.buyerId && <p>Buyer: {getBuyerName(entry.buyerId)}</p>}
-                    {entry.farmerId && <p>Farmer: {getFarmerName(entry.farmerId)}</p>}
+                    {entry.buyerId && <p>{t("cash.buyer")}: {getBuyerName(entry.buyerId)}</p>}
+                    {entry.farmerId && <p>{t("cash.farmer")}: {getFarmerName(entry.farmerId)}</p>}
                     {entry.chequeNumber && <p className="text-xs text-muted-foreground">Cheque: {entry.chequeNumber}</p>}
                     {entry.notes && <p className="text-xs text-muted-foreground">{entry.notes}</p>}
                   </div>
@@ -184,12 +186,12 @@ export default function CashPage() {
         <DialogContent className="max-w-sm max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              {activeTab === "in" ? "Cash In - Payment from Buyer" : "Cash Out - Payment to Farmer"}
+              {activeTab === "in" ? t("cash.cashInTitle") : t("cash.cashOutTitle")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label>Date</Label>
+              <Label>{t("common.date")}</Label>
               <Input
                 data-testid="input-cash-date"
                 type="date"
@@ -201,10 +203,10 @@ export default function CashPage() {
 
             {activeTab === "in" ? (
               <div className="space-y-1">
-                <Label>Buyer</Label>
+                <Label>{t("cash.buyer")}</Label>
                 <Select value={selectedBuyerId?.toString() || ""} onValueChange={(v) => setSelectedBuyerId(parseInt(v))}>
                   <SelectTrigger data-testid="select-cash-buyer" className="mobile-touch-target">
-                    <SelectValue placeholder="Select buyer" />
+                    <SelectValue placeholder={t("cash.selectBuyer")} />
                   </SelectTrigger>
                   <SelectContent>
                     {buyers.map((b) => (
@@ -215,10 +217,10 @@ export default function CashPage() {
               </div>
             ) : (
               <div className="space-y-1">
-                <Label>Farmer</Label>
+                <Label>{t("cash.farmer")}</Label>
                 <Select value={selectedFarmerId?.toString() || ""} onValueChange={(v) => setSelectedFarmerId(parseInt(v))}>
                   <SelectTrigger data-testid="select-cash-farmer" className="mobile-touch-target">
-                    <SelectValue placeholder="Select farmer" />
+                    <SelectValue placeholder={t("cash.selectFarmer")} />
                   </SelectTrigger>
                   <SelectContent>
                     {farmers.map((f) => (
@@ -230,7 +232,7 @@ export default function CashPage() {
             )}
 
             <div className="space-y-1">
-              <Label>Amount (Rs.)</Label>
+              <Label>{t("cash.amount")}</Label>
               <Input
                 data-testid="input-cash-amount"
                 type="number"
@@ -243,7 +245,7 @@ export default function CashPage() {
             </div>
 
             <div className="space-y-1">
-              <Label>Payment Mode</Label>
+              <Label>{t("cash.paymentMode")}</Label>
               <Select value={paymentMode} onValueChange={setPaymentMode}>
                 <SelectTrigger data-testid="select-payment-mode" className="mobile-touch-target">
                   <SelectValue />
@@ -259,7 +261,7 @@ export default function CashPage() {
             {paymentMode === "Cheque" && (
               <div className="space-y-3 bg-muted/50 rounded-md p-3">
                 <div className="space-y-1">
-                  <Label>Cheque Number</Label>
+                  <Label>{t("cash.chequeNumber")}</Label>
                   <Input
                     data-testid="input-cheque-number"
                     value={chequeNumber}
@@ -268,7 +270,7 @@ export default function CashPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label>Cheque Date</Label>
+                  <Label>{t("cash.chequeDate")}</Label>
                   <Input
                     data-testid="input-cheque-date"
                     type="date"
@@ -278,7 +280,7 @@ export default function CashPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label>Bank Name</Label>
+                  <Label>{t("cash.bankName")}</Label>
                   <Input
                     data-testid="input-bank-name"
                     value={bankName}
@@ -290,12 +292,12 @@ export default function CashPage() {
             )}
 
             <div className="space-y-1">
-              <Label>Notes (Optional)</Label>
+              <Label>{t("cash.notesOptional")}</Label>
               <Input
                 data-testid="input-cash-notes"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                placeholder="Any additional notes"
+                placeholder={t("cash.notesPlaceholder")}
                 className="mobile-touch-target"
               />
             </div>
@@ -306,7 +308,7 @@ export default function CashPage() {
               onClick={submit}
               disabled={createMutation.isPending}
             >
-              {createMutation.isPending ? "Saving..." : "Save Entry"}
+              {createMutation.isPending ? t("common.saving") : t("cash.saveEntry")}
             </Button>
           </div>
         </DialogContent>

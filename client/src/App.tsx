@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/lib/auth";
+import { LanguageProvider, useLanguage } from "@/lib/language";
 import { useIsMobile } from "@/hooks/use-mobile";
 import NotFound from "@/pages/not-found";
 import LoginPage from "@/pages/login";
@@ -17,25 +18,43 @@ import CashPage from "@/pages/cash";
 import FarmerLedgerPage from "@/pages/farmer-ledger";
 import BuyerLedgerPage from "@/pages/buyer-ledger";
 import {
-  Package, ClipboardList, Gavel, Receipt, Wallet, Users, ShoppingBag, LogOut, Wheat, Menu, X, ChevronLeft, ChevronRight,
+  Package, ClipboardList, Gavel, Receipt, Wallet, Users, ShoppingBag, LogOut, Wheat, Menu, ChevronLeft, ChevronRight, Globe,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 const navItems = [
-  { path: "/", label: "Stock Entry", icon: Package, shortLabel: "Entry" },
-  { path: "/register", label: "Stock Register", icon: ClipboardList, shortLabel: "Register" },
-  { path: "/bidding", label: "Bidding", icon: Gavel, shortLabel: "Bidding" },
-  { path: "/transactions", label: "Transactions", icon: Receipt, shortLabel: "Txns" },
-  { path: "/cash", label: "Cash", icon: Wallet, shortLabel: "Cash" },
-  { path: "/farmer-ledger", label: "Farmer Ledger", icon: Users, shortLabel: "Farmers" },
-  { path: "/buyer-ledger", label: "Buyer Ledger", icon: ShoppingBag, shortLabel: "Buyers" },
+  { path: "/", labelKey: "nav.stockEntry", icon: Package, shortLabelKey: "nav.entry", testId: "entry" },
+  { path: "/register", labelKey: "nav.stockRegister", icon: ClipboardList, shortLabelKey: "nav.register", testId: "register" },
+  { path: "/bidding", labelKey: "nav.bidding", icon: Gavel, shortLabelKey: "nav.bidding", testId: "bidding" },
+  { path: "/transactions", labelKey: "nav.transactions", icon: Receipt, shortLabelKey: "nav.txns", testId: "txns" },
+  { path: "/cash", labelKey: "nav.cash", icon: Wallet, shortLabelKey: "nav.cash", testId: "cash" },
+  { path: "/farmer-ledger", labelKey: "nav.farmerLedger", icon: Users, shortLabelKey: "nav.farmers", testId: "farmers" },
+  { path: "/buyer-ledger", labelKey: "nav.buyerLedger", icon: ShoppingBag, shortLabelKey: "nav.buyers", testId: "buyers" },
 ];
+
+function LanguageToggle({ compact }: { compact?: boolean }) {
+  const { language, setLanguage } = useLanguage();
+
+  return (
+    <button
+      data-testid="button-language-toggle"
+      className={`flex items-center gap-1.5 rounded-md text-sm transition-colors ${compact ? "px-2 py-1.5" : "px-3 py-2"} hover:bg-accent`}
+      onClick={() => setLanguage(language === "en" ? "hi" : "en")}
+      title={language === "en" ? "हिंदी में बदलें" : "Switch to English"}
+    >
+      <Globe className="w-4 h-4 flex-shrink-0" />
+      {!compact && <span className="text-xs font-medium">{language === "en" ? "हिंदी" : "EN"}</span>}
+    </button>
+  );
+}
 
 function MobileBottomNav() {
   const [location] = useLocation();
   const [showMore, setShowMore] = useState(false);
+  const { logout } = useAuth();
+  const { t } = useLanguage();
 
   const primaryNav = navItems.slice(0, 4);
   const moreNav = navItems.slice(4);
@@ -48,15 +67,25 @@ function MobileBottomNav() {
             {moreNav.map((item) => (
               <Link key={item.path} href={item.path}>
                 <button
-                  data-testid={`nav-more-${item.shortLabel.toLowerCase()}`}
+                  data-testid={`nav-more-${item.testId}`}
                   className={`w-full flex items-center gap-3 px-4 py-3 rounded-md text-sm ${location === item.path ? "bg-primary text-primary-foreground" : "hover-elevate"}`}
                   onClick={() => setShowMore(false)}
                 >
                   <item.icon className="w-5 h-5" />
-                  {item.label}
+                  {t(item.labelKey)}
                 </button>
               </Link>
             ))}
+            <div className="border-t my-1 pt-1">
+              <button
+                data-testid="nav-more-logout"
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-md text-sm text-destructive hover-elevate"
+                onClick={() => { setShowMore(false); logout(); }}
+              >
+                <LogOut className="w-5 h-5" />
+                {t("nav.logout")}
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -67,11 +96,11 @@ function MobileBottomNav() {
             return (
               <Link key={item.path} href={item.path} className="flex-1">
                 <button
-                  data-testid={`nav-${item.shortLabel.toLowerCase()}`}
+                  data-testid={`nav-${item.testId}`}
                   className={`w-full flex flex-col items-center justify-center py-2 px-1 text-xs gap-0.5 ${isActive ? "text-primary font-medium" : "text-muted-foreground"}`}
                 >
                   <item.icon className={`w-5 h-5 ${isActive ? "text-primary" : ""}`} />
-                  <span className="truncate max-w-full">{item.shortLabel}</span>
+                  <span className="truncate max-w-full">{t(item.shortLabelKey)}</span>
                 </button>
               </Link>
             );
@@ -82,7 +111,7 @@ function MobileBottomNav() {
             onClick={() => setShowMore(!showMore)}
           >
             <Menu className="w-5 h-5" />
-            <span>More</span>
+            <span>{t("nav.more")}</span>
           </button>
         </div>
       </nav>
@@ -93,6 +122,7 @@ function MobileBottomNav() {
 function DesktopSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle: () => void }) {
   const [location] = useLocation();
   const { logout } = useAuth();
+  const { t } = useLanguage();
 
   return (
     <div className={`hidden md:flex flex-col border-r bg-sidebar h-screen sticky top-0 transition-all duration-200 ${collapsed ? "w-16" : "w-56"}`}>
@@ -100,7 +130,7 @@ function DesktopSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
         <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
           <Wheat className="w-4 h-4 text-primary" />
         </div>
-        {!collapsed && <span className="font-bold text-sm truncate">Mandi Mitra</span>}
+        {!collapsed && <span className="font-bold text-sm truncate">{t("app.name")}</span>}
         <Button
           variant="secondary"
           size="icon"
@@ -118,26 +148,29 @@ function DesktopSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
             return (
               <Link key={item.path} href={item.path}>
                 <button
-                  data-testid={`sidebar-${item.shortLabel.toLowerCase()}`}
+                  data-testid={`sidebar-${item.testId}`}
                   className={`w-full flex items-center gap-3 rounded-md text-sm transition-colors ${collapsed ? "justify-center px-2 py-2.5" : "px-3 py-2.5"} ${isActive ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : "text-sidebar-foreground hover-elevate"}`}
-                  title={collapsed ? item.label : undefined}
+                  title={collapsed ? t(item.labelKey) : undefined}
                 >
                   <item.icon className="w-4 h-4 flex-shrink-0" />
-                  {!collapsed && <span className="truncate">{item.label}</span>}
+                  {!collapsed && <span className="truncate">{t(item.labelKey)}</span>}
                 </button>
               </Link>
             );
           })}
         </div>
       </ScrollArea>
-      <div className="border-t p-2">
+      <div className="border-t p-2 space-y-0.5">
+        <div className={`flex ${collapsed ? "justify-center" : "px-1"}`}>
+          <LanguageToggle compact={collapsed} />
+        </div>
         <button
           data-testid="button-logout"
           className={`w-full flex items-center gap-3 rounded-md text-sm text-destructive px-3 py-2.5 hover-elevate ${collapsed ? "justify-center" : ""}`}
           onClick={logout}
         >
           <LogOut className="w-4 h-4 flex-shrink-0" />
-          {!collapsed && <span>Logout</span>}
+          {!collapsed && <span>{t("nav.logout")}</span>}
         </button>
       </div>
     </div>
@@ -145,7 +178,7 @@ function DesktopSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
 }
 
 function MobileHeader() {
-  const { logout } = useAuth();
+  const { t } = useLanguage();
 
   return (
     <header className="md:hidden flex items-center justify-between px-3 py-2 border-b bg-card sticky top-0 z-30">
@@ -153,16 +186,9 @@ function MobileHeader() {
         <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center">
           <Wheat className="w-4 h-4 text-primary" />
         </div>
-        <span className="font-bold text-sm">Mandi Mitra</span>
+        <span className="font-bold text-sm">{t("app.name")}</span>
       </div>
-      <Button
-        variant="secondary"
-        size="icon"
-        data-testid="button-mobile-logout"
-        onClick={logout}
-      >
-        <LogOut className="w-4 h-4" />
-      </Button>
+      <LanguageToggle />
     </header>
   );
 }
@@ -196,6 +222,7 @@ function AppLayout() {
 
 function AuthGate() {
   const { user, isLoading } = useAuth();
+  const { t } = useLanguage();
 
   if (isLoading) {
     return (
@@ -204,7 +231,7 @@ function AuthGate() {
           <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto animate-pulse">
             <Wheat className="w-6 h-6 text-primary" />
           </div>
-          <p className="text-muted-foreground text-sm">Loading...</p>
+          <p className="text-muted-foreground text-sm">{t("app.loading")}</p>
         </div>
       </div>
     );
@@ -231,10 +258,12 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <AuthProvider>
-          <AuthGate />
-          <Toaster />
-        </AuthProvider>
+        <LanguageProvider>
+          <AuthProvider>
+            <AuthGate />
+            <Toaster />
+          </AuthProvider>
+        </LanguageProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );

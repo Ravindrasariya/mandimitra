@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/lib/language";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -36,6 +37,7 @@ const emptyLot: LotEntry = {
 
 export default function StockEntryPage() {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [farmerSearch, setFarmerSearch] = useState("");
   const [selectedFarmer, setSelectedFarmer] = useState<Farmer | null>(null);
   const [showFarmerForm, setShowFarmerForm] = useState(false);
@@ -166,16 +168,16 @@ export default function StockEntryPage() {
     <div className="p-3 md:p-6 max-w-4xl mx-auto space-y-4">
       <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
         <Wheat className="w-6 h-6 text-primary" />
-        Stock Entry
+        {t("stockEntry.title")}
       </h1>
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Farmer Details</CardTitle>
+          <CardTitle className="text-base">{t("stockEntry.farmerDetails")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="space-y-2">
-            <Label>Date</Label>
+            <Label>{t("common.date")}</Label>
             <Input
               type="date"
               data-testid="input-entry-date"
@@ -187,7 +189,7 @@ export default function StockEntryPage() {
 
           {!showFarmerForm && (
             <div className="space-y-2 relative">
-              <Label>Search Farmer (Name, Phone, Village)</Label>
+              <Label>{t("stockEntry.searchFarmer")}</Label>
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                 <Input
@@ -195,7 +197,7 @@ export default function StockEntryPage() {
                   value={farmerSearch}
                   onChange={(e) => { setFarmerSearch(e.target.value); setShowSuggestions(true); }}
                   onFocus={() => setShowSuggestions(true)}
-                  placeholder="Start typing farmer name, phone or village..."
+                  placeholder={t("stockEntry.searchPlaceholder")}
                   className="pl-9 mobile-touch-target"
                 />
               </div>
@@ -222,7 +224,7 @@ export default function StockEntryPage() {
                 onClick={() => setShowFarmerForm(true)}
               >
                 <Plus className="w-4 h-4 mr-2" />
-                New Farmer
+                {t("stockEntry.newFarmer")}
               </Button>
             </div>
           )}
@@ -231,23 +233,23 @@ export default function StockEntryPage() {
             <div className="space-y-3">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label>Farmer Name *</Label>
+                  <Label>{t("stockEntry.farmerName")}</Label>
                   <Input
                     data-testid="input-farmer-name"
                     value={farmerName}
                     onChange={(e) => setFarmerName(e.target.value)}
-                    placeholder="Farmer name"
+                    placeholder={t("stockEntry.farmerNamePlaceholder")}
                     className="mobile-touch-target capitalize"
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label>Mobile Number *</Label>
+                  <Label>{t("stockEntry.mobileNumber")}</Label>
                   <Input
                     data-testid="input-farmer-phone"
                     type="tel"
                     value={farmerPhone}
                     onChange={(e) => setFarmerPhone(e.target.value)}
-                    placeholder="10-digit mobile"
+                    placeholder={t("stockEntry.mobilePlaceholder")}
                     className="mobile-touch-target"
                     maxLength={10}
                   />
@@ -255,30 +257,30 @@ export default function StockEntryPage() {
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="space-y-1">
-                  <Label>Village</Label>
+                  <Label>{t("common.village")}</Label>
                   <Input
                     data-testid="input-village"
                     value={village}
                     onChange={(e) => setVillage(e.target.value)}
-                    placeholder="Village"
+                    placeholder={t("common.village")}
                     className="mobile-touch-target capitalize"
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label>Tehsil</Label>
+                  <Label>{t("common.tehsil")}</Label>
                   <Input
                     data-testid="input-tehsil"
                     value={tehsil}
                     onChange={(e) => setTehsil(e.target.value)}
-                    placeholder="Tehsil"
+                    placeholder={t("common.tehsil")}
                     className="mobile-touch-target capitalize"
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label>District</Label>
+                  <Label>{t("common.district")}</Label>
                   <Select value={district} onValueChange={setDistrict}>
                     <SelectTrigger data-testid="select-district" className="mobile-touch-target">
-                      <SelectValue placeholder="Select district" />
+                      <SelectValue placeholder={t("stockEntry.selectDistrict")} />
                     </SelectTrigger>
                     <SelectContent>
                       {DISTRICTS.map((d) => (
@@ -289,7 +291,7 @@ export default function StockEntryPage() {
                 </div>
               </div>
               <div className="space-y-1">
-                <Label>State</Label>
+                <Label>{t("common.state")}</Label>
                 <Input value={state} disabled className="mobile-touch-target bg-muted" />
               </div>
               {selectedFarmer && (
@@ -298,7 +300,7 @@ export default function StockEntryPage() {
                   size="sm"
                   onClick={() => { setSelectedFarmer(null); setShowFarmerForm(false); setFarmerName(""); setFarmerPhone(""); setVillage(""); setTehsil(""); setDistrict(""); }}
                 >
-                  Clear Selection
+                  {t("stockEntry.clearSelection")}
                 </Button>
               )}
             </div>
@@ -307,12 +309,12 @@ export default function StockEntryPage() {
       </Card>
 
       <div className="space-y-3">
-        <h2 className="text-base font-semibold">Lot Information</h2>
+        <h2 className="text-base font-semibold">{t("stockEntry.lotInfo")}</h2>
         {lots.map((lot, index) => (
           <Card key={index}>
             <CardContent className="pt-4 space-y-3">
               <div className="flex items-center justify-between gap-1">
-                <span className="text-sm font-medium text-muted-foreground">Lot #{index + 1}</span>
+                <span className="text-sm font-medium text-muted-foreground">{`${t("stockEntry.lot")} #${index + 1}`}</span>
                 {lots.length > 1 && (
                   <Button
                     variant="destructive"
@@ -326,10 +328,10 @@ export default function StockEntryPage() {
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <div className="space-y-1">
-                  <Label>Crop *</Label>
+                  <Label>{t("stockEntry.crop")}</Label>
                   <Select value={lot.crop} onValueChange={(v) => updateLot(index, "crop", v)}>
                     <SelectTrigger data-testid={`select-crop-${index}`} className="mobile-touch-target">
-                      <SelectValue placeholder="Select crop" />
+                      <SelectValue placeholder={t("stockEntry.selectCrop")} />
                     </SelectTrigger>
                     <SelectContent>
                       {CROPS.map((c) => (
@@ -339,10 +341,10 @@ export default function StockEntryPage() {
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <Label>Size *</Label>
+                  <Label>{t("stockEntry.size")}</Label>
                   <Select value={lot.size} onValueChange={(v) => updateLot(index, "size", v)}>
                     <SelectTrigger data-testid={`select-size-${index}`} className="mobile-touch-target">
-                      <SelectValue placeholder="Select size" />
+                      <SelectValue placeholder={t("stockEntry.selectSize")} />
                     </SelectTrigger>
                     <SelectContent>
                       {SIZES.map((s) => (
@@ -352,19 +354,19 @@ export default function StockEntryPage() {
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <Label>Variety</Label>
+                  <Label>{t("stockEntry.variety")}</Label>
                   <Input
                     data-testid={`input-variety-${index}`}
                     value={lot.variety}
                     onChange={(e) => updateLot(index, "variety", e.target.value)}
-                    placeholder="Optional"
+                    placeholder={t("common.optional")}
                     className="mobile-touch-target"
                   />
                 </div>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="space-y-1">
-                  <Label>No. of Bags *</Label>
+                  <Label>{t("stockEntry.numberOfBags")}</Label>
                   <Input
                     data-testid={`input-bags-${index}`}
                     type="text"
@@ -376,17 +378,17 @@ export default function StockEntryPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label>Bag Marka</Label>
+                  <Label>{t("stockEntry.bagMarka")}</Label>
                   <Input
                     data-testid={`input-bag-marka-${index}`}
                     value={lot.bagMarka}
                     onChange={(e) => updateLot(index, "bagMarka", e.target.value)}
-                    placeholder="Optional"
+                    placeholder={t("common.optional")}
                     className="mobile-touch-target"
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label>Vehicle #</Label>
+                  <Label>{t("stockEntry.vehicleNumber")}</Label>
                   <Input
                     data-testid={`input-vehicle-number-${index}`}
                     value={lot.vehicleNumber}
@@ -397,7 +399,7 @@ export default function StockEntryPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label>Bhada Rate/Bag</Label>
+                  <Label>{t("stockEntry.bhadaRate")}</Label>
                   <Input
                     data-testid={`input-bhada-rate-${index}`}
                     type="text"
@@ -411,7 +413,7 @@ export default function StockEntryPage() {
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="space-y-1">
-                  <Label>Initial Total Weight (kg)</Label>
+                  <Label>{t("stockEntry.initialWeight")}</Label>
                   <Input
                     data-testid={`input-initial-weight-${index}`}
                     type="text"
@@ -436,7 +438,7 @@ export default function StockEntryPage() {
           onClick={addLot}
         >
           <Plus className="w-4 h-4 mr-2" />
-          Add New Lot
+          {t("stockEntry.addLot")}
         </Button>
         <Button
           data-testid="button-submit-stock"
@@ -444,7 +446,7 @@ export default function StockEntryPage() {
           onClick={handleSubmit}
           disabled={createLotMutation.isPending || createFarmerMutation.isPending}
         >
-          {createLotMutation.isPending ? "Saving..." : "Save to Stock Register"}
+          {createLotMutation.isPending ? t("common.saving") : t("stockEntry.saveToRegister")}
         </Button>
       </div>
     </div>

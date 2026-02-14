@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/lib/language";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -27,6 +28,7 @@ function formatIndianCurrency(value: string | number): string {
 
 export default function BuyerLedgerPage() {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [editingBuyer, setEditingBuyer] = useState<BuyerWithDues | null>(null);
@@ -71,7 +73,7 @@ export default function BuyerLedgerPage() {
       setNewPhone("");
       setNewBuyerCode("");
       setNewOpeningBalance("");
-      toast({ title: "Success", description: "Buyer added successfully" });
+      toast({ title: "Success", description: t("buyerLedger.addNewBuyer") });
     },
     onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -93,7 +95,7 @@ export default function BuyerLedgerPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash-entries"] });
       setEditingBuyer(null);
-      toast({ title: "Updated", description: "Buyer details updated" });
+      toast({ title: "Updated", description: t("buyerLedger.editBuyer") });
     },
     onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -171,9 +173,9 @@ export default function BuyerLedgerPage() {
       <div>
         <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
           <ShoppingBag className="w-6 h-6 text-primary" />
-          Buyer Ledger
+          {t("buyerLedger.title")}
         </h1>
-        <p data-testid="text-buyer-subtitle" className="text-sm text-muted-foreground">Manage buyers and track dues</p>
+        <p data-testid="text-buyer-subtitle" className="text-sm text-muted-foreground">{t("buyerLedger.subtitle")}</p>
       </div>
 
       <Card>
@@ -181,7 +183,7 @@ export default function BuyerLedgerPage() {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
             <CardTitle className="text-base flex items-center gap-2">
               <Users className="w-5 h-5" />
-              Buyer Management
+              {t("buyerLedger.buyerManagement")}
             </CardTitle>
             <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -189,10 +191,10 @@ export default function BuyerLedgerPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All...</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                  <SelectItem value="negative">Negative</SelectItem>
+                  <SelectItem value="all">{t("common.all")}...</SelectItem>
+                  <SelectItem value="active">{t("common.active")}</SelectItem>
+                  <SelectItem value="inactive">{t("common.inactive")}</SelectItem>
+                  <SelectItem value="negative">{t("buyerLedger.negative")}</SelectItem>
                 </SelectContent>
               </Select>
               <div className="relative flex-1 sm:flex-none">
@@ -201,7 +203,7 @@ export default function BuyerLedgerPage() {
                   data-testid="input-buyer-search"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder="Search Name..."
+                  placeholder={t("buyerLedger.searchName")}
                   className="pl-9 mobile-touch-target w-full sm:w-[180px]"
                 />
               </div>
@@ -211,16 +213,16 @@ export default function BuyerLedgerPage() {
                 onClick={() => setShowAddDialog(true)}
               >
                 <Plus className="w-4 h-4 mr-1" />
-                Add Buyer
+                {t("buyerLedger.addBuyer")}
               </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">Loading...</div>
+            <div className="text-center py-8 text-muted-foreground">{t("app.loading")}</div>
           ) : filteredBuyers.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">No buyers found</div>
+            <div className="text-center py-8 text-muted-foreground">{t("buyerLedger.noBuyers")}</div>
           ) : (
             <>
               <div className="hidden md:block overflow-x-auto">
@@ -228,15 +230,15 @@ export default function BuyerLedgerPage() {
                   <thead>
                     <tr className="border-b bg-muted/50">
                       <th className="text-left p-3 font-medium"></th>
-                      <th className="text-left p-3 font-medium">Buyer ID</th>
-                      <th className="text-left p-3 font-medium">Name</th>
-                      <th className="text-left p-3 font-medium">Address</th>
-                      <th className="text-left p-3 font-medium">Mandi Code</th>
-                      <th className="text-left p-3 font-medium">Contact</th>
-                      <th className="text-center p-3 font-medium">Negative</th>
-                      <th className="text-center p-3 font-medium">Active</th>
-                      <th className="text-right p-3 font-medium">Overall Due</th>
-                      <th className="text-right p-3 font-medium">Receivables</th>
+                      <th className="text-left p-3 font-medium">{t("buyerLedger.buyerId")}</th>
+                      <th className="text-left p-3 font-medium">{t("common.name")}</th>
+                      <th className="text-left p-3 font-medium">{t("common.address")}</th>
+                      <th className="text-left p-3 font-medium">{t("buyerLedger.mandiCode")}</th>
+                      <th className="text-left p-3 font-medium">{t("common.contact")}</th>
+                      <th className="text-center p-3 font-medium">{t("buyerLedger.negative")}</th>
+                      <th className="text-center p-3 font-medium">{t("common.active")}</th>
+                      <th className="text-right p-3 font-medium">{t("buyerLedger.overallDue")}</th>
+                      <th className="text-right p-3 font-medium">{t("buyerLedger.receivables")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -258,7 +260,7 @@ export default function BuyerLedgerPage() {
                         <td className="p-3">{buyer.phone || "-"}</td>
                         <td className="p-3 text-center">
                           <span className={`text-xs font-medium ${buyer.negativeFlag ? "text-destructive" : "text-muted-foreground"}`}>
-                            {buyer.negativeFlag ? "Yes" : "No"}
+                            {buyer.negativeFlag ? t("common.yes") : t("common.no")}
                           </span>
                         </td>
                         <td className="p-3 text-center">
@@ -290,16 +292,16 @@ export default function BuyerLedgerPage() {
                         <div className="flex-1 min-w-0 space-y-1">
                           <div className="flex items-center gap-2">
                             <span className="font-mono text-xs text-muted-foreground">{buyer.buyerId}</span>
-                            {buyer.negativeFlag && <Badge variant="destructive" className="text-xs">Negative</Badge>}
-                            {!buyer.isActive && <Badge variant="secondary" className="text-xs">Inactive</Badge>}
+                            {buyer.negativeFlag && <Badge variant="destructive" className="text-xs">{t("buyerLedger.negative")}</Badge>}
+                            {!buyer.isActive && <Badge variant="secondary" className="text-xs">{t("common.inactive")}</Badge>}
                           </div>
                           <p className="font-medium">{buyer.name}</p>
                           {buyer.address && <p className="text-xs text-muted-foreground">{buyer.address}</p>}
                           {buyer.phone && <p className="text-xs">{buyer.phone}</p>}
                           {buyer.buyerCode && <p className="text-xs text-muted-foreground">Code: {buyer.buyerCode}</p>}
                           <div className="flex gap-4 text-xs pt-1">
-                            <span>Overall: <strong>{formatIndianCurrency(buyer.overallDue)}</strong></span>
-                            <span>Receivable: <strong className="text-orange-600">{formatIndianCurrency(buyer.receivableDue)}</strong></span>
+                            <span>{t("buyerLedger.overall")}: <strong>{formatIndianCurrency(buyer.overallDue)}</strong></span>
+                            <span>{t("buyerLedger.receivable")}: <strong className="text-orange-600">{formatIndianCurrency(buyer.receivableDue)}</strong></span>
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-2">
@@ -331,15 +333,15 @@ export default function BuyerLedgerPage() {
       <Dialog open={!!editingBuyer} onOpenChange={(open) => !open && setEditingBuyer(null)}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit Buyer - {editingBuyer?.buyerId}</DialogTitle>
+            <DialogTitle>{t("buyerLedger.editBuyer")} - {editingBuyer?.buyerId}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label>Buyer ID</Label>
+              <Label>{t("buyerLedger.buyerId")}</Label>
               <Input value={editingBuyer?.buyerId || ""} disabled className="mobile-touch-target bg-muted" />
             </div>
             <div className="space-y-1">
-              <Label>Name *</Label>
+              <Label>{t("common.name")} *</Label>
               <Input
                 data-testid="input-edit-buyer-name"
                 value={editName}
@@ -348,7 +350,7 @@ export default function BuyerLedgerPage() {
               />
             </div>
             <div className="space-y-1">
-              <Label>Address</Label>
+              <Label>{t("common.address")}</Label>
               <Input
                 data-testid="input-edit-buyer-address"
                 value={editAddress}
@@ -357,7 +359,7 @@ export default function BuyerLedgerPage() {
               />
             </div>
             <div className="space-y-1">
-              <Label>Contact</Label>
+              <Label>{t("common.contact")}</Label>
               <Input
                 data-testid="input-edit-buyer-phone"
                 type="tel"
@@ -368,7 +370,7 @@ export default function BuyerLedgerPage() {
               />
             </div>
             <div className="space-y-1">
-              <Label>Buyer Code</Label>
+              <Label>{t("buyerLedger.buyerCode")}</Label>
               <Input
                 data-testid="input-edit-buyer-code"
                 value={editBuyerCode}
@@ -377,7 +379,7 @@ export default function BuyerLedgerPage() {
               />
             </div>
             <div className="space-y-1">
-              <Label>Opening Balance</Label>
+              <Label>{t("buyerLedger.openingBalance")}</Label>
               <Input
                 data-testid="input-edit-opening-balance"
                 type="text"
@@ -388,7 +390,7 @@ export default function BuyerLedgerPage() {
               />
             </div>
             <div className="flex items-center justify-between">
-              <Label>Negative Flag</Label>
+              <Label>{t("buyerLedger.negativeFlag")}</Label>
               <Switch
                 data-testid="switch-edit-negative"
                 checked={editNegativeFlag}
@@ -401,14 +403,14 @@ export default function BuyerLedgerPage() {
               onClick={saveEdit}
               disabled={updateBuyerMutation.isPending}
             >
-              {updateBuyerMutation.isPending ? "Saving..." : "Save Changes"}
+              {updateBuyerMutation.isPending ? t("common.saving") : t("common.saveChanges")}
             </Button>
 
             {editHistory.length > 0 && (
               <>
                 <Separator />
                 <div>
-                  <h3 className="text-sm font-semibold mb-2">Edit History</h3>
+                  <h3 className="text-sm font-semibold mb-2">{t("buyerLedger.editHistory")}</h3>
                   <div className="space-y-2 max-h-48 overflow-y-auto">
                     {editHistory.map((entry) => (
                       <div key={entry.id} className="text-xs border rounded p-2 bg-muted/50">
@@ -439,53 +441,53 @@ export default function BuyerLedgerPage() {
       <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Add New Buyer</DialogTitle>
+            <DialogTitle>{t("buyerLedger.addNewBuyer")}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
-              <Label>Name *</Label>
+              <Label>{t("common.name")} *</Label>
               <Input
                 data-testid="input-new-buyer-name"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
-                placeholder="Buyer name"
+                placeholder={t("bidding.buyerName")}
                 className="mobile-touch-target"
               />
             </div>
             <div className="space-y-1">
-              <Label>Address</Label>
+              <Label>{t("common.address")}</Label>
               <Input
                 data-testid="input-new-buyer-address"
                 value={newAddress}
                 onChange={(e) => setNewAddress(e.target.value)}
-                placeholder="Address"
+                placeholder={t("common.address")}
                 className="mobile-touch-target"
               />
             </div>
             <div className="space-y-1">
-              <Label>Contact</Label>
+              <Label>{t("common.contact")}</Label>
               <Input
                 data-testid="input-new-buyer-phone"
                 type="tel"
                 value={newPhone}
                 onChange={(e) => setNewPhone(e.target.value)}
-                placeholder="Phone number"
+                placeholder={t("common.phone")}
                 className="mobile-touch-target"
                 maxLength={10}
               />
             </div>
             <div className="space-y-1">
-              <Label>Buyer Code</Label>
+              <Label>{t("buyerLedger.buyerCode")}</Label>
               <Input
                 data-testid="input-new-buyer-code"
                 value={newBuyerCode}
                 onChange={(e) => setNewBuyerCode(e.target.value)}
-                placeholder="Optional code"
+                placeholder={t("common.optional")}
                 className="mobile-touch-target"
               />
             </div>
             <div className="space-y-1">
-              <Label>Opening Balance</Label>
+              <Label>{t("buyerLedger.openingBalance")}</Label>
               <Input
                 data-testid="input-new-opening-balance"
                 type="text"
@@ -502,7 +504,7 @@ export default function BuyerLedgerPage() {
               onClick={addBuyer}
               disabled={createBuyerMutation.isPending}
             >
-              {createBuyerMutation.isPending ? "Adding..." : "Add Buyer"}
+              {createBuyerMutation.isPending ? t("buyerLedger.adding") : t("buyerLedger.addBuyer")}
             </Button>
           </div>
         </DialogContent>

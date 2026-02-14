@@ -1,17 +1,19 @@
 import { useState } from "react";
 import { useAuth } from "@/lib/auth";
+import { useLanguage } from "@/lib/language";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Lock, Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { Lock, Eye, EyeOff, ArrowLeft, Globe } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { Link, useLocation } from "wouter";
 
 export default function ChangePasswordPage({ standalone = false }: { standalone?: boolean }) {
   const { user, changePassword } = useAuth();
   const { toast } = useToast();
+  const { t, language, setLanguage } = useLanguage();
   const [, setLocation] = useLocation();
   const [username, setUsername] = useState("");
   const [currentPassword, setCurrentPassword] = useState("");
@@ -78,7 +80,16 @@ export default function ChangePasswordPage({ standalone = false }: { standalone?
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-background p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-background p-4 relative">
+      <button
+        data-testid="button-language-toggle"
+        className="absolute top-4 right-4 flex items-center gap-1.5 rounded-md px-3 py-2 text-sm hover:bg-accent transition-colors"
+        onClick={() => setLanguage(language === "en" ? "hi" : "en")}
+        title={language === "en" ? "हिंदी में बदलें" : "Switch to English"}
+      >
+        <Globe className="w-4 h-4" />
+        <span className="text-xs font-medium">{language === "en" ? "हिंदी" : "EN"}</span>
+      </button>
       <Card className="w-full max-w-sm shadow-sm">
         <CardHeader className="text-center space-y-2 pb-2">
           <div className="flex justify-center">
@@ -86,7 +97,7 @@ export default function ChangePasswordPage({ standalone = false }: { standalone?
               <Lock className="w-8 h-8 text-primary" />
             </div>
           </div>
-          <CardTitle className="text-xl font-bold">Change Password</CardTitle>
+          <CardTitle className="text-xl font-bold">{t("changePassword.title")}</CardTitle>
           <p className="text-muted-foreground text-sm">
             {isMustChange
               ? `Welcome, ${user.username}! Please verify your mobile number and set a new password.`
@@ -97,21 +108,21 @@ export default function ChangePasswordPage({ standalone = false }: { standalone?
           <form onSubmit={handleSubmit} className="space-y-4">
             {!isLoggedIn && (
               <div className="space-y-2">
-                <Label htmlFor="username" className="font-semibold">User Name</Label>
+                <Label htmlFor="username" className="font-semibold">{t("login.userName")}</Label>
                 <Input
                   id="username"
                   data-testid="input-cp-username"
                   type="text"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Enter your username"
+                  placeholder={t("changePassword.enterUsername")}
                   className="mobile-touch-target"
                   autoComplete="username"
                 />
               </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="phone" className="font-semibold">Registered Mobile Number</Label>
+              <Label htmlFor="phone" className="font-semibold">{t("changePassword.registeredMobile")}</Label>
               <Input
                 id="phone"
                 data-testid="input-phone"
@@ -119,13 +130,13 @@ export default function ChangePasswordPage({ standalone = false }: { standalone?
                 inputMode="numeric"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
-                placeholder="Enter your registered mobile number"
+                placeholder={t("changePassword.enterMobile")}
                 className="mobile-touch-target"
               />
             </div>
             {!isMustChange && (
               <div className="space-y-2">
-                <Label htmlFor="currentPassword" className="font-semibold">Current Password</Label>
+                <Label htmlFor="currentPassword" className="font-semibold">{t("changePassword.currentPassword")}</Label>
                 <div className="relative">
                   <Input
                     id="currentPassword"
@@ -133,7 +144,7 @@ export default function ChangePasswordPage({ standalone = false }: { standalone?
                     type={showCurrentPassword ? "text" : "password"}
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
-                    placeholder="Enter your current password"
+                    placeholder={t("changePassword.enterCurrent")}
                     className="mobile-touch-target pr-10"
                     autoComplete="current-password"
                   />
@@ -149,7 +160,7 @@ export default function ChangePasswordPage({ standalone = false }: { standalone?
               </div>
             )}
             <div className="space-y-2">
-              <Label htmlFor="newPassword" className="font-semibold">New Password</Label>
+              <Label htmlFor="newPassword" className="font-semibold">{t("changePassword.newPassword")}</Label>
               <div className="relative">
                 <Input
                   id="newPassword"
@@ -157,7 +168,7 @@ export default function ChangePasswordPage({ standalone = false }: { standalone?
                   type={showNewPassword ? "text" : "password"}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="Enter new password"
+                  placeholder={t("changePassword.enterNew")}
                   className="mobile-touch-target pr-10"
                   autoComplete="new-password"
                 />
@@ -172,14 +183,14 @@ export default function ChangePasswordPage({ standalone = false }: { standalone?
               </div>
             </div>
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword" className="font-semibold">Confirm Password</Label>
+              <Label htmlFor="confirmPassword" className="font-semibold">{t("changePassword.confirmPassword")}</Label>
               <Input
                 id="confirmPassword"
                 data-testid="input-confirm-password"
                 type={showNewPassword ? "text" : "password"}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Confirm new password"
+                placeholder={t("changePassword.confirmNew")}
                 className="mobile-touch-target"
                 autoComplete="new-password"
               />
@@ -190,11 +201,11 @@ export default function ChangePasswordPage({ standalone = false }: { standalone?
               className="w-full mobile-touch-target bg-green-500"
               disabled={loading || (!isLoggedIn && (!username || !currentPassword || !phone)) || (isMustChange && !phone) || (!isMustChange && isLoggedIn && (!currentPassword || !phone)) || !newPassword || !confirmPassword}
             >
-              {loading ? "Changing..." : "Set New Password"}
+              {loading ? t("changePassword.changing") : t("changePassword.setNew")}
             </Button>
             {!isMustChange && (
               <p className="text-xs text-muted-foreground text-center">
-                Forgot your password? Please contact <span className="text-green-400 font-semibold">Krashu</span><span className="text-orange-500 font-semibold">Ved</span> at +918882589392 to reset it.
+                {t("changePassword.forgotPassword")} <span className="text-green-400 font-semibold">Krashu</span><span className="text-orange-500 font-semibold">Ved</span> at +918882589392 to reset it.
               </p>
             )}
           </form>
@@ -202,7 +213,7 @@ export default function ChangePasswordPage({ standalone = false }: { standalone?
             <div className="mt-3 text-center">
               <Link href="/" data-testid="link-back-login" className="text-green-500 text-sm font-medium inline-flex items-center gap-1">
                 <ArrowLeft className="w-3 h-3" />
-                Back to Login
+                {t("changePassword.backToLogin")}
               </Link>
             </div>
           )}

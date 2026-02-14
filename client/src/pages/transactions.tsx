@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/lib/language";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -158,6 +159,7 @@ function openPrintWindow(html: string) {
 
 export default function TransactionsPage() {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [dialogItems, setDialogItems] = useState<DialogItem[]>([]);
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -396,7 +398,7 @@ export default function TransactionsPage() {
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2 mr-auto">
           <Receipt className="w-6 h-6 text-primary" />
-          Transactions
+          {t("transactions.title")}
         </h1>
         <Select value={yearFilter} onValueChange={(v) => { setYearFilter(v); setDayFilter("all"); }}>
           <SelectTrigger className="w-[85px]" data-testid="select-year-filter">
@@ -413,7 +415,7 @@ export default function TransactionsPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Months</SelectItem>
+            <SelectItem value="all">{t("transactions.allMonths")}</SelectItem>
             {["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"].map((m, i) => (
               <SelectItem key={i + 1} value={String(i + 1)}>{m}</SelectItem>
             ))}
@@ -424,7 +426,7 @@ export default function TransactionsPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Days</SelectItem>
+            <SelectItem value="all">{t("transactions.allDays")}</SelectItem>
             {Array.from({ length: new Date(parseInt(yearFilter), parseInt(monthFilter), 0).getDate() }, (_, i) => String(i + 1)).map(d => (
               <SelectItem key={d} value={d}>{d}</SelectItem>
             ))}
@@ -435,7 +437,7 @@ export default function TransactionsPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Crops</SelectItem>
+            <SelectItem value="all">{t("transactions.allCrops")}</SelectItem>
             <SelectItem value="Potato">Potato</SelectItem>
             <SelectItem value="Onion">Onion</SelectItem>
             <SelectItem value="Garlic">Garlic</SelectItem>
@@ -461,8 +463,8 @@ export default function TransactionsPage() {
                         <Badge variant="secondary" className="text-xs">{group.lotId}</Badge>
                         <Badge variant="outline" className="text-xs">{group.lot.crop}</Badge>
                       </div>
-                      <p className="text-sm">Farmer: <strong>{group.farmer.name}</strong></p>
-                      <p className="text-xs text-muted-foreground">{group.lot.numberOfBags} bags total</p>
+                      <p className="text-sm">{t("transactions.farmer")}: <strong>{group.farmer.name}</strong></p>
+                      <p className="text-xs text-muted-foreground">{group.lot.numberOfBags} {t("transactions.bagsTotal")}</p>
                     </div>
                     <div className="flex items-center gap-1">
                       <Button
@@ -472,7 +474,7 @@ export default function TransactionsPage() {
                         onClick={() => openEditDialog(group)}
                       >
                         <Pencil className="w-4 h-4 mr-1" />
-                        Edit
+                        {t("common.edit")}
                       </Button>
                       {hasCompleted && (
                         <DropdownMenu>
@@ -511,7 +513,7 @@ export default function TransactionsPage() {
 
                   {hasCompleted && (
                     <div className="border-t pt-2 mb-2 flex justify-between font-medium text-sm text-primary">
-                      <span>Payable to Farmer:</span>
+                      <span>{t("transactions.payableToFarmer")}:</span>
                       <span>Rs.{totalFarmerPayable.toFixed(2)}</span>
                     </div>
                   )}
@@ -520,9 +522,9 @@ export default function TransactionsPage() {
                     {group.completedTxns.map((tx) => (
                       <div key={tx.id} className={`flex items-center justify-between text-sm py-1 ${tx.isReversed ? "opacity-40" : ""}`}>
                         <div className="flex items-center gap-2">
-                          <span className="text-muted-foreground">Buyer:</span>
+                          <span className="text-muted-foreground">{t("transactions.buyer")}:</span>
                           <strong>{tx.buyer.name}</strong>
-                          {tx.isReversed && <Badge variant="outline" className="text-xs border-orange-400 text-orange-600 bg-orange-50">Reversed</Badge>}
+                          {tx.isReversed && <Badge variant="outline" className="text-xs border-orange-400 text-orange-600 bg-orange-50">{t("transactions.reversed")}</Badge>}
                         </div>
                         <div className="flex items-center gap-3 text-xs text-muted-foreground">
                           <Badge className="text-xs">Rs.{tx.pricePerKg}/kg</Badge>
@@ -537,7 +539,7 @@ export default function TransactionsPage() {
                     {group.pendingBids.map((bid) => (
                       <div key={bid.id} className="flex items-center justify-between text-sm py-1">
                         <div className="flex items-center gap-2">
-                          <span className="text-muted-foreground">Buyer:</span>
+                          <span className="text-muted-foreground">{t("transactions.buyer")}:</span>
                           <strong>{bid.buyer.name}</strong>
                         </div>
                         <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -555,25 +557,25 @@ export default function TransactionsPage() {
         </div>
       ) : (
         <div className="text-center py-8 text-muted-foreground">
-          No bids or transactions yet. Complete bidding first.
+          {t("transactions.noBids")}
         </div>
       )}
 
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{isEditing ? "Edit Transaction" : "Create Transaction"}</DialogTitle>
+            <DialogTitle>{isEditing ? t("transactions.editTransaction") : t("transactions.createTransaction")}</DialogTitle>
           </DialogHeader>
           {selectedBid && (
             <div className="space-y-4">
               <div className="bg-muted rounded-md p-3 text-sm space-y-1">
-                <p>Lot: <strong>{selectedBid.lot.lotId}</strong></p>
-                <p>Farmer: <strong>{selectedBid.farmer.name}</strong></p>
+                <p>{t("transactions.lot")}: <strong>{selectedBid.lot.lotId}</strong></p>
+                <p>{t("transactions.farmer")}: <strong>{selectedBid.farmer.name}</strong></p>
               </div>
 
               {dialogItems.length > 1 && (
                 <div className="space-y-1">
-                  <Label>Select Buyer</Label>
+                  <Label>{t("transactions.selectBuyer")}</Label>
                   <Select
                     data-testid="select-buyer-bid"
                     value={selectedIdx.toString()}
@@ -595,13 +597,13 @@ export default function TransactionsPage() {
               )}
 
               <div className="bg-muted/50 rounded-md p-2 text-sm">
-                <p>Buyer: <strong>{selectedBid.buyer.name}</strong></p>
+                <p>{t("transactions.buyer")}: <strong>{selectedBid.buyer.name}</strong></p>
                 <p>Price: <strong>Rs.{selectedBid.pricePerKg}/kg</strong> | Bags: <strong>{selectedBid.numberOfBags}</strong> | Grade: <strong>{selectedBid.grade || "N/A"}</strong></p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label>Total Weight (kg)</Label>
+                  <Label>{t("transactions.totalWeight")}</Label>
                   <Input
                     data-testid="input-total-weight"
                     type="text"
@@ -613,7 +615,7 @@ export default function TransactionsPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label>Net Weight (kg)</Label>
+                  <Label>{t("transactions.netWeight")}</Label>
                   <Input value={netWeight} disabled className="mobile-touch-target bg-muted" />
                   <p className="text-xs text-muted-foreground">Total - {bags} bags</p>
                 </div>
@@ -621,7 +623,7 @@ export default function TransactionsPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label>Hammali (Rs./Bag)</Label>
+                  <Label>{t("transactions.hammali")}</Label>
                   <Input
                     data-testid="input-hammali-per-bag"
                     type="text"
@@ -633,7 +635,7 @@ export default function TransactionsPage() {
                   <p className="text-xs text-muted-foreground">Total: Rs.{totalHammali.toFixed(2)} ({bags} bags)</p>
                 </div>
                 <div className="space-y-1">
-                  <Label>Grading (Rs.)</Label>
+                  <Label>{t("transactions.grading")}</Label>
                   <Input
                     data-testid="input-grading"
                     type="text"
@@ -647,7 +649,7 @@ export default function TransactionsPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label>Aadhat %</Label>
+                  <Label>{t("transactions.aadhat")}</Label>
                   <Input
                     data-testid="input-aadhat"
                     type="text"
@@ -658,7 +660,7 @@ export default function TransactionsPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label>Mandi %</Label>
+                  <Label>{t("transactions.mandi")}</Label>
                   <Input
                     data-testid="input-mandi"
                     type="text"
@@ -671,21 +673,21 @@ export default function TransactionsPage() {
               </div>
 
               <div className="space-y-1">
-                <Label>Charges Applied To</Label>
+                <Label>{t("transactions.chargedTo")}</Label>
                 <Select value={chargedTo} onValueChange={setChargedTo}>
                   <SelectTrigger data-testid="select-charged-to" className="mobile-touch-target">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Buyer">Buyer</SelectItem>
-                    <SelectItem value="Seller">Seller (Farmer)</SelectItem>
+                    <SelectItem value="Buyer">{t("transactions.buyer")}</SelectItem>
+                    <SelectItem value="Seller">{t("transactions.sellerFarmer")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               <div className="bg-muted rounded-md p-3 space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span>Gross Amount:</span>
+                  <span>{t("transactions.grossAmount")}:</span>
                   <span className="font-medium">Rs.{grossAmount.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-muted-foreground">
@@ -705,11 +707,11 @@ export default function TransactionsPage() {
                   <span>Rs.{mandi.toFixed(2)}</span>
                 </div>
                 <div className="border-t pt-2 flex justify-between font-medium text-primary">
-                  <span>Payable to Farmer:</span>
+                  <span>{t("transactions.payableToFarmer")}:</span>
                   <span>Rs.{farmerPayable.toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between font-medium">
-                  <span>Receivable from Buyer:</span>
+                  <span>{t("transactions.receivableFromBuyer")}:</span>
                   <span>Rs.{buyerReceivable.toFixed(2)}</span>
                 </div>
               </div>
@@ -720,7 +722,7 @@ export default function TransactionsPage() {
                 onClick={submitTransaction}
                 disabled={isSaving}
               >
-                {isSaving ? "Saving..." : isEditing ? "Update Transaction" : "Create Transaction"}
+                {isSaving ? t("common.saving") : isEditing ? t("transactions.updateTransaction") : t("transactions.createTransaction")}
               </Button>
               {isEditing && currentItem?.txn && !currentItem.txn.isReversed && (
                 <Button
@@ -735,7 +737,7 @@ export default function TransactionsPage() {
                   }}
                   disabled={reverseTxMutation.isPending}
                 >
-                  Return to Stock Register
+                  {t("transactions.returnToStockRegister")}
                 </Button>
               )}
             </div>
@@ -746,9 +748,9 @@ export default function TransactionsPage() {
       <AlertDialog open={reverseConfirmOpen} onOpenChange={(open) => { setReverseConfirmOpen(open); if (!open) setReversingTxn(null); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Return to Stock?</AlertDialogTitle>
+            <AlertDialogTitle>{t("transactions.returnConfirmTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to reverse this transaction?
+              {t("transactions.returnConfirmMsg")}
               {reversingTxn && (
                 <span className="block mt-2 text-orange-600 font-medium">
                   Buyer: {reversingTxn.buyer.name} — {reversingTxn.numberOfBags} bags will be returned to stock and become available for bidding again.
@@ -757,14 +759,14 @@ export default function TransactionsPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-reverse">Cancel</AlertDialogCancel>
+            <AlertDialogCancel data-testid="button-cancel-reverse">{t("common.cancel")}</AlertDialogCancel>
             <AlertDialogAction
               data-testid="button-confirm-reverse"
               className="bg-destructive text-destructive-foreground"
               onClick={() => reversingTxn && reverseTxMutation.mutate(reversingTxn.id)}
               disabled={reverseTxMutation.isPending}
             >
-              {reverseTxMutation.isPending ? "Reversing..." : "Yes, Reverse"}
+              {reverseTxMutation.isPending ? t("transactions.reversing") : t("transactions.yesReverse")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

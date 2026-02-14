@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useLanguage } from "@/lib/language";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -18,6 +19,7 @@ type BidWithDetails = Bid & { buyer: Buyer; lot: Lot };
 
 export default function BiddingPage() {
   const { toast } = useToast();
+  const { t } = useLanguage();
   const [activeCrop, setActiveCrop] = useState("Garlic");
   const [activeGrade, setActiveGrade] = useState("Large");
   const [selectedLot, setSelectedLot] = useState<LotWithFarmer | null>(null);
@@ -128,7 +130,7 @@ export default function BiddingPage() {
     <div className="p-3 md:p-6 max-w-4xl mx-auto space-y-4">
       <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
         <Gavel className="w-6 h-6 text-primary" />
-        Bidding
+        {t("bidding.title")}
       </h1>
 
       <div className="flex gap-2 overflow-x-auto pb-1">
@@ -161,10 +163,10 @@ export default function BiddingPage() {
       </div>
 
       {isLoading ? (
-        <div className="text-center py-8 text-muted-foreground">Loading...</div>
+        <div className="text-center py-8 text-muted-foreground">{t("app.loading")}</div>
       ) : availableLots.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">
-          No available lots for {activeCrop}
+          {t("bidding.noLots")} {activeCrop}
         </div>
       ) : (
         <div className="space-y-3">
@@ -179,8 +181,8 @@ export default function BiddingPage() {
                     </div>
                     <p className="text-sm font-medium truncate">{lot.farmer.name}</p>
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground mt-1">
-                      <span>Remaining: <strong className="text-foreground">{lot.remainingBags}</strong> / {lot.numberOfBags} bags</span>
-                      {lot.initialTotalWeight && <span>Init. Wt: {lot.initialTotalWeight} kg</span>}
+                      <span>{t("common.remaining")}: <strong className="text-foreground">{lot.remainingBags}</strong> / {lot.numberOfBags} {t("common.bags")}</span>
+                      {lot.initialTotalWeight && <span>{t("stockRegister.initWt")}: {lot.initialTotalWeight} kg</span>}
                     </div>
                   </div>
                   <Button
@@ -189,7 +191,7 @@ export default function BiddingPage() {
                     onClick={() => openBidDialog(lot)}
                   >
                     <Gavel className="w-4 h-4 mr-1" />
-                    Bid
+                    {t("bidding.bid")}
                   </Button>
                 </div>
               </CardContent>
@@ -209,13 +211,13 @@ export default function BiddingPage() {
           {selectedLot && (
             <div className="space-y-4">
               <div className="bg-muted rounded-md p-3 text-sm space-y-1">
-                <p>Remaining Bags: <strong>{selectedLot.remainingBags}</strong></p>
-                <p>Size: <strong>{activeGrade}</strong></p>
+                <p>{t("bidding.remainingBags")}: <strong>{selectedLot.remainingBags}</strong></p>
+                <p>{t("stockRegister.size")}: <strong>{activeGrade}</strong></p>
               </div>
 
               {lotBids.length > 0 && (
                 <div className="space-y-2">
-                  <Label className="text-xs text-muted-foreground">Existing Bids</Label>
+                  <Label className="text-xs text-muted-foreground">{t("bidding.existingBids")}</Label>
                   {lotBids.map((bid) => (
                     <div key={bid.id} className="flex items-center justify-between gap-2 bg-muted/50 rounded-md p-2 text-sm">
                       <div>
@@ -237,9 +239,9 @@ export default function BiddingPage() {
               )}
 
               <div className="border-t pt-4 space-y-3">
-                <Label className="font-medium">New Bid</Label>
+                <Label className="font-medium">{t("bidding.newBid")}</Label>
                 <div className="space-y-2">
-                  <Label>Buyer</Label>
+                  <Label>{t("bidding.buyer")}</Label>
                   {!showNewBuyer ? (
                     <div className="space-y-2">
                       <Select
@@ -247,7 +249,7 @@ export default function BiddingPage() {
                         onValueChange={(v) => setSelectedBuyerId(parseInt(v))}
                       >
                         <SelectTrigger data-testid="select-buyer" className="mobile-touch-target">
-                          <SelectValue placeholder="Select buyer" />
+                          <SelectValue placeholder={t("bidding.selectBuyer")} />
                         </SelectTrigger>
                         <SelectContent>
                           {buyers.map((b) => (
@@ -262,7 +264,7 @@ export default function BiddingPage() {
                         onClick={() => setShowNewBuyer(true)}
                         className="mobile-touch-target"
                       >
-                        <Plus className="w-3 h-3 mr-1" /> New Buyer
+                        <Plus className="w-3 h-3 mr-1" /> {t("bidding.newBuyer")}
                       </Button>
                     </div>
                   ) : (
@@ -271,26 +273,26 @@ export default function BiddingPage() {
                         data-testid="input-new-buyer-name"
                         value={newBuyerName}
                         onChange={(e) => setNewBuyerName(e.target.value)}
-                        placeholder="Buyer name"
+                        placeholder={t("bidding.buyerName")}
                         className="mobile-touch-target"
                       />
                       <Input
                         data-testid="input-new-buyer-phone"
                         value={newBuyerPhone}
                         onChange={(e) => setNewBuyerPhone(e.target.value)}
-                        placeholder="Phone (optional)"
+                        placeholder={t("bidding.phoneOptional")}
                         className="mobile-touch-target"
                       />
                       <div className="flex gap-2">
-                        <Button size="sm" data-testid="button-save-buyer" onClick={addNewBuyer} className="mobile-touch-target">Save</Button>
-                        <Button size="sm" variant="secondary" onClick={() => setShowNewBuyer(false)} className="mobile-touch-target">Cancel</Button>
+                        <Button size="sm" data-testid="button-save-buyer" onClick={addNewBuyer} className="mobile-touch-target">{t("common.save")}</Button>
+                        <Button size="sm" variant="secondary" onClick={() => setShowNewBuyer(false)} className="mobile-touch-target">{t("common.cancel")}</Button>
                       </div>
                     </div>
                   )}
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <Label>Price/kg (Rs.)</Label>
+                    <Label>{t("bidding.pricePerKg")}</Label>
                     <Input
                       data-testid="input-price-per-kg"
                       type="number"
@@ -303,7 +305,7 @@ export default function BiddingPage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label>No. of Bags</Label>
+                    <Label>{t("bidding.numberOfBags")}</Label>
                     <Input
                       data-testid="input-bid-bags"
                       type="number"
@@ -322,7 +324,7 @@ export default function BiddingPage() {
                   onClick={submitBid}
                   disabled={createBidMutation.isPending}
                 >
-                  {createBidMutation.isPending ? "Saving..." : "Add Bid"}
+                  {createBidMutation.isPending ? t("common.saving") : t("bidding.addBid")}
                 </Button>
               </div>
             </div>
