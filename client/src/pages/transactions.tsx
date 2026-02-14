@@ -66,15 +66,7 @@ function generateFarmerReceiptHtml(lot: Lot, farmer: Farmer, txns: TransactionWi
   const totalGross = txns.reduce((s, t) => s + (parseFloat(t.netWeight || "0") * parseFloat(t.pricePerKg || "0")), 0);
   const dateStr = txns[0]?.date || format(new Date(), "yyyy-MM-dd");
 
-  const buyerRows = txns.map(tx => `
-    <tr>
-      <td style="padding:6px;border:1px solid #ccc;">${tx.buyer.name}</td>
-      <td style="padding:6px;border:1px solid #ccc;text-align:center;">${tx.numberOfBags}</td>
-      <td style="padding:6px;border:1px solid #ccc;text-align:right;">${parseFloat(tx.netWeight || "0").toFixed(2)}</td>
-      <td style="padding:6px;border:1px solid #ccc;text-align:right;">₹${parseFloat(tx.pricePerKg || "0").toFixed(2)}</td>
-      <td style="padding:6px;border:1px solid #ccc;text-align:right;">₹${(parseFloat(tx.netWeight || "0") * parseFloat(tx.pricePerKg || "0")).toFixed(2)}</td>
-    </tr>
-  `).join("");
+  const totalNetWeight = txns.reduce((s, t) => s + parseFloat(t.netWeight || "0"), 0);
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>किसान रसीद</title>
 <style>body{font-family:'Noto Sans Devanagari',sans-serif;margin:20px;color:#333}
@@ -88,24 +80,12 @@ h2{text-align:center;margin-bottom:5px}
 </style></head><body>
 <div class="header">
 <h2>किसान रसीद / Farmer Receipt</h2>
-<p style="font-size:0.9em;color:#666">${businessName || "Mandi Mitra"}</p>
 </div>
 <table>
 <tr><td><strong>लॉट नं:</strong> ${lot.lotId}</td><td><strong>दिनांक:</strong> ${dateStr}</td></tr>
 <tr><td><strong>किसान:</strong> ${farmer.name}</td><td><strong>फोन:</strong> ${farmer.phone || "-"}</td></tr>
 <tr><td><strong>फसल:</strong> ${lot.crop}</td><td><strong>किस्म:</strong> ${lot.variety || "-"}</td></tr>
-<tr><td><strong>थैले:</strong> ${lot.numberOfBags}</td><td><strong>साइज़:</strong> ${lot.size || "-"}</td></tr>
-</table>
-<h3 style="margin-top:15px">खरीदार विवरण (Buyer Details)</h3>
-<table>
-<tr style="background:#f5f5f5">
-<th style="padding:6px;border:1px solid #ccc;text-align:left">खरीदार</th>
-<th style="padding:6px;border:1px solid #ccc;text-align:center">थैले</th>
-<th style="padding:6px;border:1px solid #ccc;text-align:right">वज़न (kg)</th>
-<th style="padding:6px;border:1px solid #ccc;text-align:right">दर/kg</th>
-<th style="padding:6px;border:1px solid #ccc;text-align:right">राशि</th>
-</tr>
-${buyerRows}
+<tr><td><strong>थैले:</strong> ${lot.numberOfBags}</td><td><strong>वज़न:</strong> ${totalNetWeight.toFixed(2)} kg</td></tr>
 </table>
 <div class="summary">
 <div class="summary-row"><span>कुल राशि (Gross):</span><span>₹${totalGross.toFixed(2)}</span></div>
