@@ -106,7 +106,7 @@ export function setupAuth(app: Express): void {
 
       req.logIn(user, (err) => {
         if (err) return next(err);
-        const { password, resetPasswordHash, ...safeUser } = user;
+        const { password, ...safeUser } = user;
         return res.json(safeUser);
       });
     })(req, res, next);
@@ -121,7 +121,7 @@ export function setupAuth(app: Express): void {
 
   app.get("/api/auth/me", (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
-    const { password, resetPasswordHash, ...safeUser } = req.user!;
+    const { password, ...safeUser } = req.user!;
     res.json(safeUser);
   });
 
@@ -154,6 +154,30 @@ export function setupAuth(app: Express): void {
 
     const { password, ...safeUser } = user;
     res.json({ ...safeUser, mustChangePassword: false });
+  });
+
+  app.post("/api/auth/reset-password", async (req, res) => {
+    const { username, phone, newPassword } = req.body;
+    if (!username || !phone || !newPassword) {
+      return res.status(400).json({ message: "Username, mobile number, and new password are required" });
+    }
+    if (newPassword.length < 4) {
+      return res.status(400).json({ message: "Password must be at least 4 characters" });
+    }
+
+    const user = await storage.getUserByUsername(username);
+    if (!user) {
+      return res.status(400).json({ message: "Invalid username or mobile number" });
+    }
+    if (!user.phone || user.phone !== phone) {
+      return res.status(400).json({ message: "Invalid username or mobile number" });
+    }
+
+    const hashed = await hashPassword(newPassword);
+    await storage.updateUserPassword(user.id, hashed);
+    await storage.updateUser(user.id, { mustChangePassword: false });
+
+    res.json({ message: "Password changed successfully" });
   });
 }
 

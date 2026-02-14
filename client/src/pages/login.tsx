@@ -39,7 +39,7 @@ export default function LoginPage() {
             </div>
           </div>
           <CardTitle className="text-2xl font-bold">Mandi Mitra</CardTitle>
-          <p className="text-sm">by <span className="text-orange-500 font-semibold">KrashuVed</span></p>
+          <p className="text-sm">by <span className="text-green-400 font-semibold">Krashu</span><span className="text-orange-500 font-semibold">Ved</span></p>
           <p className="text-muted-foreground text-sm">Agricultural Marketplace Manager</p>
         </CardHeader>
         <CardContent>
@@ -98,7 +98,7 @@ export default function LoginPage() {
         </CardContent>
       </Card>
       <p data-testid="text-help-footer" className="mt-6 text-center text-xs text-muted-foreground">
-        Need Help? Please reach out to <span className="text-orange-500 font-semibold">KrashuVed</span> 8882589392
+        Need Help? Please reach out to <span className="text-green-400 font-semibold">Krashu</span><span className="text-orange-500 font-semibold">Ved</span> 8882589392
       </p>
     </div>
   );

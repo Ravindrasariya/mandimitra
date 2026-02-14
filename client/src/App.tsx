@@ -210,7 +210,18 @@ function AuthGate() {
     );
   }
 
-  if (!user) return <LoginPage />;
+  if (!user) {
+    return (
+      <Switch>
+        <Route path="/change-password">
+          <ChangePasswordPage standalone />
+        </Route>
+        <Route>
+          <LoginPage />
+        </Route>
+      </Switch>
+    );
+  }
   if (user.mustChangePassword) return <ChangePasswordPage />;
   if (user.role === "system_admin") return <AdminPage />;
   return <AppLayout />;
