@@ -98,7 +98,7 @@ export default function LoginPage() {
         </CardContent>
       </Card>
       <p data-testid="text-help-footer" className="mt-6 text-center text-xs text-muted-foreground">
-        Need Help? Please reach out to <span className="text-green-400 font-semibold">Krashu</span><span className="text-orange-500 font-semibold">Ved</span> 8882589392
+        Need Help? Please reach out to <span className="text-green-400 font-semibold">Krashu</span><span className="text-orange-500 font-semibold">Ved</span> +918882589392
       </p>
     </div>
   );

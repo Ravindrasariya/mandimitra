@@ -132,15 +132,18 @@ export function setupAuth(app: Express): void {
     if (!newPassword || newPassword.length < 4) {
       return res.status(400).json({ message: "Password must be at least 4 characters" });
     }
+    if (!phone) {
+      return res.status(400).json({ message: "Please enter your registered mobile number" });
+    }
 
     const user = await storage.getUser(req.user!.id);
     if (!user) return res.status(404).json({ message: "User not found" });
 
-    if (user.mustChangePassword) {
-      if (phone && phone !== user.phone) {
-        return res.status(400).json({ message: "Mobile number does not match our records" });
-      }
-    } else {
+    if (phone !== user.phone) {
+      return res.status(400).json({ message: "Mobile number does not match our records" });
+    }
+
+    if (!user.mustChangePassword) {
       const isValid = await comparePasswords(currentPassword, user.password);
       if (!isValid) return res.status(400).json({ message: "Current password is incorrect" });
     }
@@ -157,9 +160,9 @@ export function setupAuth(app: Express): void {
   });
 
   app.post("/api/auth/change-password-public", async (req, res) => {
-    const { username, currentPassword, newPassword } = req.body;
-    if (!username || !currentPassword || !newPassword) {
-      return res.status(400).json({ message: "Username, current password, and new password are required" });
+    const { username, phone, currentPassword, newPassword } = req.body;
+    if (!username || !phone || !currentPassword || !newPassword) {
+      return res.status(400).json({ message: "Username, mobile number, current password, and new password are required" });
     }
     if (newPassword.length < 4) {
       return res.status(400).json({ message: "Password must be at least 4 characters" });
@@ -167,12 +170,16 @@ export function setupAuth(app: Express): void {
 
     const user = await storage.getUserByUsername(username);
     if (!user) {
-      return res.status(400).json({ message: "Invalid username or password" });
+      return res.status(400).json({ message: "Invalid credentials. Please check your username, mobile number, and password." });
+    }
+
+    if (!user.phone || user.phone !== phone) {
+      return res.status(400).json({ message: "Invalid credentials. Please check your username, mobile number, and password." });
     }
 
     const isValid = await comparePasswords(currentPassword, user.password);
     if (!isValid) {
-      return res.status(400).json({ message: "Invalid username or password" });
+      return res.status(400).json({ message: "Invalid credentials. Please check your username, mobile number, and password." });
     }
 
     if (user.role !== "system_admin") {

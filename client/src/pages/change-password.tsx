@@ -55,6 +55,7 @@ export default function ChangePasswordPage({ standalone = false }: { standalone?
         }
         await apiRequest("POST", "/api/auth/change-password-public", {
           username: username.trim(),
+          phone: phone.trim(),
           currentPassword,
           newPassword,
         });
@@ -66,7 +67,7 @@ export default function ChangePasswordPage({ standalone = false }: { standalone?
           setLoading(false);
           return;
         }
-        await changePassword(currentPassword, newPassword);
+        await changePassword(currentPassword, newPassword, phone.trim());
         toast({ title: "Success", description: "Password changed successfully" });
       }
     } catch (err: any) {
@@ -109,21 +110,20 @@ export default function ChangePasswordPage({ standalone = false }: { standalone?
                 />
               </div>
             )}
-            {isMustChange ? (
-              <div className="space-y-2">
-                <Label htmlFor="phone" className="font-semibold">Registered Mobile Number</Label>
-                <Input
-                  id="phone"
-                  data-testid="input-phone"
-                  type="tel"
-                  inputMode="numeric"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="Enter your registered mobile number"
-                  className="mobile-touch-target"
-                />
-              </div>
-            ) : (
+            <div className="space-y-2">
+              <Label htmlFor="phone" className="font-semibold">Registered Mobile Number</Label>
+              <Input
+                id="phone"
+                data-testid="input-phone"
+                type="tel"
+                inputMode="numeric"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="Enter your registered mobile number"
+                className="mobile-touch-target"
+              />
+            </div>
+            {!isMustChange && (
               <div className="space-y-2">
                 <Label htmlFor="currentPassword" className="font-semibold">Current Password</Label>
                 <div className="relative">
@@ -188,13 +188,13 @@ export default function ChangePasswordPage({ standalone = false }: { standalone?
               type="submit"
               data-testid="button-change-password"
               className="w-full mobile-touch-target bg-green-500"
-              disabled={loading || (!isLoggedIn && (!username || !currentPassword)) || (isMustChange && !phone) || (!isMustChange && isLoggedIn && !currentPassword) || !newPassword || !confirmPassword}
+              disabled={loading || (!isLoggedIn && (!username || !currentPassword || !phone)) || (isMustChange && !phone) || (!isMustChange && isLoggedIn && (!currentPassword || !phone)) || !newPassword || !confirmPassword}
             >
               {loading ? "Changing..." : "Set New Password"}
             </Button>
             {!isMustChange && (
               <p className="text-xs text-muted-foreground text-center">
-                Forgot your password? Please contact <span className="text-green-400 font-semibold">Krashu</span><span className="text-orange-500 font-semibold">Ved</span> to reset it.
+                Forgot your password? Please contact <span className="text-green-400 font-semibold">Krashu</span><span className="text-orange-500 font-semibold">Ved</span> at +918882589392 to reset it.
               </p>
             )}
           </form>
