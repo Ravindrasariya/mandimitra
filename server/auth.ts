@@ -156,10 +156,10 @@ export function setupAuth(app: Express): void {
     res.json({ ...safeUser, mustChangePassword: false });
   });
 
-  app.post("/api/auth/reset-password", async (req, res) => {
-    const { username, phone, newPassword } = req.body;
-    if (!username || !phone || !newPassword) {
-      return res.status(400).json({ message: "Username, mobile number, and new password are required" });
+  app.post("/api/auth/change-password-public", async (req, res) => {
+    const { username, currentPassword, newPassword } = req.body;
+    if (!username || !currentPassword || !newPassword) {
+      return res.status(400).json({ message: "Username, current password, and new password are required" });
     }
     if (newPassword.length < 4) {
       return res.status(400).json({ message: "Password must be at least 4 characters" });
@@ -167,10 +167,19 @@ export function setupAuth(app: Express): void {
 
     const user = await storage.getUserByUsername(username);
     if (!user) {
-      return res.status(400).json({ message: "Invalid username or mobile number" });
+      return res.status(400).json({ message: "Invalid username or password" });
     }
-    if (!user.phone || user.phone !== phone) {
-      return res.status(400).json({ message: "Invalid username or mobile number" });
+
+    const isValid = await comparePasswords(currentPassword, user.password);
+    if (!isValid) {
+      return res.status(400).json({ message: "Invalid username or password" });
+    }
+
+    if (user.role !== "system_admin") {
+      const business = await storage.getBusiness(user.businessId);
+      if (!business || business.status !== "active") {
+        return res.status(403).json({ message: "Your business account has been deactivated or archived. Please contact the administrator." });
+      }
     }
 
     const hashed = await hashPassword(newPassword);
