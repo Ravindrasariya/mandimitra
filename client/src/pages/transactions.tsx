@@ -12,7 +12,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import type { Bid, Buyer, Lot, Farmer, Transaction } from "@shared/schema";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { Receipt, Pencil, Printer, ChevronDown, Undo2 } from "lucide-react";
+import { Receipt, Pencil, Printer, ChevronDown } from "lucide-react";
 import { format } from "date-fns";
 
 type BidWithDetails = Bid & { buyer: Buyer; lot: Lot; farmer: Farmer };
@@ -231,6 +231,7 @@ export default function TransactionsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/cash-entries"] });
       setReverseConfirmOpen(false);
       setReversingTxn(null);
+      setDialogOpen(false);
       toast({ title: "Transaction Reversed", description: `${data.bagsReturned} bags returned to stock` });
     },
     onError: (err: any) => {
@@ -529,19 +530,7 @@ export default function TransactionsPage() {
                           <span>{tx.lot.size || ""}</span>
                           <span>Net: {tx.netWeight}kg</span>
                           <span className="text-chart-2 font-medium">Rs.{tx.totalReceivableFromBuyer}</span>
-                          {!tx.isReversed && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              data-testid={`button-reverse-tx-${tx.id}`}
-                              className="h-6 w-6 text-orange-600"
-                              onClick={(e) => { e.stopPropagation(); setReversingTxn(tx); setReverseConfirmOpen(true); }}
-                              disabled={reverseTxMutation.isPending}
-                              title="Return to Stock"
-                            >
-                              <Undo2 className="w-4 h-4" />
-                            </Button>
-                          )}
+                          
                         </div>
                       </div>
                     ))}
@@ -733,6 +722,22 @@ export default function TransactionsPage() {
               >
                 {isSaving ? "Saving..." : isEditing ? "Update Transaction" : "Create Transaction"}
               </Button>
+              {isEditing && currentItem?.txn && !currentItem.txn.isReversed && (
+                <Button
+                  variant="destructive"
+                  data-testid="button-reverse-tx"
+                  className="w-full mobile-touch-target"
+                  onClick={() => {
+                    const txn = currentItem.txn!;
+                    const fullTxn = { ...txn, buyer: currentItem.bid.buyer, lot: currentItem.bid.lot, farmer: currentItem.bid.farmer } as TransactionWithDetails;
+                    setReversingTxn(fullTxn);
+                    setReverseConfirmOpen(true);
+                  }}
+                  disabled={reverseTxMutation.isPending}
+                >
+                  Return to Stock Register
+                </Button>
+              )}
             </div>
           )}
         </DialogContent>

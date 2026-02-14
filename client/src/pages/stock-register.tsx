@@ -12,7 +12,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CROPS, SIZES } from "@shared/schema";
 import type { Lot, Farmer } from "@shared/schema";
-import { Search, Edit, Package, Wheat, Undo2 } from "lucide-react";
+import { Search, Edit, Package, Wheat } from "lucide-react";
 import { format } from "date-fns";
 
 type LotWithFarmer = Lot & { farmer: Farmer };
@@ -221,19 +221,7 @@ export default function StockRegisterPage() {
       <Dialog open={!!editingLot} onOpenChange={(open) => !open && setEditingLot(null)}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <div className="flex items-center justify-between">
-              <DialogTitle>Edit Lot - {editingLot?.lotId}</DialogTitle>
-              <Button
-                variant="ghost"
-                size="icon"
-                data-testid="button-return-lot"
-                className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 -mr-2"
-                onClick={() => setReturnConfirmOpen(true)}
-                title="Return to Farmer"
-              >
-                <Undo2 className="w-5 h-5" />
-              </Button>
-            </div>
+            <DialogTitle>Edit Lot - {editingLot?.lotId}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1">
@@ -308,6 +296,15 @@ export default function StockRegisterPage() {
               disabled={updateLotMutation.isPending}
             >
               {updateLotMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+            <Button
+              variant="destructive"
+              data-testid="button-return-lot"
+              className="w-full mobile-touch-target"
+              onClick={() => setReturnConfirmOpen(true)}
+              disabled={returnLotMutation.isPending}
+            >
+              Return to Farmer
             </Button>
           </div>
         </DialogContent>
