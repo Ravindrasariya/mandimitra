@@ -39,7 +39,7 @@ export default function StockRegisterPage() {
   const [monthPopoverOpen, setMonthPopoverOpen] = useState(false);
   const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
 
-  const [saleFilter, setSaleFilter] = usePersistedState<"all" | "sold" | "unsold">("sr-saleFilter", "all");
+  const [saleFilter, setSaleFilter] = usePersistedState<"all" | "sold" | "unsold" | "returned">("sr-saleFilter", "all");
 
   const [farmerSearch, setFarmerSearch] = useState("");
   const [selectedFarmer, setSelectedFarmer] = useState<Farmer | null>(null);
@@ -165,6 +165,8 @@ export default function StockRegisterPage() {
       result = result.filter(l => !l.isReturned && l.remainingBags === 0);
     } else if (saleFilter === "unsold") {
       result = result.filter(l => !l.isReturned && l.remainingBags > 0);
+    } else if (saleFilter === "returned") {
+      result = result.filter(l => l.isReturned);
     }
 
     return result;
@@ -404,6 +406,7 @@ export default function StockRegisterPage() {
             <SelectItem value="all">{t("stockRegister.all")}</SelectItem>
             <SelectItem value="sold">{t("stockRegister.sold")}</SelectItem>
             <SelectItem value="unsold">{t("stockRegister.unsoldFilter")}</SelectItem>
+            <SelectItem value="returned">{t("stockRegister.returned")}</SelectItem>
           </SelectContent>
         </Select>
 
