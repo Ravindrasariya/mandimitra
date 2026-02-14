@@ -33,7 +33,7 @@ function generateFarmerListPrintHtml(farmers: FarmerWithDues[], summary: { total
       <td style="padding:6px;border:1px solid #ddd">${f.phone}</td>
       <td style="padding:6px;border:1px solid #ddd;text-align:right">${formatIndianCurrency(f.totalPayable)}</td>
       <td style="padding:6px;border:1px solid #ddd;text-align:right;color:${parseFloat(f.totalDue) > 0 ? '#dc2626' : '#16a34a'}">${formatIndianCurrency(f.totalDue)}</td>
-      <td style="padding:6px;border:1px solid #ddd;text-align:center">${f.negativeFlag ? "⚠️" : "-"}</td>
+      <td style="padding:6px;border:1px solid #ddd;text-align:center">${f.negativeFlag ? "FLAG" : "-"}</td>
     </tr>
   `).join("");
 
@@ -480,6 +480,7 @@ export default function FarmerLedgerPage() {
                   variant="outline"
                   onClick={() => {
                     setMergeConfirmOpen(false);
+                    setDuplicateFarmer(null);
                     saveEdit();
                   }}
                   data-testid="button-save-anyway"

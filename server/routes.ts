@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
+import { z } from "zod";
 import { storage } from "./storage";
 import { setupAuth, requireAuth, requireAdmin, hashPassword, comparePasswords } from "./auth";
 import { format } from "date-fns";
@@ -194,27 +195,43 @@ export async function registerRoutes(
     }
   });
 
+  const farmerUpdateSchema = z.object({
+    name: z.string().optional(),
+    phone: z.string().optional(),
+    village: z.string().optional(),
+    tehsil: z.string().optional(),
+    district: z.string().optional(),
+    state: z.string().optional(),
+    openingBalance: z.string().optional(),
+    negativeFlag: z.boolean().optional(),
+    isArchived: z.boolean().optional(),
+  }).strict();
+
   app.patch("/api/farmers/:id", requireAuth, async (req, res) => {
     const farmerId = paramId(req.params.id);
     const businessId = req.user!.businessId;
     const existing = await storage.getFarmer(farmerId, businessId);
     if (!existing) return res.status(404).json({ message: "Farmer not found" });
 
+    const parsed = farmerUpdateSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ message: "Invalid fields", errors: parsed.error.flatten() });
+
+    const data = parsed.data;
     const trackFields = ["name", "phone", "village", "negativeFlag", "isArchived"] as const;
     for (const field of trackFields) {
-      if (req.body[field] !== undefined && String(req.body[field]) !== String(existing[field] ?? "")) {
+      if (data[field] !== undefined && String(data[field]) !== String(existing[field] ?? "")) {
         await storage.createFarmerEditHistory({
           farmerId,
           businessId,
           fieldChanged: field,
           oldValue: String(existing[field] ?? ""),
-          newValue: String(req.body[field]),
+          newValue: String(data[field]),
           changedBy: req.user!.username,
         });
       }
     }
 
-    const updated = await storage.updateFarmer(farmerId, businessId, req.body);
+    const updated = await storage.updateFarmer(farmerId, businessId, data);
     res.json(updated);
   });
 
