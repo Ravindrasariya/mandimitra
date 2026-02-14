@@ -263,8 +263,8 @@ export default function FarmerLedgerPage() {
   return (
     <div className="p-3 md:p-6 max-w-6xl mx-auto space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2 mr-auto">
-          <Users className="w-6 h-6 text-primary" />
+        <h1 className="text-base md:text-lg font-bold flex items-center gap-2 mr-auto">
+          <Users className="w-5 h-5 text-primary" />
           {t("farmerLedger.title")}
         </h1>
         <Select value={yearFilter} onValueChange={setYearFilter}>

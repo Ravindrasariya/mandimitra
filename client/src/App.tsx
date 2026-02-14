@@ -130,7 +130,12 @@ function DesktopSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
         <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
           <Wheat className="w-4 h-4 text-primary" />
         </div>
-        {!collapsed && <span className="font-bold text-sm truncate">{t("app.name")}</span>}
+        {!collapsed && (
+          <div className="flex flex-col leading-tight truncate">
+            <span className="font-bold text-lg">{t("app.name")}</span>
+            <span className="text-[9px] -mt-0.5">by <span className="text-green-500 font-semibold">Krashu</span><span className="text-orange-500 font-semibold">Ved</span></span>
+          </div>
+        )}
         <Button
           variant="secondary"
           size="icon"
@@ -186,7 +191,10 @@ function MobileHeader() {
         <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center">
           <Wheat className="w-4 h-4 text-primary" />
         </div>
-        <span className="font-bold text-sm">{t("app.name")}</span>
+        <div className="flex flex-col leading-tight">
+          <span className="font-bold text-lg">{t("app.name")}</span>
+          <span className="text-[9px] -mt-0.5">by <span className="text-green-500 font-semibold">Krashu</span><span className="text-orange-500 font-semibold">Ved</span></span>
+        </div>
       </div>
       <LanguageToggle />
     </header>

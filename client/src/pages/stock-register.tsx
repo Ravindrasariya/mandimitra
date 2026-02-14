@@ -133,8 +133,8 @@ export default function StockRegisterPage() {
 
   return (
     <div className="p-3 md:p-6 max-w-4xl mx-auto space-y-4">
-      <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
-        <Package className="w-6 h-6 text-primary" />
+      <h1 className="text-base md:text-lg font-bold flex items-center gap-2">
+        <Package className="w-5 h-5 text-primary" />
         {t("stockRegister.title")}
       </h1>
 
@@ -143,6 +143,7 @@ export default function StockRegisterPage() {
           <Button
             key={crop}
             variant={activeCrop === crop ? "default" : "secondary"}
+            size="sm"
             data-testid={`toggle-crop-${crop.toLowerCase()}`}
             className="mobile-touch-target whitespace-nowrap"
             onClick={() => setActiveCrop(crop)}

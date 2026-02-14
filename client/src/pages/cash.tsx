@@ -117,14 +117,15 @@ export default function CashPage() {
 
   return (
     <div className="p-3 md:p-6 max-w-4xl mx-auto space-y-4">
-      <h1 className="text-xl md:text-2xl font-bold flex items-center gap-2">
-        <Wallet className="w-6 h-6 text-primary" />
+      <h1 className="text-base md:text-lg font-bold flex items-center gap-2">
+        <Wallet className="w-5 h-5 text-primary" />
         {t("cash.title")}
       </h1>
 
       <div className="flex gap-2">
         <Button
           variant={activeTab === "in" ? "default" : "secondary"}
+          size="sm"
           data-testid="toggle-cash-in"
           className="mobile-touch-target flex-1"
           onClick={() => setActiveTab("in")}
@@ -134,6 +135,7 @@ export default function CashPage() {
         </Button>
         <Button
           variant={activeTab === "out" ? "default" : "secondary"}
+          size="sm"
           data-testid="toggle-cash-out"
           className="mobile-touch-target flex-1"
           onClick={() => setActiveTab("out")}
