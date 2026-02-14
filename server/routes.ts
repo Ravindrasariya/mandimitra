@@ -195,9 +195,66 @@ export async function registerRoutes(
   });
 
   app.patch("/api/farmers/:id", requireAuth, async (req, res) => {
-    const updated = await storage.updateFarmer(paramId(req.params.id), req.user!.businessId, req.body);
-    if (!updated) return res.status(404).json({ message: "Farmer not found" });
+    const farmerId = paramId(req.params.id);
+    const businessId = req.user!.businessId;
+    const existing = await storage.getFarmer(farmerId, businessId);
+    if (!existing) return res.status(404).json({ message: "Farmer not found" });
+
+    const trackFields = ["name", "phone", "village", "negativeFlag", "isArchived"] as const;
+    for (const field of trackFields) {
+      if (req.body[field] !== undefined && String(req.body[field]) !== String(existing[field] ?? "")) {
+        await storage.createFarmerEditHistory({
+          farmerId,
+          businessId,
+          fieldChanged: field,
+          oldValue: String(existing[field] ?? ""),
+          newValue: String(req.body[field]),
+          changedBy: req.user!.username,
+        });
+      }
+    }
+
+    const updated = await storage.updateFarmer(farmerId, businessId, req.body);
     res.json(updated);
+  });
+
+  app.get("/api/farmers-with-dues", requireAuth, async (req, res) => {
+    const search = req.query.search as string | undefined;
+    const result = await storage.getFarmersWithDues(req.user!.businessId, search);
+    res.json(result);
+  });
+
+  app.get("/api/farmer-edit-history/:farmerId", requireAuth, async (req, res) => {
+    const history = await storage.getFarmerEditHistory(paramId(req.params.farmerId), req.user!.businessId);
+    res.json(history);
+  });
+
+  app.post("/api/farmer-edit-history", requireAuth, async (req, res) => {
+    const entry = { ...req.body, businessId: req.user!.businessId, changedBy: req.user!.username };
+    const created = await storage.createFarmerEditHistory(entry);
+    res.status(201).json(created);
+  });
+
+  app.post("/api/farmers/check-duplicate", requireAuth, async (req, res) => {
+    const { name, phone, village, excludeId } = req.body;
+    const allFarmers = await storage.getFarmers(req.user!.businessId);
+    const duplicate = allFarmers.find(f =>
+      f.id !== excludeId &&
+      f.name.toLowerCase() === name?.toLowerCase() &&
+      f.phone === phone &&
+      (f.village || "").toLowerCase() === (village || "").toLowerCase()
+    );
+    res.json({ duplicate: duplicate || null });
+  });
+
+  app.post("/api/farmers/merge", requireAuth, async (req, res) => {
+    try {
+      const { keepId, mergeId } = req.body;
+      const result = await storage.mergeFarmers(req.user!.businessId, keepId, mergeId, req.user!.username);
+      res.json(result);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
   });
 
   app.get("/api/buyers", requireAuth, async (req, res) => {

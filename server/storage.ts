@@ -2,13 +2,14 @@ import {
   type User, type InsertUser,
   type Business, type InsertBusiness,
   type Farmer, type InsertFarmer,
+  type FarmerEditHistory, type InsertFarmerEditHistory,
   type Buyer, type InsertBuyer,
   type BuyerEditHistory, type InsertBuyerEditHistory,
   type Lot, type InsertLot,
   type Bid, type InsertBid,
   type Transaction, type InsertTransaction,
   type CashEntry, type InsertCashEntry,
-  users, businesses, farmers, buyers, buyerEditHistory, lots, bids, transactions, cashEntries,
+  users, businesses, farmers, farmerEditHistory, buyers, buyerEditHistory, lots, bids, transactions, cashEntries,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, ilike, or, sql, desc, asc, gte, lte, ne } from "drizzle-orm";
@@ -33,6 +34,10 @@ export interface IStorage {
   getFarmer(id: number, businessId: number): Promise<Farmer | undefined>;
   createFarmer(farmer: InsertFarmer): Promise<Farmer>;
   updateFarmer(id: number, businessId: number, data: Partial<InsertFarmer>): Promise<Farmer | undefined>;
+  getFarmersWithDues(businessId: number, search?: string): Promise<(Farmer & { totalPayable: string; totalDue: string; salesCount: number })[]>;
+  getFarmerEditHistory(farmerId: number, businessId: number): Promise<FarmerEditHistory[]>;
+  createFarmerEditHistory(entry: InsertFarmerEditHistory): Promise<FarmerEditHistory>;
+  mergeFarmers(businessId: number, keepId: number, mergeId: number, changedBy: string): Promise<Farmer>;
 
   getBuyers(businessId: number, search?: string): Promise<Buyer[]>;
   getBuyer(id: number, businessId: number): Promise<Buyer | undefined>;
@@ -143,6 +148,7 @@ export class DatabaseStorage implements IStorage {
     await db.delete(transactions).where(eq(transactions.businessId, businessId));
     await db.delete(bids).where(eq(bids.businessId, businessId));
     await db.delete(lots).where(eq(lots.businessId, businessId));
+    await db.delete(farmerEditHistory).where(eq(farmerEditHistory.businessId, businessId));
     await db.delete(farmers).where(eq(farmers.businessId, businessId));
     await db.delete(buyerEditHistory).where(eq(buyerEditHistory.businessId, businessId));
     await db.delete(buyers).where(eq(buyers.businessId, businessId));
@@ -176,6 +182,93 @@ export class DatabaseStorage implements IStorage {
 
   async updateFarmer(id: number, businessId: number, data: Partial<InsertFarmer>): Promise<Farmer | undefined> {
     const [updated] = await db.update(farmers).set(data).where(and(eq(farmers.id, id), eq(farmers.businessId, businessId))).returning();
+    return updated;
+  }
+
+  async getFarmersWithDues(businessId: number, search?: string): Promise<(Farmer & { totalPayable: string; totalDue: string; salesCount: number })[]> {
+    let farmerList: Farmer[];
+    if (search) {
+      farmerList = await db.select().from(farmers).where(
+        and(
+          eq(farmers.businessId, businessId),
+          or(
+            ilike(farmers.name, `%${search}%`),
+            ilike(farmers.phone, `%${search}%`),
+            ilike(farmers.village, `%${search}%`)
+          )
+        )
+      ).orderBy(asc(farmers.id));
+    } else {
+      farmerList = await db.select().from(farmers).where(eq(farmers.businessId, businessId)).orderBy(asc(farmers.id));
+    }
+
+    const results: (Farmer & { totalPayable: string; totalDue: string; salesCount: number })[] = [];
+    for (const farmer of farmerList) {
+      const [txSum] = await db.select({
+        total: sql<string>`coalesce(sum(cast(${transactions.totalPayableToFarmer} as numeric)), 0)`,
+        count: sql<number>`count(*)`,
+      }).from(transactions).where(and(eq(transactions.businessId, businessId), eq(transactions.farmerId, farmer.id)));
+
+      const [cashSum] = await db.select({
+        total: sql<string>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`
+      }).from(cashEntries).where(and(eq(cashEntries.businessId, businessId), eq(cashEntries.farmerId, farmer.id)));
+
+      const totalPayable = parseFloat(txSum?.total || "0");
+      const totalPaid = parseFloat(cashSum?.total || "0");
+      const openingBal = parseFloat(farmer.openingBalance || "0");
+      const totalDue = openingBal + totalPayable - totalPaid;
+      const salesCount = Number(txSum?.count || 0);
+
+      results.push({
+        ...farmer,
+        totalPayable: totalPayable.toFixed(2),
+        totalDue: totalDue.toFixed(2),
+        salesCount,
+      });
+    }
+    return results;
+  }
+
+  async getFarmerEditHistory(farmerId: number, businessId: number): Promise<FarmerEditHistory[]> {
+    return db.select().from(farmerEditHistory)
+      .where(and(eq(farmerEditHistory.farmerId, farmerId), eq(farmerEditHistory.businessId, businessId)))
+      .orderBy(desc(farmerEditHistory.createdAt));
+  }
+
+  async createFarmerEditHistory(entry: InsertFarmerEditHistory): Promise<FarmerEditHistory> {
+    const [created] = await db.insert(farmerEditHistory).values(entry).returning();
+    return created;
+  }
+
+  async mergeFarmers(businessId: number, keepId: number, mergeId: number, changedBy: string): Promise<Farmer> {
+    const keepFarmer = await this.getFarmer(keepId, businessId);
+    const mergeFarmer = await this.getFarmer(mergeId, businessId);
+    if (!keepFarmer || !mergeFarmer) throw new Error("Farmer not found");
+
+    await db.update(lots).set({ farmerId: keepId }).where(and(eq(lots.farmerId, mergeId), eq(lots.businessId, businessId)));
+    await db.update(transactions).set({ farmerId: keepId }).where(and(eq(transactions.farmerId, mergeId), eq(transactions.businessId, businessId)));
+    await db.update(cashEntries).set({ farmerId: keepId }).where(and(eq(cashEntries.farmerId, mergeId), eq(cashEntries.businessId, businessId)));
+
+    const mergeOpeningBal = parseFloat(mergeFarmer.openingBalance || "0");
+    const keepOpeningBal = parseFloat(keepFarmer.openingBalance || "0");
+    const newOpeningBal = (keepOpeningBal + mergeOpeningBal).toFixed(2);
+
+    await db.update(farmers).set({ openingBalance: newOpeningBal }).where(and(eq(farmers.id, keepId), eq(farmers.businessId, businessId)));
+
+    await this.createFarmerEditHistory({
+      farmerId: keepId,
+      businessId,
+      fieldChanged: "merge",
+      oldValue: `Farmer ID ${mergeId} (${mergeFarmer.name})`,
+      newValue: `Merged with opening balance ₹${mergeOpeningBal}`,
+      changedBy,
+    });
+
+    await db.update(farmerEditHistory).set({ farmerId: keepId }).where(and(eq(farmerEditHistory.farmerId, mergeId), eq(farmerEditHistory.businessId, businessId)));
+
+    await db.delete(farmers).where(and(eq(farmers.id, mergeId), eq(farmers.businessId, businessId)));
+
+    const [updated] = await db.select().from(farmers).where(and(eq(farmers.id, keepId), eq(farmers.businessId, businessId)));
     return updated;
   }
 
