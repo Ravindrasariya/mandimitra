@@ -16,7 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { CROPS, SIZES } from "@shared/schema";
 import type { Lot, Farmer } from "@shared/schema";
-import { Search, Edit, Package, Wheat, X, ChevronDown, Calendar } from "lucide-react";
+import { Search, Edit, Package, Wheat, X, ChevronDown, Calendar, Download } from "lucide-react";
 import { format } from "date-fns";
 
 type LotWithFarmer = Lot & { farmer: Farmer };
@@ -275,6 +275,40 @@ export default function StockRegisterPage() {
       ? selectedDays[0]
       : `${selectedDays.length} ${t("stockRegister.nDays")}`;
 
+  const exportCSV = () => {
+    if (filtered.length === 0) return;
+
+    const headers = [
+      "Lot ID", "Serial #", "Date", "Crop", "Variety", "Size",
+      "Farmer ID", "Farmer Name", "Farmer Phone", "Farmer Village", "Farmer Tehsil", "Farmer District",
+      "No. of Bags", "Remaining Bags", "Bag Marka", "Initial Total Weight",
+      "Vehicle Number", "Vehicle Bhada Rate",
+      "Status"
+    ];
+
+    const escCSV = (val: any) => {
+      const s = String(val ?? "");
+      return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+
+    const rows = filtered.map(lot => [
+      lot.lotId, lot.serialNumber, lot.date, lot.crop, lot.variety || "", lot.size || "",
+      lot.farmer.farmerId, lot.farmer.name, lot.farmer.phone, lot.farmer.village || "", lot.farmer.tehsil || "", lot.farmer.district || "",
+      lot.numberOfBags, lot.remainingBags, lot.bagMarka || "", lot.initialTotalWeight || "",
+      lot.vehicleNumber || "", lot.vehicleBhadaRate || "",
+      getLotStatus(lot)
+    ].map(escCSV).join(","));
+
+    const csv = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `stock_register_${activeCrop}_${format(new Date(), "yyyy-MM-dd")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="p-3 md:p-6 max-w-4xl mx-auto space-y-3">
       <h1 className="text-base md:text-lg font-bold flex items-center gap-2">
@@ -343,6 +377,17 @@ export default function StockRegisterPage() {
               </div>
             </PopoverContent>
           </Popover>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0 shrink-0"
+            data-testid="button-export-csv"
+            onClick={exportCSV}
+            disabled={filtered.length === 0}
+            title="Download CSV"
+          >
+            <Download className="w-4 h-4" />
+          </Button>
         </div>
       </div>
 
