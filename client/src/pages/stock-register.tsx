@@ -39,6 +39,8 @@ export default function StockRegisterPage() {
   const [monthPopoverOpen, setMonthPopoverOpen] = useState(false);
   const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
 
+  const [saleFilter, setSaleFilter] = usePersistedState<"all" | "sold" | "unsold">("sr-saleFilter", "all");
+
   const [farmerSearch, setFarmerSearch] = useState("");
   const [selectedFarmer, setSelectedFarmer] = useState<Farmer | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -122,7 +124,7 @@ export default function StockRegisterPage() {
   const isDefaultFilters = yearFilter === currentYear &&
     selectedMonths.length === 1 && selectedMonths[0] === currentMonth &&
     selectedDays.length === 1 && selectedDays[0] === currentDay &&
-    !selectedFarmer;
+    !selectedFarmer && saleFilter === "all";
 
   const clearFilters = () => {
     setYearFilter(currentYear);
@@ -130,6 +132,7 @@ export default function StockRegisterPage() {
     setSelectedDays([currentDay]);
     setSelectedFarmer(null);
     setFarmerSearch("");
+    setSaleFilter("all");
   };
 
   const filtered = useMemo(() => {
@@ -158,8 +161,14 @@ export default function StockRegisterPage() {
       result = result.filter(l => l.farmerId === selectedFarmer.id);
     }
 
+    if (saleFilter === "sold") {
+      result = result.filter(l => !l.isReturned && l.remainingBags === 0);
+    } else if (saleFilter === "unsold") {
+      result = result.filter(l => !l.isReturned && l.remainingBags > 0);
+    }
+
     return result;
-  }, [allLots, yearFilter, selectedMonths, selectedDays, selectedFarmer]);
+  }, [allLots, yearFilter, selectedMonths, selectedDays, selectedFarmer, saleFilter]);
 
   const selectFarmer = (farmer: Farmer) => {
     setSelectedFarmer(farmer);
@@ -335,7 +344,7 @@ export default function StockRegisterPage() {
         </div>
       </div>
 
-      {/* Row 2: Farmer search left, Day filter right */}
+      {/* Row 2: Farmer search left, Sold/Unsold + Day filter right */}
       <div className="flex items-center gap-2">
         <div className="flex-1 min-w-0" ref={searchRef}>
           {selectedFarmer ? (
@@ -385,6 +394,21 @@ export default function StockRegisterPage() {
               )}
             </div>
           )}
+        </div>
+
+        <div className="flex gap-0.5 shrink-0 border rounded-md p-0.5">
+          {(["all", "sold", "unsold"] as const).map((val) => (
+            <Button
+              key={val}
+              variant={saleFilter === val ? "default" : "ghost"}
+              size="sm"
+              className="h-6 px-2 text-xs"
+              data-testid={`toggle-sale-${val}`}
+              onClick={() => setSaleFilter(val)}
+            >
+              {val === "all" ? t("stockRegister.all") : val === "sold" ? t("stockRegister.sold") : t("stockRegister.unsoldFilter")}
+            </Button>
+          ))}
         </div>
 
         <Popover open={dayPopoverOpen} onOpenChange={setDayPopoverOpen}>
