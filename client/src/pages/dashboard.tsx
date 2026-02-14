@@ -108,6 +108,18 @@ export default function DashboardPage() {
   }, [data, cropFilter, selectedYears, selectedMonths, selectedDays]);
 
   const uniqueFarmerIds = useMemo(() => new Set(filteredLots.map(l => l.farmerId)), [filteredLots]);
+  const uniqueBuyerIdsFromTxns = useMemo(() => new Set(filteredTxns.map(t => t.buyerId)), [filteredTxns]);
+  const uniqueFarmerIdsFromTxns = useMemo(() => new Set(filteredTxns.map(t => t.farmerId)), [filteredTxns]);
+
+  const filteredFarmersWithDues = useMemo(() => {
+    if (!data) return [];
+    return data.farmersWithDues.filter(f => uniqueFarmerIdsFromTxns.has(f.id));
+  }, [data, uniqueFarmerIdsFromTxns]);
+
+  const filteredBuyersWithDues = useMemo(() => {
+    if (!data) return [];
+    return data.buyersWithDues.filter(b => uniqueBuyerIdsFromTxns.has(b.id));
+  }, [data, uniqueBuyerIdsFromTxns]);
 
   const summary = useMemo(() => {
     const farmersCount = uniqueFarmerIds.size;
@@ -118,11 +130,11 @@ export default function DashboardPage() {
     const totalMandi = filteredTxns.reduce((s, t) => s + parseFloat(t.mandiCharges || "0"), 0);
     const totalAadhat = filteredTxns.reduce((s, t) => s + parseFloat(t.aadhatCharges || "0"), 0);
 
-    const farmerDue = data?.farmersWithDues.reduce((s, f) => s + parseFloat(f.totalDue || "0"), 0) || 0;
-    const buyerDue = data?.buyersWithDues.reduce((s, b) => s + parseFloat(b.overallDue || "0"), 0) || 0;
+    const farmerDue = filteredFarmersWithDues.reduce((s, f) => s + parseFloat(f.totalDue || "0"), 0);
+    const buyerDue = filteredBuyersWithDues.reduce((s, b) => s + parseFloat(b.overallDue || "0"), 0);
 
     return { farmersCount, lotsCount, txnCount, totalPayable, totalReceivable, totalMandi, totalAadhat, farmerDue, buyerDue };
-  }, [filteredTxns, filteredLots, uniqueFarmerIds, data]);
+  }, [filteredTxns, filteredLots, uniqueFarmerIds, filteredFarmersWithDues, filteredBuyersWithDues]);
 
   const cropDistribution = useMemo(() => {
     const map = new Map<string, number>();
@@ -139,40 +151,102 @@ export default function DashboardPage() {
   }, [filteredTxns]);
 
   const buyerDuesDistribution = useMemo(() => {
-    if (!data) return [];
-    const filtered = data.buyersWithDues.filter(b => parseFloat(b.overallDue) > 0);
+    const filtered = filteredBuyersWithDues.filter(b => parseFloat(b.overallDue) > 0);
     const total = filtered.reduce((s, b) => s + parseFloat(b.overallDue), 0);
     return filtered.map(b => ({
       name: b.name,
       value: Math.round(parseFloat(b.overallDue)),
       pct: total > 0 ? ((parseFloat(b.overallDue) / total) * 100).toFixed(1) : "0",
     })).sort((a, b) => b.value - a.value);
+  }, [filteredBuyersWithDues]);
+
+  const farmerDueMap = useMemo(() => {
+    const map = new Map<number, number>();
+    if (!data) return map;
+    data.farmersWithDues.forEach(f => {
+      map.set(f.id, parseFloat(f.totalDue || "0"));
+    });
+    return map;
+  }, [data]);
+
+  const buyerDueMap = useMemo(() => {
+    const map = new Map<number, number>();
+    if (!data) return map;
+    data.buyersWithDues.forEach(b => {
+      map.set(b.id, parseFloat(b.overallDue || "0"));
+    });
+    return map;
   }, [data]);
 
   const timeSeriesData = useMemo(() => {
-    const dateMap = new Map<string, { farmerDue: number; buyerDue: number; volume: number; aadhat: number; count: number }>();
+    const farmerPayableByDate = new Map<string, Map<number, number>>();
+    const buyerReceivableByDate = new Map<string, Map<number, number>>();
+    const dateAggregates = new Map<string, { volume: number; aadhat: number; count: number }>();
+
+    const farmerTotalPayable = new Map<number, number>();
+    const buyerTotalReceivable = new Map<number, number>();
 
     filteredTxns.forEach(t => {
       const date = t.date || "";
-      if (!dateMap.has(date)) dateMap.set(date, { farmerDue: 0, buyerDue: 0, volume: 0, aadhat: 0, count: 0 });
-      const entry = dateMap.get(date)!;
-      entry.farmerDue += parseFloat(t.totalPayableToFarmer || "0");
-      entry.buyerDue += parseFloat(t.totalReceivableFromBuyer || "0");
-      entry.volume += parseFloat(t.netWeight || "0");
-      entry.aadhat += parseFloat(t.aadhatCharges || "0");
-      entry.count += 1;
+      const payable = parseFloat(t.totalPayableToFarmer || "0");
+      const receivable = parseFloat(t.totalReceivableFromBuyer || "0");
+
+      if (!farmerPayableByDate.has(date)) farmerPayableByDate.set(date, new Map());
+      const fp = farmerPayableByDate.get(date)!;
+      fp.set(t.farmerId, (fp.get(t.farmerId) || 0) + payable);
+      farmerTotalPayable.set(t.farmerId, (farmerTotalPayable.get(t.farmerId) || 0) + payable);
+
+      if (!buyerReceivableByDate.has(date)) buyerReceivableByDate.set(date, new Map());
+      const br = buyerReceivableByDate.get(date)!;
+      br.set(t.buyerId, (br.get(t.buyerId) || 0) + receivable);
+      buyerTotalReceivable.set(t.buyerId, (buyerTotalReceivable.get(t.buyerId) || 0) + receivable);
+
+      if (!dateAggregates.has(date)) dateAggregates.set(date, { volume: 0, aadhat: 0, count: 0 });
+      const agg = dateAggregates.get(date)!;
+      agg.volume += parseFloat(t.netWeight || "0");
+      agg.aadhat += parseFloat(t.aadhatCharges || "0");
+      agg.count += 1;
     });
 
-    return Array.from(dateMap.entries())
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([date, vals]) => ({
+    const dateSet = new Set<string>();
+    farmerPayableByDate.forEach((_, k) => dateSet.add(k));
+    buyerReceivableByDate.forEach((_, k) => dateSet.add(k));
+    const allDates = Array.from(dateSet).sort();
+
+    return allDates.map(date => {
+      let farmerDueForDate = 0;
+      const fp = farmerPayableByDate.get(date);
+      if (fp) {
+        fp.forEach((datePayable, farmerId) => {
+          const totalPayable = farmerTotalPayable.get(farmerId) || 0;
+          const totalDue = farmerDueMap.get(farmerId) || 0;
+          const ratio = totalPayable > 0 ? Math.min(totalDue / totalPayable, 1) : 0;
+          farmerDueForDate += datePayable * ratio;
+        });
+      }
+
+      let buyerDueForDate = 0;
+      const br = buyerReceivableByDate.get(date);
+      if (br) {
+        br.forEach((dateReceivable, buyerId) => {
+          const totalReceivable = buyerTotalReceivable.get(buyerId) || 0;
+          const totalDue = buyerDueMap.get(buyerId) || 0;
+          const ratio = totalReceivable > 0 ? Math.min(totalDue / totalReceivable, 1) : 0;
+          buyerDueForDate += dateReceivable * ratio;
+        });
+      }
+
+      const agg = dateAggregates.get(date) || { volume: 0, aadhat: 0, count: 0 };
+
+      return {
         date: formatShortDate(date),
-        farmerDue: Math.round(vals.farmerDue),
-        buyerDue: Math.round(vals.buyerDue),
-        avgVolume: vals.count > 0 ? Math.round(vals.volume / vals.count) : 0,
-        aadhat: Math.round(vals.aadhat),
-      }));
-  }, [filteredTxns]);
+        farmerDue: Math.round(farmerDueForDate),
+        buyerDue: Math.round(buyerDueForDate),
+        avgVolume: agg.count > 0 ? Math.round(agg.volume / agg.count) : 0,
+        aadhat: Math.round(agg.aadhat),
+      };
+    });
+  }, [filteredTxns, farmerDueMap, buyerDueMap]);
 
   if (isLoading) {
     return (
@@ -218,24 +292,24 @@ export default function DashboardPage() {
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-40 p-2" align="end">
-            <button
-              className="flex items-center gap-2 px-2 py-1.5 rounded text-sm w-full text-left border-b mb-1"
+            <div
+              className="flex items-center gap-2 px-2 py-1.5 rounded text-sm w-full text-left border-b mb-1 cursor-pointer"
               data-testid="year-select-all"
               onClick={() => { setSelectedYears([]); setSelectedDays([]); setYearPopoverOpen(false); }}
             >
               <Checkbox checked={selectedYears.length === 0} />
               <span>All Years</span>
-            </button>
+            </div>
             {Array.from({ length: 5 }, (_, i) => String(now.getFullYear() - i)).map(y => (
-              <button
+              <div
                 key={y}
-                className={`flex items-center gap-2 px-2 py-1.5 rounded text-sm w-full text-left ${selectedYears.includes(y) ? "bg-primary text-primary-foreground" : ""}`}
+                className={`flex items-center gap-2 px-2 py-1.5 rounded text-sm w-full text-left cursor-pointer ${selectedYears.includes(y) ? "bg-primary text-primary-foreground" : ""}`}
                 data-testid={`year-option-${y}`}
                 onClick={() => toggleYear(y)}
               >
                 <Checkbox checked={selectedYears.includes(y)} />
                 <span>{y}</span>
-              </button>
+              </div>
             ))}
           </PopoverContent>
         </Popover>
@@ -248,14 +322,14 @@ export default function DashboardPage() {
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-56 p-2" align="end">
-            <button
-              className="flex items-center gap-2 px-2 py-1.5 rounded text-sm w-full text-left border-b mb-1"
+            <div
+              className="flex items-center gap-2 px-2 py-1.5 rounded text-sm w-full text-left border-b mb-1 cursor-pointer"
               data-testid="dash-month-select-all"
               onClick={() => { setSelectedMonths([]); setSelectedDays([]); setMonthPopoverOpen(false); }}
             >
               <Checkbox checked={selectedMonths.length === 0} />
               <span>{t("stockRegister.allMonths")}</span>
-            </button>
+            </div>
             <div className="grid grid-cols-4 gap-0.5">
               {MONTH_LABELS.map((m, i) => {
                 const val = String(i + 1);
@@ -283,14 +357,14 @@ export default function DashboardPage() {
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-56 p-2" align="end">
-            <button
-              className="flex items-center gap-2 px-2 py-1.5 rounded text-sm w-full text-left border-b mb-1"
+            <div
+              className="flex items-center gap-2 px-2 py-1.5 rounded text-sm w-full text-left border-b mb-1 cursor-pointer"
               data-testid="dash-day-select-all"
               onClick={() => { setSelectedDays([]); setDayPopoverOpen(false); }}
             >
               <Checkbox checked={selectedDays.length === 0} />
               <span>{t("stockRegister.allDays")}</span>
-            </button>
+            </div>
             <div className="grid grid-cols-7 gap-0.5">
               {Array.from({ length: daysInMonths }, (_, i) => String(i + 1)).map(d => (
                 <button
@@ -393,14 +467,18 @@ export default function DashboardPage() {
                     nameKey="name"
                     cx="50%"
                     cy="50%"
-                    outerRadius={80}
-                    label={({ name, pct }) => `${name} (${pct}%)`}
+                    outerRadius={65}
+                    label={({ name, pct, cx: pieCx, x, y }) => {
+                      const displayName = name.length > 8 ? name.slice(0, 8) + ".." : name;
+                      const anchor = x > pieCx ? "start" : "end";
+                      return <text x={x} y={y} textAnchor={anchor} dominantBaseline="central" fontSize={10} fill="#374151">{displayName} ({pct}%)</text>;
+                    }}
                   >
                     {cropDistribution.map((_, i) => (
                       <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: number) => `₹${value.toLocaleString("en-IN")}`} />
+                  <Tooltip contentStyle={{ fontSize: 11, padding: "4px 8px" }} formatter={(value: number) => `₹${value.toLocaleString("en-IN")}`} />
                 </PieChart>
               </ResponsiveContainer>
             )}
@@ -424,14 +502,18 @@ export default function DashboardPage() {
                     nameKey="name"
                     cx="50%"
                     cy="50%"
-                    outerRadius={80}
-                    label={({ name, pct }) => `${name} (${pct}%)`}
+                    outerRadius={65}
+                    label={({ name, pct, cx: pieCx, x, y }) => {
+                      const displayName = name.length > 12 ? name.slice(0, 12) + ".." : name;
+                      const anchor = x > pieCx ? "start" : "end";
+                      return <text x={x} y={y} textAnchor={anchor} dominantBaseline="central" fontSize={10} fill="#374151">{displayName} ({pct}%)</text>;
+                    }}
                   >
                     {buyerDuesDistribution.map((_, i) => (
                       <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(value: number) => `₹${value.toLocaleString("en-IN")}`} />
+                  <Tooltip contentStyle={{ fontSize: 11, padding: "4px 8px" }} formatter={(value: number) => `₹${value.toLocaleString("en-IN")}`} />
                 </PieChart>
               </ResponsiveContainer>
             )}
@@ -442,7 +524,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardContent className="p-3">
-            <h3 className="text-sm font-semibold mb-2">Farmer Payable by Date</h3>
+            <h3 className="text-sm font-semibold mb-2">Farmer Payable Due by Date</h3>
             {timeSeriesData.length === 0 ? (
               <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">No data</div>
             ) : (
@@ -451,8 +533,8 @@ export default function DashboardPage() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                   <YAxis tick={{ fontSize: 10 }} tickFormatter={formatINR} />
-                  <Tooltip formatter={(value: number) => `₹${value.toLocaleString("en-IN")}`} />
-                  <Line type="monotone" dataKey="farmerDue" stroke="#f97316" strokeWidth={2} dot={{ r: 3 }} name="Farmer Payable" />
+                  <Tooltip contentStyle={{ fontSize: 11, padding: "4px 8px" }} formatter={(value: number) => `₹${value.toLocaleString("en-IN")}`} />
+                  <Line type="monotone" dataKey="farmerDue" stroke="#f97316" strokeWidth={2} dot={{ r: 3 }} name="Farmer Due" />
                 </LineChart>
               </ResponsiveContainer>
             )}
@@ -461,7 +543,7 @@ export default function DashboardPage() {
 
         <Card>
           <CardContent className="p-3">
-            <h3 className="text-sm font-semibold mb-2">Buyer Receivable by Date</h3>
+            <h3 className="text-sm font-semibold mb-2">Buyer Receivable Due by Date</h3>
             {timeSeriesData.length === 0 ? (
               <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">No data</div>
             ) : (
@@ -470,8 +552,8 @@ export default function DashboardPage() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                   <YAxis tick={{ fontSize: 10 }} tickFormatter={formatINR} />
-                  <Tooltip formatter={(value: number) => `₹${value.toLocaleString("en-IN")}`} />
-                  <Line type="monotone" dataKey="buyerDue" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} name="Buyer Receivable" />
+                  <Tooltip contentStyle={{ fontSize: 11, padding: "4px 8px" }} formatter={(value: number) => `₹${value.toLocaleString("en-IN")}`} />
+                  <Line type="monotone" dataKey="buyerDue" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} name="Buyer Due" />
                 </LineChart>
               </ResponsiveContainer>
             )}
@@ -489,7 +571,7 @@ export default function DashboardPage() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                   <YAxis tick={{ fontSize: 10 }} />
-                  <Tooltip formatter={(value: number) => `${value.toLocaleString("en-IN")} Kg`} />
+                  <Tooltip contentStyle={{ fontSize: 11, padding: "4px 8px" }} formatter={(value: number) => `${value.toLocaleString("en-IN")} Kg`} />
                   <Line type="monotone" dataKey="avgVolume" stroke="#2563eb" strokeWidth={2} dot={{ r: 3 }} name="Avg Volume (Kg)" />
                 </LineChart>
               </ResponsiveContainer>
@@ -508,7 +590,7 @@ export default function DashboardPage() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                   <YAxis tick={{ fontSize: 10 }} tickFormatter={formatINR} />
-                  <Tooltip formatter={(value: number) => `₹${value.toLocaleString("en-IN")}`} />
+                  <Tooltip contentStyle={{ fontSize: 11, padding: "4px 8px" }} formatter={(value: number) => `₹${value.toLocaleString("en-IN")}`} />
                   <Line type="monotone" dataKey="aadhat" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 3 }} name="Aadhat Value" />
                 </LineChart>
               </ResponsiveContainer>
