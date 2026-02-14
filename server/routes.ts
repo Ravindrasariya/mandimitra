@@ -598,7 +598,7 @@ export async function registerRoutes(
   app.get("/api/cash-entries", requireAuth, async (req, res) => {
     const filters = {
       category: req.query.category as string | undefined,
-      partyType: req.query.partyType as string | undefined,
+      outflowType: req.query.outflowType as string | undefined,
       farmerId: req.query.farmerId ? parseInt(req.query.farmerId as string) : undefined,
       buyerId: req.query.buyerId ? parseInt(req.query.buyerId as string) : undefined,
       month: req.query.month as string | undefined,
@@ -622,6 +622,15 @@ export async function registerRoutes(
     try {
       const result = await storage.reverseCashEntry(paramId(req.params.id), req.user!.businessId);
       if (!result) return res.status(404).json({ message: "Entry not found" });
+      res.json(result);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  app.get("/api/transaction-aggregates", requireAuth, async (req, res) => {
+    try {
+      const result = await storage.getTransactionAggregates(req.user!.businessId);
       res.json(result);
     } catch (e: any) {
       res.status(400).json({ message: e.message });

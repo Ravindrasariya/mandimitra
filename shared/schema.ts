@@ -158,7 +158,7 @@ export const cashEntries = pgTable("cash_entries", {
   businessId: integer("business_id").notNull().references(() => businesses.id),
   category: text("category").notNull().default("inward"),
   type: text("type").notNull(),
-  partyType: text("party_type"),
+  outflowType: text("outflow_type"),
   farmerId: integer("farmer_id").references(() => farmers.id),
   buyerId: integer("buyer_id").references(() => buyers.id),
   transactionId: integer("transaction_id").references(() => transactions.id),

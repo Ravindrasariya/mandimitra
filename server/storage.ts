@@ -75,7 +75,7 @@ export interface IStorage {
   getCashSettings(businessId: number): Promise<CashSettings | undefined>;
   upsertCashSettings(businessId: number, cashInHandOpening: string): Promise<CashSettings>;
 
-  getCashEntries(businessId: number, filters?: { category?: string; partyType?: string; farmerId?: number; buyerId?: number; month?: string; year?: string }): Promise<CashEntry[]>;
+  getCashEntries(businessId: number, filters?: { category?: string; outflowType?: string; farmerId?: number; buyerId?: number; month?: string; year?: string }): Promise<CashEntry[]>;
   createCashEntry(entry: InsertCashEntry): Promise<CashEntry>;
   reverseCashEntry(id: number, businessId: number): Promise<CashEntry | undefined>;
 
@@ -601,10 +601,10 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async getCashEntries(businessId: number, filters?: { category?: string; partyType?: string; farmerId?: number; buyerId?: number; month?: string; year?: string }): Promise<CashEntry[]> {
+  async getCashEntries(businessId: number, filters?: { category?: string; outflowType?: string; farmerId?: number; buyerId?: number; month?: string; year?: string }): Promise<CashEntry[]> {
     let conditions = [eq(cashEntries.businessId, businessId)];
     if (filters?.category) conditions.push(eq(cashEntries.category, filters.category));
-    if (filters?.partyType) conditions.push(eq(cashEntries.partyType, filters.partyType));
+    if (filters?.outflowType) conditions.push(eq(cashEntries.outflowType, filters.outflowType));
     if (filters?.farmerId) conditions.push(eq(cashEntries.farmerId, filters.farmerId));
     if (filters?.buyerId) conditions.push(eq(cashEntries.buyerId, filters.buyerId));
     if (filters?.year) {
@@ -628,19 +628,18 @@ export class DatabaseStorage implements IStorage {
     const txDate = entry.date ? new Date(entry.date + "T00:00:00") : new Date();
     const dateStr = `${txDate.getFullYear()}${String(txDate.getMonth() + 1).padStart(2, "0")}${String(txDate.getDate()).padStart(2, "0")}`;
     const prefix = `CF${dateStr}`;
+    const prefixLen = prefix.length + 1;
 
-    const [result] = await db.select({ max: sql<string>`coalesce(max(
-      case when ${cashEntries.cashFlowId} ~ ${`^${prefix}\\d+$`}
-        then cast(substring(${cashEntries.cashFlowId} from ${prefix.length + 1}) as integer)
-        else 0 end
-    ), 0)` })
+    const [result] = await db.select({
+      max: sql<number>`coalesce(max(cast(substr(${cashEntries.cashFlowId}, ${prefixLen}) as integer)), 0)`
+    })
       .from(cashEntries)
       .where(and(
         eq(cashEntries.businessId, entry.businessId),
         sql`${cashEntries.cashFlowId} like ${prefix + "%"}`
       ));
 
-    const seq = parseInt(result?.max || "0", 10) + 1;
+    const seq = (result?.max || 0) + 1;
     const cashFlowId = `${prefix}${seq}`;
 
     const [created] = await db.insert(cashEntries).values({ ...entry, cashFlowId }).returning();
@@ -648,11 +647,68 @@ export class DatabaseStorage implements IStorage {
   }
 
   async reverseCashEntry(id: number, businessId: number): Promise<CashEntry | undefined> {
+    const [existing] = await db.select().from(cashEntries).where(and(eq(cashEntries.id, id), eq(cashEntries.businessId, businessId)));
+    if (!existing) return undefined;
+    if (existing.isReversed) throw new Error("Entry is already reversed");
     const [updated] = await db.update(cashEntries)
       .set({ isReversed: true, reversedAt: new Date() })
       .where(and(eq(cashEntries.id, id), eq(cashEntries.businessId, businessId)))
       .returning();
     return updated;
+  }
+
+  async getTransactionAggregates(businessId: number): Promise<{
+    totalHammali: number;
+    totalGrading: number;
+    totalMandiCommission: number;
+    paidHammali: number;
+    paidGrading: number;
+    paidMandiCommission: number;
+  }> {
+    const [txAgg] = await db.select({
+      totalHammali: sql<number>`coalesce(sum(cast(${transactions.hammaliCharges} as numeric)), 0)`,
+      totalGrading: sql<number>`coalesce(sum(cast(${transactions.gradingCharges} as numeric)), 0)`,
+      totalMandiCommission: sql<number>`coalesce(sum(cast(${transactions.mandiCharges} as numeric)), 0)`,
+    }).from(transactions).where(and(
+      eq(transactions.businessId, businessId),
+      eq(transactions.isReversed, false)
+    ));
+
+    const paidHammaliResult = await db.select({
+      total: sql<number>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`
+    }).from(cashEntries).where(and(
+      eq(cashEntries.businessId, businessId),
+      eq(cashEntries.outflowType, "Hammali"),
+      eq(cashEntries.category, "outward"),
+      eq(cashEntries.isReversed, false)
+    ));
+
+    const paidGradingResult = await db.select({
+      total: sql<number>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`
+    }).from(cashEntries).where(and(
+      eq(cashEntries.businessId, businessId),
+      eq(cashEntries.outflowType, "Grading"),
+      eq(cashEntries.category, "outward"),
+      eq(cashEntries.isReversed, false)
+    ));
+
+    const paidMandiResult = await db.select({
+      total: sql<number>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`
+    }).from(cashEntries).where(and(
+      eq(cashEntries.businessId, businessId),
+      eq(cashEntries.outflowType, "Mandi Commission"),
+      eq(cashEntries.category, "outward"),
+      eq(cashEntries.isReversed, false)
+    ));
+
+    return {
+      totalHammali: Number(txAgg.totalHammali) || 0,
+      totalGrading: Number(txAgg.totalGrading) || 0,
+      totalMandiCommission: Number(txAgg.totalMandiCommission) || 0,
+      paidHammali: Number(paidHammaliResult[0]?.total) || 0,
+      paidGrading: Number(paidGradingResult[0]?.total) || 0,
+      paidMandiCommission: Number(paidMandiResult[0]?.total) || 0,
+    };
   }
 
   async getFarmerLedger(businessId: number, farmerId: number, dateFrom?: string, dateTo?: string) {
