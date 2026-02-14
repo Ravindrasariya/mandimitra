@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import type { Farmer, Buyer, CashEntry, BankAccount } from "@shared/schema";
-import { Wallet, Settings, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Download, RotateCcw, Trash2, Plus, Filter, X } from "lucide-react";
+import { Wallet, Settings, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Download, RotateCcw, Trash2, Plus, Filter, X, Search, ChevronsUpDown } from "lucide-react";
 import { format } from "date-fns";
 
 type BuyerWithDues = Buyer & { receivableDue: string; overallDue: string };
@@ -74,6 +74,11 @@ export default function CashPage() {
   const [transferDate, setTransferDate] = useState(format(now, "yyyy-MM-dd"));
   const [transferNotes, setTransferNotes] = useState("");
 
+  const [filterFarmerSearch, setFilterFarmerSearch] = useState("");
+  const [filterFarmerOpen, setFilterFarmerOpen] = useState(false);
+  const [outwardFarmerSearch, setOutwardFarmerSearch] = useState("");
+  const [outwardFarmerOpen, setOutwardFarmerOpen] = useState(false);
+
   const [cashInHandOpening, setCashInHandOpening] = useState("");
   const [newBankName, setNewBankName] = useState("");
   const [newBankType, setNewBankType] = useState("Current");
@@ -130,11 +135,7 @@ export default function CashPage() {
       result = result.filter(e => e.paymentMode === filterPaymentMode);
     }
     if (filterOutflowType !== "all") {
-      if (filterOutflowType === "none") {
-        result = result.filter(e => e.category === "inward" || e.category === "transfer");
-      } else {
-        result = result.filter(e => e.outflowType === filterOutflowType);
-      }
+      result = result.filter(e => e.outflowType === filterOutflowType);
     }
     if (filterBuyer !== "all") {
       result = result.filter(e => e.buyerId === parseInt(filterBuyer));
@@ -145,13 +146,27 @@ export default function CashPage() {
     return result;
   }, [allEntries, filterPaymentMode, filterOutflowType, filterBuyer, filterFarmer]);
 
+  const filteredTotals = useMemo(() => {
+    let totalInflow = 0, totalOutflow = 0;
+    filteredEntries.filter(e => !e.isReversed).forEach(e => {
+      const amt = parseFloat(e.amount || "0");
+      if (e.category === "inward") totalInflow += amt;
+      else if (e.category === "outward") totalOutflow += amt;
+      else if (e.category === "transfer") {
+        if (e.type === "account_to_cash") totalInflow += amt;
+        else if (e.type === "cash_to_account") totalOutflow += amt;
+      }
+    });
+    return { totalInflow, totalOutflow };
+  }, [filteredEntries]);
+
   const summaryData = useMemo(() => {
     const opening = parseFloat(cashSettingsData?.cashInHandOpening || "0");
     let cashReceived = 0, cashExpense = 0;
     const acctReceived: Record<number, number> = {};
     const acctExpense: Record<number, number> = {};
 
-    filteredEntries.filter(e => !e.isReversed).forEach(e => {
+    allEntries.filter(e => !e.isReversed).forEach(e => {
       const amt = parseFloat(e.amount || "0");
       if (e.category === "inward") {
         if (e.paymentMode === "Cash") cashReceived += amt;
@@ -191,7 +206,7 @@ export default function CashPage() {
       totalAccountReceived, totalAccountExpense, totalAccountBalance,
       accountBreakdowns,
     };
-  }, [filteredEntries, cashSettingsData, bankAccountsList]);
+  }, [allEntries, cashSettingsData, bankAccountsList]);
 
   const invalidateCashQueries = () => {
     queryClient.invalidateQueries({ predicate: (query) => {
@@ -381,6 +396,16 @@ export default function CashPage() {
     return name.substring(0, maxLen - 2) + "..";
   };
 
+  const filterFarmerResults = (search: string) => {
+    if (!search || search.length < 1) return [];
+    const s = search.toLowerCase();
+    return farmers.filter(f => !f.isArchived && (
+      f.name.toLowerCase().includes(s) ||
+      f.phone?.toLowerCase().includes(s) ||
+      f.village?.toLowerCase().includes(s)
+    )).sort((a, b) => a.name.localeCompare(b.name)).slice(0, 20);
+  };
+
   const getEntryLabel = (e: CashEntry) => {
     if (e.category === "transfer") return "Transfer";
     if (e.outflowType === "Buyer" && e.buyerId) return getBuyerName(e.buyerId);
@@ -527,19 +552,45 @@ export default function CashPage() {
           </select>
           <select value={filterOutflowType} onChange={(e) => setFilterOutflowType(e.target.value)} className="h-8 w-[150px] text-xs rounded-md border border-input bg-background px-2" data-testid="filter-outflow-type">
             <option value="all">Outflow: All</option>
-            <option value="none">None (Inflow/Transfer)</option>
             {OUTFLOW_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
           </select>
           <select value={filterBuyer} onChange={(e) => setFilterBuyer(e.target.value)} className="h-8 w-[150px] text-xs rounded-md border border-input bg-background px-2" data-testid="filter-buyer">
             <option value="all">Buyer: All</option>
             {buyers.map(b => <option key={b.id} value={b.id.toString()}>{b.name}</option>)}
           </select>
-          <select value={filterFarmer} onChange={(e) => setFilterFarmer(e.target.value)} className="h-8 w-[200px] text-xs rounded-md border border-input bg-background px-2" data-testid="filter-farmer">
-            <option value="all">Farmer: All</option>
-            {farmers.filter(f => !f.isArchived).sort((a, b) => a.name.localeCompare(b.name)).map(f => (
-              <option key={f.id} value={f.id.toString()}>{f.name} • {f.phone} • {f.village}</option>
-            ))}
-          </select>
+          <div className="relative" data-testid="filter-farmer-wrapper">
+            {filterFarmer !== "all" ? (
+              <div className="h-8 w-[200px] text-xs rounded-md border border-input bg-background px-2 flex items-center gap-1">
+                <span className="truncate flex-1">{farmers.find(f => f.id === parseInt(filterFarmer))?.name || "Farmer"}</span>
+                <button onClick={() => { setFilterFarmer("all"); setFilterFarmerSearch(""); }} className="shrink-0" data-testid="button-clear-filter-farmer"><X className="w-3 h-3" /></button>
+              </div>
+            ) : (
+              <>
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+                <input
+                  value={filterFarmerSearch}
+                  onChange={(e) => { setFilterFarmerSearch(e.target.value); setFilterFarmerOpen(true); }}
+                  onFocus={() => setFilterFarmerOpen(true)}
+                  onBlur={() => setTimeout(() => setFilterFarmerOpen(false), 200)}
+                  placeholder="Farmer: Search..."
+                  className="h-8 w-[200px] text-xs rounded-md border border-input bg-background pl-7 pr-2"
+                  data-testid="filter-farmer"
+                />
+                {filterFarmerOpen && filterFarmerResults(filterFarmerSearch).length > 0 && (
+                  <div className="absolute z-50 w-[280px] mt-1 bg-popover border rounded-md shadow-lg max-h-[200px] overflow-y-auto">
+                    {filterFarmerResults(filterFarmerSearch).map(f => (
+                      <button key={f.id} className="flex items-center gap-1.5 px-3 py-2 text-xs w-full text-left hover:bg-accent" data-testid={`filter-farmer-opt-${f.id}`}
+                        onMouseDown={(e) => { e.preventDefault(); setFilterFarmer(f.id.toString()); setFilterFarmerSearch(""); setFilterFarmerOpen(false); }}>
+                        <span className="font-medium">{f.name}</span>
+                        <span className="text-muted-foreground">{f.phone}</span>
+                        {f.village && <span className="text-muted-foreground">({f.village})</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
           <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="h-8 w-[90px] text-xs rounded-md border border-input bg-background px-2" data-testid="filter-month">
             <option value="all">All</option>
             {MONTHS.map((m, i) => <option key={i} value={String(i + 1)}>{m}</option>)}
@@ -556,6 +607,19 @@ export default function CashPage() {
             </Button>
           )}
         </div>
+        {hasActiveFilters && (
+          <div className="flex items-center gap-3 mt-2 pt-2 border-t border-border/50 text-xs">
+            {filteredTotals.totalInflow > 0 && (
+              <span className="font-semibold text-green-600">Total Inflow: ₹{filteredTotals.totalInflow.toLocaleString("en-IN")}</span>
+            )}
+            {filteredTotals.totalOutflow > 0 && (
+              <span className="font-semibold text-red-600">Total Outflow: ₹{filteredTotals.totalOutflow.toLocaleString("en-IN")}</span>
+            )}
+            {filteredTotals.totalInflow === 0 && filteredTotals.totalOutflow === 0 && (
+              <span className="text-muted-foreground">No matching entries</span>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -711,16 +775,45 @@ export default function CashPage() {
               {(outwardOutflowType === "Farmer-Advance" || outwardOutflowType === "Farmer-Harvest Sale") && (
                 <div className="space-y-1">
                   <Label className="text-xs">{t("cash.farmerWithDues")}</Label>
-                  <Select value={outwardFarmerId} onValueChange={setOutwardFarmerId}>
-                    <SelectTrigger className="h-9 text-sm" data-testid="outward-farmer"><SelectValue placeholder={t("cash.selectFarmer")} /></SelectTrigger>
-                    <SelectContent>
-                      {farmersWithDues.filter(f => !f.isArchived).sort((a, b) => a.name.localeCompare(b.name)).map(f => (
-                        <SelectItem key={f.id} value={f.id.toString()}>
-                          {f.name} - Due: ₹{f.totalDue.toLocaleString("en-IN")}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="relative">
+                    {outwardFarmerId ? (
+                      <div className="h-9 text-sm rounded-md border border-input bg-background px-3 flex items-center gap-2">
+                        <span className="truncate flex-1">
+                          {(() => { const f = farmersWithDues.find(f => f.id === parseInt(outwardFarmerId)); return f ? `${f.name} - Due: ₹${f.totalDue.toLocaleString("en-IN")}` : ""; })()}
+                        </span>
+                        <button onClick={() => { setOutwardFarmerId(""); setOutwardFarmerSearch(""); }} className="shrink-0" data-testid="button-clear-outward-farmer"><X className="w-3.5 h-3.5" /></button>
+                      </div>
+                    ) : (
+                      <>
+                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                        <Input
+                          value={outwardFarmerSearch}
+                          onChange={(e) => { setOutwardFarmerSearch(e.target.value); setOutwardFarmerOpen(true); }}
+                          onFocus={() => setOutwardFarmerOpen(true)}
+                          onBlur={() => setTimeout(() => setOutwardFarmerOpen(false), 200)}
+                          placeholder={t("cash.selectFarmer")}
+                          className="h-9 text-sm pl-8"
+                          data-testid="outward-farmer"
+                        />
+                        {outwardFarmerOpen && (
+                          <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-[200px] overflow-y-auto">
+                            {(outwardFarmerSearch ? filterFarmerResults(outwardFarmerSearch).map(f => ({ ...f, totalDue: farmersWithDues.find(fw => fw.id === f.id)?.totalDue || 0 })) : farmersWithDues.filter(f => !f.isArchived).sort((a, b) => a.name.localeCompare(b.name)).slice(0, 20)).map(f => (
+                              <button key={f.id} className="flex items-center gap-1.5 px-3 py-2 text-sm w-full text-left hover:bg-accent" data-testid={`outward-farmer-opt-${f.id}`}
+                                onMouseDown={(e) => { e.preventDefault(); setOutwardFarmerId(f.id.toString()); setOutwardFarmerSearch(""); setOutwardFarmerOpen(false); }}>
+                                <span className="font-medium">{f.name}</span>
+                                <span className="text-muted-foreground text-xs">{f.phone}</span>
+                                {f.village && <span className="text-muted-foreground text-xs">({f.village})</span>}
+                                <span className="ml-auto text-xs text-orange-600">Due: ₹{(f as any).totalDue?.toLocaleString("en-IN") || "0"}</span>
+                              </button>
+                            ))}
+                            {outwardFarmerSearch && filterFarmerResults(outwardFarmerSearch).length === 0 && (
+                              <div className="px-3 py-2 text-xs text-muted-foreground">No farmers found</div>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </div>
               )}
               {outwardOutflowType === "Hammali" && dueHammali > 0 && (
