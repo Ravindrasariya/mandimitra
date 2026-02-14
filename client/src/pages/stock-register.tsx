@@ -396,20 +396,16 @@ export default function StockRegisterPage() {
           )}
         </div>
 
-        <div className="flex gap-0.5 shrink-0 border rounded-md p-0.5">
-          {(["all", "sold", "unsold"] as const).map((val) => (
-            <Button
-              key={val}
-              variant={saleFilter === val ? "default" : "ghost"}
-              size="sm"
-              className="h-6 px-2 text-xs"
-              data-testid={`toggle-sale-${val}`}
-              onClick={() => setSaleFilter(val)}
-            >
-              {val === "all" ? t("stockRegister.all") : val === "sold" ? t("stockRegister.sold") : t("stockRegister.unsoldFilter")}
-            </Button>
-          ))}
-        </div>
+        <Select value={saleFilter} onValueChange={(v) => setSaleFilter(v as "all" | "sold" | "unsold")}>
+          <SelectTrigger className="w-[75px] h-8 text-xs shrink-0" data-testid="select-sale-filter">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t("stockRegister.all")}</SelectItem>
+            <SelectItem value="sold">{t("stockRegister.sold")}</SelectItem>
+            <SelectItem value="unsold">{t("stockRegister.unsoldFilter")}</SelectItem>
+          </SelectContent>
+        </Select>
 
         <Popover open={dayPopoverOpen} onOpenChange={setDayPopoverOpen}>
           <PopoverTrigger asChild>
