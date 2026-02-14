@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -14,10 +14,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import type { Buyer, BuyerEditHistory } from "@shared/schema";
-import { ShoppingBag, Search, Plus, Pencil, Users } from "lucide-react";
+import { ShoppingBag, Search, Plus, Pencil, Users, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { format } from "date-fns";
 
 type BuyerWithDues = Buyer & { receivableDue: string; overallDue: string };
+type SortField = "buyerId" | "overallDue" | "receivableDue";
+type SortDir = "asc" | "desc";
 
 function formatIndianCurrency(value: string | number): string {
   const num = typeof value === "string" ? parseFloat(value) : value;
@@ -32,6 +34,8 @@ export default function BuyerLedgerPage() {
   const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = usePersistedState("bl-searchTerm", "");
   const [statusFilter, setStatusFilter] = usePersistedState("bl-statusFilter", "all");
+  const [sortField, setSortField] = usePersistedState<SortField>("bl-sortField", "overallDue");
+  const [sortDir, setSortDir] = usePersistedState<SortDir>("bl-sortDir", "desc");
   const [editingBuyer, setEditingBuyer] = useState<BuyerWithDues | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
 
@@ -130,6 +134,36 @@ export default function BuyerLedgerPage() {
           ? buyers.filter(b => b.negativeFlag)
           : buyers;
 
+  const sortedBuyers = useMemo(() => {
+    const sorted = [...filteredBuyers];
+    sorted.sort((a, b) => {
+      let cmp = 0;
+      if (sortField === "buyerId") {
+        cmp = a.buyerId.localeCompare(b.buyerId);
+      } else if (sortField === "overallDue") {
+        cmp = parseFloat(a.overallDue) - parseFloat(b.overallDue);
+      } else if (sortField === "receivableDue") {
+        cmp = parseFloat(a.receivableDue) - parseFloat(b.receivableDue);
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return sorted;
+  }, [filteredBuyers, sortField, sortDir]);
+
+  const toggleSort = (field: SortField) => {
+    if (sortField === field) {
+      setSortDir(prev => prev === "asc" ? "desc" : "asc");
+    } else {
+      setSortField(field);
+      setSortDir(field === "buyerId" ? "asc" : "desc");
+    }
+  };
+
+  const SortIcon = ({ field }: { field: SortField }) => {
+    if (sortField !== field) return <ArrowUpDown className="w-3 h-3 ml-1 opacity-40" />;
+    return sortDir === "asc" ? <ArrowUp className="w-3 h-3 ml-1" /> : <ArrowDown className="w-3 h-3 ml-1" />;
+  };
+
   const openEdit = (buyer: BuyerWithDues) => {
     setEditingBuyer(buyer);
     setEditName(buyer.name);
@@ -222,7 +256,7 @@ export default function BuyerLedgerPage() {
         <CardContent className="p-0">
           {isLoading ? (
             <div className="text-center py-8 text-muted-foreground">{t("app.loading")}</div>
-          ) : filteredBuyers.length === 0 ? (
+          ) : sortedBuyers.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">{t("buyerLedger.noBuyers")}</div>
           ) : (
             <>
@@ -231,19 +265,37 @@ export default function BuyerLedgerPage() {
                   <thead>
                     <tr className="border-b bg-muted/50">
                       <th className="text-left p-3 font-medium"></th>
-                      <th className="text-left p-3 font-medium">{t("buyerLedger.buyerId")}</th>
+                      <th
+                        className="text-left p-3 font-medium cursor-pointer select-none"
+                        onClick={() => toggleSort("buyerId")}
+                        data-testid="sort-buyer-id"
+                      >
+                        <span className="inline-flex items-center">{t("buyerLedger.buyerId")} <SortIcon field="buyerId" /></span>
+                      </th>
                       <th className="text-left p-3 font-medium">{t("common.name")}</th>
                       <th className="text-left p-3 font-medium">{t("common.address")}</th>
                       <th className="text-left p-3 font-medium">{t("buyerLedger.mandiCode")}</th>
                       <th className="text-left p-3 font-medium">{t("common.contact")}</th>
                       <th className="text-center p-3 font-medium">{t("buyerLedger.negative")}</th>
                       <th className="text-center p-3 font-medium">{t("common.active")}</th>
-                      <th className="text-right p-3 font-medium">{t("buyerLedger.overallDue")}</th>
-                      <th className="text-right p-3 font-medium">{t("buyerLedger.receivables")}</th>
+                      <th
+                        className="text-right p-3 font-medium cursor-pointer select-none"
+                        onClick={() => toggleSort("overallDue")}
+                        data-testid="sort-overall-due"
+                      >
+                        <span className="inline-flex items-center justify-end">{t("buyerLedger.overallDue")} <SortIcon field="overallDue" /></span>
+                      </th>
+                      <th
+                        className="text-right p-3 font-medium cursor-pointer select-none"
+                        onClick={() => toggleSort("receivableDue")}
+                        data-testid="sort-receivables"
+                      >
+                        <span className="inline-flex items-center justify-end">{t("buyerLedger.receivables")} <SortIcon field="receivableDue" /></span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredBuyers.map((buyer) => (
+                    {sortedBuyers.map((buyer) => (
                       <tr key={buyer.id} data-testid={`row-buyer-${buyer.id}`} className="border-b hover:bg-muted/30 transition-colors">
                         <td className="p-3">
                           <button
@@ -286,7 +338,7 @@ export default function BuyerLedgerPage() {
               </div>
 
               <div className="md:hidden space-y-3 p-3">
-                {filteredBuyers.map((buyer) => (
+                {sortedBuyers.map((buyer) => (
                   <Card key={buyer.id} data-testid={`card-buyer-${buyer.id}`}>
                     <CardContent className="pt-3 pb-3">
                       <div className="flex items-start justify-between gap-2">
