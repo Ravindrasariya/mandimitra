@@ -242,7 +242,7 @@ export default function DashboardPage() {
         date: formatShortDate(date),
         farmerDue: Math.round(farmerDueForDate),
         buyerDue: Math.round(buyerDueForDate),
-        avgVolume: agg.count > 0 ? Math.round(agg.volume / agg.count) : 0,
+        totalVolume: Math.round(agg.volume),
         aadhat: Math.round(agg.aadhat),
       };
     });
@@ -468,10 +468,14 @@ export default function DashboardPage() {
                     cx="50%"
                     cy="50%"
                     outerRadius={65}
-                    label={({ name, pct, cx: pieCx, x, y }) => {
-                      const displayName = name.length > 8 ? name.slice(0, 8) + ".." : name;
+                    label={({ name, pct, value, cx: pieCx, x, y }) => {
                       const anchor = x > pieCx ? "start" : "end";
-                      return <text x={x} y={y} textAnchor={anchor} dominantBaseline="central" fontSize={10} fill="#374151">{displayName} ({pct}%)</text>;
+                      return (
+                        <text x={x} y={y} textAnchor={anchor} fontSize={10} fill="#374151">
+                          <tspan x={x} dy="-0.4em">{name}</tspan>
+                          <tspan x={x} dy="1.2em">₹{Number(value).toLocaleString("en-IN")} ({pct}%)</tspan>
+                        </text>
+                      );
                     }}
                   >
                     {cropDistribution.map((_, i) => (
@@ -503,10 +507,14 @@ export default function DashboardPage() {
                     cx="50%"
                     cy="50%"
                     outerRadius={65}
-                    label={({ name, pct, cx: pieCx, x, y }) => {
-                      const displayName = name.length > 12 ? name.slice(0, 12) + ".." : name;
+                    label={({ name, pct, value, cx: pieCx, x, y }) => {
                       const anchor = x > pieCx ? "start" : "end";
-                      return <text x={x} y={y} textAnchor={anchor} dominantBaseline="central" fontSize={10} fill="#374151">{displayName} ({pct}%)</text>;
+                      return (
+                        <text x={x} y={y} textAnchor={anchor} fontSize={10} fill="#374151">
+                          <tspan x={x} dy="-0.4em">{name}</tspan>
+                          <tspan x={x} dy="1.2em">₹{Number(value).toLocaleString("en-IN")} ({pct}%)</tspan>
+                        </text>
+                      );
                     }}
                   >
                     {buyerDuesDistribution.map((_, i) => (
@@ -562,7 +570,7 @@ export default function DashboardPage() {
 
         <Card>
           <CardContent className="p-3">
-            <h3 className="text-sm font-semibold mb-2">Average Volume (Kg) by Date</h3>
+            <h3 className="text-sm font-semibold mb-2">Total Volume (Kg) by Date</h3>
             {timeSeriesData.length === 0 ? (
               <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">No data</div>
             ) : (
@@ -572,7 +580,7 @@ export default function DashboardPage() {
                   <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                   <YAxis tick={{ fontSize: 10 }} />
                   <Tooltip contentStyle={{ fontSize: 11, padding: "4px 8px" }} formatter={(value: number) => `${value.toLocaleString("en-IN")} Kg`} />
-                  <Line type="monotone" dataKey="avgVolume" stroke="#2563eb" strokeWidth={2} dot={{ r: 3 }} name="Avg Volume (Kg)" />
+                  <Line type="monotone" dataKey="totalVolume" stroke="#2563eb" strokeWidth={2} dot={{ r: 3 }} name="Total Volume (Kg)" />
                 </LineChart>
               </ResponsiveContainer>
             )}
