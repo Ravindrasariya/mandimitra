@@ -188,7 +188,7 @@ h2{text-align:center;margin-bottom:5px}
 </style></head><body>
 <div class="header">
 <h2>Buyer Receipt</h2>
-<p style="font-size:0.9em;color:#666">${businessName || "Mandi Mitra"}</p>
+${businessName ? `<p style="font-size:0.9em;color:#666">${businessName}</p>` : ""}
 </div>
 <table class="detail-table">
 <tr><td><strong>Lot No:</strong> ${lot.lotId}</td><td><strong>Date:</strong> ${dateStr}</td></tr>
