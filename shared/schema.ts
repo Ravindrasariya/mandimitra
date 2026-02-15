@@ -128,6 +128,7 @@ export const transactions = pgTable("transactions", {
   numberOfBags: integer("number_of_bags"),
   hammaliCharges: decimal("hammali_charges", { precision: 10, scale: 2 }).default("0"),
   gradingCharges: decimal("grading_charges", { precision: 10, scale: 2 }).default("0"),
+  freightCharges: decimal("freight_charges", { precision: 10, scale: 2 }).default("0"),
   netWeight: decimal("net_weight", { precision: 12, scale: 2 }),
   pricePerKg: decimal("price_per_kg", { precision: 10, scale: 2 }),
   aadhatCharges: decimal("aadhat_charges", { precision: 10, scale: 2 }).default("0"),

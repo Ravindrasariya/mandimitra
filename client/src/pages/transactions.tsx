@@ -80,10 +80,13 @@ function generateFarmerReceiptHtml(lot: Lot, farmer: Farmer, txns: TransactionWi
     return s + gross * parseFloat(t.mandiFarmerPercent || "0") / 100;
   }, 0);
 
+  const totalFreightFarmer = txns.reduce((s, t) => s + parseFloat(t.freightCharges || "0"), 0);
+
   const hammaliDisplay = totalHammaliFarmer;
   const gradingDisplay = totalGradingFarmer;
   const aadhatDisplay = totalAadhatFarmer;
   const mandiDisplay = totalMandiFarmer;
+  const freightDisplay = totalFreightFarmer;
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>किसान रसीद</title>
 <style>body{font-family:'Noto Sans Devanagari',sans-serif;margin:20px;color:#333}
@@ -110,6 +113,7 @@ ${hammaliDisplay > 0 ? `<div class="summary-row"><span>हम्माली (${
 ${gradingDisplay > 0 ? `<div class="summary-row"><span>ग्रेडिंग:</span><span>₹${gradingDisplay.toFixed(2)}</span></div>` : ""}
 ${aadhatDisplay > 0 ? `<div class="summary-row"><span>आढ़त:</span><span>₹${aadhatDisplay.toFixed(2)}</span></div>` : ""}
 ${mandiDisplay > 0 ? `<div class="summary-row"><span>मण्डी शुल्क:</span><span>₹${mandiDisplay.toFixed(2)}</span></div>` : ""}
+${freightDisplay > 0 ? `<div class="summary-row"><span>भाड़ा / Freight:</span><span>₹${freightDisplay.toFixed(2)}</span></div>` : ""}
 <div class="summary-row total"><span>किसान को देय राशि:</span><span>₹${totalPayable.toFixed(2)}</span></div>
 </div>
 <script>window.onload=function(){window.print()}</script>
@@ -491,6 +495,11 @@ export default function TransactionsPage() {
   const mandiFarmerPct = parseFloat(cs.mandiCommissionFarmerPercent) || 0;
   const mandiBuyerPct = parseFloat(cs.mandiCommissionBuyerPercent) || 0;
 
+  const vehicleBhadaRate = parseFloat(selectedBid?.lot.vehicleBhadaRate || "0");
+  const originalBags = selectedBid?.lot.numberOfBags || 1;
+  const actualBags = selectedBid?.lot.actualNumberOfBags ?? originalBags;
+  const freightFarmerTotal = actualBags > 0 ? ((bags * originalBags) / actualBags) * vehicleBhadaRate : 0;
+
   const hammaliFarmerTotal = hammaliFarmerRate * bags;
   const hammaliBuyerTotal = hammaliBuyerRate * bags;
   const gradingFarmerTotal = gradingFarmerRate * bags;
@@ -500,7 +509,7 @@ export default function TransactionsPage() {
   const mandiFarmer = (grossAmount * mandiFarmerPct) / 100;
   const mandiBuyer = (grossAmount * mandiBuyerPct) / 100;
 
-  const farmerDeductions = hammaliFarmerTotal + gradingFarmerTotal + aadhatFarmer + mandiFarmer;
+  const farmerDeductions = hammaliFarmerTotal + gradingFarmerTotal + aadhatFarmer + mandiFarmer + freightFarmerTotal;
   const buyerAdditions = hammaliBuyerTotal + gradingBuyerTotal + aadhatBuyer + mandiBuyer;
 
   const farmerPayable = grossAmount - farmerDeductions;
@@ -521,6 +530,7 @@ export default function TransactionsPage() {
       numberOfBags: bags,
       hammaliCharges: hammaliFarmerTotal.toString(),
       gradingCharges: gradingFarmerTotal.toString(),
+      freightCharges: freightFarmerTotal.toFixed(2),
       netWeight,
       pricePerKg: selectedBid.pricePerKg,
       aadhatCharges: aadhatBuyer.toFixed(2),
@@ -571,6 +581,7 @@ export default function TransactionsPage() {
       "Total Weight", "Net Weight",
       "Hammali Farmer/Bag", "Hammali Buyer/Bag", "Grading Farmer/Bag", "Grading Buyer/Bag",
       "Aadhat Farmer %", "Aadhat Buyer %", "Mandi Farmer %", "Mandi Buyer %",
+      "Freight Charges",
       "Payable to Farmer", "Receivable from Buyer", "Status"
     ];
 
@@ -591,6 +602,7 @@ export default function TransactionsPage() {
         tx.gradingFarmerPerBag || "0", tx.gradingBuyerPerBag || "0",
         tx.aadhatFarmerPercent || "0", tx.aadhatBuyerPercent || "0",
         tx.mandiFarmerPercent || "0", tx.mandiBuyerPercent || "0",
+        tx.freightCharges || "0",
         tx.totalPayableToFarmer, tx.totalReceivableFromBuyer, tx.isReversed ? "Reversed" : "Active"
       ].map(escCSV).join(",");
     });
@@ -971,6 +983,9 @@ export default function TransactionsPage() {
                     </div>
                     <span className={!applyFarmerGrading ? "text-muted-foreground/50 line-through" : ""}>₹{parseFloat(cs.gradingFarmerPerBag) || 0}/bag</span>
                   </div>
+                  {vehicleBhadaRate > 0 && (
+                    <div className="flex justify-between"><span>Freight/Bhada:</span><span>₹{vehicleBhadaRate}/bag</span></div>
+                  )}
                 </div>
                 <div className="bg-muted/50 rounded p-2 space-y-1">
                   <p className="font-semibold text-muted-foreground">Buyer Charges</p>
@@ -1017,6 +1032,12 @@ export default function TransactionsPage() {
                     <div className="flex justify-between text-muted-foreground">
                       <span>Mandi ({mandiFarmerPct}%):</span>
                       <span>-Rs.{mandiFarmer.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {freightFarmerTotal > 0 && (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Freight ({originalBags !== actualBags ? `${bags}×${originalBags}/${actualBags}` : bags} × ₹{vehicleBhadaRate}):</span>
+                      <span>-Rs.{freightFarmerTotal.toFixed(2)}</span>
                     </div>
                   )}
                   {farmerDeductions === 0 && (
