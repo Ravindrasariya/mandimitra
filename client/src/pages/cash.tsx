@@ -769,8 +769,8 @@ export default function CashPage() {
                   <div className="relative">
                     {outwardFarmerId ? (
                       <div className="h-9 text-sm rounded-md border border-input bg-background px-3 flex items-center gap-2">
-                        <span className="truncate flex-1">
-                          {(() => { const f = farmersWithDues.find(f => f.id === parseInt(outwardFarmerId)); return f ? `${f.name} - Due: ₹${parseFloat(f.totalDue).toLocaleString("en-IN")}` : ""; })()}
+                        <span className="truncate flex-1" data-testid="text-outward-farmer-selected">
+                          {(() => { const f = farmersWithDues.find(f => f.id === parseInt(outwardFarmerId)); return f ? (parseFloat(f.totalDue) > 0 ? `${f.name} - Due: ₹${parseFloat(f.totalDue).toLocaleString("en-IN")}` : f.name) : ""; })()}
                         </span>
                         <button onClick={() => { setOutwardFarmerId(""); setOutwardFarmerSearch(""); }} className="shrink-0" data-testid="button-clear-outward-farmer"><X className="w-3.5 h-3.5" /></button>
                       </div>
@@ -789,23 +789,26 @@ export default function CashPage() {
                         {outwardFarmerOpen && (
                           <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-[200px] overflow-y-auto">
                             {(() => {
-                              const withDuesOnly = farmersWithDues.filter(f => !f.isArchived && parseFloat(f.totalDue) > 0).sort((a, b) => a.name.localeCompare(b.name));
+                              const isAdvance = outwardOutflowType === "Farmer-Advance";
+                              const farmerList = isAdvance
+                                ? farmersWithDues.filter(f => !f.isArchived).sort((a, b) => a.name.localeCompare(b.name))
+                                : farmersWithDues.filter(f => !f.isArchived && parseFloat(f.totalDue) > 0).sort((a, b) => a.name.localeCompare(b.name));
                               const list = outwardFarmerSearch
-                                ? withDuesOnly.filter(f => {
+                                ? farmerList.filter(f => {
                                     const q = outwardFarmerSearch.toLowerCase();
                                     return f.name.toLowerCase().includes(q) || f.phone.includes(q) || (f.village || "").toLowerCase().includes(q);
                                   }).slice(0, 20)
-                                : withDuesOnly.slice(0, 20);
+                                : farmerList.slice(0, 20);
                               return list.length > 0 ? list.map(f => (
                                 <button key={f.id} className="flex items-center gap-1.5 px-3 py-2 text-sm w-full text-left hover:bg-accent" data-testid={`outward-farmer-opt-${f.id}`}
                                   onMouseDown={(e) => { e.preventDefault(); setOutwardFarmerId(f.id.toString()); setOutwardFarmerSearch(""); setOutwardFarmerOpen(false); }}>
                                   <span className="font-medium">{f.name}</span>
                                   <span className="text-muted-foreground text-xs">{f.phone}</span>
                                   {f.village && <span className="text-muted-foreground text-xs">({f.village})</span>}
-                                  <span className="ml-auto text-xs text-orange-600">Due: ₹{parseFloat(f.totalDue).toLocaleString("en-IN")}</span>
+                                  {parseFloat(f.totalDue) > 0 && <span className="ml-auto text-xs text-orange-600">Due: ₹{parseFloat(f.totalDue).toLocaleString("en-IN")}</span>}
                                 </button>
                               )) : (
-                                <div className="px-3 py-2 text-xs text-muted-foreground">{outwardFarmerSearch ? "No farmers found" : "No farmers with dues"}</div>
+                                <div className="px-3 py-2 text-xs text-muted-foreground" data-testid="status-outward-farmer-empty">{outwardFarmerSearch ? "No farmers found" : isAdvance ? "No farmers found" : "No farmers with dues"}</div>
                               );
                             })()}
                           </div>
