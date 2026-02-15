@@ -83,10 +83,10 @@ export default function DashboardPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/charge-settings"] });
       setSettingsOpen(false);
-      toast({ title: "Settings Saved", description: "Charge settings updated successfully" });
+      toast({ title: t("dash.settingsSaved"), description: t("dash.settingsSavedDesc") });
     },
     onError: (err: any) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: t("dash.error"), description: err.message, variant: "destructive" });
     },
   });
 
@@ -129,10 +129,10 @@ export default function DashboardPage() {
   };
 
   const yearLabel = selectedYears.length === 0
-    ? "All Years"
+    ? t("dash.allYears")
     : selectedYears.length === 1
       ? selectedYears[0]
-      : `${selectedYears.length} Years`;
+      : `${selectedYears.length} ${t("dash.nYears")}`;
 
   const monthLabel = selectedMonths.length === 0
     ? t("stockRegister.allMonths")
