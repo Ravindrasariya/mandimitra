@@ -913,32 +913,35 @@ export default function TransactionsPage() {
 
                   <div className="border-t pt-2 space-y-1">
                     {group.completedTxns.map((tx) => (
-                      <div key={tx.id} className={`flex items-center justify-between text-sm py-1 ${tx.isReversed ? "opacity-40" : ""}`}>
-                        <div className="flex items-center gap-2">
-                          <span className="text-muted-foreground">{t("transactions.buyer")}:</span>
-                          <strong>{tx.buyer.name}</strong>
-                          {tx.isReversed && <Badge variant="outline" className="text-xs border-orange-400 text-orange-600 bg-orange-50">{t("transactions.reversed")}</Badge>}
-                        </div>
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                          <Badge className="text-xs">Rs.{tx.pricePerKg}/kg</Badge>
-                          <span>{tx.numberOfBags} bags</span>
-                          <span>{tx.lot.size || ""}</span>
-                          <span>Net: {tx.netWeight}kg</span>
-                          <span className="text-chart-2 font-medium">Rs.{tx.totalReceivableFromBuyer}</span>
-                          
+                      <div key={tx.id} className={`text-sm py-1 ${tx.isReversed ? "opacity-40" : ""}`}>
+                        <div className="flex items-center justify-between flex-wrap gap-x-2 gap-y-0.5">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-muted-foreground">{t("transactions.buyer")}:</span>
+                            <strong className="truncate">{tx.buyer.name}</strong>
+                            <span className="text-green-600 font-semibold whitespace-nowrap">₹{tx.pricePerKg}/kg</span>
+                            {tx.isReversed && <Badge variant="outline" className="text-xs border-orange-400 text-orange-600 bg-orange-50">{t("transactions.reversed")}</Badge>}
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>{tx.numberOfBags} bags</span>
+                            <span>{tx.lot.size || ""}</span>
+                            <span>Net: {tx.netWeight}kg</span>
+                            <span className="text-chart-2 font-medium text-sm">Rs.{tx.totalReceivableFromBuyer}</span>
+                          </div>
                         </div>
                       </div>
                     ))}
                     {group.pendingBids.map((bid) => (
-                      <div key={bid.id} className="flex items-center justify-between text-sm py-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-muted-foreground">{t("transactions.buyer")}:</span>
-                          <strong>{bid.buyer.name}</strong>
-                        </div>
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                          <Badge className="text-xs">Rs.{bid.pricePerKg}/kg</Badge>
-                          <span>{bid.numberOfBags} bags</span>
-                          <span>{bid.grade || "N/A"}</span>
+                      <div key={bid.id} className="text-sm py-1">
+                        <div className="flex items-center justify-between flex-wrap gap-x-2 gap-y-0.5">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="text-muted-foreground">{t("transactions.buyer")}:</span>
+                            <strong className="truncate">{bid.buyer.name}</strong>
+                            <span className="text-green-600 font-semibold whitespace-nowrap">₹{bid.pricePerKg}/kg</span>
+                          </div>
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                            <span>{bid.numberOfBags} bags</span>
+                            <span>{bid.grade || "N/A"}</span>
+                          </div>
                         </div>
                       </div>
                     ))}
