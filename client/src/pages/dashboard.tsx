@@ -1,13 +1,19 @@
 import { useState, useMemo } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/lib/language";
 import { Card, CardContent } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, ChevronDown, Calendar, Users, Package, Landmark, HandCoins, ShoppingBag, TrendingUp } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { LayoutDashboard, ChevronDown, Calendar, Users, Package, Landmark, HandCoins, ShoppingBag, TrendingUp, Settings } from "lucide-react";
+import type { BusinessChargeSettings } from "@shared/schema";
 import {
   PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
   LineChart, Line, XAxis, YAxis, CartesianGrid,
@@ -23,8 +29,20 @@ type DashboardData = {
 
 const PIE_COLORS = ["#2563eb", "#f59e0b", "#10b981", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"];
 
+type ChargeSettingsData = {
+  mandiCommissionFarmerPercent: string;
+  mandiCommissionBuyerPercent: string;
+  aadhatCommissionFarmerPercent: string;
+  aadhatCommissionBuyerPercent: string;
+  hammaliFarmerPerBag: string;
+  hammaliBuyerPerBag: string;
+  gradingFarmerPerBag: string;
+  gradingBuyerPerBag: string;
+};
+
 export default function DashboardPage() {
   const { t } = useLanguage();
+  const { toast } = useToast();
   const now = new Date();
   const currentYear = String(now.getFullYear());
   const currentMonth = String(now.getMonth() + 1);
@@ -37,10 +55,56 @@ export default function DashboardPage() {
   const [monthPopoverOpen, setMonthPopoverOpen] = useState(false);
   const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
   const [yearPopoverOpen, setYearPopoverOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [chargeForm, setChargeForm] = useState<ChargeSettingsData>({
+    mandiCommissionFarmerPercent: "0",
+    mandiCommissionBuyerPercent: "1",
+    aadhatCommissionFarmerPercent: "0",
+    aadhatCommissionBuyerPercent: "2",
+    hammaliFarmerPerBag: "0",
+    hammaliBuyerPerBag: "0",
+    gradingFarmerPerBag: "0",
+    gradingBuyerPerBag: "0",
+  });
 
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ["/api/dashboard"],
   });
+
+  const { data: chargeSettings } = useQuery<ChargeSettingsData>({
+    queryKey: ["/api/charge-settings"],
+  });
+
+  const saveChargeSettingsMutation = useMutation({
+    mutationFn: async (formData: ChargeSettingsData) => {
+      const res = await apiRequest("PUT", "/api/charge-settings", formData);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/charge-settings"] });
+      setSettingsOpen(false);
+      toast({ title: "Settings Saved", description: "Charge settings updated successfully" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const openSettings = () => {
+    if (chargeSettings) {
+      setChargeForm({
+        mandiCommissionFarmerPercent: chargeSettings.mandiCommissionFarmerPercent || "0",
+        mandiCommissionBuyerPercent: chargeSettings.mandiCommissionBuyerPercent || "1",
+        aadhatCommissionFarmerPercent: chargeSettings.aadhatCommissionFarmerPercent || "0",
+        aadhatCommissionBuyerPercent: chargeSettings.aadhatCommissionBuyerPercent || "2",
+        hammaliFarmerPerBag: chargeSettings.hammaliFarmerPerBag || "0",
+        hammaliBuyerPerBag: chargeSettings.hammaliBuyerPerBag || "0",
+        gradingFarmerPerBag: chargeSettings.gradingFarmerPerBag || "0",
+        gradingBuyerPerBag: chargeSettings.gradingBuyerPerBag || "0",
+      });
+    }
+    setSettingsOpen(true);
+  };
 
   const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -269,6 +333,16 @@ export default function DashboardPage() {
         <h1 className="text-base md:text-lg font-bold" data-testid="text-business-name">
           {data?.businessName || "Dashboard"}
         </h1>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-7 w-7 p-0 ml-1"
+          data-testid="button-charge-settings"
+          onClick={openSettings}
+          title="Charge Settings"
+        >
+          <Settings className="w-4 h-4 text-muted-foreground" />
+        </Button>
       </div>
 
       <div className="flex flex-wrap items-center gap-2" data-testid="dashboard-filters">
@@ -606,6 +680,147 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={settingsOpen} onOpenChange={setSettingsOpen}>
+        <DialogContent className="max-w-sm max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Settings className="w-4 h-4" />
+              Charge Settings
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold">Mandi Commission (%)</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Farmer</Label>
+                  <Input
+                    data-testid="input-mandi-farmer"
+                    type="text"
+                    inputMode="decimal"
+                    value={chargeForm.mandiCommissionFarmerPercent}
+                    onChange={(e) => setChargeForm(f => ({ ...f, mandiCommissionFarmerPercent: e.target.value }))}
+                    onFocus={(e) => e.target.select()}
+                    className="mobile-touch-target"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Buyer</Label>
+                  <Input
+                    data-testid="input-mandi-buyer"
+                    type="text"
+                    inputMode="decimal"
+                    value={chargeForm.mandiCommissionBuyerPercent}
+                    onChange={(e) => setChargeForm(f => ({ ...f, mandiCommissionBuyerPercent: e.target.value }))}
+                    onFocus={(e) => e.target.select()}
+                    className="mobile-touch-target"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold">Aadhat Commission (%)</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Farmer</Label>
+                  <Input
+                    data-testid="input-aadhat-farmer"
+                    type="text"
+                    inputMode="decimal"
+                    value={chargeForm.aadhatCommissionFarmerPercent}
+                    onChange={(e) => setChargeForm(f => ({ ...f, aadhatCommissionFarmerPercent: e.target.value }))}
+                    onFocus={(e) => e.target.select()}
+                    className="mobile-touch-target"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Buyer</Label>
+                  <Input
+                    data-testid="input-aadhat-buyer"
+                    type="text"
+                    inputMode="decimal"
+                    value={chargeForm.aadhatCommissionBuyerPercent}
+                    onChange={(e) => setChargeForm(f => ({ ...f, aadhatCommissionBuyerPercent: e.target.value }))}
+                    onFocus={(e) => e.target.select()}
+                    className="mobile-touch-target"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold">Hammali (₹/bag)</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Farmer</Label>
+                  <Input
+                    data-testid="input-hammali-farmer"
+                    type="text"
+                    inputMode="decimal"
+                    value={chargeForm.hammaliFarmerPerBag}
+                    onChange={(e) => setChargeForm(f => ({ ...f, hammaliFarmerPerBag: e.target.value }))}
+                    onFocus={(e) => e.target.select()}
+                    className="mobile-touch-target"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Buyer</Label>
+                  <Input
+                    data-testid="input-hammali-buyer"
+                    type="text"
+                    inputMode="decimal"
+                    value={chargeForm.hammaliBuyerPerBag}
+                    onChange={(e) => setChargeForm(f => ({ ...f, hammaliBuyerPerBag: e.target.value }))}
+                    onFocus={(e) => e.target.select()}
+                    className="mobile-touch-target"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold">Grading (₹/bag)</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Farmer</Label>
+                  <Input
+                    data-testid="input-grading-farmer"
+                    type="text"
+                    inputMode="decimal"
+                    value={chargeForm.gradingFarmerPerBag}
+                    onChange={(e) => setChargeForm(f => ({ ...f, gradingFarmerPerBag: e.target.value }))}
+                    onFocus={(e) => e.target.select()}
+                    className="mobile-touch-target"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">Buyer</Label>
+                  <Input
+                    data-testid="input-grading-buyer"
+                    type="text"
+                    inputMode="decimal"
+                    value={chargeForm.gradingBuyerPerBag}
+                    onChange={(e) => setChargeForm(f => ({ ...f, gradingBuyerPerBag: e.target.value }))}
+                    onFocus={(e) => e.target.select()}
+                    className="mobile-touch-target"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <Button
+              data-testid="button-save-charge-settings"
+              className="w-full mobile-touch-target"
+              onClick={() => saveChargeSettingsMutation.mutate(chargeForm)}
+              disabled={saveChargeSettingsMutation.isPending}
+            >
+              {saveChargeSettingsMutation.isPending ? "Saving..." : "Save Settings"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

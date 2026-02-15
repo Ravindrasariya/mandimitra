@@ -11,7 +11,8 @@ import {
   type BankAccount, type InsertBankAccount,
   type CashSettings, type InsertCashSettings,
   type CashEntry, type InsertCashEntry,
-  users, businesses, farmers, farmerEditHistory, buyers, buyerEditHistory, lots, bids, transactions, bankAccounts, cashSettings, cashEntries,
+  type BusinessChargeSettings, type InsertBusinessChargeSettings,
+  users, businesses, farmers, farmerEditHistory, buyers, buyerEditHistory, lots, bids, transactions, bankAccounts, cashSettings, cashEntries, businessChargeSettings,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, ilike, or, sql, desc, asc, gte, lte, ne } from "drizzle-orm";
@@ -71,6 +72,9 @@ export interface IStorage {
   createBankAccount(account: InsertBankAccount): Promise<BankAccount>;
   updateBankAccount(id: number, businessId: number, data: Partial<InsertBankAccount>): Promise<BankAccount | undefined>;
   deleteBankAccount(id: number, businessId: number): Promise<void>;
+
+  getBusinessChargeSettings(businessId: number): Promise<BusinessChargeSettings | undefined>;
+  upsertBusinessChargeSettings(businessId: number, data: Partial<InsertBusinessChargeSettings>): Promise<BusinessChargeSettings>;
 
   getCashSettings(businessId: number): Promise<CashSettings | undefined>;
   upsertCashSettings(businessId: number, cashInHandOpening: string): Promise<CashSettings>;
@@ -584,6 +588,21 @@ export class DatabaseStorage implements IStorage {
 
   async deleteBankAccount(id: number, businessId: number): Promise<void> {
     await db.delete(bankAccounts).where(and(eq(bankAccounts.id, id), eq(bankAccounts.businessId, businessId)));
+  }
+
+  async getBusinessChargeSettings(businessId: number): Promise<BusinessChargeSettings | undefined> {
+    const [settings] = await db.select().from(businessChargeSettings).where(eq(businessChargeSettings.businessId, businessId));
+    return settings;
+  }
+
+  async upsertBusinessChargeSettings(businessId: number, data: Partial<InsertBusinessChargeSettings>): Promise<BusinessChargeSettings> {
+    const existing = await this.getBusinessChargeSettings(businessId);
+    if (existing) {
+      const [updated] = await db.update(businessChargeSettings).set(data).where(eq(businessChargeSettings.businessId, businessId)).returning();
+      return updated;
+    }
+    const [created] = await db.insert(businessChargeSettings).values({ businessId, ...data }).returning();
+    return created;
   }
 
   async getCashSettings(businessId: number): Promise<CashSettings | undefined> {

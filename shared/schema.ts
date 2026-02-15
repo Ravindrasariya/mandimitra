@@ -135,6 +135,14 @@ export const transactions = pgTable("transactions", {
   aadhatCharges: decimal("aadhat_charges", { precision: 10, scale: 2 }).default("0"),
   mandiCharges: decimal("mandi_charges", { precision: 10, scale: 2 }).default("0"),
   chargedTo: text("charged_to").default("Buyer"),
+  aadhatFarmerPercent: decimal("aadhat_farmer_percent", { precision: 5, scale: 2 }).default("0"),
+  mandiFarmerPercent: decimal("mandi_farmer_percent", { precision: 5, scale: 2 }).default("0"),
+  aadhatBuyerPercent: decimal("aadhat_buyer_percent", { precision: 5, scale: 2 }).default("0"),
+  mandiBuyerPercent: decimal("mandi_buyer_percent", { precision: 5, scale: 2 }).default("0"),
+  hammaliFarmerPerBag: decimal("hammali_farmer_per_bag", { precision: 10, scale: 2 }).default("0"),
+  hammaliBuyerPerBag: decimal("hammali_buyer_per_bag", { precision: 10, scale: 2 }).default("0"),
+  gradingFarmerPerBag: decimal("grading_farmer_per_bag", { precision: 10, scale: 2 }).default("0"),
+  gradingBuyerPerBag: decimal("grading_buyer_per_bag", { precision: 10, scale: 2 }).default("0"),
   totalPayableToFarmer: decimal("total_payable_to_farmer", { precision: 12, scale: 2 }).default("0"),
   totalReceivableFromBuyer: decimal("total_receivable_from_buyer", { precision: 12, scale: 2 }).default("0"),
   date: date("date"),
@@ -143,6 +151,20 @@ export const transactions = pgTable("transactions", {
 }, (table) => ({
   uniqueTransactionPerBusiness: uniqueIndex("transactions_business_transaction_id_unique").on(table.businessId, table.transactionId),
 }));
+
+export const businessChargeSettings = pgTable("business_charge_settings", {
+  id: serial("id").primaryKey(),
+  businessId: integer("business_id").notNull().references(() => businesses.id).unique(),
+  mandiCommissionFarmerPercent: decimal("mandi_commission_farmer_percent", { precision: 5, scale: 2 }).default("0"),
+  mandiCommissionBuyerPercent: decimal("mandi_commission_buyer_percent", { precision: 5, scale: 2 }).default("1"),
+  aadhatCommissionFarmerPercent: decimal("aadhat_commission_farmer_percent", { precision: 5, scale: 2 }).default("0"),
+  aadhatCommissionBuyerPercent: decimal("aadhat_commission_buyer_percent", { precision: 5, scale: 2 }).default("2"),
+  hammaliFarmerPerBag: decimal("hammali_farmer_per_bag", { precision: 10, scale: 2 }).default("0"),
+  hammaliBuyerPerBag: decimal("hammali_buyer_per_bag", { precision: 10, scale: 2 }).default("0"),
+  gradingFarmerPerBag: decimal("grading_farmer_per_bag", { precision: 10, scale: 2 }).default("0"),
+  gradingBuyerPerBag: decimal("grading_buyer_per_bag", { precision: 10, scale: 2 }).default("0"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
 
 export const bankAccounts = pgTable("bank_accounts", {
   id: serial("id").primaryKey(),
@@ -195,6 +217,7 @@ export const insertLotSchema = createInsertSchema(lots).omit({ id: true, created
 export const insertBidSchema = createInsertSchema(bids).omit({ id: true, createdAt: true });
 export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true, transactionId: true, createdAt: true });
 export const insertBankAccountSchema = createInsertSchema(bankAccounts).omit({ id: true, createdAt: true });
+export const insertBusinessChargeSettingsSchema = createInsertSchema(businessChargeSettings).omit({ id: true, createdAt: true });
 export const insertCashSettingsSchema = createInsertSchema(cashSettings).omit({ id: true, createdAt: true });
 export const insertCashEntrySchema = createInsertSchema(cashEntries).omit({ id: true, cashFlowId: true, createdAt: true });
 
@@ -218,6 +241,8 @@ export type Transaction = typeof transactions.$inferSelect;
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 export type BankAccount = typeof bankAccounts.$inferSelect;
 export type InsertBankAccount = z.infer<typeof insertBankAccountSchema>;
+export type BusinessChargeSettings = typeof businessChargeSettings.$inferSelect;
+export type InsertBusinessChargeSettings = z.infer<typeof insertBusinessChargeSettingsSchema>;
 export type CashSettings = typeof cashSettings.$inferSelect;
 export type InsertCashSettings = z.infer<typeof insertCashSettingsSchema>;
 export type CashEntry = typeof cashEntries.$inferSelect;

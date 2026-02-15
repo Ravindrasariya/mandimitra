@@ -581,6 +581,38 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/charge-settings", requireAuth, async (req, res) => {
+    const result = await storage.getBusinessChargeSettings(req.user!.businessId);
+    res.json(result || {
+      mandiCommissionFarmerPercent: "0",
+      mandiCommissionBuyerPercent: "1",
+      aadhatCommissionFarmerPercent: "0",
+      aadhatCommissionBuyerPercent: "2",
+      hammaliFarmerPerBag: "0",
+      hammaliBuyerPerBag: "0",
+      gradingFarmerPerBag: "0",
+      gradingBuyerPerBag: "0",
+    });
+  });
+
+  app.put("/api/charge-settings", requireAuth, async (req, res) => {
+    try {
+      const result = await storage.upsertBusinessChargeSettings(req.user!.businessId, {
+        mandiCommissionFarmerPercent: req.body.mandiCommissionFarmerPercent,
+        mandiCommissionBuyerPercent: req.body.mandiCommissionBuyerPercent,
+        aadhatCommissionFarmerPercent: req.body.aadhatCommissionFarmerPercent,
+        aadhatCommissionBuyerPercent: req.body.aadhatCommissionBuyerPercent,
+        hammaliFarmerPerBag: req.body.hammaliFarmerPerBag,
+        hammaliBuyerPerBag: req.body.hammaliBuyerPerBag,
+        gradingFarmerPerBag: req.body.gradingFarmerPerBag,
+        gradingBuyerPerBag: req.body.gradingBuyerPerBag,
+      });
+      res.json(result);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
   app.get("/api/cash-settings", requireAuth, async (req, res) => {
     const result = await storage.getCashSettings(req.user!.businessId);
     res.json(result || { cashInHandOpening: "0" });

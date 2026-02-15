@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import type { Bid, Buyer, Lot, Farmer, Transaction } from "@shared/schema";
+import type { Bid, Buyer, Lot, Farmer, Transaction, BusinessChargeSettings } from "@shared/schema";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -63,16 +63,40 @@ function buildUnifiedLotGroups(
 
 function generateFarmerReceiptHtml(lot: Lot, farmer: Farmer, txns: TransactionWithDetails[], businessName?: string) {
   const totalBags = txns.reduce((s, t) => s + (t.numberOfBags || 0), 0);
-  const totalHammali = txns.reduce((s, t) => s + parseFloat(t.hammaliCharges || "0"), 0);
-  const totalGrading = txns.reduce((s, t) => s + parseFloat(t.gradingCharges || "0"), 0);
-  const sellerChargedTxns = txns.filter(t => t.chargedTo === "Seller");
-  const totalAadhat = sellerChargedTxns.reduce((s, t) => s + parseFloat(t.aadhatCharges || "0"), 0);
-  const totalMandi = sellerChargedTxns.reduce((s, t) => s + parseFloat(t.mandiCharges || "0"), 0);
   const totalPayable = txns.reduce((s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0);
   const totalGross = txns.reduce((s, t) => s + (parseFloat(t.netWeight || "0") * parseFloat(t.pricePerKg || "0")), 0);
   const dateStr = txns[0]?.date || format(new Date(), "yyyy-MM-dd");
-
   const totalNetWeight = txns.reduce((s, t) => s + parseFloat(t.netWeight || "0"), 0);
+
+  const totalHammaliFarmer = txns.reduce((s, t) => s + parseFloat(t.hammaliFarmerPerBag || "0") * (t.numberOfBags || 0), 0);
+  const totalGradingFarmer = txns.reduce((s, t) => s + parseFloat(t.gradingFarmerPerBag || "0") * (t.numberOfBags || 0), 0);
+  const totalAadhatFarmer = txns.reduce((s, t) => {
+    const gross = parseFloat(t.netWeight || "0") * parseFloat(t.pricePerKg || "0");
+    return s + gross * parseFloat(t.aadhatFarmerPercent || "0") / 100;
+  }, 0);
+  const totalMandiFarmer = txns.reduce((s, t) => {
+    const gross = parseFloat(t.netWeight || "0") * parseFloat(t.pricePerKg || "0");
+    return s + gross * parseFloat(t.mandiFarmerPercent || "0") / 100;
+  }, 0);
+
+  const isNewFormat = (t: TransactionWithDetails) =>
+    parseFloat(t.aadhatFarmerPercent || "0") > 0 || parseFloat(t.mandiFarmerPercent || "0") > 0 ||
+    parseFloat(t.aadhatBuyerPercent || "0") > 0 || parseFloat(t.mandiBuyerPercent || "0") > 0 ||
+    parseFloat(t.hammaliFarmerPerBag || "0") > 0 || parseFloat(t.hammaliBuyerPerBag || "0") > 0 ||
+    parseFloat(t.gradingFarmerPerBag || "0") > 0 || parseFloat(t.gradingBuyerPerBag || "0") > 0;
+
+  const hasAnyOldFormat = txns.some(t => !isNewFormat(t));
+
+  const oldHammali = txns.filter(t => !isNewFormat(t)).reduce((s, t) => s + parseFloat(t.hammaliCharges || "0"), 0);
+  const oldGrading = txns.filter(t => !isNewFormat(t)).reduce((s, t) => s + parseFloat(t.gradingCharges || "0"), 0);
+  const oldSellerTxns = txns.filter(t => !isNewFormat(t) && t.chargedTo === "Seller");
+  const oldAadhat = oldSellerTxns.reduce((s, t) => s + parseFloat(t.aadhatCharges || "0"), 0);
+  const oldMandi = oldSellerTxns.reduce((s, t) => s + parseFloat(t.mandiCharges || "0"), 0);
+
+  const hammaliDisplay = totalHammaliFarmer + oldHammali;
+  const gradingDisplay = totalGradingFarmer + oldGrading;
+  const aadhatDisplay = totalAadhatFarmer + oldAadhat;
+  const mandiDisplay = totalMandiFarmer + oldMandi;
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>किसान रसीद</title>
 <style>body{font-family:'Noto Sans Devanagari',sans-serif;margin:20px;color:#333}
@@ -95,10 +119,10 @@ h2{text-align:center;margin-bottom:5px}
 </table>
 <div class="summary">
 <div class="summary-row"><span>कुल राशि (Gross):</span><span>₹${totalGross.toFixed(2)}</span></div>
-<div class="summary-row"><span>हम्माली (${totalBags} थैले):</span><span>₹${totalHammali.toFixed(2)}</span></div>
-<div class="summary-row"><span>ग्रेडिंग:</span><span>₹${totalGrading.toFixed(2)}</span></div>
-${sellerChargedTxns.length > 0 ? `<div class="summary-row"><span>आढ़त:</span><span>₹${totalAadhat.toFixed(2)}</span></div>
-<div class="summary-row"><span>मण्डी शुल्क:</span><span>₹${totalMandi.toFixed(2)}</span></div>` : ""}
+${hammaliDisplay > 0 ? `<div class="summary-row"><span>हम्माली (${totalBags} थैले):</span><span>₹${hammaliDisplay.toFixed(2)}</span></div>` : ""}
+${gradingDisplay > 0 ? `<div class="summary-row"><span>ग्रेडिंग:</span><span>₹${gradingDisplay.toFixed(2)}</span></div>` : ""}
+${aadhatDisplay > 0 ? `<div class="summary-row"><span>आढ़त:</span><span>₹${aadhatDisplay.toFixed(2)}</span></div>` : ""}
+${mandiDisplay > 0 ? `<div class="summary-row"><span>मण्डी शुल्क:</span><span>₹${mandiDisplay.toFixed(2)}</span></div>` : ""}
 <div class="summary-row total"><span>किसान को देय राशि:</span><span>₹${totalPayable.toFixed(2)}</span></div>
 </div>
 <script>window.onload=function(){window.print()}</script>
@@ -108,6 +132,16 @@ ${sellerChargedTxns.length > 0 ? `<div class="summary-row"><span>आढ़त:</
 function generateBuyerReceiptHtml(lot: Lot, farmer: Farmer, tx: TransactionWithDetails, businessName?: string) {
   const grossAmount = parseFloat(tx.netWeight || "0") * parseFloat(tx.pricePerKg || "0");
   const dateStr = tx.date || format(new Date(), "yyyy-MM-dd");
+  const bags = tx.numberOfBags || 0;
+
+  const hasNewSplitFields = parseFloat(tx.aadhatBuyerPercent || "0") > 0 || parseFloat(tx.mandiBuyerPercent || "0") > 0 ||
+    parseFloat(tx.hammaliBuyerPerBag || "0") > 0 || parseFloat(tx.gradingBuyerPerBag || "0") > 0 ||
+    parseFloat(tx.aadhatFarmerPercent || "0") > 0 || parseFloat(tx.mandiFarmerPercent || "0") > 0 ||
+    parseFloat(tx.hammaliFarmerPerBag || "0") > 0 || parseFloat(tx.gradingFarmerPerBag || "0") > 0;
+  const hammaliBuyer = hasNewSplitFields ? parseFloat(tx.hammaliBuyerPerBag || "0") * bags : parseFloat(tx.hammaliCharges || "0");
+  const gradingBuyer = hasNewSplitFields ? parseFloat(tx.gradingBuyerPerBag || "0") * bags : parseFloat(tx.gradingCharges || "0");
+  const aadhatBuyer = hasNewSplitFields ? grossAmount * parseFloat(tx.aadhatBuyerPercent || "0") / 100 : (tx.chargedTo === "Buyer" ? parseFloat(tx.aadhatCharges || "0") : 0);
+  const mandiBuyer = hasNewSplitFields ? grossAmount * parseFloat(tx.mandiBuyerPercent || "0") / 100 : (tx.chargedTo === "Buyer" ? parseFloat(tx.mandiCharges || "0") : 0);
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Buyer Receipt</title>
 <style>body{font-family:Arial,sans-serif;margin:20px;color:#333}
@@ -135,17 +169,17 @@ h2{text-align:center;margin-bottom:5px}
 <th style="padding:8px;border:1px solid #ccc;text-align:left">Description</th>
 <th style="padding:8px;border:1px solid #ccc;text-align:right">Amount</th>
 </tr>
-<tr><td style="padding:6px;border:1px solid #ccc">Bags</td><td style="padding:6px;border:1px solid #ccc;text-align:right">${tx.numberOfBags}</td></tr>
+<tr><td style="padding:6px;border:1px solid #ccc">Bags</td><td style="padding:6px;border:1px solid #ccc;text-align:right">${bags}</td></tr>
 <tr><td style="padding:6px;border:1px solid #ccc">Total Weight</td><td style="padding:6px;border:1px solid #ccc;text-align:right">${parseFloat(tx.totalWeight || "0").toFixed(2)} kg</td></tr>
 <tr><td style="padding:6px;border:1px solid #ccc">Net Weight</td><td style="padding:6px;border:1px solid #ccc;text-align:right">${parseFloat(tx.netWeight || "0").toFixed(2)} kg</td></tr>
 <tr><td style="padding:6px;border:1px solid #ccc">Rate</td><td style="padding:6px;border:1px solid #ccc;text-align:right">Rs.${parseFloat(tx.pricePerKg || "0").toFixed(2)}/kg</td></tr>
 <tr style="background:#f9f9f9"><td style="padding:6px;border:1px solid #ccc"><strong>Gross Amount</strong></td><td style="padding:6px;border:1px solid #ccc;text-align:right"><strong>Rs.${grossAmount.toFixed(2)}</strong></td></tr>
 </table>
 <div class="summary">
-<div class="summary-row"><span>Hammali (${tx.numberOfBags} bags × Rs.${parseFloat(tx.hammaliPerBag || "0").toFixed(2)}):</span><span>Rs.${parseFloat(tx.hammaliCharges || "0").toFixed(2)}</span></div>
-<div class="summary-row"><span>Grading:</span><span>Rs.${parseFloat(tx.gradingCharges || "0").toFixed(2)}</span></div>
-${tx.chargedTo === "Buyer" ? `<div class="summary-row"><span>Aadhat (${tx.aadhatCommissionPercent}%):</span><span>Rs.${parseFloat(tx.aadhatCharges || "0").toFixed(2)}</span></div>
-<div class="summary-row"><span>Mandi (${tx.mandiCommissionPercent}%):</span><span>Rs.${parseFloat(tx.mandiCharges || "0").toFixed(2)}</span></div>` : ""}
+${hammaliBuyer > 0 ? `<div class="summary-row"><span>Hammali (${bags} bags):</span><span>Rs.${hammaliBuyer.toFixed(2)}</span></div>` : ""}
+${gradingBuyer > 0 ? `<div class="summary-row"><span>Grading:</span><span>Rs.${gradingBuyer.toFixed(2)}</span></div>` : ""}
+${aadhatBuyer > 0 ? `<div class="summary-row"><span>Aadhat (${hasNewSplitFields ? tx.aadhatBuyerPercent : tx.aadhatCommissionPercent}%):</span><span>Rs.${aadhatBuyer.toFixed(2)}</span></div>` : ""}
+${mandiBuyer > 0 ? `<div class="summary-row"><span>Mandi (${hasNewSplitFields ? tx.mandiBuyerPercent : tx.mandiCommissionPercent}%):</span><span>Rs.${mandiBuyer.toFixed(2)}</span></div>` : ""}
 <div class="summary-row total"><span>Total Receivable from Buyer:</span><span>Rs.${parseFloat(tx.totalReceivableFromBuyer || "0").toFixed(2)}</span></div>
 </div>
 <script>window.onload=function(){window.print()}</script>
@@ -180,11 +214,21 @@ export default function TransactionsPage() {
   const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
 
   const [totalWeight, setTotalWeight] = useState("");
-  const [hammaliPerBag, setHammaliPerBag] = useState("0");
-  const [gradingCharges, setGradingCharges] = useState("0");
-  const [aadhatPercent, setAadhatPercent] = useState("2");
-  const [mandiPercent, setMandiPercent] = useState("1");
-  const [chargedTo, setChargedTo] = useState("Buyer");
+
+  type ChargeSettingsData = {
+    mandiCommissionFarmerPercent: string;
+    mandiCommissionBuyerPercent: string;
+    aadhatCommissionFarmerPercent: string;
+    aadhatCommissionBuyerPercent: string;
+    hammaliFarmerPerBag: string;
+    hammaliBuyerPerBag: string;
+    gradingFarmerPerBag: string;
+    gradingBuyerPerBag: string;
+  };
+
+  const { data: chargeSettings } = useQuery<ChargeSettingsData>({
+    queryKey: ["/api/charge-settings"],
+  });
 
   const { data: allBids = [] } = useQuery<BidWithDetails[]>({
     queryKey: ["/api/bids"],
@@ -382,20 +426,10 @@ export default function TransactionsPage() {
 
   const prefillFromTxn = (tx: TransactionWithDetails) => {
     setTotalWeight(tx.totalWeight || "");
-    setHammaliPerBag(tx.hammaliPerBag || "0");
-    setGradingCharges(tx.gradingCharges || "0");
-    setAadhatPercent(tx.aadhatCommissionPercent || "2");
-    setMandiPercent(tx.mandiCommissionPercent || "1");
-    setChargedTo(tx.chargedTo || "Buyer");
   };
 
   const resetFormDefaults = () => {
     setTotalWeight("");
-    setHammaliPerBag("0");
-    setGradingCharges("0");
-    setAadhatPercent("2");
-    setMandiPercent("1");
-    setChargedTo("Buyer");
   };
 
   const handleBuyerChange = (val: string) => {
@@ -413,21 +447,43 @@ export default function TransactionsPage() {
   const selectedBid = currentItem?.bid || null;
   const isEditing = currentItem?.type === "completed";
 
+  const cs = chargeSettings || {
+    mandiCommissionFarmerPercent: "0", mandiCommissionBuyerPercent: "1",
+    aadhatCommissionFarmerPercent: "0", aadhatCommissionBuyerPercent: "2",
+    hammaliFarmerPerBag: "0", hammaliBuyerPerBag: "0",
+    gradingFarmerPerBag: "0", gradingBuyerPerBag: "0",
+  };
+
   const tw = parseFloat(totalWeight) || 0;
   const bags = selectedBid?.numberOfBags || 0;
   const netWeight = tw > 0 ? (tw - bags).toFixed(2) : "0.00";
   const nw = parseFloat(netWeight);
   const price = parseFloat(selectedBid?.pricePerKg || "0");
   const grossAmount = nw * price;
-  const hammaliRate = parseFloat(hammaliPerBag) || 0;
-  const totalHammali = hammaliRate * bags;
-  const grading = parseFloat(gradingCharges) || 0;
-  const aadhat = (grossAmount * (parseFloat(aadhatPercent) || 0)) / 100;
-  const mandi = (grossAmount * (parseFloat(mandiPercent) || 0)) / 100;
-  const totalCommission = aadhat + mandi;
 
-  const farmerPayable = grossAmount - totalHammali - grading - (chargedTo === "Seller" ? totalCommission : 0);
-  const buyerReceivable = grossAmount + (chargedTo === "Buyer" ? totalCommission : 0) + totalHammali + grading;
+  const hammaliFarmerRate = parseFloat(cs.hammaliFarmerPerBag) || 0;
+  const hammaliBuyerRate = parseFloat(cs.hammaliBuyerPerBag) || 0;
+  const gradingFarmerRate = parseFloat(cs.gradingFarmerPerBag) || 0;
+  const gradingBuyerRate = parseFloat(cs.gradingBuyerPerBag) || 0;
+  const aadhatFarmerPct = parseFloat(cs.aadhatCommissionFarmerPercent) || 0;
+  const aadhatBuyerPct = parseFloat(cs.aadhatCommissionBuyerPercent) || 0;
+  const mandiFarmerPct = parseFloat(cs.mandiCommissionFarmerPercent) || 0;
+  const mandiBuyerPct = parseFloat(cs.mandiCommissionBuyerPercent) || 0;
+
+  const hammaliFarmerTotal = hammaliFarmerRate * bags;
+  const hammaliBuyerTotal = hammaliBuyerRate * bags;
+  const gradingFarmerTotal = gradingFarmerRate * bags;
+  const gradingBuyerTotal = gradingBuyerRate * bags;
+  const aadhatFarmer = (grossAmount * aadhatFarmerPct) / 100;
+  const aadhatBuyer = (grossAmount * aadhatBuyerPct) / 100;
+  const mandiFarmer = (grossAmount * mandiFarmerPct) / 100;
+  const mandiBuyer = (grossAmount * mandiBuyerPct) / 100;
+
+  const farmerDeductions = hammaliFarmerTotal + gradingFarmerTotal + aadhatFarmer + mandiFarmer;
+  const buyerAdditions = hammaliBuyerTotal + gradingBuyerTotal + aadhatBuyer + mandiBuyer;
+
+  const farmerPayable = grossAmount - farmerDeductions;
+  const buyerReceivable = grossAmount + buyerAdditions;
 
   const submitTransaction = () => {
     if (!selectedBid || !totalWeight) {
@@ -442,16 +498,24 @@ export default function TransactionsPage() {
       farmerId: selectedBid.lot.farmerId,
       totalWeight,
       numberOfBags: bags,
-      hammaliPerBag: hammaliRate.toString(),
-      hammaliCharges: totalHammali.toString(),
-      gradingCharges: grading.toString(),
+      hammaliPerBag: hammaliFarmerRate.toString(),
+      hammaliCharges: hammaliFarmerTotal.toString(),
+      gradingCharges: gradingFarmerTotal.toString(),
       netWeight,
       pricePerKg: selectedBid.pricePerKg,
-      aadhatCommissionPercent: aadhatPercent,
-      mandiCommissionPercent: mandiPercent,
-      aadhatCharges: aadhat.toFixed(2),
-      mandiCharges: mandi.toFixed(2),
-      chargedTo,
+      aadhatCommissionPercent: aadhatBuyerPct.toString(),
+      mandiCommissionPercent: mandiBuyerPct.toString(),
+      aadhatCharges: aadhatBuyer.toFixed(2),
+      mandiCharges: mandiBuyer.toFixed(2),
+      chargedTo: "Buyer",
+      aadhatFarmerPercent: aadhatFarmerPct.toString(),
+      mandiFarmerPercent: mandiFarmerPct.toString(),
+      aadhatBuyerPercent: aadhatBuyerPct.toString(),
+      mandiBuyerPercent: mandiBuyerPct.toString(),
+      hammaliFarmerPerBag: hammaliFarmerRate.toString(),
+      hammaliBuyerPerBag: hammaliBuyerRate.toString(),
+      gradingFarmerPerBag: gradingFarmerRate.toString(),
+      gradingBuyerPerBag: gradingBuyerRate.toString(),
       totalPayableToFarmer: farmerPayable.toFixed(2),
       totalReceivableFromBuyer: buyerReceivable.toFixed(2),
       date: format(new Date(), "yyyy-MM-dd"),
@@ -487,8 +551,9 @@ export default function TransactionsPage() {
       "Farmer Name", "Farmer Phone", "Farmer Village",
       "Buyer Name", "Buyer Phone",
       "Grade", "No. of Bags", "Rate/Kg",
-      "Total Weight", "Hammali/Bag", "Hammali Charges", "Grading Charges", "Net Weight",
-      "Charged To", "Aadhat %", "Aadhat Charges", "Mandi %", "Mandi Charges",
+      "Total Weight", "Net Weight",
+      "Hammali Farmer/Bag", "Hammali Buyer/Bag", "Grading Farmer/Bag", "Grading Buyer/Bag",
+      "Aadhat Farmer %", "Aadhat Buyer %", "Mandi Farmer %", "Mandi Buyer %",
       "Payable to Farmer", "Receivable from Buyer", "Status"
     ];
 
@@ -504,8 +569,11 @@ export default function TransactionsPage() {
         tx.farmer.name, tx.farmer.phone, tx.farmer.village || "",
         tx.buyer.name, tx.buyer.phone || "",
         bid.grade || "", tx.numberOfBags, tx.pricePerKg,
-        tx.totalWeight, tx.hammaliPerBag, tx.hammaliCharges, tx.gradingCharges, tx.netWeight,
-        tx.chargedTo || "", tx.aadhatCommissionPercent, tx.aadhatCharges, tx.mandiCommissionPercent, tx.mandiCharges,
+        tx.totalWeight, tx.netWeight,
+        tx.hammaliFarmerPerBag || "0", tx.hammaliBuyerPerBag || "0",
+        tx.gradingFarmerPerBag || "0", tx.gradingBuyerPerBag || "0",
+        tx.aadhatFarmerPercent || "0", tx.aadhatBuyerPercent || "0",
+        tx.mandiFarmerPercent || "0", tx.mandiBuyerPercent || "0",
         tx.totalPayableToFarmer, tx.totalReceivableFromBuyer, tx.isReversed ? "Reversed" : "Active"
       ].map(escCSV).join(",");
     });
@@ -873,102 +941,103 @@ export default function TransactionsPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label>{t("transactions.hammali")}</Label>
-                  <Input
-                    data-testid="input-hammali-per-bag"
-                    type="text"
-                    inputMode="decimal"
-                    value={hammaliPerBag}
-                    onChange={(e) => setHammaliPerBag(e.target.value)}
-                    onFocus={(e) => e.target.select()}
-                    className="mobile-touch-target"
-                  />
-                  <p className="text-xs text-muted-foreground">Total: Rs.{totalHammali.toFixed(2)} ({bags} bags)</p>
+              <div className="grid grid-cols-2 gap-2 text-xs" data-testid="charge-rates-display">
+                <div className="bg-muted/50 rounded p-2 space-y-1">
+                  <p className="font-semibold text-muted-foreground">Farmer Charges</p>
+                  <div className="flex justify-between"><span>Aadhat:</span><span>{aadhatFarmerPct}%</span></div>
+                  <div className="flex justify-between"><span>Mandi:</span><span>{mandiFarmerPct}%</span></div>
+                  <div className="flex justify-between"><span>Hammali:</span><span>₹{hammaliFarmerRate}/bag</span></div>
+                  <div className="flex justify-between"><span>Grading:</span><span>₹{gradingFarmerRate}/bag</span></div>
                 </div>
-                <div className="space-y-1">
-                  <Label>{t("transactions.grading")}</Label>
-                  <Input
-                    data-testid="input-grading"
-                    type="text"
-                    inputMode="decimal"
-                    value={gradingCharges}
-                    onChange={(e) => setGradingCharges(e.target.value)}
-                    onFocus={(e) => e.target.select()}
-                    className="mobile-touch-target"
-                  />
+                <div className="bg-muted/50 rounded p-2 space-y-1">
+                  <p className="font-semibold text-muted-foreground">Buyer Charges</p>
+                  <div className="flex justify-between"><span>Aadhat:</span><span>{aadhatBuyerPct}%</span></div>
+                  <div className="flex justify-between"><span>Mandi:</span><span>{mandiBuyerPct}%</span></div>
+                  <div className="flex justify-between"><span>Hammali:</span><span>₹{hammaliBuyerRate}/bag</span></div>
+                  <div className="flex justify-between"><span>Grading:</span><span>₹{gradingBuyerRate}/bag</span></div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label>{t("transactions.aadhat")}</Label>
-                  <Input
-                    data-testid="input-aadhat"
-                    type="text"
-                    inputMode="decimal"
-                    value={aadhatPercent}
-                    onChange={(e) => setAadhatPercent(e.target.value)}
-                    onFocus={(e) => e.target.select()}
-                    className="mobile-touch-target"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>{t("transactions.mandi")}</Label>
-                  <Input
-                    data-testid="input-mandi"
-                    type="text"
-                    inputMode="decimal"
-                    value={mandiPercent}
-                    onChange={(e) => setMandiPercent(e.target.value)}
-                    onFocus={(e) => e.target.select()}
-                    className="mobile-touch-target"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <Label>{t("transactions.chargedTo")}</Label>
-                <Select value={chargedTo} onValueChange={setChargedTo}>
-                  <SelectTrigger data-testid="select-charged-to" className="mobile-touch-target">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Buyer">{t("transactions.buyer")}</SelectItem>
-                    <SelectItem value="Seller">{t("transactions.sellerFarmer")}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="bg-muted rounded-md p-3 space-y-2 text-sm">
+              <div className="bg-muted rounded-md p-3 space-y-2 text-sm" data-testid="txn-calculation-summary">
                 <div className="flex justify-between">
                   <span>{t("transactions.grossAmount")}:</span>
                   <span className="font-medium">Rs.{grossAmount.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Hammali ({bags} bags × Rs.{hammaliRate.toFixed(2)}):</span>
-                  <span>Rs.{totalHammali.toFixed(2)}</span>
+
+                <div className="border-t pt-2 mt-2">
+                  <p className="text-xs font-semibold text-muted-foreground mb-1">Farmer Deductions:</p>
+                  {hammaliFarmerRate > 0 && (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Hammali ({bags} × ₹{hammaliFarmerRate}):</span>
+                      <span>-Rs.{hammaliFarmerTotal.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {gradingFarmerRate > 0 && (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Grading ({bags} × ₹{gradingFarmerRate}):</span>
+                      <span>-Rs.{gradingFarmerTotal.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {aadhatFarmerPct > 0 && (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Aadhat ({aadhatFarmerPct}%):</span>
+                      <span>-Rs.{aadhatFarmer.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {mandiFarmerPct > 0 && (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Mandi ({mandiFarmerPct}%):</span>
+                      <span>-Rs.{mandiFarmer.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {farmerDeductions === 0 && (
+                    <div className="text-xs text-muted-foreground italic">No deductions</div>
+                  )}
                 </div>
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Grading:</span>
-                  <span>Rs.{grading.toFixed(2)}</span>
+
+                <div className="border-t pt-2">
+                  <div className="flex justify-between font-medium text-primary">
+                    <span>{t("transactions.payableToFarmer")}:</span>
+                    <span>Rs.{farmerPayable.toFixed(2)}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Aadhat ({aadhatPercent}%):</span>
-                  <span>Rs.{aadhat.toFixed(2)}</span>
+
+                <div className="border-t pt-2 mt-2">
+                  <p className="text-xs font-semibold text-muted-foreground mb-1">Buyer Additions:</p>
+                  {hammaliBuyerRate > 0 && (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Hammali ({bags} × ₹{hammaliBuyerRate}):</span>
+                      <span>+Rs.{hammaliBuyerTotal.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {gradingBuyerRate > 0 && (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Grading ({bags} × ₹{gradingBuyerRate}):</span>
+                      <span>+Rs.{gradingBuyerTotal.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {aadhatBuyerPct > 0 && (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Aadhat ({aadhatBuyerPct}%):</span>
+                      <span>+Rs.{aadhatBuyer.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {mandiBuyerPct > 0 && (
+                    <div className="flex justify-between text-muted-foreground">
+                      <span>Mandi ({mandiBuyerPct}%):</span>
+                      <span>+Rs.{mandiBuyer.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {buyerAdditions === 0 && (
+                    <div className="text-xs text-muted-foreground italic">No additions</div>
+                  )}
                 </div>
-                <div className="flex justify-between text-muted-foreground">
-                  <span>Mandi ({mandiPercent}%):</span>
-                  <span>Rs.{mandi.toFixed(2)}</span>
-                </div>
-                <div className="border-t pt-2 flex justify-between font-medium text-primary">
-                  <span>{t("transactions.payableToFarmer")}:</span>
-                  <span>Rs.{farmerPayable.toFixed(2)}</span>
-                </div>
-                <div className="flex justify-between font-medium">
-                  <span>{t("transactions.receivableFromBuyer")}:</span>
-                  <span>Rs.{buyerReceivable.toFixed(2)}</span>
+
+                <div className="border-t pt-2">
+                  <div className="flex justify-between font-medium">
+                    <span>{t("transactions.receivableFromBuyer")}:</span>
+                    <span>Rs.{buyerReceivable.toFixed(2)}</span>
+                  </div>
                 </div>
               </div>
 
