@@ -189,7 +189,7 @@ export default function StockEntryPage() {
               data-testid="input-entry-date"
               value={entryDate}
               onChange={(e) => setEntryDate(e.target.value)}
-              className="mobile-touch-target"
+              className="mobile-touch-target text-sm"
             />
           </div>
 
@@ -204,7 +204,7 @@ export default function StockEntryPage() {
                   onChange={(e) => { setFarmerSearch(e.target.value); setShowSuggestions(true); }}
                   onFocus={() => setShowSuggestions(true)}
                   placeholder={t("stockEntry.searchPlaceholder")}
-                  className="pl-9 mobile-touch-target"
+                  className="pl-9 mobile-touch-target text-sm"
                 />
               </div>
               {showSuggestions && farmerSuggestions.length > 0 && (
@@ -245,7 +245,7 @@ export default function StockEntryPage() {
                     value={farmerName}
                     onChange={(e) => setFarmerName(e.target.value)}
                     placeholder={t("stockEntry.farmerNamePlaceholder")}
-                    className="mobile-touch-target capitalize"
+                    className="mobile-touch-target text-sm capitalize"
                   />
                 </div>
                 <div className="space-y-1">
@@ -256,7 +256,7 @@ export default function StockEntryPage() {
                     value={farmerPhone}
                     onChange={(e) => setFarmerPhone(e.target.value)}
                     placeholder={t("stockEntry.mobilePlaceholder")}
-                    className="mobile-touch-target"
+                    className="mobile-touch-target text-sm"
                     maxLength={10}
                   />
                 </div>
@@ -269,7 +269,7 @@ export default function StockEntryPage() {
                     value={village}
                     onChange={(e) => setVillage(e.target.value)}
                     placeholder={t("common.village")}
-                    className="mobile-touch-target capitalize"
+                    className="mobile-touch-target text-sm capitalize"
                   />
                 </div>
                 <div className="space-y-1">
@@ -279,13 +279,13 @@ export default function StockEntryPage() {
                     value={tehsil}
                     onChange={(e) => setTehsil(e.target.value)}
                     placeholder={t("common.tehsil")}
-                    className="mobile-touch-target capitalize"
+                    className="mobile-touch-target text-sm capitalize"
                   />
                 </div>
                 <div className="space-y-1">
                   <Label>{t("common.district")}</Label>
                   <Select value={district} onValueChange={setDistrict}>
-                    <SelectTrigger data-testid="select-district" className="mobile-touch-target">
+                    <SelectTrigger data-testid="select-district" className="mobile-touch-target text-sm">
                       <SelectValue placeholder={t("stockEntry.selectDistrict")} />
                     </SelectTrigger>
                     <SelectContent>
@@ -298,7 +298,7 @@ export default function StockEntryPage() {
               </div>
               <div className="space-y-1">
                 <Label>{t("common.state")}</Label>
-                <Input value={state} disabled className="mobile-touch-target bg-muted" />
+                <Input value={state} disabled className="mobile-touch-target text-sm bg-muted" />
               </div>
               {selectedFarmer && (
                 <Button
@@ -336,7 +336,7 @@ export default function StockEntryPage() {
                 <div className="space-y-1">
                   <Label>{t("stockEntry.crop")}</Label>
                   <Select value={lot.crop} onValueChange={(v) => updateLot(index, "crop", v)}>
-                    <SelectTrigger data-testid={`select-crop-${index}`} className="mobile-touch-target">
+                    <SelectTrigger data-testid={`select-crop-${index}`} className="mobile-touch-target text-sm">
                       <SelectValue placeholder={t("stockEntry.selectCrop")} />
                     </SelectTrigger>
                     <SelectContent>
@@ -349,7 +349,7 @@ export default function StockEntryPage() {
                 <div className="space-y-1">
                   <Label>{t("stockEntry.size")}</Label>
                   <Select value={lot.size} onValueChange={(v) => updateLot(index, "size", v)}>
-                    <SelectTrigger data-testid={`select-size-${index}`} className="mobile-touch-target">
+                    <SelectTrigger data-testid={`select-size-${index}`} className="mobile-touch-target text-sm">
                       <SelectValue placeholder={t("stockEntry.selectSize")} />
                     </SelectTrigger>
                     <SelectContent>
@@ -366,7 +366,7 @@ export default function StockEntryPage() {
                     value={lot.variety}
                     onChange={(e) => updateLot(index, "variety", e.target.value)}
                     placeholder={t("common.optional")}
-                    className="mobile-touch-target"
+                    className="mobile-touch-target text-sm"
                   />
                 </div>
               </div>
@@ -381,7 +381,7 @@ export default function StockEntryPage() {
                     onChange={(e) => updateLot(index, "numberOfBags", e.target.value)}
                     onFocus={(e) => e.target.select()}
                     placeholder="0"
-                    className="mobile-touch-target"
+                    className="mobile-touch-target text-sm"
                   />
                 </div>
                 <div className="space-y-1">
@@ -391,7 +391,7 @@ export default function StockEntryPage() {
                     value={lot.bagMarka}
                     onChange={(e) => updateLot(index, "bagMarka", e.target.value)}
                     placeholder={t("common.optional")}
-                    className="mobile-touch-target"
+                    className="mobile-touch-target text-sm"
                   />
                 </div>
                 <div className="space-y-1">
@@ -401,7 +401,7 @@ export default function StockEntryPage() {
                     value={lot.vehicleNumber}
                     onChange={(e) => updateLot(index, "vehicleNumber", e.target.value.toUpperCase())}
                     placeholder="e.g. MP09AB1234"
-                    className="mobile-touch-target"
+                    className="mobile-touch-target text-sm"
                     style={{ textTransform: 'uppercase' }}
                   />
                 </div>
@@ -415,7 +415,7 @@ export default function StockEntryPage() {
                     onChange={(e) => updateLot(index, "vehicleBhadaRate", e.target.value)}
                     onFocus={(e) => e.target.select()}
                     placeholder="0.00"
-                    className="mobile-touch-target"
+                    className="mobile-touch-target text-sm"
                   />
                 </div>
               </div>
@@ -430,7 +430,7 @@ export default function StockEntryPage() {
                     onChange={(e) => updateLot(index, "initialTotalWeight", e.target.value)}
                     onFocus={(e) => e.target.select()}
                     placeholder="0.00"
-                    className="mobile-touch-target"
+                    className="mobile-touch-target text-sm"
                   />
                 </div>
               </div>
@@ -443,7 +443,7 @@ export default function StockEntryPage() {
         <Button
           variant="secondary"
           data-testid="button-add-lot"
-          className="mobile-touch-target"
+          className="mobile-touch-target text-sm"
           onClick={addLot}
         >
           <Plus className="w-4 h-4 mr-2" />
