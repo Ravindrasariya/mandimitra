@@ -582,112 +582,120 @@ export default function StockRegisterPage() {
             <DialogTitle>{t("stockRegister.editLot")} - {editingLot?.lotId}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <div className="space-y-1">
-              <Label>Original # of Bags</Label>
-              <Input
-                data-testid="input-original-bags"
-                value={editingLot?.numberOfBags ?? ""}
-                disabled
-                className="mobile-touch-target bg-muted"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>Original # of Bags</Label>
+                <Input
+                  data-testid="input-original-bags"
+                  value={editingLot?.numberOfBags ?? ""}
+                  disabled
+                  className="mobile-touch-target bg-muted"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Actual # of Bags</Label>
+                <Input
+                  data-testid="input-actual-bags"
+                  type="text"
+                  inputMode="numeric"
+                  value={editActualNumberOfBags}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '');
+                    if (val === '' || parseInt(val) <= (editingLot?.numberOfBags ?? 0)) {
+                      setEditActualNumberOfBags(val);
+                    }
+                  }}
+                  onFocus={(e) => e.target.select()}
+                  className="mobile-touch-target"
+                />
+                {editingLot && (() => {
+                  const actual = editingLot.actualNumberOfBags ?? editingLot.numberOfBags;
+                  const soldBags = actual - editingLot.remainingBags;
+                  return (
+                    <>
+                      {editActualNumberOfBags && parseInt(editActualNumberOfBags) < editingLot.numberOfBags && (
+                        <p className="text-xs text-orange-600">Reduced from {editingLot.numberOfBags} due to damaged/graded harvest</p>
+                      )}
+                      {soldBags > 0 && (
+                        <p className="text-xs text-muted-foreground">Min: {soldBags} (already sold)</p>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
             </div>
-            <div className="space-y-1">
-              <Label>Actual # of Bags</Label>
-              <Input
-                data-testid="input-actual-bags"
-                type="text"
-                inputMode="numeric"
-                value={editActualNumberOfBags}
-                onChange={(e) => {
-                  const val = e.target.value.replace(/\D/g, '');
-                  if (val === '' || parseInt(val) <= (editingLot?.numberOfBags ?? 0)) {
-                    setEditActualNumberOfBags(val);
-                  }
-                }}
-                onFocus={(e) => e.target.select()}
-                className="mobile-touch-target"
-              />
-              {editingLot && (() => {
-                const actual = editingLot.actualNumberOfBags ?? editingLot.numberOfBags;
-                const soldBags = actual - editingLot.remainingBags;
-                return (
-                  <>
-                    {editActualNumberOfBags && parseInt(editActualNumberOfBags) < editingLot.numberOfBags && (
-                      <p className="text-xs text-orange-600">Reduced from {editingLot.numberOfBags} due to damaged/graded harvest</p>
-                    )}
-                    {soldBags > 0 && (
-                      <p className="text-xs text-muted-foreground">Min: {soldBags} (already sold)</p>
-                    )}
-                  </>
-                );
-              })()}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>{t("stockRegister.variety")}</Label>
+                <Input
+                  data-testid="input-edit-variety"
+                  value={editVariety}
+                  onChange={(e) => setEditVariety(e.target.value)}
+                  className="mobile-touch-target"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>{t("stockRegister.size")}</Label>
+                <Select value={editSize} onValueChange={setEditSize}>
+                  <SelectTrigger data-testid="select-edit-size" className="mobile-touch-target">
+                    <SelectValue placeholder={t("stockEntry.selectSize")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SIZES.map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-            <div className="space-y-1">
-              <Label>{t("stockRegister.variety")}</Label>
-              <Input
-                data-testid="input-edit-variety"
-                value={editVariety}
-                onChange={(e) => setEditVariety(e.target.value)}
-                className="mobile-touch-target"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>{t("stockRegister.bagMarka")}</Label>
+                <Input
+                  data-testid="input-edit-bag-marka"
+                  value={editBagMarka}
+                  onChange={(e) => setEditBagMarka(e.target.value)}
+                  className="mobile-touch-target"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>{t("stockRegister.vehicleNumber")}</Label>
+                <Input
+                  data-testid="input-edit-vehicle-number"
+                  value={editVehicleNumber}
+                  onChange={(e) => setEditVehicleNumber(e.target.value.toUpperCase())}
+                  className="mobile-touch-target"
+                  style={{ textTransform: 'uppercase' }}
+                />
+              </div>
             </div>
-            <div className="space-y-1">
-              <Label>{t("stockRegister.size")}</Label>
-              <Select value={editSize} onValueChange={setEditSize}>
-                <SelectTrigger data-testid="select-edit-size" className="mobile-touch-target">
-                  <SelectValue placeholder={t("stockEntry.selectSize")} />
-                </SelectTrigger>
-                <SelectContent>
-                  {SIZES.map((s) => (
-                    <SelectItem key={s} value={s}>{s}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label>{t("stockRegister.bagMarka")}</Label>
-              <Input
-                data-testid="input-edit-bag-marka"
-                value={editBagMarka}
-                onChange={(e) => setEditBagMarka(e.target.value)}
-                className="mobile-touch-target"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>{t("stockRegister.vehicleNumber")}</Label>
-              <Input
-                data-testid="input-edit-vehicle-number"
-                value={editVehicleNumber}
-                onChange={(e) => setEditVehicleNumber(e.target.value.toUpperCase())}
-                className="mobile-touch-target"
-                style={{ textTransform: 'uppercase' }}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>{t("stockRegister.vehicleBhadaRate")}</Label>
-              <Input
-                data-testid="input-edit-bhada-rate"
-                type="text"
-                inputMode="decimal"
-                value={editVehicleBhadaRate}
-                onChange={(e) => setEditVehicleBhadaRate(e.target.value)}
-                onFocus={(e) => e.target.select()}
-                placeholder="0.00"
-                className="mobile-touch-target"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label>{t("stockRegister.initialWeight")}</Label>
-              <Input
-                data-testid="input-edit-initial-weight"
-                type="text"
-                inputMode="decimal"
-                value={editInitialTotalWeight}
-                onChange={(e) => setEditInitialTotalWeight(e.target.value)}
-                onFocus={(e) => e.target.select()}
-                placeholder="0.00"
-                className="mobile-touch-target"
-              />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label>{t("stockRegister.vehicleBhadaRate")}</Label>
+                <Input
+                  data-testid="input-edit-bhada-rate"
+                  type="text"
+                  inputMode="decimal"
+                  value={editVehicleBhadaRate}
+                  onChange={(e) => setEditVehicleBhadaRate(e.target.value)}
+                  onFocus={(e) => e.target.select()}
+                  placeholder="0.00"
+                  className="mobile-touch-target"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>{t("stockRegister.initialWeight")}</Label>
+                <Input
+                  data-testid="input-edit-initial-weight"
+                  type="text"
+                  inputMode="decimal"
+                  value={editInitialTotalWeight}
+                  onChange={(e) => setEditInitialTotalWeight(e.target.value)}
+                  onFocus={(e) => e.target.select()}
+                  placeholder="0.00"
+                  className="mobile-touch-target"
+                />
+              </div>
             </div>
             <Button
               data-testid="button-save-edit"
