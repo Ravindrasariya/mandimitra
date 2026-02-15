@@ -352,9 +352,9 @@ export default function DashboardPage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">{t("dash.allCrops")}</SelectItem>
-            <SelectItem value="Potato">Potato</SelectItem>
-            <SelectItem value="Onion">Onion</SelectItem>
-            <SelectItem value="Garlic">Garlic</SelectItem>
+            <SelectItem value="Potato">{t("crop.potato")}</SelectItem>
+            <SelectItem value="Onion">{t("crop.onion")}</SelectItem>
+            <SelectItem value="Garlic">{t("crop.garlic")}</SelectItem>
           </SelectContent>
         </Select>
 
@@ -620,7 +620,7 @@ export default function DashboardPage() {
                   <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                   <YAxis tick={{ fontSize: 10 }} tickFormatter={formatINR} />
                   <Tooltip contentStyle={{ fontSize: 11, padding: "4px 8px" }} formatter={(value: number) => `₹${value.toLocaleString("en-IN")}`} />
-                  <Line type="monotone" dataKey="farmerDue" stroke="#f97316" strokeWidth={2} dot={{ r: 3 }} name="Farmer Due" />
+                  <Line type="monotone" dataKey="farmerDue" stroke="#f97316" strokeWidth={2} dot={{ r: 3 }} name={t("dash.lineFarmerDue")} />
                 </LineChart>
               </ResponsiveContainer>
             )}
@@ -639,7 +639,7 @@ export default function DashboardPage() {
                   <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                   <YAxis tick={{ fontSize: 10 }} tickFormatter={formatINR} />
                   <Tooltip contentStyle={{ fontSize: 11, padding: "4px 8px" }} formatter={(value: number) => `₹${value.toLocaleString("en-IN")}`} />
-                  <Line type="monotone" dataKey="buyerDue" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} name="Buyer Due" />
+                  <Line type="monotone" dataKey="buyerDue" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} name={t("dash.lineBuyerDue")} />
                 </LineChart>
               </ResponsiveContainer>
             )}
@@ -658,7 +658,7 @@ export default function DashboardPage() {
                   <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                   <YAxis tick={{ fontSize: 10 }} />
                   <Tooltip contentStyle={{ fontSize: 11, padding: "4px 8px" }} formatter={(value: number) => `${value.toLocaleString("en-IN")} Kg`} />
-                  <Line type="monotone" dataKey="totalVolume" stroke="#2563eb" strokeWidth={2} dot={{ r: 3 }} name="Total Volume (Kg)" />
+                  <Line type="monotone" dataKey="totalVolume" stroke="#2563eb" strokeWidth={2} dot={{ r: 3 }} name={t("dash.lineTotalVolume")} />
                 </LineChart>
               </ResponsiveContainer>
             )}
@@ -677,7 +677,7 @@ export default function DashboardPage() {
                   <XAxis dataKey="date" tick={{ fontSize: 10 }} />
                   <YAxis tick={{ fontSize: 10 }} tickFormatter={formatINR} />
                   <Tooltip contentStyle={{ fontSize: 11, padding: "4px 8px" }} formatter={(value: number) => `₹${value.toLocaleString("en-IN")}`} />
-                  <Line type="monotone" dataKey="aadhat" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 3 }} name="Aadhat Value" />
+                  <Line type="monotone" dataKey="aadhat" stroke="#8b5cf6" strokeWidth={2} dot={{ r: 3 }} name={t("dash.lineAadhatValue")} />
                 </LineChart>
               </ResponsiveContainer>
             )}
