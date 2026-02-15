@@ -197,8 +197,8 @@ export default function TransactionsPage() {
   const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
 
   const [totalWeight, setTotalWeight] = useState("");
-  const [applyFarmerHammali, setApplyFarmerHammali] = useState(false);
-  const [applyBuyerHammali, setApplyBuyerHammali] = useState(false);
+  const [applyFarmerGrading, setApplyFarmerGrading] = useState(false);
+  const [applyBuyerGrading, setApplyBuyerGrading] = useState(false);
 
   type ChargeSettingsData = {
     mandiCommissionFarmerPercent: string;
@@ -435,8 +435,8 @@ export default function TransactionsPage() {
 
   const prefillFromTxn = (tx: TransactionWithDetails) => {
     setTotalWeight(tx.totalWeight || "");
-    setApplyFarmerHammali(parseFloat(tx.hammaliFarmerPerBag || "0") > 0);
-    setApplyBuyerHammali(parseFloat(tx.hammaliBuyerPerBag || "0") > 0);
+    setApplyFarmerGrading(parseFloat(tx.gradingFarmerPerBag || "0") > 0);
+    setApplyBuyerGrading(parseFloat(tx.gradingBuyerPerBag || "0") > 0);
   };
 
   const calcProportionateWeight = (bid: BidWithDetails): string => {
@@ -449,8 +449,8 @@ export default function TransactionsPage() {
 
   const resetFormDefaults = (bid?: BidWithDetails) => {
     setTotalWeight(bid ? calcProportionateWeight(bid) : "");
-    setApplyFarmerHammali(false);
-    setApplyBuyerHammali(false);
+    setApplyFarmerGrading(false);
+    setApplyBuyerGrading(false);
   };
 
   const handleBuyerChange = (val: string) => {
@@ -482,10 +482,10 @@ export default function TransactionsPage() {
   const price = parseFloat(selectedBid?.pricePerKg || "0");
   const grossAmount = nw * price;
 
-  const hammaliFarmerRate = applyFarmerHammali ? (parseFloat(cs.hammaliFarmerPerBag) || 0) : 0;
-  const hammaliBuyerRate = applyBuyerHammali ? (parseFloat(cs.hammaliBuyerPerBag) || 0) : 0;
-  const gradingFarmerRate = parseFloat(cs.gradingFarmerPerBag) || 0;
-  const gradingBuyerRate = parseFloat(cs.gradingBuyerPerBag) || 0;
+  const hammaliFarmerRate = parseFloat(cs.hammaliFarmerPerBag) || 0;
+  const hammaliBuyerRate = parseFloat(cs.hammaliBuyerPerBag) || 0;
+  const gradingFarmerRate = applyFarmerGrading ? (parseFloat(cs.gradingFarmerPerBag) || 0) : 0;
+  const gradingBuyerRate = applyBuyerGrading ? (parseFloat(cs.gradingBuyerPerBag) || 0) : 0;
   const aadhatFarmerPct = parseFloat(cs.aadhatCommissionFarmerPercent) || 0;
   const aadhatBuyerPct = parseFloat(cs.aadhatCommissionBuyerPercent) || 0;
   const mandiFarmerPct = parseFloat(cs.mandiCommissionFarmerPercent) || 0;
@@ -963,27 +963,27 @@ export default function TransactionsPage() {
                   <p className="font-semibold text-muted-foreground">Farmer Charges</p>
                   <div className="flex justify-between"><span>Aadhat:</span><span>{aadhatFarmerPct}%</span></div>
                   <div className="flex justify-between"><span>Mandi:</span><span>{mandiFarmerPct}%</span></div>
+                  <div className="flex justify-between"><span>Hammali:</span><span>₹{hammaliFarmerRate}/bag</span></div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
-                      <Switch checked={applyFarmerHammali} onCheckedChange={setApplyFarmerHammali} className="scale-75" data-testid="toggle-farmer-hammali" />
-                      <span>Hammali:</span>
+                      <Switch checked={applyFarmerGrading} onCheckedChange={setApplyFarmerGrading} className="scale-75" data-testid="toggle-farmer-grading" />
+                      <span>Grading:</span>
                     </div>
-                    <span className={!applyFarmerHammali ? "text-muted-foreground/50 line-through" : ""}>₹{parseFloat(cs.hammaliFarmerPerBag) || 0}/bag</span>
+                    <span className={!applyFarmerGrading ? "text-muted-foreground/50 line-through" : ""}>₹{parseFloat(cs.gradingFarmerPerBag) || 0}/bag</span>
                   </div>
-                  <div className="flex justify-between"><span>Grading:</span><span>₹{gradingFarmerRate}/bag</span></div>
                 </div>
                 <div className="bg-muted/50 rounded p-2 space-y-1">
                   <p className="font-semibold text-muted-foreground">Buyer Charges</p>
                   <div className="flex justify-between"><span>Aadhat:</span><span>{aadhatBuyerPct}%</span></div>
                   <div className="flex justify-between"><span>Mandi:</span><span>{mandiBuyerPct}%</span></div>
+                  <div className="flex justify-between"><span>Hammali:</span><span>₹{hammaliBuyerRate}/bag</span></div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
-                      <Switch checked={applyBuyerHammali} onCheckedChange={setApplyBuyerHammali} className="scale-75" data-testid="toggle-buyer-hammali" />
-                      <span>Hammali:</span>
+                      <Switch checked={applyBuyerGrading} onCheckedChange={setApplyBuyerGrading} className="scale-75" data-testid="toggle-buyer-grading" />
+                      <span>Grading:</span>
                     </div>
-                    <span className={!applyBuyerHammali ? "text-muted-foreground/50 line-through" : ""}>₹{parseFloat(cs.hammaliBuyerPerBag) || 0}/bag</span>
+                    <span className={!applyBuyerGrading ? "text-muted-foreground/50 line-through" : ""}>₹{parseFloat(cs.gradingBuyerPerBag) || 0}/bag</span>
                   </div>
-                  <div className="flex justify-between"><span>Grading:</span><span>₹{gradingBuyerRate}/bag</span></div>
                 </div>
               </div>
 
