@@ -196,7 +196,7 @@ export default function BiddingPage() {
                     </div>
                     <p className="text-sm font-medium truncate">{lot.farmer.name}</p>
                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground mt-1">
-                      <span>{t("common.remaining")}: <strong className="text-foreground">{lot.remainingBags}</strong> / {lot.numberOfBags} {t("common.bags")}</span>
+                      <span>{t("common.remaining")}: <strong className="text-foreground">{lot.remainingBags}</strong> / {lot.actualNumberOfBags ?? lot.numberOfBags} {t("common.bags")}</span>
                       {lot.initialTotalWeight && <span>{t("stockRegister.initWt")}: {lot.initialTotalWeight} kg</span>}
                     </div>
                   </div>

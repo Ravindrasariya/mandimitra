@@ -53,6 +53,7 @@ export default function StockRegisterPage() {
   const [editVehicleNumber, setEditVehicleNumber] = useState("");
   const [editVehicleBhadaRate, setEditVehicleBhadaRate] = useState("");
   const [editInitialTotalWeight, setEditInitialTotalWeight] = useState("");
+  const [editActualNumberOfBags, setEditActualNumberOfBags] = useState("");
   const [returnConfirmOpen, setReturnConfirmOpen] = useState(false);
 
   const { data: allLots = [], isLoading } = useQuery<LotWithFarmer[]>({
@@ -236,6 +237,7 @@ export default function StockRegisterPage() {
     setEditVehicleNumber(lot.vehicleNumber || "");
     setEditVehicleBhadaRate(lot.vehicleBhadaRate || "");
     setEditInitialTotalWeight(lot.initialTotalWeight || "");
+    setEditActualNumberOfBags(String(lot.actualNumberOfBags ?? lot.numberOfBags));
   };
 
   const saveEdit = () => {
@@ -249,14 +251,16 @@ export default function StockRegisterPage() {
         vehicleNumber: editVehicleNumber ? editVehicleNumber.toUpperCase() : null,
         vehicleBhadaRate: editVehicleBhadaRate || null,
         initialTotalWeight: editInitialTotalWeight || null,
+        actualNumberOfBags: editActualNumberOfBags ? parseInt(editActualNumberOfBags) : (editingLot?.numberOfBags ?? null),
       },
     });
   };
 
   const getLotStatus = (lot: LotWithFarmer) => {
     if (lot.isReturned) return "Returned";
+    const actual = lot.actualNumberOfBags ?? lot.numberOfBags;
     if (lot.remainingBags === 0) return "Sold Out";
-    if (lot.remainingBags < lot.numberOfBags) return "Partially Sold";
+    if (lot.remainingBags < actual) return "Partially Sold";
     return "Unsold";
   };
 
@@ -542,6 +546,9 @@ export default function StockRegisterPage() {
                       </div>
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
                         <span>Bags: <strong>{lot.numberOfBags}</strong></span>
+                        {(lot.actualNumberOfBags != null && lot.actualNumberOfBags !== lot.numberOfBags) && (
+                          <span>Actual: <strong className="text-orange-600">{lot.actualNumberOfBags}</strong></span>
+                        )}
                         <span>{t("common.remaining")}: <strong className={lot.remainingBags > 0 ? "text-primary" : "text-destructive"}>{lot.remainingBags}</strong></span>
                       </div>
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
@@ -575,6 +582,46 @@ export default function StockRegisterPage() {
             <DialogTitle>{t("stockRegister.editLot")} - {editingLot?.lotId}</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
+            <div className="space-y-1">
+              <Label>Original # of Bags</Label>
+              <Input
+                data-testid="input-original-bags"
+                value={editingLot?.numberOfBags ?? ""}
+                disabled
+                className="mobile-touch-target bg-muted"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Actual # of Bags</Label>
+              <Input
+                data-testid="input-actual-bags"
+                type="text"
+                inputMode="numeric"
+                value={editActualNumberOfBags}
+                onChange={(e) => {
+                  const val = e.target.value.replace(/\D/g, '');
+                  if (val === '' || parseInt(val) <= (editingLot?.numberOfBags ?? 0)) {
+                    setEditActualNumberOfBags(val);
+                  }
+                }}
+                onFocus={(e) => e.target.select()}
+                className="mobile-touch-target"
+              />
+              {editingLot && (() => {
+                const actual = editingLot.actualNumberOfBags ?? editingLot.numberOfBags;
+                const soldBags = actual - editingLot.remainingBags;
+                return (
+                  <>
+                    {editActualNumberOfBags && parseInt(editActualNumberOfBags) < editingLot.numberOfBags && (
+                      <p className="text-xs text-orange-600">Reduced from {editingLot.numberOfBags} due to damaged/graded harvest</p>
+                    )}
+                    {soldBags > 0 && (
+                      <p className="text-xs text-muted-foreground">Min: {soldBags} (already sold)</p>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
             <div className="space-y-1">
               <Label>{t("stockRegister.variety")}</Label>
               <Input
@@ -669,9 +716,9 @@ export default function StockRegisterPage() {
             <AlertDialogTitle>{t("stockRegister.returnConfirmTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
               {t("stockRegister.returnConfirmMsg")}
-              {editingLot && editingLot.remainingBags < editingLot.numberOfBags ? (
+              {editingLot && editingLot.remainingBags < (editingLot.actualNumberOfBags ?? editingLot.numberOfBags) ? (
                 <span className="block mt-2 text-orange-600 font-medium">
-                  {t("stockRegister.returnPartialMsg")} ({editingLot.numberOfBags - editingLot.remainingBags} bags sold). The bag count will be adjusted to the sold amount and marked as sold out.
+                  {t("stockRegister.returnPartialMsg")} ({(editingLot.actualNumberOfBags ?? editingLot.numberOfBags) - editingLot.remainingBags} bags sold). The bag count will be adjusted to the sold amount and marked as sold out.
                 </span>
               ) : (
                 <span className="block mt-2">

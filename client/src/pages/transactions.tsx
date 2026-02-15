@@ -102,7 +102,7 @@ h2{text-align:center;margin-bottom:5px}
 <tr><td><strong>लॉट नं:</strong> ${lot.lotId}</td><td><strong>दिनांक:</strong> ${dateStr}</td></tr>
 <tr><td><strong>किसान:</strong> ${farmer.name}</td><td><strong>फोन:</strong> ${farmer.phone || "-"}</td></tr>
 <tr><td><strong>फसल:</strong> ${lot.crop}</td><td><strong>किस्म:</strong> ${lot.variety || "-"}</td></tr>
-<tr><td><strong>थैले:</strong> ${lot.numberOfBags}</td><td><strong>वज़न:</strong> ${totalNetWeight.toFixed(2)} kg</td></tr>
+<tr><td><strong>थैले:</strong> ${lot.actualNumberOfBags ?? lot.numberOfBags}</td><td><strong>वज़न:</strong> ${totalNetWeight.toFixed(2)} kg</td></tr>
 </table>
 <div class="summary">
 <div class="summary-row"><span>कुल राशि (Gross):</span><span>₹${totalGross.toFixed(2)}</span></div>
@@ -800,7 +800,7 @@ export default function TransactionsPage() {
                         <Badge variant="outline" className="text-xs">{group.lot.crop}</Badge>
                       </div>
                       <p className="text-sm">{t("transactions.farmer")}: <strong>{group.farmer.name}</strong></p>
-                      <p className="text-xs text-muted-foreground">{group.lot.numberOfBags} {t("transactions.bagsTotal")}</p>
+                      <p className="text-xs text-muted-foreground">{group.lot.actualNumberOfBags ?? group.lot.numberOfBags} {t("transactions.bagsTotal")}{(group.lot.actualNumberOfBags != null && group.lot.actualNumberOfBags !== group.lot.numberOfBags) ? ` (Orig: ${group.lot.numberOfBags})` : ""}</p>
                     </div>
                     <div className="flex items-center gap-1">
                       <Button

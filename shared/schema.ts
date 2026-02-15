@@ -92,6 +92,7 @@ export const lots = pgTable("lots", {
   crop: text("crop").notNull(),
   variety: text("variety"),
   numberOfBags: integer("number_of_bags").notNull(),
+  actualNumberOfBags: integer("actual_number_of_bags"),
   remainingBags: integer("remaining_bags").notNull(),
   size: text("size").notNull(),
   bagMarka: text("bag_marka"),

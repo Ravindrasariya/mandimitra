@@ -414,6 +414,7 @@ export async function registerRoutes(
         crop,
         variety: req.body.variety || null,
         numberOfBags: parseInt(req.body.numberOfBags),
+        actualNumberOfBags: parseInt(req.body.numberOfBags),
         remainingBags: parseInt(req.body.numberOfBags),
         size: req.body.size,
         bagMarka: req.body.bagMarka || null,
@@ -430,7 +431,26 @@ export async function registerRoutes(
   });
 
   app.patch("/api/lots/:id", requireAuth, async (req, res) => {
-    const updated = await storage.updateLot(paramId(req.params.id), req.user!.businessId, req.body);
+    const lotId = paramId(req.params.id);
+    const businessId = req.user!.businessId;
+    const data = { ...req.body };
+
+    if (data.actualNumberOfBags != null) {
+      const lot = await storage.getLot(lotId, businessId);
+      if (!lot) return res.status(404).json({ message: "Lot not found" });
+
+      const oldActual = lot.actualNumberOfBags ?? lot.numberOfBags;
+      const newActual = data.actualNumberOfBags;
+      const soldBags = oldActual - lot.remainingBags;
+
+      if (newActual < soldBags) {
+        return res.status(400).json({ message: `Cannot reduce below already sold bags (${soldBags})` });
+      }
+
+      data.remainingBags = newActual - soldBags;
+    }
+
+    const updated = await storage.updateLot(lotId, businessId, data);
     if (!updated) return res.status(404).json({ message: "Lot not found" });
     res.json(updated);
   });
@@ -443,11 +463,12 @@ export async function registerRoutes(
       if (!lot) return res.status(404).json({ message: "Lot not found" });
       if (lot.isReturned) return res.status(400).json({ message: "Lot is already returned" });
 
-      const soldBags = lot.numberOfBags - lot.remainingBags;
+      const actual = lot.actualNumberOfBags ?? lot.numberOfBags;
+      const soldBags = actual - lot.remainingBags;
 
       if (soldBags > 0) {
         await storage.updateLot(lotId, businessId, {
-          numberOfBags: soldBags,
+          actualNumberOfBags: soldBags,
           remainingBags: 0,
           isReturned: true,
         } as any);
@@ -536,9 +557,10 @@ export async function registerRoutes(
       const lot = await storage.getLot(tx.lotId, businessId);
       if (!lot) return res.status(404).json({ message: "Lot not found" });
 
-      const newNumberOfBags = lot.isReturned ? lot.numberOfBags + bagsToReturn : lot.numberOfBags;
-      const newRemaining = Math.min(lot.remainingBags + bagsToReturn, newNumberOfBags);
-      const updateData: any = { remainingBags: newRemaining, numberOfBags: newNumberOfBags };
+      const actual = lot.actualNumberOfBags ?? lot.numberOfBags;
+      const newActual = lot.isReturned ? actual + bagsToReturn : actual;
+      const newRemaining = Math.min(lot.remainingBags + bagsToReturn, newActual);
+      const updateData: any = { remainingBags: newRemaining, actualNumberOfBags: newActual };
       await storage.updateLot(lot.id, businessId, updateData);
       await storage.updateTransaction(txId, businessId, { isReversed: true } as any);
 
@@ -711,7 +733,7 @@ export async function registerRoutes(
         businessName: business?.name || "Mandi Mitra",
         lots: allLots.map(l => ({
           id: l.id, lotId: l.lotId, crop: l.crop, date: l.date,
-          numberOfBags: l.numberOfBags, remainingBags: l.remainingBags,
+          numberOfBags: l.numberOfBags, actualNumberOfBags: l.actualNumberOfBags, remainingBags: l.remainingBags,
           farmerId: l.farmerId, farmerName: l.farmer.name,
           initialTotalWeight: l.initialTotalWeight,
         })),
