@@ -765,7 +765,7 @@ export default function CashPage() {
               </div>
               {(outwardOutflowType === "Farmer-Advance" || outwardOutflowType === "Farmer-Harvest Sale") && (
                 <div className="space-y-1">
-                  <Label className="text-xs">{t("cash.farmerWithDues")}</Label>
+                  <Label className="text-xs">{outwardOutflowType === "Farmer-Advance" ? t("cash.farmer") : t("cash.farmerWithDues")}</Label>
                   <div className="relative">
                     {outwardFarmerId ? (
                       <div className="h-9 text-sm rounded-md border border-input bg-background px-3 flex items-center gap-2">
