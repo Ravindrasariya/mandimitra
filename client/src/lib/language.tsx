@@ -140,7 +140,6 @@ const translations: Record<string, Record<Language, string>> = {
   "transactions.grading": { en: "Grading (Rs.)", hi: "ग्रेडिंग (रु.)" },
   "transactions.aadhat": { en: "Aadhat %", hi: "आढ़त %" },
   "transactions.mandi": { en: "Mandi %", hi: "मण्डी %" },
-  "transactions.chargedTo": { en: "Charges Applied To", hi: "शुल्क लागू" },
   "transactions.buyer": { en: "Buyer", hi: "खरीदार" },
   "transactions.sellerFarmer": { en: "Seller (Farmer)", hi: "विक्रेता (किसान)" },
   "transactions.grossAmount": { en: "Gross Amount", hi: "कुल राशि" },

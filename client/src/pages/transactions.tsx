@@ -79,24 +79,10 @@ function generateFarmerReceiptHtml(lot: Lot, farmer: Farmer, txns: TransactionWi
     return s + gross * parseFloat(t.mandiFarmerPercent || "0") / 100;
   }, 0);
 
-  const isNewFormat = (t: TransactionWithDetails) =>
-    parseFloat(t.aadhatFarmerPercent || "0") > 0 || parseFloat(t.mandiFarmerPercent || "0") > 0 ||
-    parseFloat(t.aadhatBuyerPercent || "0") > 0 || parseFloat(t.mandiBuyerPercent || "0") > 0 ||
-    parseFloat(t.hammaliFarmerPerBag || "0") > 0 || parseFloat(t.hammaliBuyerPerBag || "0") > 0 ||
-    parseFloat(t.gradingFarmerPerBag || "0") > 0 || parseFloat(t.gradingBuyerPerBag || "0") > 0;
-
-  const hasAnyOldFormat = txns.some(t => !isNewFormat(t));
-
-  const oldHammali = txns.filter(t => !isNewFormat(t)).reduce((s, t) => s + parseFloat(t.hammaliCharges || "0"), 0);
-  const oldGrading = txns.filter(t => !isNewFormat(t)).reduce((s, t) => s + parseFloat(t.gradingCharges || "0"), 0);
-  const oldSellerTxns = txns.filter(t => !isNewFormat(t) && t.chargedTo === "Seller");
-  const oldAadhat = oldSellerTxns.reduce((s, t) => s + parseFloat(t.aadhatCharges || "0"), 0);
-  const oldMandi = oldSellerTxns.reduce((s, t) => s + parseFloat(t.mandiCharges || "0"), 0);
-
-  const hammaliDisplay = totalHammaliFarmer + oldHammali;
-  const gradingDisplay = totalGradingFarmer + oldGrading;
-  const aadhatDisplay = totalAadhatFarmer + oldAadhat;
-  const mandiDisplay = totalMandiFarmer + oldMandi;
+  const hammaliDisplay = totalHammaliFarmer;
+  const gradingDisplay = totalGradingFarmer;
+  const aadhatDisplay = totalAadhatFarmer;
+  const mandiDisplay = totalMandiFarmer;
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>किसान रसीद</title>
 <style>body{font-family:'Noto Sans Devanagari',sans-serif;margin:20px;color:#333}
@@ -134,14 +120,10 @@ function generateBuyerReceiptHtml(lot: Lot, farmer: Farmer, tx: TransactionWithD
   const dateStr = tx.date || format(new Date(), "yyyy-MM-dd");
   const bags = tx.numberOfBags || 0;
 
-  const hasNewSplitFields = parseFloat(tx.aadhatBuyerPercent || "0") > 0 || parseFloat(tx.mandiBuyerPercent || "0") > 0 ||
-    parseFloat(tx.hammaliBuyerPerBag || "0") > 0 || parseFloat(tx.gradingBuyerPerBag || "0") > 0 ||
-    parseFloat(tx.aadhatFarmerPercent || "0") > 0 || parseFloat(tx.mandiFarmerPercent || "0") > 0 ||
-    parseFloat(tx.hammaliFarmerPerBag || "0") > 0 || parseFloat(tx.gradingFarmerPerBag || "0") > 0;
-  const hammaliBuyer = hasNewSplitFields ? parseFloat(tx.hammaliBuyerPerBag || "0") * bags : parseFloat(tx.hammaliCharges || "0");
-  const gradingBuyer = hasNewSplitFields ? parseFloat(tx.gradingBuyerPerBag || "0") * bags : parseFloat(tx.gradingCharges || "0");
-  const aadhatBuyer = hasNewSplitFields ? grossAmount * parseFloat(tx.aadhatBuyerPercent || "0") / 100 : (tx.chargedTo === "Buyer" ? parseFloat(tx.aadhatCharges || "0") : 0);
-  const mandiBuyer = hasNewSplitFields ? grossAmount * parseFloat(tx.mandiBuyerPercent || "0") / 100 : (tx.chargedTo === "Buyer" ? parseFloat(tx.mandiCharges || "0") : 0);
+  const hammaliBuyer = parseFloat(tx.hammaliBuyerPerBag || "0") * bags;
+  const gradingBuyer = parseFloat(tx.gradingBuyerPerBag || "0") * bags;
+  const aadhatBuyer = grossAmount * parseFloat(tx.aadhatBuyerPercent || "0") / 100;
+  const mandiBuyer = grossAmount * parseFloat(tx.mandiBuyerPercent || "0") / 100;
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Buyer Receipt</title>
 <style>body{font-family:Arial,sans-serif;margin:20px;color:#333}
@@ -178,8 +160,8 @@ h2{text-align:center;margin-bottom:5px}
 <div class="summary">
 ${hammaliBuyer > 0 ? `<div class="summary-row"><span>Hammali (${bags} bags):</span><span>Rs.${hammaliBuyer.toFixed(2)}</span></div>` : ""}
 ${gradingBuyer > 0 ? `<div class="summary-row"><span>Grading:</span><span>Rs.${gradingBuyer.toFixed(2)}</span></div>` : ""}
-${aadhatBuyer > 0 ? `<div class="summary-row"><span>Aadhat (${hasNewSplitFields ? tx.aadhatBuyerPercent : tx.aadhatCommissionPercent}%):</span><span>Rs.${aadhatBuyer.toFixed(2)}</span></div>` : ""}
-${mandiBuyer > 0 ? `<div class="summary-row"><span>Mandi (${hasNewSplitFields ? tx.mandiBuyerPercent : tx.mandiCommissionPercent}%):</span><span>Rs.${mandiBuyer.toFixed(2)}</span></div>` : ""}
+${aadhatBuyer > 0 ? `<div class="summary-row"><span>Aadhat (${tx.aadhatBuyerPercent}%):</span><span>Rs.${aadhatBuyer.toFixed(2)}</span></div>` : ""}
+${mandiBuyer > 0 ? `<div class="summary-row"><span>Mandi (${tx.mandiBuyerPercent}%):</span><span>Rs.${mandiBuyer.toFixed(2)}</span></div>` : ""}
 <div class="summary-row total"><span>Total Receivable from Buyer:</span><span>Rs.${parseFloat(tx.totalReceivableFromBuyer || "0").toFixed(2)}</span></div>
 </div>
 <script>window.onload=function(){window.print()}</script>
@@ -498,16 +480,12 @@ export default function TransactionsPage() {
       farmerId: selectedBid.lot.farmerId,
       totalWeight,
       numberOfBags: bags,
-      hammaliPerBag: hammaliFarmerRate.toString(),
       hammaliCharges: hammaliFarmerTotal.toString(),
       gradingCharges: gradingFarmerTotal.toString(),
       netWeight,
       pricePerKg: selectedBid.pricePerKg,
-      aadhatCommissionPercent: aadhatBuyerPct.toString(),
-      mandiCommissionPercent: mandiBuyerPct.toString(),
       aadhatCharges: aadhatBuyer.toFixed(2),
       mandiCharges: mandiBuyer.toFixed(2),
-      chargedTo: "Buyer",
       aadhatFarmerPercent: aadhatFarmerPct.toString(),
       mandiFarmerPercent: mandiFarmerPct.toString(),
       aadhatBuyerPercent: aadhatBuyerPct.toString(),
