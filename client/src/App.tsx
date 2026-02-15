@@ -227,9 +227,9 @@ function AppLayout() {
         </main>
         <footer className={`border-t bg-background text-xs text-muted-foreground px-4 py-2 flex flex-col sm:flex-row items-center justify-between gap-1 ${isMobile ? "mb-16" : ""}`}>
           <span className="flex items-center gap-1">
-            <Phone className="w-3 h-3" /> Need Help? Reach out to <span className="text-green-600 font-medium">KrashuVed</span> : +918882589392
+            <Phone className="w-3 h-3" /> Need Help? Reach out to <span className="font-medium"><span className="text-green-600">Krashu</span><span className="text-orange-500">Ved</span></span> : +918882589392
           </span>
-          <span>Powered by <span className="text-green-600 font-medium">KrashuVed</span> &nbsp;All Rights Reserved</span>
+          <span>Powered by <span className="font-medium"><span className="text-green-600">Krashu</span><span className="text-orange-500">Ved</span></span> &nbsp;All Rights Reserved</span>
         </footer>
         {isMobile && <MobileBottomNav />}
       </div>
