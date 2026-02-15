@@ -63,14 +63,13 @@ function buildUnifiedLotGroups(
 }
 
 function generateFarmerReceiptHtml(lot: Lot, farmer: Farmer, txns: TransactionWithDetails[], businessName?: string) {
-  const totalBags = txns.reduce((s, t) => s + (t.numberOfBags || 0), 0);
-  const totalPayable = txns.reduce((s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0);
-  const totalGross = txns.reduce((s, t) => s + (parseFloat(t.netWeight || "0") * parseFloat(t.pricePerKg || "0")), 0);
   const dateStr = txns[0]?.date || format(new Date(), "yyyy-MM-dd");
-  const totalNetWeight = txns.reduce((s, t) => s + parseFloat(t.netWeight || "0"), 0);
+  const originalBags = lot.numberOfBags;
+  const cropLabel: Record<string, string> = { Potato: "आलू / Potato", Onion: "प्याज / Onion", Garlic: "लहसुन / Garlic" };
 
-  const totalHammaliFarmer = txns.reduce((s, t) => s + parseFloat(t.hammaliFarmerPerBag || "0") * (t.numberOfBags || 0), 0);
-  const totalGradingFarmer = txns.reduce((s, t) => s + parseFloat(t.gradingFarmerPerBag || "0") * (t.numberOfBags || 0), 0);
+  const totalHammali = txns.reduce((s, t) => s + parseFloat(t.hammaliCharges || "0"), 0);
+  const totalGrading = txns.reduce((s, t) => s + parseFloat(t.gradingCharges || "0"), 0);
+  const totalFreight = txns.reduce((s, t) => s + parseFloat(t.freightCharges || "0"), 0);
   const totalAadhatFarmer = txns.reduce((s, t) => {
     const gross = parseFloat(t.netWeight || "0") * parseFloat(t.pricePerKg || "0");
     return s + gross * parseFloat(t.aadhatFarmerPercent || "0") / 100;
@@ -80,41 +79,87 @@ function generateFarmerReceiptHtml(lot: Lot, farmer: Farmer, txns: TransactionWi
     return s + gross * parseFloat(t.mandiFarmerPercent || "0") / 100;
   }, 0);
 
-  const totalFreightFarmer = txns.reduce((s, t) => s + parseFloat(t.freightCharges || "0"), 0);
+  const totalDeduction = totalHammali + totalGrading + totalFreight + totalAadhatFarmer + totalMandiFarmer;
+  const totalPayable = txns.reduce((s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0);
+  const totalGross = txns.reduce((s, t) => s + (parseFloat(t.netWeight || "0") * parseFloat(t.pricePerKg || "0")), 0);
 
-  const hammaliDisplay = totalHammaliFarmer;
-  const gradingDisplay = totalGradingFarmer;
-  const aadhatDisplay = totalAadhatFarmer;
-  const mandiDisplay = totalMandiFarmer;
-  const freightDisplay = totalFreightFarmer;
+  const txnRows = txns.map(t => {
+    const nw = parseFloat(t.netWeight || "0");
+    const ppk = parseFloat(t.pricePerKg || "0");
+    const gross = nw * ppk;
+    return `<tr>
+      <td style="padding:6px;border:1px solid #999;text-align:center">${cropLabel[lot.crop] || lot.crop}</td>
+      <td style="padding:6px;border:1px solid #999;text-align:center">${t.numberOfBags || 0}</td>
+      <td style="padding:6px;border:1px solid #999;text-align:right">${nw.toFixed(2)}</td>
+      <td style="padding:6px;border:1px solid #999;text-align:right">₹${ppk.toFixed(2)}</td>
+      <td style="padding:6px;border:1px solid #999;text-align:right">₹${gross.toFixed(2)}</td>
+    </tr>`;
+  }).join("");
+
+  const totalActualBags = txns.reduce((s, t) => s + (t.numberOfBags || 0), 0);
+  const totalNetWeight = txns.reduce((s, t) => s + parseFloat(t.netWeight || "0"), 0);
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>किसान रसीद</title>
-<style>body{font-family:'Noto Sans Devanagari',sans-serif;margin:20px;color:#333}
-table{width:100%;border-collapse:collapse;margin:10px 0}
-h2{text-align:center;margin-bottom:5px}
-.header{text-align:center;margin-bottom:15px}
-.summary{margin-top:15px;border-top:2px solid #333;padding-top:10px}
-.summary-row{display:flex;justify-content:space-between;padding:3px 0}
-.total{font-weight:bold;font-size:1.1em;color:#16a34a;border-top:2px solid #333;padding-top:8px;margin-top:8px}
+<style>body{font-family:'Noto Sans Devanagari',sans-serif;margin:20px;color:#333;font-size:14px}
+table{width:100%;border-collapse:collapse;margin:8px 0}
+h2{text-align:center;margin-bottom:2px}
+.header{text-align:center;margin-bottom:10px}
+.info-table td{padding:4px 8px;vertical-align:top}
+.info-table{margin-bottom:12px}
+.txn-table th{padding:6px;border:1px solid #999;background:#f5f5f5;text-align:center;font-size:13px}
+.ded-section{margin-top:12px;border-top:2px solid #333;padding-top:8px}
+.ded-row{display:flex;justify-content:space-between;padding:3px 0;font-size:14px}
+.total-row{font-weight:bold;font-size:1.1em;color:#16a34a;border-top:2px solid #333;padding-top:8px;margin-top:8px}
+.sub-total{font-weight:bold;border-top:1px solid #999;padding-top:4px;margin-top:4px}
 @media print{body{margin:10mm}}
 </style></head><body>
 <div class="header">
 <h2>किसान रसीद / Farmer Receipt</h2>
+${businessName ? `<p style="font-size:0.9em;color:#666;margin:2px 0">${businessName}</p>` : ""}
 </div>
-<table>
-<tr><td><strong>लॉट नं:</strong> ${lot.lotId}</td><td><strong>दिनांक:</strong> ${dateStr}</td></tr>
-<tr><td><strong>किसान:</strong> ${farmer.name}</td><td><strong>फोन:</strong> ${farmer.phone || "-"}</td></tr>
-<tr><td><strong>फसल:</strong> ${lot.crop}</td><td><strong>किस्म:</strong> ${lot.variety || "-"}</td></tr>
-<tr><td><strong>थैले:</strong> ${lot.actualNumberOfBags ?? lot.numberOfBags}</td><td><strong>वज़न:</strong> ${totalNetWeight.toFixed(2)} kg</td></tr>
+
+<table class="info-table">
+<tr><td><strong>रसीद / Lot नं:</strong> ${lot.lotId}</td><td style="text-align:right"><strong>दिनांक:</strong> ${dateStr}</td></tr>
 </table>
-<div class="summary">
-<div class="summary-row"><span>कुल राशि (Gross):</span><span>₹${totalGross.toFixed(2)}</span></div>
-${hammaliDisplay > 0 ? `<div class="summary-row"><span>हम्माली (${totalBags} थैले):</span><span>₹${hammaliDisplay.toFixed(2)}</span></div>` : ""}
-${gradingDisplay > 0 ? `<div class="summary-row"><span>ग्रेडिंग:</span><span>₹${gradingDisplay.toFixed(2)}</span></div>` : ""}
-${aadhatDisplay > 0 ? `<div class="summary-row"><span>आढ़त:</span><span>₹${aadhatDisplay.toFixed(2)}</span></div>` : ""}
-${mandiDisplay > 0 ? `<div class="summary-row"><span>मण्डी शुल्क:</span><span>₹${mandiDisplay.toFixed(2)}</span></div>` : ""}
-${freightDisplay > 0 ? `<div class="summary-row"><span>भाड़ा / Freight:</span><span>₹${freightDisplay.toFixed(2)}</span></div>` : ""}
-<div class="summary-row total"><span>किसान को देय राशि:</span><span>₹${totalPayable.toFixed(2)}</span></div>
+
+<table class="info-table">
+<tr><td><strong>किसान / Farmer:</strong> ${farmer.name}</td><td><strong>फोन:</strong> ${farmer.phone || "-"}</td></tr>
+<tr><td><strong>गाँव:</strong> ${farmer.village || "-"}</td><td><strong>तहसील:</strong> ${farmer.tehsil || "-"}</td></tr>
+<tr><td><strong>जिला:</strong> ${farmer.district || "-"}</td><td><strong>राज्य:</strong> ${farmer.state || "-"}</td></tr>
+<tr><td><strong>गाड़ी नं:</strong> ${lot.vehicleNumber || "-"}</td><td><strong>थैले (Original):</strong> ${originalBags}</td></tr>
+</table>
+
+<table class="txn-table">
+<thead>
+<tr>
+  <th>फसल / Crop</th>
+  <th>थैले / Bags</th>
+  <th>वज़न / Net Wt (kg)</th>
+  <th>भाव / Rate (₹/kg)</th>
+  <th>राशि / Amount (₹)</th>
+</tr>
+</thead>
+<tbody>
+${txnRows}
+<tr style="background:#f9f9f9;font-weight:bold">
+  <td style="padding:6px;border:1px solid #999;text-align:center">कुल / Total</td>
+  <td style="padding:6px;border:1px solid #999;text-align:center">${totalActualBags}</td>
+  <td style="padding:6px;border:1px solid #999;text-align:right">${totalNetWeight.toFixed(2)}</td>
+  <td style="padding:6px;border:1px solid #999;text-align:right">-</td>
+  <td style="padding:6px;border:1px solid #999;text-align:right">₹${totalGross.toFixed(2)}</td>
+</tr>
+</tbody>
+</table>
+
+<div class="ded-section">
+<div class="ded-row" style="font-weight:bold;margin-bottom:4px"><span>कटौती / Deductions:</span><span></span></div>
+${totalHammali > 0 ? `<div class="ded-row"><span>हम्माली / Hammali:</span><span>₹${totalHammali.toFixed(2)}</span></div>` : ""}
+${totalGrading > 0 ? `<div class="ded-row"><span>ग्रेडिंग / Grading:</span><span>₹${totalGrading.toFixed(2)}</span></div>` : ""}
+${totalAadhatFarmer > 0 ? `<div class="ded-row"><span>आढ़त / Aadhat:</span><span>₹${totalAadhatFarmer.toFixed(2)}</span></div>` : ""}
+${totalMandiFarmer > 0 ? `<div class="ded-row"><span>मण्डी शुल्क / Mandi:</span><span>₹${totalMandiFarmer.toFixed(2)}</span></div>` : ""}
+${totalFreight > 0 ? `<div class="ded-row"><span>भाड़ा / Freight:</span><span>₹${totalFreight.toFixed(2)}</span></div>` : ""}
+${totalDeduction > 0 ? `<div class="ded-row sub-total"><span>कुल कटौती / Total Deduction:</span><span>₹${totalDeduction.toFixed(2)}</span></div>` : ""}
+<div class="ded-row total-row"><span>किसान को देय राशि / Net Payable:</span><span>₹${totalPayable.toFixed(2)}</span></div>
 </div>
 <script>window.onload=function(){window.print()}</script>
 </body></html>`;
