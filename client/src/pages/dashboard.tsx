@@ -330,16 +330,16 @@ export default function DashboardPage() {
     <div className="p-3 md:p-6 max-w-6xl mx-auto space-y-4">
       <div className="flex items-center gap-2">
         <LayoutDashboard className="w-5 h-5 text-primary" />
-        <h1 className="text-base md:text-lg font-bold" data-testid="text-business-name">
-          {data?.businessName || "Dashboard"}
+        <h1 className="text-base md:text-lg font-bold flex-1" data-testid="text-business-name">
+          {data?.businessName || t("nav.dashboard")}
         </h1>
         <Button
           variant="ghost"
           size="sm"
-          className="h-7 w-7 p-0 ml-1"
+          className="h-7 w-7 p-0 shrink-0"
           data-testid="button-charge-settings"
           onClick={openSettings}
-          title="Charge Settings"
+          title={t("dash.chargeSettings")}
         >
           <Settings className="w-4 h-4 text-muted-foreground" />
         </Button>
@@ -351,7 +351,7 @@ export default function DashboardPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Crops</SelectItem>
+            <SelectItem value="all">{t("dash.allCrops")}</SelectItem>
             <SelectItem value="Potato">Potato</SelectItem>
             <SelectItem value="Onion">Onion</SelectItem>
             <SelectItem value="Garlic">Garlic</SelectItem>
@@ -372,7 +372,7 @@ export default function DashboardPage() {
               onClick={() => { setSelectedYears([]); setSelectedDays([]); setYearPopoverOpen(false); }}
             >
               <Checkbox checked={selectedYears.length === 0} />
-              <span>All Years</span>
+              <span>{t("dash.allYears")}</span>
             </div>
             {Array.from({ length: 5 }, (_, i) => String(now.getFullYear() - i)).map(y => (
               <div
@@ -460,7 +460,7 @@ export default function DashboardPage() {
           <CardContent className="p-3">
             <div className="flex items-center gap-1.5 mb-1">
               <Package className="w-3.5 h-3.5 text-blue-600" />
-              <span className="text-[11px] font-medium text-muted-foreground">Farmers / Lots / Txns</span>
+              <span className="text-[11px] font-medium text-muted-foreground">{t("dash.farmersLotsTxns")}</span>
             </div>
             <div className="text-lg font-bold text-blue-700 dark:text-blue-400" data-testid="text-summary-counts">
               {summary.farmersCount} <span className="text-xs font-normal text-muted-foreground">/</span> {summary.lotsCount} <span className="text-xs font-normal text-muted-foreground">/</span> {summary.txnCount}
@@ -472,13 +472,13 @@ export default function DashboardPage() {
           <CardContent className="p-3">
             <div className="flex items-center gap-1.5 mb-1">
               <Users className="w-3.5 h-3.5 text-orange-600" />
-              <span className="text-[11px] font-medium text-muted-foreground">Farmer Payable</span>
+              <span className="text-[11px] font-medium text-muted-foreground">{t("dash.farmerPayable")}</span>
             </div>
             <div className="text-sm font-bold text-orange-700 dark:text-orange-400" data-testid="text-farmer-payable">
               ₹{summary.totalPayable.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
             </div>
             <div className="text-[11px] text-red-600 font-medium" data-testid="text-farmer-due">
-              Due: ₹{summary.farmerDue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+              {t("dash.due")}: ₹{summary.farmerDue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
             </div>
           </CardContent>
         </Card>
@@ -487,13 +487,13 @@ export default function DashboardPage() {
           <CardContent className="p-3">
             <div className="flex items-center gap-1.5 mb-1">
               <ShoppingBag className="w-3.5 h-3.5 text-green-600" />
-              <span className="text-[11px] font-medium text-muted-foreground">Buyer Receivable</span>
+              <span className="text-[11px] font-medium text-muted-foreground">{t("dash.buyerReceivable")}</span>
             </div>
             <div className="text-sm font-bold text-green-700 dark:text-green-400" data-testid="text-buyer-receivable">
               ₹{summary.totalReceivable.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
             </div>
             <div className="text-[11px] text-red-600 font-medium" data-testid="text-buyer-due">
-              Due: ₹{summary.buyerDue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+              {t("dash.due")}: ₹{summary.buyerDue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
             </div>
           </CardContent>
         </Card>
@@ -502,7 +502,7 @@ export default function DashboardPage() {
           <CardContent className="p-3">
             <div className="flex items-center gap-1.5 mb-1">
               <Landmark className="w-3.5 h-3.5 text-purple-600" />
-              <span className="text-[11px] font-medium text-muted-foreground">Mandi Commission</span>
+              <span className="text-[11px] font-medium text-muted-foreground">{t("dash.mandiCommission")}</span>
             </div>
             <div className="text-sm font-bold text-purple-700 dark:text-purple-400" data-testid="text-mandi-commission">
               ₹{summary.totalMandi.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
@@ -514,7 +514,7 @@ export default function DashboardPage() {
           <CardContent className="p-3">
             <div className="flex items-center gap-1.5 mb-1">
               <HandCoins className="w-3.5 h-3.5 text-amber-600" />
-              <span className="text-[11px] font-medium text-muted-foreground">Aadhat Commission</span>
+              <span className="text-[11px] font-medium text-muted-foreground">{t("dash.aadhatCommission")}</span>
             </div>
             <div className="text-sm font-bold text-amber-700 dark:text-amber-400" data-testid="text-aadhat-commission">
               ₹{summary.totalAadhat.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
@@ -528,26 +528,28 @@ export default function DashboardPage() {
           <CardContent className="p-3">
             <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
               <TrendingUp className="w-4 h-4 text-primary" />
-              Receivables by Crop
+              {t("dash.receivablesByCrop")}
             </h3>
             {cropDistribution.length === 0 ? (
-              <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">No data</div>
+              <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">{t("dash.noData")}</div>
             ) : (
               <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
+                <PieChart margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
                   <Pie
                     data={cropDistribution}
                     dataKey="value"
                     nameKey="name"
                     cx="50%"
                     cy="50%"
-                    outerRadius={65}
-                    label={({ name, pct, value, cx: pieCx, x, y }) => {
-                      const anchor = x > pieCx ? "start" : "end";
+                    outerRadius={60}
+                    label={({ name, pct, value, cx: pieCx, x, y, midAngle }) => {
+                      const isRight = x > pieCx;
+                      const anchor = isRight ? "start" : "end";
+                      const xOffset = isRight ? 4 : -4;
                       return (
-                        <text x={x} y={y} textAnchor={anchor} fontSize={10} fill="#374151">
-                          <tspan x={x} dy="-0.4em">{name}</tspan>
-                          <tspan x={x} dy="1.2em">₹{Number(value).toLocaleString("en-IN")} ({pct}%)</tspan>
+                        <text x={x + xOffset} y={y} textAnchor={anchor} fontSize={10} fill="#374151">
+                          <tspan x={x + xOffset} dy="-0.4em">{name}</tspan>
+                          <tspan x={x + xOffset} dy="1.2em">{Number(value).toLocaleString("en-IN")} ({pct}%)</tspan>
                         </text>
                       );
                     }}
@@ -567,26 +569,28 @@ export default function DashboardPage() {
           <CardContent className="p-3">
             <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5">
               <ShoppingBag className="w-4 h-4 text-primary" />
-              Buyer Dues Distribution
+              {t("dash.buyerDuesDist")}
             </h3>
             {buyerDuesDistribution.length === 0 ? (
-              <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">No data</div>
+              <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">{t("dash.noData")}</div>
             ) : (
               <ResponsiveContainer width="100%" height={220}>
-                <PieChart>
+                <PieChart margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
                   <Pie
                     data={buyerDuesDistribution}
                     dataKey="value"
                     nameKey="name"
                     cx="50%"
                     cy="50%"
-                    outerRadius={65}
-                    label={({ name, pct, value, cx: pieCx, x, y }) => {
-                      const anchor = x > pieCx ? "start" : "end";
+                    outerRadius={60}
+                    label={({ name, pct, value, cx: pieCx, x, y, midAngle }) => {
+                      const isRight = x > pieCx;
+                      const anchor = isRight ? "start" : "end";
+                      const xOffset = isRight ? 4 : -4;
                       return (
-                        <text x={x} y={y} textAnchor={anchor} fontSize={10} fill="#374151">
-                          <tspan x={x} dy="-0.4em">{name}</tspan>
-                          <tspan x={x} dy="1.2em">₹{Number(value).toLocaleString("en-IN")} ({pct}%)</tspan>
+                        <text x={x + xOffset} y={y} textAnchor={anchor} fontSize={10} fill="#374151">
+                          <tspan x={x + xOffset} dy="-0.4em">{name}</tspan>
+                          <tspan x={x + xOffset} dy="1.2em">{Number(value).toLocaleString("en-IN")} ({pct}%)</tspan>
                         </text>
                       );
                     }}
@@ -606,9 +610,9 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <Card>
           <CardContent className="p-3">
-            <h3 className="text-sm font-semibold mb-2">Farmer Payable Due by Date</h3>
+            <h3 className="text-sm font-semibold mb-2">{t("dash.farmerDueByDate")}</h3>
             {timeSeriesData.length === 0 ? (
-              <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">No data</div>
+              <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">{t("dash.noData")}</div>
             ) : (
               <ResponsiveContainer width="100%" height={220}>
                 <LineChart data={timeSeriesData}>
@@ -625,9 +629,9 @@ export default function DashboardPage() {
 
         <Card>
           <CardContent className="p-3">
-            <h3 className="text-sm font-semibold mb-2">Buyer Receivable Due by Date</h3>
+            <h3 className="text-sm font-semibold mb-2">{t("dash.buyerDueByDate")}</h3>
             {timeSeriesData.length === 0 ? (
-              <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">No data</div>
+              <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">{t("dash.noData")}</div>
             ) : (
               <ResponsiveContainer width="100%" height={220}>
                 <LineChart data={timeSeriesData}>
@@ -644,9 +648,9 @@ export default function DashboardPage() {
 
         <Card>
           <CardContent className="p-3">
-            <h3 className="text-sm font-semibold mb-2">Total Volume (Kg) by Date</h3>
+            <h3 className="text-sm font-semibold mb-2">{t("dash.volumeByDate")}</h3>
             {timeSeriesData.length === 0 ? (
-              <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">No data</div>
+              <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">{t("dash.noData")}</div>
             ) : (
               <ResponsiveContainer width="100%" height={220}>
                 <LineChart data={timeSeriesData}>
@@ -663,9 +667,9 @@ export default function DashboardPage() {
 
         <Card>
           <CardContent className="p-3">
-            <h3 className="text-sm font-semibold mb-2">Aadhat Value by Date</h3>
+            <h3 className="text-sm font-semibold mb-2">{t("dash.aadhatByDate")}</h3>
             {timeSeriesData.length === 0 ? (
-              <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">No data</div>
+              <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">{t("dash.noData")}</div>
             ) : (
               <ResponsiveContainer width="100%" height={220}>
                 <LineChart data={timeSeriesData}>
@@ -686,15 +690,15 @@ export default function DashboardPage() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Settings className="w-4 h-4" />
-              Charge Settings
+              {t("dash.chargeSettings")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label className="text-sm font-semibold">Mandi Commission (%)</Label>
+              <Label className="text-sm font-semibold">{t("dash.mandiCommPct")}</Label>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Farmer</Label>
+                  <Label className="text-xs text-muted-foreground">{t("dash.farmer")}</Label>
                   <Input
                     data-testid="input-mandi-farmer"
                     type="text"
@@ -706,7 +710,7 @@ export default function DashboardPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Buyer</Label>
+                  <Label className="text-xs text-muted-foreground">{t("dash.buyer")}</Label>
                   <Input
                     data-testid="input-mandi-buyer"
                     type="text"
@@ -721,10 +725,10 @@ export default function DashboardPage() {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-sm font-semibold">Aadhat Commission (%)</Label>
+              <Label className="text-sm font-semibold">{t("dash.aadhatCommPct")}</Label>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Farmer</Label>
+                  <Label className="text-xs text-muted-foreground">{t("dash.farmer")}</Label>
                   <Input
                     data-testid="input-aadhat-farmer"
                     type="text"
@@ -736,7 +740,7 @@ export default function DashboardPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Buyer</Label>
+                  <Label className="text-xs text-muted-foreground">{t("dash.buyer")}</Label>
                   <Input
                     data-testid="input-aadhat-buyer"
                     type="text"
@@ -751,10 +755,10 @@ export default function DashboardPage() {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-sm font-semibold">Hammali (₹/bag)</Label>
+              <Label className="text-sm font-semibold">{t("dash.hammaliPerBag")}</Label>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Farmer</Label>
+                  <Label className="text-xs text-muted-foreground">{t("dash.farmer")}</Label>
                   <Input
                     data-testid="input-hammali-farmer"
                     type="text"
@@ -766,7 +770,7 @@ export default function DashboardPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Buyer</Label>
+                  <Label className="text-xs text-muted-foreground">{t("dash.buyer")}</Label>
                   <Input
                     data-testid="input-hammali-buyer"
                     type="text"
@@ -781,10 +785,10 @@ export default function DashboardPage() {
             </div>
 
             <div className="space-y-2">
-              <Label className="text-sm font-semibold">Grading (₹/bag)</Label>
+              <Label className="text-sm font-semibold">{t("dash.gradingPerBag")}</Label>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Farmer</Label>
+                  <Label className="text-xs text-muted-foreground">{t("dash.farmer")}</Label>
                   <Input
                     data-testid="input-grading-farmer"
                     type="text"
@@ -796,7 +800,7 @@ export default function DashboardPage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">Buyer</Label>
+                  <Label className="text-xs text-muted-foreground">{t("dash.buyer")}</Label>
                   <Input
                     data-testid="input-grading-buyer"
                     type="text"
@@ -816,7 +820,7 @@ export default function DashboardPage() {
               onClick={() => saveChargeSettingsMutation.mutate(chargeForm)}
               disabled={saveChargeSettingsMutation.isPending}
             >
-              {saveChargeSettingsMutation.isPending ? "Saving..." : "Save Settings"}
+              {saveChargeSettingsMutation.isPending ? t("dash.saving") : t("dash.saveSettings")}
             </Button>
           </div>
         </DialogContent>
