@@ -549,22 +549,30 @@ export class DatabaseStorage implements IStorage {
     const dateStr = `${txDate.getFullYear()}${String(txDate.getMonth() + 1).padStart(2, "0")}${String(txDate.getDate()).padStart(2, "0")}`;
     const prefix = `TX${dateStr}`;
 
-    const [result] = await db.select({ max: sql<string>`coalesce(max(
-      case when ${transactions.transactionId} ~ ${`^${prefix}\\d+$`}
-        then cast(substring(${transactions.transactionId} from ${prefix.length + 1}) as integer)
-        else 0 end
-    ), 0)` })
-      .from(transactions)
-      .where(and(
-        eq(transactions.businessId, transaction.businessId),
-        sql`${transactions.transactionId} like ${prefix + "%"}`
-      ));
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const [result] = await db.select({ max: sql<string>`coalesce(max(
+        case when ${transactions.transactionId} ~ ${`^${prefix}\\d+$`}
+          then cast(substring(${transactions.transactionId} from ${prefix.length + 1}) as integer)
+          else 0 end
+      ), 0)` })
+        .from(transactions)
+        .where(and(
+          eq(transactions.businessId, transaction.businessId),
+          sql`${transactions.transactionId} like ${prefix + "%"}`
+        ));
 
-    const seq = parseInt(result?.max || "0", 10) + 1;
-    const transactionId = `${prefix}${seq}`;
+      const seq = parseInt(result?.max || "0", 10) + 1;
+      const transactionId = `${prefix}${seq}`;
 
-    const [created] = await db.insert(transactions).values({ ...transaction, transactionId }).returning();
-    return created;
+      try {
+        const [created] = await db.insert(transactions).values({ ...transaction, transactionId }).returning();
+        return created;
+      } catch (e: any) {
+        if (e.code === "23505" && attempt < 4) continue;
+        throw e;
+      }
+    }
+    throw new Error("Failed to generate unique transaction ID after retries");
   }
 
   async updateTransaction(id: number, businessId: number, data: Partial<InsertTransaction>): Promise<Transaction | undefined> {
@@ -649,20 +657,28 @@ export class DatabaseStorage implements IStorage {
     const prefix = `CF${dateStr}`;
     const prefixLen = prefix.length + 1;
 
-    const [result] = await db.select({
-      max: sql<number>`coalesce(max(cast(substr(${cashEntries.cashFlowId}, ${prefixLen}) as integer)), 0)`
-    })
-      .from(cashEntries)
-      .where(and(
-        eq(cashEntries.businessId, entry.businessId),
-        sql`${cashEntries.cashFlowId} like ${prefix + "%"}`
-      ));
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const [result] = await db.select({
+        max: sql<number>`coalesce(max(cast(substr(${cashEntries.cashFlowId}, ${prefixLen}) as integer)), 0)`
+      })
+        .from(cashEntries)
+        .where(and(
+          eq(cashEntries.businessId, entry.businessId),
+          sql`${cashEntries.cashFlowId} like ${prefix + "%"}`
+        ));
 
-    const seq = (result?.max || 0) + 1;
-    const cashFlowId = `${prefix}${seq}`;
+      const seq = (result?.max || 0) + 1;
+      const cashFlowId = `${prefix}${seq}`;
 
-    const [created] = await db.insert(cashEntries).values({ ...entry, cashFlowId }).returning();
-    return created;
+      try {
+        const [created] = await db.insert(cashEntries).values({ ...entry, cashFlowId }).returning();
+        return created;
+      } catch (e: any) {
+        if (e.code === "23505" && attempt < 4) continue;
+        throw e;
+      }
+    }
+    throw new Error("Failed to generate unique cash flow ID after retries");
   }
 
   async reverseCashEntry(id: number, businessId: number): Promise<CashEntry | undefined> {
