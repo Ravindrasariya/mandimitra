@@ -16,6 +16,7 @@ import type { Bid, Buyer, Lot, Farmer, Transaction, BusinessChargeSettings } fro
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch";
 import { Receipt, Pencil, Printer, ChevronDown, Calendar, Package, Users, Landmark, HandCoins, Download } from "lucide-react";
 import { format } from "date-fns";
 
@@ -196,6 +197,8 @@ export default function TransactionsPage() {
   const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
 
   const [totalWeight, setTotalWeight] = useState("");
+  const [applyFarmerHammali, setApplyFarmerHammali] = useState(false);
+  const [applyBuyerHammali, setApplyBuyerHammali] = useState(false);
 
   type ChargeSettingsData = {
     mandiCommissionFarmerPercent: string;
@@ -424,7 +427,7 @@ export default function TransactionsPage() {
     if (firstItem?.type === "completed" && firstItem.txn) {
       prefillFromTxn(firstItem.txn);
     } else {
-      resetFormDefaults();
+      resetFormDefaults(firstItem?.bid);
     }
 
     setDialogOpen(true);
@@ -432,10 +435,22 @@ export default function TransactionsPage() {
 
   const prefillFromTxn = (tx: TransactionWithDetails) => {
     setTotalWeight(tx.totalWeight || "");
+    setApplyFarmerHammali(parseFloat(tx.hammaliFarmerPerBag || "0") > 0);
+    setApplyBuyerHammali(parseFloat(tx.hammaliBuyerPerBag || "0") > 0);
   };
 
-  const resetFormDefaults = () => {
-    setTotalWeight("");
+  const calcProportionateWeight = (bid: BidWithDetails): string => {
+    const lotWeight = parseFloat(bid.lot.initialTotalWeight || "0");
+    const lotBags = bid.lot.numberOfBags || 1;
+    const bidBags = bid.numberOfBags || 0;
+    if (lotWeight <= 0 || lotBags <= 0) return "";
+    return ((bidBags / lotBags) * lotWeight).toFixed(2);
+  };
+
+  const resetFormDefaults = (bid?: BidWithDetails) => {
+    setTotalWeight(bid ? calcProportionateWeight(bid) : "");
+    setApplyFarmerHammali(false);
+    setApplyBuyerHammali(false);
   };
 
   const handleBuyerChange = (val: string) => {
@@ -445,7 +460,7 @@ export default function TransactionsPage() {
     if (item?.type === "completed" && item.txn) {
       prefillFromTxn(item.txn);
     } else {
-      resetFormDefaults();
+      resetFormDefaults(item?.bid);
     }
   };
 
@@ -467,8 +482,8 @@ export default function TransactionsPage() {
   const price = parseFloat(selectedBid?.pricePerKg || "0");
   const grossAmount = nw * price;
 
-  const hammaliFarmerRate = parseFloat(cs.hammaliFarmerPerBag) || 0;
-  const hammaliBuyerRate = parseFloat(cs.hammaliBuyerPerBag) || 0;
+  const hammaliFarmerRate = applyFarmerHammali ? (parseFloat(cs.hammaliFarmerPerBag) || 0) : 0;
+  const hammaliBuyerRate = applyBuyerHammali ? (parseFloat(cs.hammaliBuyerPerBag) || 0) : 0;
   const gradingFarmerRate = parseFloat(cs.gradingFarmerPerBag) || 0;
   const gradingBuyerRate = parseFloat(cs.gradingBuyerPerBag) || 0;
   const aadhatFarmerPct = parseFloat(cs.aadhatCommissionFarmerPercent) || 0;
@@ -948,14 +963,26 @@ export default function TransactionsPage() {
                   <p className="font-semibold text-muted-foreground">Farmer Charges</p>
                   <div className="flex justify-between"><span>Aadhat:</span><span>{aadhatFarmerPct}%</span></div>
                   <div className="flex justify-between"><span>Mandi:</span><span>{mandiFarmerPct}%</span></div>
-                  <div className="flex justify-between"><span>Hammali:</span><span>₹{hammaliFarmerRate}/bag</span></div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Switch checked={applyFarmerHammali} onCheckedChange={setApplyFarmerHammali} className="scale-75" data-testid="toggle-farmer-hammali" />
+                      <span>Hammali:</span>
+                    </div>
+                    <span className={!applyFarmerHammali ? "text-muted-foreground/50 line-through" : ""}>₹{parseFloat(cs.hammaliFarmerPerBag) || 0}/bag</span>
+                  </div>
                   <div className="flex justify-between"><span>Grading:</span><span>₹{gradingFarmerRate}/bag</span></div>
                 </div>
                 <div className="bg-muted/50 rounded p-2 space-y-1">
                   <p className="font-semibold text-muted-foreground">Buyer Charges</p>
                   <div className="flex justify-between"><span>Aadhat:</span><span>{aadhatBuyerPct}%</span></div>
                   <div className="flex justify-between"><span>Mandi:</span><span>{mandiBuyerPct}%</span></div>
-                  <div className="flex justify-between"><span>Hammali:</span><span>₹{hammaliBuyerRate}/bag</span></div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Switch checked={applyBuyerHammali} onCheckedChange={setApplyBuyerHammali} className="scale-75" data-testid="toggle-buyer-hammali" />
+                      <span>Hammali:</span>
+                    </div>
+                    <span className={!applyBuyerHammali ? "text-muted-foreground/50 line-through" : ""}>₹{parseFloat(cs.hammaliBuyerPerBag) || 0}/bag</span>
+                  </div>
                   <div className="flex justify-between"><span>Grading:</span><span>₹{gradingBuyerRate}/bag</span></div>
                 </div>
               </div>
