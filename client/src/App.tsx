@@ -19,7 +19,7 @@ import CashPage from "@/pages/cash";
 import FarmerLedgerPage from "@/pages/farmer-ledger";
 import BuyerLedgerPage from "@/pages/buyer-ledger";
 import {
-  LayoutDashboard, Package, ClipboardList, Gavel, Receipt, Wallet, Users, ShoppingBag, LogOut, Wheat, Menu, ChevronLeft, ChevronRight, Globe,
+  LayoutDashboard, Package, ClipboardList, Gavel, Receipt, Wallet, Users, ShoppingBag, LogOut, Wheat, Menu, ChevronLeft, ChevronRight, Globe, Phone,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -225,6 +225,12 @@ function AppLayout() {
             <Route component={NotFound} />
           </Switch>
         </main>
+        <footer className={`border-t bg-background text-xs text-muted-foreground px-4 py-2 flex flex-col sm:flex-row items-center justify-between gap-1 ${isMobile ? "mb-16" : ""}`}>
+          <span className="flex items-center gap-1">
+            <Phone className="w-3 h-3" /> Need Help? Reach out to <span className="text-green-600 font-medium">KrashuVed</span> : +918882589392
+          </span>
+          <span>Powered by <span className="text-green-600 font-medium">KrashuVed</span> &nbsp;All Rights Reserved</span>
+        </footer>
         {isMobile && <MobileBottomNav />}
       </div>
     </div>
