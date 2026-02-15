@@ -190,6 +190,10 @@ export default function StockRegisterPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bids"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
       setEditingLot(null);
       toast({ title: "Updated", description: "Lot details updated" });
     },
@@ -204,6 +208,13 @@ export default function StockRegisterPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
       queryClient.invalidateQueries({ queryKey: ["/api/bids"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === "string" && key.startsWith("/api/buyers");
+      }});
+      queryClient.invalidateQueries({ queryKey: ["/api/cash-entries"] });
       setReturnConfirmOpen(false);
       setEditingLot(null);
       if (data.soldBags > 0) {

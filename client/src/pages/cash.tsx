@@ -203,10 +203,15 @@ export default function CashPage() {
       const key = query.queryKey[0];
       return typeof key === "string" && key.startsWith("/api/cash-entries");
     }});
-    queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
+    queryClient.invalidateQueries({ predicate: (query) => {
+      const key = query.queryKey[0];
+      return typeof key === "string" && key.startsWith("/api/buyers");
+    }});
     queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
     queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"] });
     queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
   };
 
   const createMutation = useMutation({

@@ -82,6 +82,14 @@ export default function DashboardPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/charge-settings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === "string" && key.startsWith("/api/buyers");
+      }});
+      queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"] });
       setSettingsOpen(false);
       toast({ title: t("dash.settingsSaved"), description: t("dash.settingsSavedDesc") });
     },

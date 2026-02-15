@@ -105,6 +105,8 @@ export default function FarmerLedgerPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/bids"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"] });
       if (historyFarmerId) queryClient.invalidateQueries({ queryKey: ["/api/farmer-edit-history", historyFarmerId] });
       setEditDialogOpen(false);
       toast({ title: "Farmer Updated" });
@@ -126,6 +128,8 @@ export default function FarmerLedgerPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/bids"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"] });
       setMergeConfirmOpen(false);
       setEditDialogOpen(false);
       setDuplicateFarmer(null);
@@ -249,6 +253,7 @@ export default function FarmerLedgerPage() {
 
   const handleSync = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
     toast({ title: "Synced", description: "Data refreshed" });
   };
 

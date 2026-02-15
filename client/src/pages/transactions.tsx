@@ -243,6 +243,15 @@ export default function TransactionsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/bids"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === "string" && key.startsWith("/api/buyers");
+      }});
+      queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash-entries"] });
       setDialogOpen(false);
       setDialogItems([]);
       toast({ title: "Transaction Created", description: "Transaction recorded successfully" });
@@ -260,6 +269,15 @@ export default function TransactionsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/bids"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === "string" && key.startsWith("/api/buyers");
+      }});
+      queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash-entries"] });
       setDialogOpen(false);
       setDialogItems([]);
       toast({ title: "Transaction Updated", description: "Transaction updated successfully" });
@@ -278,7 +296,13 @@ export default function TransactionsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/bids"] });
       queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === "string" && key.startsWith("/api/buyers");
+      }});
+      queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash-entries"] });
       setReverseConfirmOpen(false);
       setReversingTxn(null);

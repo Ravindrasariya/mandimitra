@@ -72,6 +72,7 @@ export default function BuyerLedgerPage() {
         const key = query.queryKey[0];
         return typeof key === "string" && key.startsWith("/api/buyers");
       }});
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       setShowAddDialog(false);
       setNewName("");
       setNewAddress("");
@@ -99,6 +100,8 @@ export default function BuyerLedgerPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/bids"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"] });
       setEditingBuyer(null);
       toast({ title: "Updated", description: t("buyerLedger.editBuyer") });
     },
@@ -121,6 +124,8 @@ export default function BuyerLedgerPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/bids"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"] });
     },
   });
 

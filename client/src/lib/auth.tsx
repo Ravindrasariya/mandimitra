@@ -34,6 +34,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return res.json();
     },
     onSuccess: (data) => {
+      queryClient.clear();
       queryClient.setQueryData(["/api/auth/me"], data);
     },
   });
