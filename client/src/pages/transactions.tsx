@@ -849,15 +849,11 @@ export default function TransactionsPage() {
             return (
               <Card key={group.lot.id} data-testid={`card-lot-${group.lot.id}`}>
                 <CardContent className="pt-4">
-                  <div className="flex items-start justify-between gap-2 mb-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex flex-wrap items-center gap-2 mb-1">
-                        <Badge variant="secondary" className="text-xs">#{group.lot.serialNumber}</Badge>
-                        <Badge variant="secondary" className="text-xs">{group.lotId}</Badge>
-                        <Badge variant="outline" className="text-xs">{group.lot.crop}</Badge>
-                      </div>
-                      <p className="text-xs sm:text-sm">{t("transactions.farmer")}: <strong>{group.farmer.name}</strong></p>
-                      <p className="text-xs text-muted-foreground">{group.lot.actualNumberOfBags ?? group.lot.numberOfBags} {t("transactions.bagsTotal")}{(group.lot.actualNumberOfBags != null && group.lot.actualNumberOfBags !== group.lot.numberOfBags) ? ` (Orig: ${group.lot.numberOfBags})` : ""}</p>
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="secondary" className="text-xs">#{group.lot.serialNumber}</Badge>
+                      <Badge variant="secondary" className="text-xs">{group.lotId}</Badge>
+                      <Badge variant="outline" className="text-xs">{group.lot.crop}</Badge>
                     </div>
                     <div className="flex items-center gap-1">
                       <Button
@@ -903,6 +899,8 @@ export default function TransactionsPage() {
                       )}
                     </div>
                   </div>
+                  <p className="text-xs sm:text-sm mb-0.5">{t("transactions.farmer")}: <strong>{group.farmer.name}</strong></p>
+                  <p className="text-xs text-muted-foreground mb-2">{group.lot.actualNumberOfBags ?? group.lot.numberOfBags} {t("transactions.bagsTotal")}{(group.lot.actualNumberOfBags != null && group.lot.actualNumberOfBags !== group.lot.numberOfBags) ? ` (Orig: ${group.lot.numberOfBags})` : ""}</p>
 
                   {hasCompleted && (
                     <div className="border-t pt-2 mb-2 flex justify-between font-medium text-sm text-primary">
