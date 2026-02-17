@@ -662,19 +662,23 @@ export class DatabaseStorage implements IStorage {
     const txDate = entry.date ? new Date(entry.date + "T00:00:00") : new Date();
     const dateStr = `${txDate.getFullYear()}${String(txDate.getMonth() + 1).padStart(2, "0")}${String(txDate.getDate()).padStart(2, "0")}`;
     const prefix = `CF${dateStr}`;
-    const prefixLen = prefix.length + 1;
 
     for (let attempt = 0; attempt < 5; attempt++) {
-      const [result] = await db.select({
-        max: sql<number>`coalesce(max(cast(substr(${cashEntries.cashFlowId}, ${prefixLen}) as integer)), 0)`
-      })
+      const existing = await db.select({ cashFlowId: cashEntries.cashFlowId })
         .from(cashEntries)
         .where(and(
           eq(cashEntries.businessId, entry.businessId),
           sql`${cashEntries.cashFlowId} like ${prefix + "%"}`
         ));
 
-      const seq = (result?.max || 0) + 1;
+      let maxSeq = 0;
+      for (const row of existing) {
+        const suffix = (row.cashFlowId || "").substring(prefix.length);
+        const num = parseInt(suffix, 10);
+        if (!isNaN(num) && num > maxSeq) maxSeq = num;
+      }
+
+      const seq = maxSeq + 1;
       const cashFlowId = `${prefix}${seq}`;
 
       try {
