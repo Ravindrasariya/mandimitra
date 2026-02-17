@@ -802,6 +802,7 @@ export async function registerRoutes(
           buyerId: t.buyerId, buyerName: t.buyer.name,
           totalPayableToFarmer: t.totalPayableToFarmer,
           totalReceivableFromBuyer: t.totalReceivableFromBuyer,
+          paidAmount: t.paidAmount, farmerPaidAmount: t.farmerPaidAmount,
           mandiCharges: t.mandiCharges, aadhatCharges: t.aadhatCharges,
           hammaliCharges: t.hammaliCharges, gradingCharges: t.gradingCharges,
           netWeight: t.netWeight, numberOfBags: t.numberOfBags,

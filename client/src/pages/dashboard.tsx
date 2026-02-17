@@ -22,7 +22,7 @@ import {
 type DashboardData = {
   businessName: string;
   lots: { id: number; lotId: string; crop: string; date: string; numberOfBags: number; remainingBags: number; farmerId: number; farmerName: string; initialTotalWeight: string | null }[];
-  transactions: { id: number; transactionId: string; date: string; crop: string; lotId: string; farmerId: number; farmerName: string; buyerId: number; buyerName: string; totalPayableToFarmer: string; totalReceivableFromBuyer: string; mandiCharges: string; aadhatCharges: string; hammaliCharges: string; gradingCharges: string; netWeight: string; numberOfBags: number; isReversed: boolean }[];
+  transactions: { id: number; transactionId: string; date: string; crop: string; lotId: string; farmerId: number; farmerName: string; buyerId: number; buyerName: string; totalPayableToFarmer: string; totalReceivableFromBuyer: string; paidAmount: string; farmerPaidAmount: string; mandiCharges: string; aadhatCharges: string; hammaliCharges: string; gradingCharges: string; netWeight: string; numberOfBags: number; isReversed: boolean }[];
   farmersWithDues: { id: number; name: string; totalPayable: string; totalDue: string }[];
   buyersWithDues: { id: number; name: string; receivableDue: string; overallDue: string }[];
   txAggregates: { totalHammali: number; totalGrading: number; totalMandiCommission: number; paidHammali: number; paidGrading: number; paidMandiCommission: number };
@@ -239,14 +239,16 @@ export default function DashboardPage() {
   }, [filteredBuyersWithDues]);
 
   const timeSeriesData = useMemo(() => {
-    const dateAggregates = new Map<string, { farmerPayable: number; buyerReceivable: number; volume: number; aadhat: number }>();
+    const dateAggregates = new Map<string, { farmerDue: number; buyerDue: number; volume: number; aadhat: number }>();
 
     filteredTxns.forEach(t => {
       const date = t.date || "";
-      if (!dateAggregates.has(date)) dateAggregates.set(date, { farmerPayable: 0, buyerReceivable: 0, volume: 0, aadhat: 0 });
+      if (!dateAggregates.has(date)) dateAggregates.set(date, { farmerDue: 0, buyerDue: 0, volume: 0, aadhat: 0 });
       const agg = dateAggregates.get(date)!;
-      agg.farmerPayable += parseFloat(t.totalPayableToFarmer || "0");
-      agg.buyerReceivable += parseFloat(t.totalReceivableFromBuyer || "0");
+      const farmerDue = parseFloat(t.totalPayableToFarmer || "0") - parseFloat(t.farmerPaidAmount || "0");
+      const buyerDue = parseFloat(t.totalReceivableFromBuyer || "0") - parseFloat(t.paidAmount || "0");
+      agg.farmerDue += farmerDue;
+      agg.buyerDue += buyerDue;
       agg.volume += parseFloat(t.netWeight || "0");
       agg.aadhat += parseFloat(t.aadhatCharges || "0");
     });
@@ -258,8 +260,8 @@ export default function DashboardPage() {
 
     return allDates.map(date => {
       const agg = dateAggregates.get(date)!;
-      cumulativeFarmerDue += agg.farmerPayable;
-      cumulativeBuyerDue += agg.buyerReceivable;
+      cumulativeFarmerDue += agg.farmerDue;
+      cumulativeBuyerDue += agg.buyerDue;
 
       return {
         date: formatShortDate(date),
