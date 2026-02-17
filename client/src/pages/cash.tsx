@@ -30,6 +30,7 @@ const OUTFLOW_TYPES = [
   "Grading",
   "Hammali",
   "Mandi Commission",
+  "Salary",
 ] as const;
 
 export default function CashPage() {
@@ -76,6 +77,7 @@ export default function CashPage() {
 
   const [filterFarmerSearch, setFilterFarmerSearch] = useState("");
   const [filterFarmerOpen, setFilterFarmerOpen] = useState(false);
+  const [outwardReceiverName, setOutwardReceiverName] = useState("");
   const [outwardFarmerSearch, setOutwardFarmerSearch] = useState("");
   const [outwardFarmerOpen, setOutwardFarmerOpen] = useState(false);
 
@@ -318,6 +320,10 @@ export default function CashPage() {
       toast({ title: t("common.error"), description: "Select a farmer", variant: "destructive" });
       return;
     }
+    if (outwardOutflowType === "Salary" && !outwardReceiverName.trim()) {
+      toast({ title: t("common.error"), description: "Enter receiver name", variant: "destructive" });
+      return;
+    }
     if (outwardPaymentMode !== "Cash" && !outwardBankAccountId) {
       toast({ title: t("common.error"), description: "Select bank account", variant: "destructive" });
       return;
@@ -327,6 +333,7 @@ export default function CashPage() {
       type: "cash_out",
       outflowType: outwardOutflowType,
       farmerId: needsFarmer ? parseInt(outwardFarmerId) : null,
+      partyName: outwardOutflowType === "Salary" ? outwardReceiverName.trim() : null,
       amount: outwardAmount,
       date: outwardDate,
       paymentMode: outwardPaymentMode,
@@ -336,6 +343,7 @@ export default function CashPage() {
     setOutwardAmount("");
     setOutwardNotes("");
     setOutwardFarmerId("");
+    setOutwardReceiverName("");
   };
 
   const submitTransfer = () => {
@@ -406,6 +414,7 @@ export default function CashPage() {
     if (e.category === "transfer") return "Transfer";
     if (e.outflowType === "Buyer" && e.buyerId) return getBuyerName(e.buyerId);
     if (e.farmerId) return getFarmerName(e.farmerId);
+    if (e.outflowType === "Salary" && e.partyName) return `Salary - ${e.partyName}`;
     if (e.outflowType === "Others") return "General";
     return e.outflowType || "Entry";
   };
@@ -422,6 +431,7 @@ export default function CashPage() {
       "Date": e.date,
       "Category": e.category,
       "Outflow Type": e.outflowType || "",
+      "Receiver/Party": e.partyName || (e.buyerId ? getBuyerName(e.buyerId) : e.farmerId ? getFarmerName(e.farmerId) : ""),
       "Buyer": e.buyerId ? getBuyerName(e.buyerId) : "",
       "Farmer": e.farmerId ? getFarmerName(e.farmerId) : "",
       "Amount": e.amount,
@@ -763,6 +773,12 @@ export default function CashPage() {
                   </SelectContent>
                 </Select>
               </div>
+              {outwardOutflowType === "Salary" && (
+                <div className="space-y-1">
+                  <Label className="text-xs">Receiver Name</Label>
+                  <Input value={outwardReceiverName} onChange={e => setOutwardReceiverName(e.target.value)} placeholder="Enter receiver name" className="h-9 text-sm" data-testid="outward-receiver-name" />
+                </div>
+              )}
               {(outwardOutflowType === "Farmer-Advance" || outwardOutflowType === "Farmer-Harvest Sale") && (
                 <div className="space-y-1">
                   <Label className="text-xs">{outwardOutflowType === "Farmer-Advance" ? t("cash.farmer") : t("cash.farmerWithDues")}</Label>
@@ -996,6 +1012,7 @@ export default function CashPage() {
               <div className="flex justify-between"><span className="text-muted-foreground">{t("common.date")}</span><span>{detailEntry.date}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.category")}</span>{getCategoryBadge(detailEntry)}</div>
               {detailEntry.outflowType && <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.outflowType")}</span><span>{detailEntry.outflowType}</span></div>}
+              {detailEntry.partyName && <div className="flex justify-between"><span className="text-muted-foreground">Receiver</span><span>{detailEntry.partyName}</span></div>}
               <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.amount")}</span><span className="font-bold">₹{parseFloat(detailEntry.amount).toLocaleString("en-IN")}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.paymentMode")}</span><span>{detailEntry.paymentMode}</span></div>
               {detailEntry.bankAccountId && <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.bankAccount")}</span><span>{getAccountName(detailEntry.bankAccountId)}</span></div>}

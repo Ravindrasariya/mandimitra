@@ -197,6 +197,7 @@ export const cashEntries = pgTable("cash_entries", {
   chequeDate: date("cheque_date"),
   bankName: text("bank_name"),
   date: date("date").notNull(),
+  partyName: text("party_name"),
   notes: text("notes"),
   isReversed: boolean("is_reversed").default(false).notNull(),
   reversedAt: timestamp("reversed_at"),
