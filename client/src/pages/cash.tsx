@@ -49,6 +49,7 @@ export default function CashPage() {
   const [filterOutflowType, setFilterOutflowType] = usePersistedState("cash-filterOutflow", "all");
   const [filterBuyer, setFilterBuyer] = usePersistedState("cash-filterBuyer", "all");
   const [filterFarmer, setFilterFarmer] = usePersistedState("cash-filterFarmer", "all");
+  const [filterRemarks, setFilterRemarks] = usePersistedState("cash-filterRemarks", "all");
   const [filterMonth, setFilterMonth] = usePersistedState("cash-filterMonth", "all");
   const [filterYear, setFilterYear] = usePersistedState("cash-filterYear", String(now.getFullYear()));
 
@@ -78,6 +79,8 @@ export default function CashPage() {
 
   const [filterFarmerSearch, setFilterFarmerSearch] = useState("");
   const [filterFarmerOpen, setFilterFarmerOpen] = useState(false);
+  const [filterRemarksSearch, setFilterRemarksSearch] = useState("");
+  const [filterRemarksOpen, setFilterRemarksOpen] = useState(false);
   const [outwardReceiverName, setOutwardReceiverName] = useState("");
   const [outwardFarmerSearch, setOutwardFarmerSearch] = useState("");
   const [outwardFarmerOpen, setOutwardFarmerOpen] = useState(false);
@@ -110,7 +113,19 @@ export default function CashPage() {
 
   const hasBankAccounts = bankAccountsList.length > 0;
 
-  const hasActiveFilters = filterCategory !== "all" || filterPaymentMode !== "all" || filterOutflowType !== "all" || filterBuyer !== "all" || filterFarmer !== "all" || filterMonth !== "all" || filterYear !== String(now.getFullYear());
+  const uniqueRemarks = useMemo(() => {
+    const remarks = new Set<string>();
+    allEntries.forEach(e => { if (e.notes && e.notes.trim()) remarks.add(e.notes.trim()); });
+    return Array.from(remarks).sort();
+  }, [allEntries]);
+
+  const filterRemarksResults = (search: string) => {
+    if (!search) return uniqueRemarks;
+    const lower = search.toLowerCase();
+    return uniqueRemarks.filter(r => r.toLowerCase().includes(lower));
+  };
+
+  const hasActiveFilters = filterCategory !== "all" || filterPaymentMode !== "all" || filterOutflowType !== "all" || filterBuyer !== "all" || filterFarmer !== "all" || filterRemarks !== "all" || filterMonth !== "all" || filterYear !== String(now.getFullYear());
 
   const clearAllFilters = () => {
     setFilterCategory("all");
@@ -118,6 +133,8 @@ export default function CashPage() {
     setFilterOutflowType("all");
     setFilterBuyer("all");
     setFilterFarmer("all");
+    setFilterRemarks("all");
+    setFilterRemarksSearch("");
     setFilterMonth("all");
     setFilterYear(String(now.getFullYear()));
   };
@@ -136,8 +153,11 @@ export default function CashPage() {
     if (filterFarmer !== "all") {
       result = result.filter(e => e.farmerId === parseInt(filterFarmer));
     }
+    if (filterRemarks !== "all") {
+      result = result.filter(e => e.notes && e.notes.trim() === filterRemarks);
+    }
     return result;
-  }, [allEntries, filterPaymentMode, filterOutflowType, filterBuyer, filterFarmer]);
+  }, [allEntries, filterPaymentMode, filterOutflowType, filterBuyer, filterFarmer, filterRemarks]);
 
   const filteredTotals = useMemo(() => {
     let totalInflow = 0, totalOutflow = 0;
@@ -593,6 +613,37 @@ export default function CashPage() {
                         <span className="font-medium">{f.name}</span>
                         <span className="text-muted-foreground">{f.phone}</span>
                         {f.village && <span className="text-muted-foreground">({f.village})</span>}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+          <div className="relative" data-testid="filter-remarks-wrapper">
+            {filterRemarks !== "all" ? (
+              <div className="h-8 w-[180px] text-xs rounded-md border border-input bg-background px-2 flex items-center gap-1">
+                <span className="truncate flex-1">{filterRemarks}</span>
+                <button onClick={() => { setFilterRemarks("all"); setFilterRemarksSearch(""); }} className="shrink-0" data-testid="button-clear-filter-remarks"><X className="w-3 h-3" /></button>
+              </div>
+            ) : (
+              <>
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+                <input
+                  value={filterRemarksSearch}
+                  onChange={(e) => { setFilterRemarksSearch(e.target.value); setFilterRemarksOpen(true); }}
+                  onFocus={() => setFilterRemarksOpen(true)}
+                  onBlur={() => setTimeout(() => setFilterRemarksOpen(false), 200)}
+                  placeholder="Remarks: Search..."
+                  className="h-8 w-[180px] text-xs rounded-md border border-input bg-background pl-7 pr-2"
+                  data-testid="filter-remarks"
+                />
+                {filterRemarksOpen && filterRemarksResults(filterRemarksSearch).length > 0 && (
+                  <div className="absolute z-50 w-[220px] mt-1 bg-popover border rounded-md shadow-lg max-h-[200px] overflow-y-auto">
+                    {filterRemarksResults(filterRemarksSearch).map(remark => (
+                      <button key={remark} className="flex items-center gap-1.5 px-3 py-2 text-xs w-full text-left hover:bg-accent" data-testid={`filter-remarks-opt-${remark}`}
+                        onMouseDown={(e) => { e.preventDefault(); setFilterRemarks(remark); setFilterRemarksSearch(""); setFilterRemarksOpen(false); }}>
+                        <span className="truncate">{remark}</span>
                       </button>
                     ))}
                   </div>
