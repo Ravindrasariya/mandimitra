@@ -242,6 +242,8 @@ export default function TransactionsPage() {
   const [selectedMonths, setSelectedMonths] = usePersistedState<string[]>("txn-selectedMonths", [currentMonth]);
   const [selectedDays, setSelectedDays] = usePersistedState<string[]>("txn-selectedDays", [currentDay]);
   const [cropFilter, setCropFilter] = usePersistedState("txn-cropFilter", "all");
+  const [buyerPaymentFilter, setBuyerPaymentFilter] = usePersistedState("txn-buyerPaymentFilter", "all");
+  const [farmerPaymentFilter, setFarmerPaymentFilter] = usePersistedState("txn-farmerPaymentFilter", "all");
   const [monthPopoverOpen, setMonthPopoverOpen] = useState(false);
   const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
 
@@ -427,9 +429,23 @@ export default function TransactionsPage() {
         const lotDay = String(lotDate.getDate());
         if (!selectedDays.includes(lotDay)) return false;
       }
+      if (buyerPaymentFilter !== "all") {
+        const activeTxns = g.completedTxns.filter(t => !t.isReversed);
+        if (activeTxns.length === 0) return false;
+        const hasMatch = activeTxns.some(t => t.paymentStatus === buyerPaymentFilter);
+        if (!hasMatch) return false;
+      }
+      if (farmerPaymentFilter !== "all") {
+        const activeTxns = g.completedTxns.filter(t => !t.isReversed);
+        if (activeTxns.length === 0) return false;
+        const totalPayable = activeTxns.reduce((s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0);
+        const totalPaid = activeTxns.reduce((s, t) => s + parseFloat(t.farmerPaidAmount || "0"), 0);
+        const groupFarmerStatus = totalPaid >= totalPayable ? "paid" : totalPaid > 0 ? "partial" : "due";
+        if (groupFarmerStatus !== farmerPaymentFilter) return false;
+      }
       return true;
     });
-  }, [unifiedGroups, cropFilter, yearFilter, selectedMonths, selectedDays]);
+  }, [unifiedGroups, cropFilter, yearFilter, selectedMonths, selectedDays, buyerPaymentFilter, farmerPaymentFilter]);
 
   const summaryStats = useMemo(() => {
     const allActiveTxns = filteredGroups.flatMap(g => g.completedTxns.filter(t => !t.isReversed));
@@ -757,6 +773,28 @@ export default function TransactionsPage() {
             </div>
           </PopoverContent>
         </Popover>
+        <Select value={buyerPaymentFilter} onValueChange={setBuyerPaymentFilter}>
+          <SelectTrigger className="w-[120px]" data-testid="select-buyer-payment-filter">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Buyer: All</SelectItem>
+            <SelectItem value="paid">Buyer: Paid</SelectItem>
+            <SelectItem value="due">Buyer: Due</SelectItem>
+            <SelectItem value="partial">Buyer: Partial</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={farmerPaymentFilter} onValueChange={setFarmerPaymentFilter}>
+          <SelectTrigger className="w-[125px]" data-testid="select-farmer-payment-filter">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Farmer: All</SelectItem>
+            <SelectItem value="paid">Farmer: Paid</SelectItem>
+            <SelectItem value="due">Farmer: Due</SelectItem>
+            <SelectItem value="partial">Farmer: Partial</SelectItem>
+          </SelectContent>
+        </Select>
         <Button
           variant="outline"
           size="sm"
@@ -905,12 +943,22 @@ export default function TransactionsPage() {
                   <p className="text-sm mb-0.5">{t("transactions.farmer")}: <strong>{group.farmer.name}</strong></p>
                   <p className="text-xs text-muted-foreground mb-2">{group.lot.actualNumberOfBags ?? group.lot.numberOfBags} {t("transactions.bagsTotal")}{(group.lot.actualNumberOfBags != null && group.lot.actualNumberOfBags !== group.lot.numberOfBags) ? ` (Orig: ${group.lot.numberOfBags})` : ""}</p>
 
-                  {hasCompleted && (
-                    <div className="border-t pt-2 mb-2 flex justify-between font-medium text-sm text-primary">
-                      <span>{t("transactions.payableToFarmer")}:</span>
-                      <span>Rs.{totalFarmerPayable.toFixed(2)}</span>
-                    </div>
-                  )}
+                  {hasCompleted && (() => {
+                    const farmerTotalPayable = activeTxns.reduce((s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0);
+                    const farmerTotalPaid = activeTxns.reduce((s, t) => s + parseFloat(t.farmerPaidAmount || "0"), 0);
+                    const fStatus = farmerTotalPaid >= farmerTotalPayable ? "paid" : farmerTotalPaid > 0 ? "partial" : "due";
+                    return (
+                      <div className="border-t pt-2 mb-2 flex justify-between items-center font-medium text-sm text-primary">
+                        <span className="flex items-center gap-2">
+                          {t("transactions.payableToFarmer")}:
+                          {fStatus === "paid" && <Badge variant="outline" className="text-xs border-green-400 text-green-700 bg-green-50">Paid</Badge>}
+                          {fStatus === "partial" && <Badge variant="outline" className="text-xs border-orange-400 text-orange-600 bg-orange-50">Partial</Badge>}
+                          {fStatus === "due" && <Badge variant="outline" className="text-xs border-red-400 text-red-600 bg-red-50">Due</Badge>}
+                        </span>
+                        <span>Rs.{totalFarmerPayable.toFixed(2)}</span>
+                      </div>
+                    );
+                  })()}
 
                   <div className="border-t pt-2 space-y-1">
                     {group.completedTxns.map((tx) => (

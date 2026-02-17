@@ -533,6 +533,7 @@ export async function registerRoutes(
       const data = { ...req.body, businessId: req.user!.businessId };
       const tx = await storage.createTransaction(data);
       await storage.recalculateBuyerPaymentStatus(req.user!.businessId, tx.buyerId);
+      await storage.recalculateFarmerPaymentStatus(req.user!.businessId, tx.farmerId);
       res.status(201).json(tx);
     } catch (e: any) {
       res.status(400).json({ message: e.message });
@@ -560,6 +561,7 @@ export async function registerRoutes(
 
       await storage.updateTransaction(txId, businessId, { isReversed: true } as any);
       await storage.recalculateBuyerPaymentStatus(businessId, tx.buyerId);
+      await storage.recalculateFarmerPaymentStatus(businessId, tx.farmerId);
 
       const actual = lot.actualNumberOfBags ?? lot.numberOfBags;
       const newActual = lot.isReturned ? actual + bagsToReturn : actual;

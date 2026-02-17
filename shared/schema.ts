@@ -145,6 +145,8 @@ export const transactions = pgTable("transactions", {
   totalReceivableFromBuyer: decimal("total_receivable_from_buyer", { precision: 12, scale: 2 }).default("0"),
   paidAmount: decimal("paid_amount", { precision: 12, scale: 2 }).default("0").notNull(),
   paymentStatus: text("payment_status").default("due").notNull(),
+  farmerPaidAmount: decimal("farmer_paid_amount", { precision: 12, scale: 2 }).default("0").notNull(),
+  farmerPaymentStatus: text("farmer_payment_status").default("due").notNull(),
   date: date("date"),
   isReversed: boolean("is_reversed").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
