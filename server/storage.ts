@@ -452,8 +452,12 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getBids(businessId: number, lotId?: number): Promise<(Bid & { buyer: Buyer; lot: Lot; farmer: Farmer })[]> {
-    let conditions = [eq(bids.businessId, businessId)];
+    let conditions: any[] = [eq(bids.businessId, businessId)];
     if (lotId) conditions.push(eq(bids.lotId, lotId));
+
+    conditions.push(
+      sql`NOT EXISTS (SELECT 1 FROM ${transactions} WHERE ${transactions.bidId} = ${bids.id} AND ${transactions.businessId} = ${businessId} AND ${transactions.isReversed} = true)`
+    );
 
     const results = await db.select({
       bid: bids,
