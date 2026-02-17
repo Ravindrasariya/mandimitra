@@ -470,9 +470,11 @@ export default function TransactionsPage() {
     }
 
     setDialogItems(items);
-    setSelectedIdx(0);
+    const firstActiveIdx = items.findIndex(item => !(item.type === "completed" && item.txn?.isReversed));
+    const startIdx = firstActiveIdx >= 0 ? firstActiveIdx : 0;
+    setSelectedIdx(startIdx);
 
-    const firstItem = items[0];
+    const firstItem = items[startIdx];
     if (firstItem?.type === "completed" && firstItem.txn) {
       prefillFromTxn(firstItem.txn);
     } else {
@@ -504,8 +506,9 @@ export default function TransactionsPage() {
 
   const handleBuyerChange = (val: string) => {
     const idx = parseInt(val);
-    setSelectedIdx(idx);
     const item = dialogItems[idx];
+    if (item?.type === "completed" && item.txn?.isReversed) return;
+    setSelectedIdx(idx);
     if (item?.type === "completed" && item.txn) {
       prefillFromTxn(item.txn);
     } else {
@@ -979,12 +982,21 @@ export default function TransactionsPage() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {dialogItems.map((item, idx) => (
-                        <SelectItem key={item.bid.id} value={idx.toString()}>
-                          {item.bid.buyer.name} - Rs.{item.bid.pricePerKg}/kg ({item.bid.numberOfBags} bags)
-                          {item.type === "completed" ? " ✓" : ""}
-                        </SelectItem>
-                      ))}
+                      {dialogItems.map((item, idx) => {
+                        const isReversed = item.type === "completed" && item.txn?.isReversed;
+                        return (
+                          <SelectItem
+                            key={item.bid.id}
+                            value={idx.toString()}
+                            disabled={!!isReversed}
+                            className={isReversed ? "opacity-40" : ""}
+                          >
+                            {item.bid.buyer.name} - Rs.{item.bid.pricePerKg}/kg ({item.bid.numberOfBags} bags)
+                            {item.type === "completed" && !isReversed ? " ✓" : ""}
+                            {isReversed ? " (Reversed)" : ""}
+                          </SelectItem>
+                        );
+                      })}
                     </SelectContent>
                   </Select>
                 </div>
