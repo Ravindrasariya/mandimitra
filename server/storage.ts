@@ -554,18 +554,21 @@ export class DatabaseStorage implements IStorage {
     const prefix = `TX${dateStr}`;
 
     for (let attempt = 0; attempt < 5; attempt++) {
-      const [result] = await db.select({ max: sql<string>`coalesce(max(
-        case when ${transactions.transactionId} ~ ${`^${prefix}\\d+$`}
-          then cast(substring(${transactions.transactionId} from ${prefix.length + 1}) as integer)
-          else 0 end
-      ), 0)` })
+      const existing = await db.select({ transactionId: transactions.transactionId })
         .from(transactions)
         .where(and(
           eq(transactions.businessId, transaction.businessId),
           sql`${transactions.transactionId} like ${prefix + "%"}`
         ));
 
-      const seq = parseInt(result?.max || "0", 10) + 1;
+      let maxSeq = 0;
+      for (const row of existing) {
+        const suffix = row.transactionId.substring(prefix.length);
+        const num = parseInt(suffix, 10);
+        if (!isNaN(num) && num > maxSeq) maxSeq = num;
+      }
+
+      const seq = maxSeq + 1;
       const transactionId = `${prefix}${seq}`;
 
       try {
