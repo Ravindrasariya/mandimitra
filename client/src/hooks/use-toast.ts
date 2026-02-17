@@ -7,6 +7,7 @@ import type {
 
 const TOAST_LIMIT = 1
 const TOAST_REMOVE_DELAY = 1000000
+const SUCCESS_AUTO_DISMISS_DELAY = 2000
 
 type ToasterToast = ToastProps & {
   id: string
@@ -90,8 +91,6 @@ export const reducer = (state: State, action: Action): State => {
     case "DISMISS_TOAST": {
       const { toastId } = action
 
-      // ! Side effects ! - This could be extracted into a dismissToast() action,
-      // but I'll keep it here for simplicity
       if (toastId) {
         addToRemoveQueue(toastId)
       } else {
@@ -160,6 +159,12 @@ function toast({ ...props }: Toast) {
       },
     },
   })
+
+  if (props.variant === "success") {
+    setTimeout(() => {
+      dismiss()
+    }, SUCCESS_AUTO_DISMISS_DELAY)
+  }
 
   return {
     id: id,

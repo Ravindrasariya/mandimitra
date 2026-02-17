@@ -196,7 +196,7 @@ export default function StockRegisterPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
       setEditingLot(null);
-      toast({ title: "Updated", description: "Lot details updated" });
+      toast({ title: "Lot Updated", variant: "success" });
     },
   });
 
@@ -219,9 +219,9 @@ export default function StockRegisterPage() {
       setReturnConfirmOpen(false);
       setEditingLot(null);
       if (data.soldBags > 0) {
-        toast({ title: "Lot Returned", description: `Partially sold lot adjusted to ${data.soldBags} bags and marked as sold` });
+        toast({ title: "Lot Returned", description: `Partially sold lot adjusted to ${data.soldBags} bags and marked as sold`, variant: "success" });
       } else {
-        toast({ title: "Lot Returned", description: "Lot marked as returned to farmer" });
+        toast({ title: "Lot Returned", variant: "success" });
       }
     },
     onError: (err: any) => {

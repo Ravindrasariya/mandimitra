@@ -109,7 +109,7 @@ export default function FarmerLedgerPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"] });
       if (historyFarmerId) queryClient.invalidateQueries({ queryKey: ["/api/farmer-edit-history", historyFarmerId] });
       setEditDialogOpen(false);
-      toast({ title: "Farmer Updated" });
+      toast({ title: "Farmer Updated", variant: "success" });
     },
     onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -133,7 +133,7 @@ export default function FarmerLedgerPage() {
       setMergeConfirmOpen(false);
       setEditDialogOpen(false);
       setDuplicateFarmer(null);
-      toast({ title: "Farmers Merged", description: "Records have been merged successfully" });
+      toast({ title: "Farmers Merged", variant: "success" });
     },
     onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -254,7 +254,7 @@ export default function FarmerLedgerPage() {
   const handleSync = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
     queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
-    toast({ title: "Synced", description: "Data refreshed" });
+    toast({ title: "Data Synced", variant: "success" });
   };
 
   const handlePrint = () => {

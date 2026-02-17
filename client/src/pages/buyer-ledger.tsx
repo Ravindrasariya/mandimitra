@@ -79,7 +79,7 @@ export default function BuyerLedgerPage() {
       setNewPhone("");
       setNewBuyerCode("");
       setNewOpeningBalance("");
-      toast({ title: "Success", description: t("buyerLedger.addNewBuyer") });
+      toast({ title: "Buyer Created", variant: "success" });
     },
     onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -103,7 +103,7 @@ export default function BuyerLedgerPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"] });
       setEditingBuyer(null);
-      toast({ title: "Updated", description: t("buyerLedger.editBuyer") });
+      toast({ title: "Buyer Updated", variant: "success" });
     },
     onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });

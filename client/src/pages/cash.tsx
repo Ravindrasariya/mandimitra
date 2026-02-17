@@ -224,7 +224,7 @@ export default function CashPage() {
     },
     onSuccess: () => {
       invalidateCashQueries();
-      toast({ title: t("common.saved") });
+      toast({ title: t("common.saved"), variant: "success" });
     },
     onError: (err: any) => {
       toast({ title: t("common.error"), description: err.message, variant: "destructive" });
@@ -240,7 +240,7 @@ export default function CashPage() {
       invalidateCashQueries();
       setReverseConfirmEntry(null);
       setChequeBounceEntry(null);
-      toast({ title: t("common.saved"), description: "Entry reversed" });
+      toast({ title: t("common.saved"), description: "Entry reversed", variant: "success" });
     },
     onError: (err: any) => {
       toast({ title: t("common.error"), description: err.message, variant: "destructive" });
@@ -254,7 +254,7 @@ export default function CashPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cash-settings"] });
-      toast({ title: t("common.saved") });
+      toast({ title: t("common.saved"), variant: "success" });
     },
   });
 
@@ -268,7 +268,7 @@ export default function CashPage() {
       setNewBankName("");
       setNewBankType("Current");
       setNewBankBalance("0");
-      toast({ title: t("common.saved") });
+      toast({ title: t("common.saved"), variant: "success" });
     },
   });
 
@@ -279,7 +279,7 @@ export default function CashPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
       setDeleteAccountId(null);
-      toast({ title: "Deleted" });
+      toast({ title: "Account Deleted", variant: "success" });
     },
   });
 

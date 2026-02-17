@@ -60,7 +60,7 @@ export default function BiddingPage() {
         const key = query.queryKey[0];
         return typeof key === "string" && key.startsWith("/api/buyers");
       }});
-      toast({ title: "Bid Saved", description: "Bid recorded successfully" });
+      toast({ title: "Bid Saved", variant: "success" });
       setPricePerKg("");
       setBidBags("");
       setSelectedBuyerId(null);
@@ -85,7 +85,7 @@ export default function BiddingPage() {
         const key = query.queryKey[0];
         return typeof key === "string" && key.startsWith("/api/buyers");
       }});
-      toast({ title: "Deleted", description: "Bid removed" });
+      toast({ title: "Bid Deleted", variant: "success" });
     },
   });
 

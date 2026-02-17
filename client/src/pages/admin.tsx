@@ -92,7 +92,7 @@ function MerchantsTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/businesses"] });
-      toast({ title: "Success", description: "Merchant created" });
+      toast({ title: "Merchant Created", variant: "success" });
       setShowAdd(false);
     },
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
@@ -105,7 +105,7 @@ function MerchantsTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/businesses"] });
-      toast({ title: "Success", description: "Merchant updated" });
+      toast({ title: "Merchant Updated", variant: "success" });
       setEditBiz(null);
     },
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
@@ -316,7 +316,7 @@ function ConfirmMerchantAction({ action, onClose }: { action: { type: "toggle" |
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/businesses"] });
-      toast({ title: "Success", description: `Merchant ${action.biz.status === "active" ? "deactivated" : "activated"}` });
+      toast({ title: `Merchant ${action.biz.status === "active" ? "Deactivated" : "Activated"}`, variant: "success" });
       onClose();
     },
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
@@ -329,7 +329,7 @@ function ConfirmMerchantAction({ action, onClose }: { action: { type: "toggle" |
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/businesses"] });
-      toast({ title: "Success", description: `Merchant ${action.biz.status === "archived" ? "reinstated" : "archived"}` });
+      toast({ title: `Merchant ${action.biz.status === "archived" ? "Reinstated" : "Archived"}`, variant: "success" });
       onClose();
     },
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
@@ -342,7 +342,7 @@ function ConfirmMerchantAction({ action, onClose }: { action: { type: "toggle" |
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/businesses"] });
-      toast({ title: "Success", description: "Business data has been reset" });
+      toast({ title: "Business Data Reset", variant: "success" });
       onClose();
     },
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
@@ -468,7 +468,7 @@ function UsersTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast({ title: "Success", description: "User created with default password: password123" });
+      toast({ title: "User Created", description: "Default password: password123", variant: "success" });
       setShowAdd(false);
     },
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
@@ -481,7 +481,7 @@ function UsersTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast({ title: "Success", description: "User updated" });
+      toast({ title: "User Updated", variant: "success" });
       setEditUser(null);
     },
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
@@ -493,7 +493,7 @@ function UsersTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast({ title: "Success", description: "User deleted" });
+      toast({ title: "User Deleted", variant: "success" });
       setDeleteUser(null);
     },
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
@@ -505,7 +505,7 @@ function UsersTab() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/users"] });
-      toast({ title: "Success", description: "Password reset to default (password123)" });
+      toast({ title: "Password Reset", description: "Default password: password123", variant: "success" });
     },
     onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
   });

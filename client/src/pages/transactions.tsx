@@ -306,7 +306,7 @@ export default function TransactionsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/cash-entries"] });
       setDialogOpen(false);
       setDialogItems([]);
-      toast({ title: "Transaction Created", description: "Transaction recorded successfully" });
+      toast({ title: "Transaction Created", variant: "success" });
     },
     onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -332,7 +332,7 @@ export default function TransactionsPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/cash-entries"] });
       setDialogOpen(false);
       setDialogItems([]);
-      toast({ title: "Transaction Updated", description: "Transaction updated successfully" });
+      toast({ title: "Transaction Updated", variant: "success" });
     },
     onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -359,7 +359,7 @@ export default function TransactionsPage() {
       setReverseConfirmOpen(false);
       setReversingTxn(null);
       setDialogOpen(false);
-      toast({ title: "Transaction Reversed", description: `${data.bagsReturned} bags returned to stock` });
+      toast({ title: "Transaction Reversed", description: `${data.bagsReturned} bags returned to stock`, variant: "success" });
     },
     onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });

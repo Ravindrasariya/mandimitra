@@ -153,7 +153,7 @@ export default function StockEntryPage() {
         });
       }
 
-      toast({ title: "Success", description: `${lots.length} lot(s) added to stock register` });
+      toast({ title: "Stock Entry Saved", description: `${lots.length} lot(s) added to stock register`, variant: "success" });
 
       clearFarmerSearch();
       clearSelectedFarmer();

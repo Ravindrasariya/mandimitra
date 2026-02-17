@@ -48,7 +48,7 @@ export default function ChangePasswordPage({ standalone = false }: { standalone?
           return;
         }
         await changePassword("", newPassword, phone.trim());
-        toast({ title: "Success", description: "Password changed successfully" });
+        toast({ title: "Password Changed", variant: "success" });
       } else if (standalone && !isLoggedIn) {
         if (!username.trim() || !currentPassword) {
           toast({ title: "Error", description: "Please enter your username and current password", variant: "destructive" });
@@ -61,7 +61,7 @@ export default function ChangePasswordPage({ standalone = false }: { standalone?
           currentPassword,
           newPassword,
         });
-        toast({ title: "Success", description: "Password changed successfully. Please login with your new password." });
+        toast({ title: "Password Changed", description: "Please login with your new password.", variant: "success" });
         setLocation("/");
       } else {
         if (!currentPassword) {
@@ -70,7 +70,7 @@ export default function ChangePasswordPage({ standalone = false }: { standalone?
           return;
         }
         await changePassword(currentPassword, newPassword, phone.trim());
-        toast({ title: "Success", description: "Password changed successfully" });
+        toast({ title: "Password Changed", variant: "success" });
       }
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
