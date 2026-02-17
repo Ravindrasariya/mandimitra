@@ -856,7 +856,7 @@ export default function TransactionsPage() {
                         <Badge variant="secondary" className="text-xs">{group.lotId}</Badge>
                         <Badge variant="outline" className="text-xs">{group.lot.crop}</Badge>
                       </div>
-                      <p className="text-sm">{t("transactions.farmer")}: <strong>{group.farmer.name}</strong></p>
+                      <p className="text-xs sm:text-sm">{t("transactions.farmer")}: <strong>{group.farmer.name}</strong></p>
                       <p className="text-xs text-muted-foreground">{group.lot.actualNumberOfBags ?? group.lot.numberOfBags} {t("transactions.bagsTotal")}{(group.lot.actualNumberOfBags != null && group.lot.actualNumberOfBags !== group.lot.numberOfBags) ? ` (Orig: ${group.lot.numberOfBags})` : ""}</p>
                     </div>
                     <div className="flex items-center gap-1">
