@@ -634,8 +634,6 @@ export async function registerRoutes(
       aadhatCommissionBuyerPercent: "2",
       hammaliFarmerPerBag: "0",
       hammaliBuyerPerBag: "0",
-      gradingFarmerPerBag: "0",
-      gradingBuyerPerBag: "0",
     });
   });
 
@@ -648,8 +646,6 @@ export async function registerRoutes(
         aadhatCommissionBuyerPercent: req.body.aadhatCommissionBuyerPercent,
         hammaliFarmerPerBag: req.body.hammaliFarmerPerBag,
         hammaliBuyerPerBag: req.body.hammaliBuyerPerBag,
-        gradingFarmerPerBag: req.body.gradingFarmerPerBag,
-        gradingBuyerPerBag: req.body.gradingBuyerPerBag,
       });
       res.json(result);
     } catch (e: any) {
@@ -804,7 +800,7 @@ export async function registerRoutes(
           totalReceivableFromBuyer: t.totalReceivableFromBuyer,
           paidAmount: t.paidAmount, farmerPaidAmount: t.farmerPaidAmount,
           mandiCharges: t.mandiCharges, aadhatCharges: t.aadhatCharges,
-          hammaliCharges: t.hammaliCharges, gradingCharges: t.gradingCharges,
+          hammaliCharges: t.hammaliCharges, extraChargesFarmer: t.extraChargesFarmer, extraChargesBuyer: t.extraChargesBuyer,
           netWeight: t.netWeight, numberOfBags: t.numberOfBags,
           isReversed: t.isReversed,
         })),

@@ -127,7 +127,8 @@ export const transactions = pgTable("transactions", {
   totalWeight: decimal("total_weight", { precision: 12, scale: 2 }),
   numberOfBags: integer("number_of_bags"),
   hammaliCharges: decimal("hammali_charges", { precision: 10, scale: 2 }).default("0"),
-  gradingCharges: decimal("grading_charges", { precision: 10, scale: 2 }).default("0"),
+  extraChargesFarmer: decimal("extra_charges_farmer", { precision: 10, scale: 2 }).default("0"),
+  extraChargesBuyer: decimal("extra_charges_buyer", { precision: 10, scale: 2 }).default("0"),
   freightCharges: decimal("freight_charges", { precision: 10, scale: 2 }).default("0"),
   netWeight: decimal("net_weight", { precision: 12, scale: 2 }),
   pricePerKg: decimal("price_per_kg", { precision: 10, scale: 2 }),
@@ -139,8 +140,6 @@ export const transactions = pgTable("transactions", {
   mandiBuyerPercent: decimal("mandi_buyer_percent", { precision: 5, scale: 2 }).default("0"),
   hammaliFarmerPerBag: decimal("hammali_farmer_per_bag", { precision: 10, scale: 2 }).default("0"),
   hammaliBuyerPerBag: decimal("hammali_buyer_per_bag", { precision: 10, scale: 2 }).default("0"),
-  gradingFarmerPerBag: decimal("grading_farmer_per_bag", { precision: 10, scale: 2 }).default("0"),
-  gradingBuyerPerBag: decimal("grading_buyer_per_bag", { precision: 10, scale: 2 }).default("0"),
   totalPayableToFarmer: decimal("total_payable_to_farmer", { precision: 12, scale: 2 }).default("0"),
   totalReceivableFromBuyer: decimal("total_receivable_from_buyer", { precision: 12, scale: 2 }).default("0"),
   paidAmount: decimal("paid_amount", { precision: 12, scale: 2 }).default("0").notNull(),
@@ -163,8 +162,6 @@ export const businessChargeSettings = pgTable("business_charge_settings", {
   aadhatCommissionBuyerPercent: decimal("aadhat_commission_buyer_percent", { precision: 5, scale: 2 }).default("2"),
   hammaliFarmerPerBag: decimal("hammali_farmer_per_bag", { precision: 10, scale: 2 }).default("0"),
   hammaliBuyerPerBag: decimal("hammali_buyer_per_bag", { precision: 10, scale: 2 }).default("0"),
-  gradingFarmerPerBag: decimal("grading_farmer_per_bag", { precision: 10, scale: 2 }).default("0"),
-  gradingBuyerPerBag: decimal("grading_buyer_per_bag", { precision: 10, scale: 2 }).default("0"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

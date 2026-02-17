@@ -19,15 +19,14 @@ import { format } from "date-fns";
 type BuyerWithDues = Buyer & { receivableDue: string; overallDue: string };
 type FarmerWithDues = Farmer & { totalPayable: string; totalDue: string; salesCount: number };
 type TransactionAggregates = {
-  totalHammali: number; totalGrading: number; totalMandiCommission: number;
-  paidHammali: number; paidGrading: number; paidMandiCommission: number;
+  totalHammali: number; totalExtraCharges: number; totalMandiCommission: number;
+  paidHammali: number; paidMandiCommission: number;
 };
 
 const OUTFLOW_TYPES = [
   "Farmer-Advance",
   "Farmer-Harvest Sale",
   "General Expenses",
-  "Grading",
   "Hammali",
   "Mandi Commission",
   "Salary",
@@ -477,12 +476,10 @@ export default function CashPage() {
   const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
   const dueHammali = (txAggregates?.totalHammali || 0) - (txAggregates?.paidHammali || 0);
-  const dueGrading = (txAggregates?.totalGrading || 0) - (txAggregates?.paidGrading || 0);
   const dueMandi = (txAggregates?.totalMandiCommission || 0) - (txAggregates?.paidMandiCommission || 0);
 
   const getOutflowHint = (type: string) => {
     if (type === "Hammali") return dueHammali > 0 ? `Due: ₹${dueHammali.toLocaleString("en-IN")}` : null;
-    if (type === "Grading") return dueGrading > 0 ? `Due: ₹${dueGrading.toLocaleString("en-IN")}` : null;
     if (type === "Mandi Commission") return dueMandi > 0 ? `Due: ₹${dueMandi.toLocaleString("en-IN")}` : null;
     return null;
   };
@@ -894,11 +891,6 @@ export default function CashPage() {
               {outwardOutflowType === "Hammali" && dueHammali > 0 && (
                 <div className="p-2 bg-amber-50 dark:bg-amber-950 rounded text-xs text-amber-700 dark:text-amber-300">
                   Total Hammali from Transactions: ₹{(txAggregates?.totalHammali || 0).toLocaleString("en-IN")} | Paid: ₹{(txAggregates?.paidHammali || 0).toLocaleString("en-IN")} | <span className="font-bold">Due: ₹{dueHammali.toLocaleString("en-IN")}</span>
-                </div>
-              )}
-              {outwardOutflowType === "Grading" && dueGrading > 0 && (
-                <div className="p-2 bg-amber-50 dark:bg-amber-950 rounded text-xs text-amber-700 dark:text-amber-300">
-                  Total Grading from Transactions: ₹{(txAggregates?.totalGrading || 0).toLocaleString("en-IN")} | Paid: ₹{(txAggregates?.paidGrading || 0).toLocaleString("en-IN")} | <span className="font-bold">Due: ₹{dueGrading.toLocaleString("en-IN")}</span>
                 </div>
               )}
               {outwardOutflowType === "Mandi Commission" && dueMandi > 0 && (

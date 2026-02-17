@@ -16,7 +16,6 @@ import type { Bid, Buyer, Lot, Farmer, Transaction, BusinessChargeSettings } fro
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Switch } from "@/components/ui/switch";
 import { Receipt, Pencil, Printer, ChevronDown, Calendar, Package, Users, Landmark, HandCoins, Download } from "lucide-react";
 import { format } from "date-fns";
 
@@ -68,7 +67,7 @@ function generateFarmerReceiptHtml(lot: Lot, farmer: Farmer, txns: TransactionWi
   const cropLabel: Record<string, string> = { Potato: "आलू / Potato", Onion: "प्याज / Onion", Garlic: "लहसुन / Garlic" };
 
   const totalHammali = txns.reduce((s, t) => s + parseFloat(t.hammaliCharges || "0"), 0);
-  const totalGrading = txns.reduce((s, t) => s + parseFloat(t.gradingCharges || "0"), 0);
+  const totalExtraCharges = txns.reduce((s, t) => s + parseFloat(t.extraChargesFarmer || "0"), 0);
   const totalFreight = txns.reduce((s, t) => s + parseFloat(t.freightCharges || "0"), 0);
   const totalAadhatFarmer = txns.reduce((s, t) => {
     const gross = parseFloat(t.netWeight || "0") * parseFloat(t.pricePerKg || "0");
@@ -79,7 +78,7 @@ function generateFarmerReceiptHtml(lot: Lot, farmer: Farmer, txns: TransactionWi
     return s + gross * parseFloat(t.mandiFarmerPercent || "0") / 100;
   }, 0);
 
-  const totalDeduction = totalHammali + totalGrading + totalFreight + totalAadhatFarmer + totalMandiFarmer;
+  const totalDeduction = totalHammali + totalExtraCharges + totalFreight + totalAadhatFarmer + totalMandiFarmer;
   const totalPayable = txns.reduce((s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0);
   const totalGross = txns.reduce((s, t) => s + (parseFloat(t.netWeight || "0") * parseFloat(t.pricePerKg || "0")), 0);
 
@@ -154,7 +153,7 @@ ${txnRows}
 <div class="ded-section">
 <div class="ded-row" style="font-weight:bold;margin-bottom:4px"><span>कटौती / Deductions:</span><span></span></div>
 ${totalHammali > 0 ? `<div class="ded-row"><span>हम्माली / Hammali:</span><span>₹${totalHammali.toFixed(2)}</span></div>` : ""}
-${totalGrading > 0 ? `<div class="ded-row"><span>ग्रेडिंग / Grading:</span><span>₹${totalGrading.toFixed(2)}</span></div>` : ""}
+${totalExtraCharges > 0 ? `<div class="ded-row"><span>अतिरिक्त शुल्क / Extra Charges:</span><span>₹${totalExtraCharges.toFixed(2)}</span></div>` : ""}
 ${totalAadhatFarmer > 0 ? `<div class="ded-row"><span>आढ़त / Aadhat:</span><span>₹${totalAadhatFarmer.toFixed(2)}</span></div>` : ""}
 ${totalMandiFarmer > 0 ? `<div class="ded-row"><span>मण्डी शुल्क / Mandi:</span><span>₹${totalMandiFarmer.toFixed(2)}</span></div>` : ""}
 ${totalFreight > 0 ? `<div class="ded-row"><span>भाड़ा / Freight:</span><span>₹${totalFreight.toFixed(2)}</span></div>` : ""}
@@ -171,7 +170,7 @@ function generateBuyerReceiptHtml(lot: Lot, farmer: Farmer, tx: TransactionWithD
   const bags = tx.numberOfBags || 0;
 
   const hammaliBuyer = parseFloat(tx.hammaliBuyerPerBag || "0") * bags;
-  const gradingBuyer = parseFloat(tx.gradingBuyerPerBag || "0") * bags;
+  const extraBuyer = parseFloat(tx.extraChargesBuyer || "0");
   const aadhatBuyer = grossAmount * parseFloat(tx.aadhatBuyerPercent || "0") / 100;
   const mandiBuyer = grossAmount * parseFloat(tx.mandiBuyerPercent || "0") / 100;
 
@@ -209,7 +208,7 @@ ${businessName ? `<p style="font-size:0.9em;color:#666">${businessName}</p>` : "
 </table>
 <div class="summary">
 ${hammaliBuyer > 0 ? `<div class="summary-row"><span>Hammali (${bags} bags):</span><span>Rs.${hammaliBuyer.toFixed(2)}</span></div>` : ""}
-${gradingBuyer > 0 ? `<div class="summary-row"><span>Grading:</span><span>Rs.${gradingBuyer.toFixed(2)}</span></div>` : ""}
+${extraBuyer > 0 ? `<div class="summary-row"><span>Extra Charges:</span><span>Rs.${extraBuyer.toFixed(2)}</span></div>` : ""}
 ${aadhatBuyer > 0 ? `<div class="summary-row"><span>Aadhat (${tx.aadhatBuyerPercent}%):</span><span>Rs.${aadhatBuyer.toFixed(2)}</span></div>` : ""}
 ${mandiBuyer > 0 ? `<div class="summary-row"><span>Mandi (${tx.mandiBuyerPercent}%):</span><span>Rs.${mandiBuyer.toFixed(2)}</span></div>` : ""}
 <div class="summary-row total"><span>Total Receivable from Buyer:</span><span>Rs.${parseFloat(tx.totalReceivableFromBuyer || "0").toFixed(2)}</span></div>
@@ -248,8 +247,8 @@ export default function TransactionsPage() {
   const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
 
   const [totalWeight, setTotalWeight] = useState("");
-  const [applyFarmerGrading, setApplyFarmerGrading] = useState(false);
-  const [applyBuyerGrading, setApplyBuyerGrading] = useState(false);
+  const [extraChargesFarmer, setExtraChargesFarmer] = useState("0");
+  const [extraChargesBuyer, setExtraChargesBuyer] = useState("0");
 
   type ChargeSettingsData = {
     mandiCommissionFarmerPercent: string;
@@ -258,8 +257,6 @@ export default function TransactionsPage() {
     aadhatCommissionBuyerPercent: string;
     hammaliFarmerPerBag: string;
     hammaliBuyerPerBag: string;
-    gradingFarmerPerBag: string;
-    gradingBuyerPerBag: string;
   };
 
   const { data: chargeSettings } = useQuery<ChargeSettingsData>({
@@ -283,8 +280,8 @@ export default function TransactionsPage() {
   });
 
   const { data: txAggregates } = useQuery<{
-    totalHammali: number; totalGrading: number; totalMandiCommission: number;
-    paidHammali: number; paidGrading: number; paidMandiCommission: number;
+    totalHammali: number; totalExtraCharges: number; totalMandiCommission: number;
+    paidHammali: number; paidMandiCommission: number;
   }>({
     queryKey: ["/api/transaction-aggregates"],
   });
@@ -502,8 +499,8 @@ export default function TransactionsPage() {
 
   const prefillFromTxn = (tx: TransactionWithDetails) => {
     setTotalWeight(tx.totalWeight || "");
-    setApplyFarmerGrading(parseFloat(tx.gradingFarmerPerBag || "0") > 0);
-    setApplyBuyerGrading(parseFloat(tx.gradingBuyerPerBag || "0") > 0);
+    setExtraChargesFarmer(tx.extraChargesFarmer || "0");
+    setExtraChargesBuyer(tx.extraChargesBuyer || "0");
   };
 
   const calcProportionateWeight = (bid: BidWithDetails): string => {
@@ -516,8 +513,8 @@ export default function TransactionsPage() {
 
   const resetFormDefaults = (bid?: BidWithDetails) => {
     setTotalWeight(bid ? calcProportionateWeight(bid) : "");
-    setApplyFarmerGrading(false);
-    setApplyBuyerGrading(false);
+    setExtraChargesFarmer("0");
+    setExtraChargesBuyer("0");
   };
 
   const handleBuyerChange = (val: string) => {
@@ -540,7 +537,6 @@ export default function TransactionsPage() {
     mandiCommissionFarmerPercent: "0", mandiCommissionBuyerPercent: "1",
     aadhatCommissionFarmerPercent: "0", aadhatCommissionBuyerPercent: "2",
     hammaliFarmerPerBag: "0", hammaliBuyerPerBag: "0",
-    gradingFarmerPerBag: "0", gradingBuyerPerBag: "0",
   };
 
   const tw = parseFloat(totalWeight) || 0;
@@ -552,8 +548,8 @@ export default function TransactionsPage() {
 
   const hammaliFarmerRate = parseFloat(cs.hammaliFarmerPerBag) || 0;
   const hammaliBuyerRate = parseFloat(cs.hammaliBuyerPerBag) || 0;
-  const gradingFarmerRate = applyFarmerGrading ? (parseFloat(cs.gradingFarmerPerBag) || 0) : 0;
-  const gradingBuyerRate = applyBuyerGrading ? (parseFloat(cs.gradingBuyerPerBag) || 0) : 0;
+  const extraFarmer = parseFloat(extraChargesFarmer) || 0;
+  const extraBuyer = parseFloat(extraChargesBuyer) || 0;
   const aadhatFarmerPct = parseFloat(cs.aadhatCommissionFarmerPercent) || 0;
   const aadhatBuyerPct = parseFloat(cs.aadhatCommissionBuyerPercent) || 0;
   const mandiFarmerPct = parseFloat(cs.mandiCommissionFarmerPercent) || 0;
@@ -566,15 +562,13 @@ export default function TransactionsPage() {
 
   const hammaliFarmerTotal = hammaliFarmerRate * bags;
   const hammaliBuyerTotal = hammaliBuyerRate * bags;
-  const gradingFarmerTotal = gradingFarmerRate * bags;
-  const gradingBuyerTotal = gradingBuyerRate * bags;
   const aadhatFarmer = (grossAmount * aadhatFarmerPct) / 100;
   const aadhatBuyer = (grossAmount * aadhatBuyerPct) / 100;
   const mandiFarmer = (grossAmount * mandiFarmerPct) / 100;
   const mandiBuyer = (grossAmount * mandiBuyerPct) / 100;
 
-  const farmerDeductions = hammaliFarmerTotal + gradingFarmerTotal + aadhatFarmer + mandiFarmer + freightFarmerTotal;
-  const buyerAdditions = hammaliBuyerTotal + gradingBuyerTotal + aadhatBuyer + mandiBuyer;
+  const farmerDeductions = hammaliFarmerTotal + extraFarmer + aadhatFarmer + mandiFarmer + freightFarmerTotal;
+  const buyerAdditions = hammaliBuyerTotal + extraBuyer + aadhatBuyer + mandiBuyer;
 
   const farmerPayable = grossAmount - farmerDeductions;
   const buyerReceivable = grossAmount + buyerAdditions;
@@ -593,7 +587,6 @@ export default function TransactionsPage() {
       totalWeight,
       numberOfBags: bags,
       hammaliCharges: hammaliFarmerTotal.toString(),
-      gradingCharges: gradingFarmerTotal.toString(),
       freightCharges: freightFarmerTotal.toFixed(2),
       netWeight,
       pricePerKg: selectedBid.pricePerKg,
@@ -605,8 +598,8 @@ export default function TransactionsPage() {
       mandiBuyerPercent: mandiBuyerPct.toString(),
       hammaliFarmerPerBag: hammaliFarmerRate.toString(),
       hammaliBuyerPerBag: hammaliBuyerRate.toString(),
-      gradingFarmerPerBag: gradingFarmerRate.toString(),
-      gradingBuyerPerBag: gradingBuyerRate.toString(),
+      extraChargesFarmer: extraFarmer.toFixed(2),
+      extraChargesBuyer: extraBuyer.toFixed(2),
       totalPayableToFarmer: farmerPayable.toFixed(2),
       totalReceivableFromBuyer: buyerReceivable.toFixed(2),
       date: format(new Date(), "yyyy-MM-dd"),
@@ -643,7 +636,7 @@ export default function TransactionsPage() {
       "Buyer Name", "Buyer Phone",
       "Grade", "No. of Bags", "Rate/Kg",
       "Total Weight", "Net Weight",
-      "Hammali Farmer/Bag", "Hammali Buyer/Bag", "Grading Farmer/Bag", "Grading Buyer/Bag",
+      "Hammali Farmer/Bag", "Hammali Buyer/Bag", "Extra Charges Farmer", "Extra Charges Buyer",
       "Aadhat Farmer %", "Aadhat Buyer %", "Mandi Farmer %", "Mandi Buyer %",
       "Freight Charges",
       "Payable to Farmer", "Receivable from Buyer", "Status"
@@ -663,7 +656,7 @@ export default function TransactionsPage() {
         bid.grade || "", tx.numberOfBags, tx.pricePerKg,
         tx.totalWeight, tx.netWeight,
         tx.hammaliFarmerPerBag || "0", tx.hammaliBuyerPerBag || "0",
-        tx.gradingFarmerPerBag || "0", tx.gradingBuyerPerBag || "0",
+        tx.extraChargesFarmer || "0", tx.extraChargesBuyer || "0",
         tx.aadhatFarmerPercent || "0", tx.aadhatBuyerPercent || "0",
         tx.mandiFarmerPercent || "0", tx.mandiBuyerPercent || "0",
         tx.freightCharges || "0",
@@ -1086,11 +1079,16 @@ export default function TransactionsPage() {
                   <div className="flex justify-between"><span>Mandi:</span><span>{mandiFarmerPct}%</span></div>
                   <div className="flex justify-between"><span>Hammali:</span><span>₹{hammaliFarmerRate}/bag</span></div>
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <Switch checked={applyFarmerGrading} onCheckedChange={setApplyFarmerGrading} className="scale-75" data-testid="toggle-farmer-grading" />
-                      <span>Grading:</span>
-                    </div>
-                    <span className={!applyFarmerGrading ? "text-muted-foreground/50 line-through" : ""}>₹{parseFloat(cs.gradingFarmerPerBag) || 0}/bag</span>
+                    <span>Extra:</span>
+                    <Input
+                      data-testid="input-extra-charges-farmer"
+                      type="text"
+                      inputMode="decimal"
+                      value={extraChargesFarmer}
+                      onChange={(e) => setExtraChargesFarmer(e.target.value)}
+                      onFocus={(e) => e.target.select()}
+                      className="w-20 h-6 text-xs text-right p-1"
+                    />
                   </div>
                   {vehicleBhadaRate > 0 && (
                     <div className="flex justify-between"><span>Freight/Bhada:</span><span>₹{vehicleBhadaRate}/bag</span></div>
@@ -1102,11 +1100,16 @@ export default function TransactionsPage() {
                   <div className="flex justify-between"><span>Mandi:</span><span>{mandiBuyerPct}%</span></div>
                   <div className="flex justify-between"><span>Hammali:</span><span>₹{hammaliBuyerRate}/bag</span></div>
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <Switch checked={applyBuyerGrading} onCheckedChange={setApplyBuyerGrading} className="scale-75" data-testid="toggle-buyer-grading" />
-                      <span>Grading:</span>
-                    </div>
-                    <span className={!applyBuyerGrading ? "text-muted-foreground/50 line-through" : ""}>₹{parseFloat(cs.gradingBuyerPerBag) || 0}/bag</span>
+                    <span>Extra:</span>
+                    <Input
+                      data-testid="input-extra-charges-buyer"
+                      type="text"
+                      inputMode="decimal"
+                      value={extraChargesBuyer}
+                      onChange={(e) => setExtraChargesBuyer(e.target.value)}
+                      onFocus={(e) => e.target.select()}
+                      className="w-20 h-6 text-xs text-right p-1"
+                    />
                   </div>
                 </div>
               </div>
@@ -1125,10 +1128,10 @@ export default function TransactionsPage() {
                       <span>-Rs.{hammaliFarmerTotal.toFixed(2)}</span>
                     </div>
                   )}
-                  {gradingFarmerRate > 0 && (
+                  {extraFarmer > 0 && (
                     <div className="flex justify-between text-muted-foreground">
-                      <span>Grading ({bags} × ₹{gradingFarmerRate}):</span>
-                      <span>-Rs.{gradingFarmerTotal.toFixed(2)}</span>
+                      <span>Extra Charges:</span>
+                      <span>-Rs.{extraFarmer.toFixed(2)}</span>
                     </div>
                   )}
                   {aadhatFarmerPct > 0 && (
@@ -1169,10 +1172,10 @@ export default function TransactionsPage() {
                       <span>+Rs.{hammaliBuyerTotal.toFixed(2)}</span>
                     </div>
                   )}
-                  {gradingBuyerRate > 0 && (
+                  {extraBuyer > 0 && (
                     <div className="flex justify-between text-muted-foreground">
-                      <span>Grading ({bags} × ₹{gradingBuyerRate}):</span>
-                      <span>+Rs.{gradingBuyerTotal.toFixed(2)}</span>
+                      <span>Extra Charges:</span>
+                      <span>+Rs.{extraBuyer.toFixed(2)}</span>
                     </div>
                   )}
                   {aadhatBuyerPct > 0 && (

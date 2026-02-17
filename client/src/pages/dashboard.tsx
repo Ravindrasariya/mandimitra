@@ -22,10 +22,10 @@ import {
 type DashboardData = {
   businessName: string;
   lots: { id: number; lotId: string; crop: string; date: string; numberOfBags: number; remainingBags: number; farmerId: number; farmerName: string; initialTotalWeight: string | null }[];
-  transactions: { id: number; transactionId: string; date: string; crop: string; lotId: string; farmerId: number; farmerName: string; buyerId: number; buyerName: string; totalPayableToFarmer: string; totalReceivableFromBuyer: string; paidAmount: string; farmerPaidAmount: string; mandiCharges: string; aadhatCharges: string; hammaliCharges: string; gradingCharges: string; netWeight: string; numberOfBags: number; isReversed: boolean }[];
+  transactions: { id: number; transactionId: string; date: string; crop: string; lotId: string; farmerId: number; farmerName: string; buyerId: number; buyerName: string; totalPayableToFarmer: string; totalReceivableFromBuyer: string; paidAmount: string; farmerPaidAmount: string; mandiCharges: string; aadhatCharges: string; hammaliCharges: string; extraChargesFarmer: string; extraChargesBuyer: string; netWeight: string; numberOfBags: number; isReversed: boolean }[];
   farmersWithDues: { id: number; name: string; totalPayable: string; totalDue: string }[];
   buyersWithDues: { id: number; name: string; receivableDue: string; overallDue: string }[];
-  txAggregates: { totalHammali: number; totalGrading: number; totalMandiCommission: number; paidHammali: number; paidGrading: number; paidMandiCommission: number };
+  txAggregates: { totalHammali: number; totalExtraCharges: number; totalMandiCommission: number; paidHammali: number; paidMandiCommission: number };
 };
 
 const PIE_COLORS = ["#2563eb", "#f59e0b", "#10b981", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"];
@@ -37,8 +37,6 @@ type ChargeSettingsData = {
   aadhatCommissionBuyerPercent: string;
   hammaliFarmerPerBag: string;
   hammaliBuyerPerBag: string;
-  gradingFarmerPerBag: string;
-  gradingBuyerPerBag: string;
 };
 
 export default function DashboardPage() {
@@ -64,8 +62,6 @@ export default function DashboardPage() {
     aadhatCommissionBuyerPercent: "2",
     hammaliFarmerPerBag: "0",
     hammaliBuyerPerBag: "0",
-    gradingFarmerPerBag: "0",
-    gradingBuyerPerBag: "0",
   });
 
   const { data, isLoading } = useQuery<DashboardData>({
@@ -108,8 +104,6 @@ export default function DashboardPage() {
         aadhatCommissionBuyerPercent: chargeSettings.aadhatCommissionBuyerPercent || "2",
         hammaliFarmerPerBag: chargeSettings.hammaliFarmerPerBag || "0",
         hammaliBuyerPerBag: chargeSettings.hammaliBuyerPerBag || "0",
-        gradingFarmerPerBag: chargeSettings.gradingFarmerPerBag || "0",
-        gradingBuyerPerBag: chargeSettings.gradingBuyerPerBag || "0",
       });
     }
     setSettingsOpen(true);
@@ -203,15 +197,14 @@ export default function DashboardPage() {
     const totalMandi = filteredTxns.reduce((s, t) => s + parseFloat(t.mandiCharges || "0"), 0);
     const totalAadhat = filteredTxns.reduce((s, t) => s + parseFloat(t.aadhatCharges || "0"), 0);
     const totalHammali = filteredTxns.reduce((s, t) => s + parseFloat(t.hammaliCharges || "0"), 0);
-    const totalGrading = filteredTxns.reduce((s, t) => s + parseFloat(t.gradingCharges || "0"), 0);
+    const totalExtraCharges = filteredTxns.reduce((s, t) => s + parseFloat(t.extraChargesFarmer || "0") + parseFloat(t.extraChargesBuyer || "0"), 0);
 
     const farmerDue = filteredFarmersWithDues.reduce((s, f) => s + parseFloat(f.totalDue || "0"), 0);
     const buyerDue = filteredBuyersWithDues.reduce((s, b) => s + parseFloat(b.overallDue || "0"), 0);
 
     const hammaliDue = (data?.txAggregates?.totalHammali || 0) - (data?.txAggregates?.paidHammali || 0);
-    const gradingDue = (data?.txAggregates?.totalGrading || 0) - (data?.txAggregates?.paidGrading || 0);
 
-    return { farmersCount, lotsCount, txnCount, totalPayable, totalReceivable, totalMandi, totalAadhat, totalHammali, totalGrading, farmerDue, buyerDue, hammaliDue, gradingDue };
+    return { farmersCount, lotsCount, txnCount, totalPayable, totalReceivable, totalMandi, totalAadhat, totalHammali, totalExtraCharges, farmerDue, buyerDue, hammaliDue };
   }, [filteredTxns, filteredLots, uniqueFarmerIds, filteredFarmersWithDues, filteredBuyersWithDues, data]);
 
   const cropDistribution = useMemo(() => {
@@ -487,18 +480,10 @@ export default function DashboardPage() {
           <CardContent className="p-3">
             <div className="flex items-center gap-1.5 mb-1">
               <Hammer className="w-3.5 h-3.5 text-teal-600" />
-              <span className="text-[11px] font-medium text-muted-foreground">{t("dash.hammaliGradingDue")}</span>
+              <span className="text-[11px] font-medium text-muted-foreground">{t("dash.hammali")}</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div data-testid="text-hammali-due">
-                <span className="text-[10px] text-muted-foreground">{t("dash.hammali")}</span>
-                <div className="text-sm font-bold text-teal-700 dark:text-teal-400">₹{summary.hammaliDue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
-              </div>
-              <div className="h-6 w-px bg-border" />
-              <div data-testid="text-grading-due">
-                <span className="text-[10px] text-muted-foreground">{t("dash.grading")}</span>
-                <div className="text-sm font-bold text-teal-700 dark:text-teal-400">₹{summary.gradingDue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
-              </div>
+            <div data-testid="text-hammali-due">
+              <div className="text-sm font-bold text-teal-700 dark:text-teal-400">₹{summary.hammaliDue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
             </div>
           </CardContent>
         </Card>
@@ -758,36 +743,6 @@ export default function DashboardPage() {
                     inputMode="decimal"
                     value={chargeForm.hammaliBuyerPerBag}
                     onChange={(e) => setChargeForm(f => ({ ...f, hammaliBuyerPerBag: e.target.value }))}
-                    onFocus={(e) => e.target.select()}
-                    className="mobile-touch-target"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold">{t("dash.gradingPerBag")}</Label>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">{t("dash.farmer")}</Label>
-                  <Input
-                    data-testid="input-grading-farmer"
-                    type="text"
-                    inputMode="decimal"
-                    value={chargeForm.gradingFarmerPerBag}
-                    onChange={(e) => setChargeForm(f => ({ ...f, gradingFarmerPerBag: e.target.value }))}
-                    onFocus={(e) => e.target.select()}
-                    className="mobile-touch-target"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-muted-foreground">{t("dash.buyer")}</Label>
-                  <Input
-                    data-testid="input-grading-buyer"
-                    type="text"
-                    inputMode="decimal"
-                    value={chargeForm.gradingBuyerPerBag}
-                    onChange={(e) => setChargeForm(f => ({ ...f, gradingBuyerPerBag: e.target.value }))}
                     onFocus={(e) => e.target.select()}
                     className="mobile-touch-target"
                   />
