@@ -81,7 +81,7 @@ export interface IStorage {
 
   getCashEntries(businessId: number, filters?: { category?: string; outflowType?: string; farmerId?: number; buyerId?: number; month?: string; year?: string }): Promise<CashEntry[]>;
   createCashEntry(entry: InsertCashEntry): Promise<CashEntry>;
-  reverseCashEntry(id: number, businessId: number): Promise<CashEntry | undefined>;
+  reverseCashEntry(id: number, businessId: number, reason?: string | null): Promise<CashEntry | undefined>;
 
   getFarmerLedger(businessId: number, farmerId: number, dateFrom?: string, dateTo?: string): Promise<{ transactions: Transaction[]; cashEntries: CashEntry[]; farmer: Farmer }>;
   getBuyerLedger(businessId: number, buyerId: number, dateFrom?: string, dateTo?: string): Promise<{ transactions: Transaction[]; cashEntries: CashEntry[]; buyer: Buyer }>;
@@ -692,12 +692,16 @@ export class DatabaseStorage implements IStorage {
     throw new Error("Failed to generate unique cash flow ID after retries");
   }
 
-  async reverseCashEntry(id: number, businessId: number): Promise<CashEntry | undefined> {
+  async reverseCashEntry(id: number, businessId: number, reason?: string | null): Promise<CashEntry | undefined> {
     const [existing] = await db.select().from(cashEntries).where(and(eq(cashEntries.id, id), eq(cashEntries.businessId, businessId)));
     if (!existing) return undefined;
     if (existing.isReversed) throw new Error("Entry is already reversed");
+    const updateData: any = { isReversed: true, reversedAt: new Date() };
+    if (reason) {
+      updateData.notes = existing.notes ? `${existing.notes} | ${reason}` : reason;
+    }
     const [updated] = await db.update(cashEntries)
-      .set({ isReversed: true, reversedAt: new Date() })
+      .set(updateData)
       .where(and(eq(cashEntries.id, id), eq(cashEntries.businessId, businessId)))
       .returning();
     return updated;

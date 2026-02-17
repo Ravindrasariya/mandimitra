@@ -41,6 +41,7 @@ export default function CashPage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [detailEntry, setDetailEntry] = useState<CashEntry | null>(null);
   const [reverseConfirmEntry, setReverseConfirmEntry] = useState<CashEntry | null>(null);
+  const [chequeBounceEntry, setChequeBounceEntry] = useState<CashEntry | null>(null);
   const [deleteAccountId, setDeleteAccountId] = useState<number | null>(null);
 
   const [filterCategory, setFilterCategory] = usePersistedState("cash-filterCategory", "all");
@@ -231,13 +232,14 @@ export default function CashPage() {
   });
 
   const reverseMutation = useMutation({
-    mutationFn: async (id: number) => {
-      const res = await apiRequest("PATCH", `/api/cash-entries/${id}/reverse`);
+    mutationFn: async ({ id, reason }: { id: number; reason?: string }) => {
+      const res = await apiRequest("PATCH", `/api/cash-entries/${id}/reverse`, reason ? { reason } : undefined);
       return res.json();
     },
     onSuccess: () => {
       invalidateCashQueries();
       setReverseConfirmEntry(null);
+      setChequeBounceEntry(null);
       toast({ title: t("common.saved"), description: "Entry reversed" });
     },
     onError: (err: any) => {
@@ -555,6 +557,7 @@ export default function CashPage() {
             <option value="all">Payment: All</option>
             <option value="Cash">Cash</option>
             <option value="Online">Account</option>
+            <option value="Cheque">Cheque</option>
           </select>
           <select value={filterOutflowType} onChange={(e) => setFilterOutflowType(e.target.value)} className="h-8 w-[150px] text-xs rounded-md border border-input bg-background px-2" data-testid="filter-outflow-type">
             <option value="all">Outflow: All</option>
@@ -670,6 +673,7 @@ export default function CashPage() {
                     <SelectContent>
                       <SelectItem value="Cash">Cash</SelectItem>
                       <SelectItem value="Online">Account/Online</SelectItem>
+                      <SelectItem value="Cheque">Cheque</SelectItem>
                     </SelectContent>
                   </Select>
                 ) : (
@@ -740,6 +744,7 @@ export default function CashPage() {
                     <SelectContent>
                       <SelectItem value="Cash">Cash</SelectItem>
                       <SelectItem value="Online">Account/Online</SelectItem>
+                      <SelectItem value="Cheque">Cheque</SelectItem>
                     </SelectContent>
                   </Select>
                 ) : (
@@ -1020,6 +1025,16 @@ export default function CashPage() {
               {detailEntry.farmerId && <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.farmer")}</span><span>{getFarmerName(detailEntry.farmerId)}</span></div>}
               {detailEntry.notes && <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.remarks")}</span><span>{detailEntry.notes}</span></div>}
               <div className="flex justify-between"><span className="text-muted-foreground">Status</span><span>{detailEntry.isReversed ? "Reversed" : "Active"}</span></div>
+              {!detailEntry.isReversed && detailEntry.paymentMode === "Cheque" && (
+                <Button variant="destructive" size="sm" className="w-full mt-2" onClick={() => { setChequeBounceEntry(detailEntry); setDetailEntry(null); }} data-testid="button-cheque-bounced">
+                  Cheque Bounced
+                </Button>
+              )}
+              {!detailEntry.isReversed && (
+                <Button variant="outline" size="sm" className="w-full" onClick={() => { setReverseConfirmEntry(detailEntry); setDetailEntry(null); }} data-testid="button-reverse-from-detail">
+                  {t("cash.reverseEntry")}
+                </Button>
+              )}
             </div>
           )}
         </DialogContent>
@@ -1033,8 +1048,25 @@ export default function CashPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-            <AlertDialogAction onClick={() => reverseConfirmEntry && reverseMutation.mutate(reverseConfirmEntry.id)}>
+            <AlertDialogAction onClick={() => reverseConfirmEntry && reverseMutation.mutate({ id: reverseConfirmEntry.id })}>
               {t("cash.reverse")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!chequeBounceEntry} onOpenChange={() => setChequeBounceEntry(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cheque Bounced</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will reverse the entry and mark it as "Cheque Bounced". The bank account balance will be adjusted accordingly. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-destructive-foreground hover:bg-destructive/90" onClick={() => chequeBounceEntry && reverseMutation.mutate({ id: chequeBounceEntry.id, reason: "Cheque Bounced" })} data-testid="button-confirm-cheque-bounced">
+              Confirm Cheque Bounced
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -692,7 +692,8 @@ export async function registerRoutes(
 
   app.patch("/api/cash-entries/:id/reverse", requireAuth, async (req, res) => {
     try {
-      const result = await storage.reverseCashEntry(paramId(req.params.id), req.user!.businessId);
+      const reason = req.body?.reason || null;
+      const result = await storage.reverseCashEntry(paramId(req.params.id), req.user!.businessId, reason);
       if (!result) return res.status(404).json({ message: "Entry not found" });
       res.json(result);
     } catch (e: any) {
