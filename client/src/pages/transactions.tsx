@@ -921,6 +921,9 @@ export default function TransactionsPage() {
                             <strong className="truncate">{tx.buyer.name}</strong>
                             <span className="text-green-600 font-semibold whitespace-nowrap">₹{tx.pricePerKg}/kg</span>
                             {tx.isReversed && <Badge variant="outline" className="text-xs border-orange-400 text-orange-600 bg-orange-50">{t("transactions.reversed")}</Badge>}
+                            {!tx.isReversed && tx.paymentStatus === "paid" && <Badge variant="outline" className="text-xs border-green-400 text-green-700 bg-green-50">Paid</Badge>}
+                            {!tx.isReversed && tx.paymentStatus === "partial" && <Badge variant="outline" className="text-xs border-orange-400 text-orange-600 bg-orange-50">Partial</Badge>}
+                            {!tx.isReversed && tx.paymentStatus === "due" && <Badge variant="outline" className="text-xs border-red-400 text-red-600 bg-red-50">Due</Badge>}
                           </div>
                           <div className="flex items-center gap-2 text-xs text-muted-foreground">
                             <span>{tx.numberOfBags} bags</span>

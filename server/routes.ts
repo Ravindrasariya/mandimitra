@@ -532,6 +532,7 @@ export async function registerRoutes(
     try {
       const data = { ...req.body, businessId: req.user!.businessId };
       const tx = await storage.createTransaction(data);
+      await storage.recalculateBuyerPaymentStatus(req.user!.businessId, tx.buyerId);
       res.status(201).json(tx);
     } catch (e: any) {
       res.status(400).json({ message: e.message });
@@ -558,6 +559,7 @@ export async function registerRoutes(
       if (!lot) return res.status(404).json({ message: "Lot not found" });
 
       await storage.updateTransaction(txId, businessId, { isReversed: true } as any);
+      await storage.recalculateBuyerPaymentStatus(businessId, tx.buyerId);
 
       const actual = lot.actualNumberOfBags ?? lot.numberOfBags;
       const newActual = lot.isReturned ? actual + bagsToReturn : actual;
@@ -733,6 +735,38 @@ export async function registerRoutes(
         req.query.dateTo as string | undefined,
       );
       res.json(result);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  app.get("/api/buyers/:id/paana", requireAuth, async (req, res) => {
+    try {
+      const businessId = req.user!.businessId;
+      const buyerId = paramId(req.params.id);
+      const business = await storage.getBusiness(businessId);
+      const buyer = await storage.getBuyer(buyerId, businessId);
+      if (!buyer) return res.status(404).json({ message: "Buyer not found" });
+
+      const allTxns = await storage.getTransactions(businessId);
+      const buyerTxns = allTxns
+        .filter(t => t.buyerId === buyerId && !t.isReversed)
+        .map(t => ({
+          id: t.id,
+          date: t.date,
+          crop: t.lot.crop,
+          lotId: t.lot.lotId,
+          numberOfBags: t.numberOfBags,
+          totalReceivableFromBuyer: t.totalReceivableFromBuyer,
+          paidAmount: t.paidAmount,
+          paymentStatus: t.paymentStatus,
+        }));
+
+      res.json({
+        businessName: business?.name || "Mandi Mitra",
+        buyer: { id: buyer.id, buyerId: buyer.buyerId, name: buyer.name, address: buyer.address, phone: buyer.phone, openingBalance: buyer.openingBalance },
+        transactions: buyerTxns,
+      });
     } catch (e: any) {
       res.status(400).json({ message: e.message });
     }

@@ -14,7 +14,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import type { Buyer, BuyerEditHistory } from "@shared/schema";
-import { ShoppingBag, Search, Plus, Pencil, Users, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { ShoppingBag, Search, Plus, Pencil, Users, ArrowUpDown, ArrowUp, ArrowDown, Printer } from "lucide-react";
 import { format } from "date-fns";
 
 type BuyerWithDues = Buyer & { receivableDue: string; overallDue: string };
@@ -27,6 +27,101 @@ function formatIndianCurrency(value: string | number): string {
   const absNum = Math.abs(num);
   const formatted = absNum.toLocaleString("en-IN", { maximumFractionDigits: 0 });
   return `\u20B9${formatted}`;
+}
+
+type PaanaTxn = {
+  id: number;
+  date: string;
+  crop: string;
+  lotId: string;
+  numberOfBags: number;
+  totalReceivableFromBuyer: string;
+  paidAmount: string;
+  paymentStatus: string;
+};
+
+function generateBuyerPaanaHtml(
+  businessName: string,
+  buyer: { name: string; address?: string | null; phone?: string | null; openingBalance?: string | null },
+  txns: PaanaTxn[],
+  overallDue: string
+) {
+  const today = format(new Date(), "dd/MM/yyyy");
+  const dueTxns = txns.filter(t => t.paymentStatus === "due" || t.paymentStatus === "partial");
+  const openingBal = parseFloat(buyer.openingBalance || "0");
+
+  let tableRows = "";
+  let totalDue = 0;
+
+  for (const tx of dueTxns) {
+    const receivable = parseFloat(tx.totalReceivableFromBuyer || "0");
+    const paid = parseFloat(tx.paidAmount || "0");
+    const dueAmt = receivable - paid;
+    totalDue += dueAmt;
+
+    const txDate = new Date(tx.date + "T00:00:00");
+    const diffDays = Math.floor((Date.now() - txDate.getTime()) / (1000 * 60 * 60 * 24));
+    const dateStr = format(txDate, "dd/MM/yyyy");
+    const cropLabel: Record<string, string> = { Potato: "Potato", Onion: "Onion", Garlic: "Garlic" };
+
+    tableRows += `<tr>
+      <td style="padding:6px 8px;border:1px solid #ddd;text-align:center">${dateStr}</td>
+      <td style="padding:6px 8px;border:1px solid #ddd;text-align:center">${cropLabel[tx.crop] || tx.crop}</td>
+      <td style="padding:6px 8px;border:1px solid #ddd;text-align:center">${tx.lotId}</td>
+      <td style="padding:6px 8px;border:1px solid #ddd;text-align:right">${tx.numberOfBags}</td>
+      <td style="padding:6px 8px;border:1px solid #ddd;text-align:right">${diffDays}</td>
+      <td style="padding:6px 8px;border:1px solid #ddd;text-align:right;font-weight:600">${dueAmt.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</td>
+    </tr>`;
+  }
+
+  let totalSection = `<tr style="background:#f5f5f5;font-weight:bold">
+    <td colspan="5" style="padding:8px;border:1px solid #ddd;text-align:right">Total Receivable Due</td>
+    <td style="padding:8px;border:1px solid #ddd;text-align:right">\u20B9${totalDue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</td>
+  </tr>`;
+
+  if (openingBal > 0) {
+    const grandTotal = totalDue + openingBal;
+    totalSection += `<tr style="font-weight:bold">
+      <td colspan="5" style="padding:8px;border:1px solid #ddd;text-align:right">PY Receivable (Opening Balance)</td>
+      <td style="padding:8px;border:1px solid #ddd;text-align:right">\u20B9${openingBal.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</td>
+    </tr>
+    <tr style="background:#e8f5e9;font-weight:bold;font-size:1.1em">
+      <td colspan="5" style="padding:8px;border:1px solid #ddd;text-align:right">Grand Total Due</td>
+      <td style="padding:8px;border:1px solid #ddd;text-align:right">\u20B9${grandTotal.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</td>
+    </tr>`;
+  }
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Buyer Paana - ${buyer.name}</title>
+<style>
+  @media print { body { margin: 0; } @page { margin: 15mm; } }
+  body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+  th { background: #2e7d32; color: white; padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 0.85em; }
+</style></head><body>
+  <div style="text-align:center;margin-bottom:16px">
+    <h2 style="margin:0;color:#2e7d32">${businessName}</h2>
+    <p style="margin:4px 0;color:#666;font-size:0.85em">Date: ${today}</p>
+  </div>
+  <div style="background:#f8f8f8;padding:12px;border-radius:6px;margin-bottom:16px">
+    <h3 style="margin:0 0 6px 0">Buyer Paana - ${buyer.name}</h3>
+    ${buyer.address ? `<p style="margin:2px 0;font-size:0.9em;color:#555">${buyer.address}</p>` : ""}
+    ${buyer.phone ? `<p style="margin:2px 0;font-size:0.9em;color:#555">Phone: ${buyer.phone}</p>` : ""}
+  </div>
+  <table>
+    <thead><tr>
+      <th>Bidding Date</th>
+      <th>Crop</th>
+      <th>Lot ID</th>
+      <th># Bags</th>
+      <th># Days</th>
+      <th>Due Amount (\u20B9)</th>
+    </tr></thead>
+    <tbody>
+      ${tableRows || `<tr><td colspan="6" style="padding:12px;text-align:center;color:#999;border:1px solid #ddd">No outstanding dues</td></tr>`}
+      ${totalSection}
+    </tbody>
+  </table>
+</body></html>`;
 }
 
 export default function BuyerLedgerPage() {
@@ -179,6 +274,27 @@ export default function BuyerLedgerPage() {
     setEditOpeningBalance(buyer.openingBalance || "0");
   };
 
+  const printBuyerPaana = async (buyer: BuyerWithDues) => {
+    try {
+      const res = await apiRequest("GET", `/api/buyers/${buyer.id}/paana`);
+      const data = await res.json();
+      const html = generateBuyerPaanaHtml(
+        data.businessName,
+        data.buyer,
+        data.transactions,
+        buyer.overallDue
+      );
+      const w = window.open("", "_blank");
+      if (w) {
+        w.document.write(html);
+        w.document.close();
+        w.onload = () => w.print();
+      }
+    } catch {
+      toast({ title: t("common.error"), description: "Failed to generate Buyer Paana", variant: "destructive" });
+    }
+  };
+
   const saveEdit = () => {
     if (!editingBuyer) return;
     updateBuyerMutation.mutate({
@@ -297,6 +413,7 @@ export default function BuyerLedgerPage() {
                       >
                         <span className="inline-flex items-center justify-end">{t("buyerLedger.receivables")} <SortIcon field="receivableDue" /></span>
                       </th>
+                      <th className="p-3 w-10"></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -336,6 +453,15 @@ export default function BuyerLedgerPage() {
                         <td className="p-3 text-right font-medium text-orange-600">
                           {formatIndianCurrency(buyer.receivableDue)}
                         </td>
+                        <td className="p-3">
+                          <button
+                            data-testid={`button-print-buyer-${buyer.id}`}
+                            className="p-1.5 rounded hover:bg-muted"
+                            onClick={() => printBuyerPaana(buyer)}
+                          >
+                            <Printer className="w-4 h-4 text-muted-foreground" />
+                          </button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -363,13 +489,22 @@ export default function BuyerLedgerPage() {
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-2">
-                          <button
-                            data-testid={`button-edit-buyer-mobile-${buyer.id}`}
-                            className="p-1.5 rounded hover:bg-muted"
-                            onClick={() => openEdit(buyer)}
-                          >
-                            <Pencil className="w-4 h-4 text-muted-foreground" />
-                          </button>
+                          <div className="flex items-center gap-1">
+                            <button
+                              data-testid={`button-edit-buyer-mobile-${buyer.id}`}
+                              className="p-1.5 rounded hover:bg-muted"
+                              onClick={() => openEdit(buyer)}
+                            >
+                              <Pencil className="w-4 h-4 text-muted-foreground" />
+                            </button>
+                            <button
+                              data-testid={`button-print-buyer-mobile-${buyer.id}`}
+                              className="p-1.5 rounded hover:bg-muted"
+                              onClick={() => printBuyerPaana(buyer)}
+                            >
+                              <Printer className="w-4 h-4 text-muted-foreground" />
+                            </button>
+                          </div>
                           <Switch
                             data-testid={`switch-active-mobile-${buyer.id}`}
                             checked={buyer.isActive}

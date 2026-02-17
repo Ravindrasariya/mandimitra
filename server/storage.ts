@@ -83,6 +83,8 @@ export interface IStorage {
   createCashEntry(entry: InsertCashEntry): Promise<CashEntry>;
   reverseCashEntry(id: number, businessId: number, reason?: string | null): Promise<CashEntry | undefined>;
 
+  recalculateBuyerPaymentStatus(businessId: number, buyerId: number): Promise<void>;
+
   getFarmerLedger(businessId: number, farmerId: number, dateFrom?: string, dateTo?: string): Promise<{ transactions: Transaction[]; cashEntries: CashEntry[]; farmer: Farmer }>;
   getBuyerLedger(businessId: number, buyerId: number, dateFrom?: string, dateTo?: string): Promise<{ transactions: Transaction[]; cashEntries: CashEntry[]; buyer: Buyer }>;
 }
@@ -683,6 +685,9 @@ export class DatabaseStorage implements IStorage {
 
       try {
         const [created] = await db.insert(cashEntries).values({ ...entry, cashFlowId }).returning();
+        if (created.buyerId && created.category === "inward") {
+          await this.recalculateBuyerPaymentStatus(entry.businessId, created.buyerId);
+        }
         return created;
       } catch (e: any) {
         if (e.code === "23505" && attempt < 4) continue;
@@ -704,7 +709,54 @@ export class DatabaseStorage implements IStorage {
       .set(updateData)
       .where(and(eq(cashEntries.id, id), eq(cashEntries.businessId, businessId)))
       .returning();
+    if (updated && updated.buyerId && updated.category === "inward") {
+      await this.recalculateBuyerPaymentStatus(businessId, updated.buyerId);
+    }
     return updated;
+  }
+
+  async recalculateBuyerPaymentStatus(businessId: number, buyerId: number): Promise<void> {
+    const buyerTxns = await db.select()
+      .from(transactions)
+      .where(and(
+        eq(transactions.businessId, businessId),
+        eq(transactions.buyerId, buyerId),
+        eq(transactions.isReversed, false)
+      ))
+      .orderBy(transactions.date, transactions.id);
+
+    const [cashSum] = await db.select({
+      total: sql<string>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`
+    }).from(cashEntries).where(and(
+      eq(cashEntries.businessId, businessId),
+      eq(cashEntries.buyerId, buyerId),
+      eq(cashEntries.category, "inward"),
+      eq(cashEntries.isReversed, false)
+    ));
+
+    let remaining = parseFloat(cashSum?.total || "0");
+
+    for (const txn of buyerTxns) {
+      const receivable = parseFloat(txn.totalReceivableFromBuyer || "0");
+      let paidForThis = 0;
+
+      if (remaining >= receivable) {
+        paidForThis = receivable;
+        remaining -= receivable;
+      } else if (remaining > 0) {
+        paidForThis = remaining;
+        remaining = 0;
+      }
+
+      const status = paidForThis >= receivable ? "paid" : paidForThis > 0 ? "partial" : "due";
+
+      await db.update(transactions)
+        .set({
+          paidAmount: paidForThis.toFixed(2),
+          paymentStatus: status,
+        })
+        .where(eq(transactions.id, txn.id));
+    }
   }
 
   async getTransactionAggregates(businessId: number): Promise<{
