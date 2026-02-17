@@ -20,12 +20,13 @@ type BuyerWithDues = Buyer & { receivableDue: string; overallDue: string };
 type FarmerWithDues = Farmer & { totalPayable: string; totalDue: string; salesCount: number };
 type TransactionAggregates = {
   totalHammali: number; totalExtraCharges: number; totalMandiCommission: number;
-  paidHammali: number; paidMandiCommission: number;
+  paidHammali: number; paidExtraCharges: number; paidMandiCommission: number;
 };
 
 const OUTFLOW_TYPES = [
   "Farmer-Advance",
   "Farmer-Harvest Sale",
+  "Extra Charges",
   "General Expenses",
   "Hammali",
   "Mandi Commission",
@@ -476,10 +477,12 @@ export default function CashPage() {
   const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
   const dueHammali = (txAggregates?.totalHammali || 0) - (txAggregates?.paidHammali || 0);
+  const dueExtraCharges = (txAggregates?.totalExtraCharges || 0) - (txAggregates?.paidExtraCharges || 0);
   const dueMandi = (txAggregates?.totalMandiCommission || 0) - (txAggregates?.paidMandiCommission || 0);
 
   const getOutflowHint = (type: string) => {
     if (type === "Hammali") return dueHammali > 0 ? `Due: ₹${dueHammali.toLocaleString("en-IN")}` : null;
+    if (type === "Extra Charges") return dueExtraCharges > 0 ? `Due: ₹${dueExtraCharges.toLocaleString("en-IN")}` : null;
     if (type === "Mandi Commission") return dueMandi > 0 ? `Due: ₹${dueMandi.toLocaleString("en-IN")}` : null;
     return null;
   };
@@ -891,6 +894,11 @@ export default function CashPage() {
               {outwardOutflowType === "Hammali" && dueHammali > 0 && (
                 <div className="p-2 bg-amber-50 dark:bg-amber-950 rounded text-xs text-amber-700 dark:text-amber-300">
                   Total Hammali from Transactions: ₹{(txAggregates?.totalHammali || 0).toLocaleString("en-IN")} | Paid: ₹{(txAggregates?.paidHammali || 0).toLocaleString("en-IN")} | <span className="font-bold">Due: ₹{dueHammali.toLocaleString("en-IN")}</span>
+                </div>
+              )}
+              {outwardOutflowType === "Extra Charges" && dueExtraCharges > 0 && (
+                <div className="p-2 bg-purple-50 dark:bg-purple-950 rounded text-xs text-purple-700 dark:text-purple-300">
+                  Total Extra Charges from Transactions: ₹{(txAggregates?.totalExtraCharges || 0).toLocaleString("en-IN")} | Paid: ₹{(txAggregates?.paidExtraCharges || 0).toLocaleString("en-IN")} | <span className="font-bold">Due: ₹{dueExtraCharges.toLocaleString("en-IN")}</span>
                 </div>
               )}
               {outwardOutflowType === "Mandi Commission" && dueMandi > 0 && (

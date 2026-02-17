@@ -15,6 +15,7 @@ const translations: Record<string, Record<Language, string>> = {
   "dash.aadhatCommission": { en: "Aadhat Commission", hi: "आढ़त कमीशन" },
   "dash.hammaliDue": { en: "Hammali Due", hi: "हम्माली बकाया" },
   "dash.hammali": { en: "Hammali", hi: "हम्माली" },
+  "dash.hammaliExtra": { en: "Hammali | Extra", hi: "हम्माली | अतिरिक्त" },
   "dash.receivablesByCrop": { en: "Receivables by Crop", hi: "फसल अनुसार प्राप्य" },
   "dash.buyerDuesDist": { en: "Buyer Dues Distribution", hi: "खरीदार बकाया वितरण" },
   "dash.farmerDueByDate": { en: "Farmer Payable Due by Date", hi: "तारीख अनुसार किसान बकाया" },

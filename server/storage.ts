@@ -815,6 +815,7 @@ export class DatabaseStorage implements IStorage {
     totalExtraCharges: number;
     totalMandiCommission: number;
     paidHammali: number;
+    paidExtraCharges: number;
     paidMandiCommission: number;
   }> {
     const [txAgg] = await db.select({
@@ -835,6 +836,15 @@ export class DatabaseStorage implements IStorage {
       eq(cashEntries.isReversed, false)
     ));
 
+    const paidExtraChargesResult = await db.select({
+      total: sql<number>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`
+    }).from(cashEntries).where(and(
+      eq(cashEntries.businessId, businessId),
+      eq(cashEntries.outflowType, "Extra Charges"),
+      eq(cashEntries.category, "outward"),
+      eq(cashEntries.isReversed, false)
+    ));
+
     const paidMandiResult = await db.select({
       total: sql<number>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`
     }).from(cashEntries).where(and(
@@ -849,6 +859,7 @@ export class DatabaseStorage implements IStorage {
       totalExtraCharges: Number(txAgg.totalExtraCharges) || 0,
       totalMandiCommission: Number(txAgg.totalMandiCommission) || 0,
       paidHammali: Number(paidHammaliResult[0]?.total) || 0,
+      paidExtraCharges: Number(paidExtraChargesResult[0]?.total) || 0,
       paidMandiCommission: Number(paidMandiResult[0]?.total) || 0,
     };
   }

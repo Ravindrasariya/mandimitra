@@ -12,8 +12,10 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import type { Farmer, FarmerEditHistory } from "@shared/schema";
-import { Users, Search, Pencil, RefreshCw, Printer, Archive, AlertTriangle, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Users, Search, Pencil, RefreshCw, Printer, Archive, AlertTriangle, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, Calendar } from "lucide-react";
 import { format } from "date-fns";
 
 type FarmerWithDues = Farmer & { totalPayable: string; totalDue: string; salesCount: number };
@@ -81,6 +83,11 @@ export default function FarmerLedgerPage() {
 
   const [historyFarmerId, setHistoryFarmerId] = useState<number | null>(null);
 
+  const [selectedMonths, setSelectedMonths] = usePersistedState<string[]>("fl-selectedMonths", []);
+  const [selectedDays, setSelectedDays] = usePersistedState<string[]>("fl-selectedDays", []);
+  const [monthPopoverOpen, setMonthPopoverOpen] = useState(false);
+  const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
+
   const [sortField, setSortField] = usePersistedState<SortField>("fl-sortField", "totalDue");
   const [sortDir, setSortDir] = usePersistedState<SortDir>("fl-sortDir", "desc");
 
@@ -143,19 +150,67 @@ export default function FarmerLedgerPage() {
   const now = new Date();
   const years = Array.from({ length: 5 }, (_, i) => String(now.getFullYear() - i));
 
+  const MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+  const daysInMonths = useMemo(() => {
+    if (selectedMonths.length === 0) return 31;
+    const year = yearFilter !== "all" ? parseInt(yearFilter) : now.getFullYear();
+    return Math.max(...selectedMonths.map(m => new Date(year, parseInt(m), 0).getDate()));
+  }, [selectedMonths, yearFilter]);
+
+  const toggleMonth = (month: string) => {
+    setSelectedMonths(prev => prev.includes(month) ? prev.filter(m => m !== month) : [...prev, month]);
+    setSelectedDays([]);
+  };
+
+  const selectAllMonths = () => {
+    setSelectedMonths([]);
+    setSelectedDays([]);
+    setMonthPopoverOpen(false);
+  };
+
+  const toggleDay = (day: string) => {
+    setSelectedDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
+  };
+
+  const selectAllDays = () => {
+    setSelectedDays([]);
+    setDayPopoverOpen(false);
+  };
+
+  const monthLabel = selectedMonths.length === 0
+    ? t("stockRegister.allMonths")
+    : selectedMonths.length === 1
+      ? MONTH_LABELS[parseInt(selectedMonths[0]) - 1]
+      : `${selectedMonths.length} ${t("stockRegister.nMonths")}`;
+
+  const dayLabel = selectedDays.length === 0
+    ? t("stockRegister.allDays")
+    : selectedDays.length === 1
+      ? selectedDays[0]
+      : `${selectedDays.length} ${t("stockRegister.nDays")}`;
+
   const filteredFarmers = useMemo(() => {
     return farmersWithDues.filter(f => {
       if (!showArchived && f.isArchived) return false;
       if (showArchived && !f.isArchived) return false;
       if (searchName && !f.name.toLowerCase().includes(searchName.toLowerCase())) return false;
       if (searchVillage && !(f.village || "").toLowerCase().includes(searchVillage.toLowerCase())) return false;
+      const createdDate = new Date(f.createdAt);
       if (yearFilter !== "all") {
-        const year = new Date(f.createdAt).getFullYear();
-        if (year !== parseInt(yearFilter)) return false;
+        if (createdDate.getFullYear() !== parseInt(yearFilter)) return false;
+      }
+      if (selectedMonths.length > 0) {
+        const fMonth = String(createdDate.getMonth() + 1);
+        if (!selectedMonths.includes(fMonth)) return false;
+      }
+      if (selectedDays.length > 0) {
+        const fDay = String(createdDate.getDate());
+        if (!selectedDays.includes(fDay)) return false;
       }
       return true;
     });
-  }, [farmersWithDues, showArchived, searchName, searchVillage, yearFilter]);
+  }, [farmersWithDues, showArchived, searchName, searchVillage, yearFilter, selectedMonths, selectedDays]);
 
   const sortedFarmers = useMemo(() => {
     const sorted = [...filteredFarmers];
@@ -273,7 +328,7 @@ export default function FarmerLedgerPage() {
           <Users className="w-5 h-5 text-primary" />
           {t("farmerLedger.title")}
         </h1>
-        <Select value={yearFilter} onValueChange={setYearFilter}>
+        <Select value={yearFilter} onValueChange={(v) => { setYearFilter(v); setSelectedDays([]); }}>
           <SelectTrigger className="w-[100px]" data-testid="select-year-filter">
             <SelectValue />
           </SelectTrigger>
@@ -284,6 +339,70 @@ export default function FarmerLedgerPage() {
             ))}
           </SelectContent>
         </Select>
+        <Popover open={monthPopoverOpen} onOpenChange={setMonthPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="h-8 text-xs min-w-[65px] justify-between px-2 shrink-0" data-testid="fl-select-month-filter">
+              {monthLabel}
+              <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56 p-2" align="end">
+            <button
+              className="flex items-center gap-2 px-2 py-1.5 rounded text-sm w-full text-left border-b mb-1"
+              data-testid="fl-month-select-all"
+              onClick={selectAllMonths}
+            >
+              <Checkbox checked={selectedMonths.length === 0} />
+              <span>{t("stockRegister.allMonths")}</span>
+            </button>
+            <div className="grid grid-cols-4 gap-0.5">
+              {MONTH_LABELS.map((m, i) => {
+                const val = String(i + 1);
+                return (
+                  <button
+                    key={val}
+                    className={`flex items-center justify-center rounded text-xs p-1.5 ${selectedMonths.includes(val) ? "bg-primary text-primary-foreground" : ""}`}
+                    data-testid={`fl-month-option-${val}`}
+                    onClick={() => toggleMonth(val)}
+                  >
+                    {m}
+                  </button>
+                );
+              })}
+            </div>
+          </PopoverContent>
+        </Popover>
+        <Popover open={dayPopoverOpen} onOpenChange={setDayPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="h-8 text-xs min-w-[65px] justify-between px-2 shrink-0" data-testid="fl-select-day-filter">
+              <Calendar className="w-3 h-3 mr-1" />
+              {dayLabel}
+              <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56 p-2" align="end">
+            <button
+              className="flex items-center gap-2 px-2 py-1.5 rounded text-sm w-full text-left border-b mb-1"
+              data-testid="fl-day-select-all"
+              onClick={selectAllDays}
+            >
+              <Checkbox checked={selectedDays.length === 0} />
+              <span>{t("stockRegister.allDays")}</span>
+            </button>
+            <div className="grid grid-cols-7 gap-0.5">
+              {Array.from({ length: daysInMonths }, (_, i) => String(i + 1)).map(d => (
+                <button
+                  key={d}
+                  className={`flex items-center justify-center rounded text-xs p-1.5 ${selectedDays.includes(d) ? "bg-primary text-primary-foreground" : ""}`}
+                  data-testid={`fl-day-option-${d}`}
+                  onClick={() => toggleDay(d)}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
           <Input

@@ -25,7 +25,7 @@ type DashboardData = {
   transactions: { id: number; transactionId: string; date: string; crop: string; lotId: string; farmerId: number; farmerName: string; buyerId: number; buyerName: string; totalPayableToFarmer: string; totalReceivableFromBuyer: string; paidAmount: string; farmerPaidAmount: string; mandiCharges: string; aadhatCharges: string; hammaliCharges: string; extraChargesFarmer: string; extraChargesBuyer: string; netWeight: string; numberOfBags: number; isReversed: boolean }[];
   farmersWithDues: { id: number; name: string; totalPayable: string; totalDue: string }[];
   buyersWithDues: { id: number; name: string; receivableDue: string; overallDue: string }[];
-  txAggregates: { totalHammali: number; totalExtraCharges: number; totalMandiCommission: number; paidHammali: number; paidMandiCommission: number };
+  txAggregates: { totalHammali: number; totalExtraCharges: number; totalMandiCommission: number; paidHammali: number; paidExtraCharges: number; paidMandiCommission: number };
 };
 
 const PIE_COLORS = ["#2563eb", "#f59e0b", "#10b981", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"];
@@ -203,8 +203,9 @@ export default function DashboardPage() {
     const buyerDue = filteredBuyersWithDues.reduce((s, b) => s + parseFloat(b.overallDue || "0"), 0);
 
     const hammaliDue = (data?.txAggregates?.totalHammali || 0) - (data?.txAggregates?.paidHammali || 0);
+    const extraChargesDue = (data?.txAggregates?.totalExtraCharges || 0) - (data?.txAggregates?.paidExtraCharges || 0);
 
-    return { farmersCount, lotsCount, txnCount, totalPayable, totalReceivable, totalMandi, totalAadhat, totalHammali, totalExtraCharges, farmerDue, buyerDue, hammaliDue };
+    return { farmersCount, lotsCount, txnCount, totalPayable, totalReceivable, totalMandi, totalAadhat, totalHammali, totalExtraCharges, farmerDue, buyerDue, hammaliDue, extraChargesDue };
   }, [filteredTxns, filteredLots, uniqueFarmerIds, filteredFarmersWithDues, filteredBuyersWithDues, data]);
 
   const cropDistribution = useMemo(() => {
@@ -480,10 +481,12 @@ export default function DashboardPage() {
           <CardContent className="p-3">
             <div className="flex items-center gap-1.5 mb-1">
               <Hammer className="w-3.5 h-3.5 text-teal-600" />
-              <span className="text-[11px] font-medium text-muted-foreground">{t("dash.hammali")}</span>
+              <span className="text-[11px] font-medium text-muted-foreground">{t("dash.hammaliExtra")}</span>
             </div>
-            <div data-testid="text-hammali-due">
+            <div className="flex items-center gap-2" data-testid="text-hammali-extra-due">
               <div className="text-sm font-bold text-teal-700 dark:text-teal-400">₹{summary.hammaliDue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
+              <span className="text-muted-foreground text-xs">|</span>
+              <div className="text-sm font-bold text-purple-700 dark:text-purple-400">₹{summary.extraChargesDue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
             </div>
           </CardContent>
         </Card>

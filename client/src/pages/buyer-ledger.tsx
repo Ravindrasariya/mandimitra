@@ -12,9 +12,11 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import type { Buyer, BuyerEditHistory } from "@shared/schema";
-import { ShoppingBag, Search, Plus, Pencil, ArrowUpDown, ArrowUp, ArrowDown, Printer, RefreshCw } from "lucide-react";
+import { ShoppingBag, Search, Plus, Pencil, ArrowUpDown, ArrowUp, ArrowDown, Printer, RefreshCw, ChevronDown, Calendar } from "lucide-react";
 import { format } from "date-fns";
 
 type BuyerWithDues = Buyer & { receivableDue: string; overallDue: string };
@@ -173,6 +175,10 @@ export default function BuyerLedgerPage() {
   const [newBuyerCode, setNewBuyerCode] = useState("");
   const [newOpeningBalance, setNewOpeningBalance] = useState("");
   const [yearFilter, setYearFilter] = usePersistedState("bl-yearFilter", "all");
+  const [selectedMonths, setSelectedMonths] = usePersistedState<string[]>("bl-selectedMonths", []);
+  const [selectedDays, setSelectedDays] = usePersistedState<string[]>("bl-selectedDays", []);
+  const [monthPopoverOpen, setMonthPopoverOpen] = useState(false);
+  const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
 
   const buyerQueryParams = `?withDues=true${searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : ""}`;
   const { data: buyers = [], isLoading } = useQuery<BuyerWithDues[]>({
@@ -255,6 +261,7 @@ export default function BuyerLedgerPage() {
     },
   });
 
+  const now = new Date();
   const years = useMemo(() => {
     const yearSet = new Set<string>();
     buyers.forEach(b => {
@@ -265,19 +272,65 @@ export default function BuyerLedgerPage() {
     return Array.from(yearSet).sort().reverse();
   }, [buyers]);
 
-  const yearFilteredBuyers = yearFilter === "all" 
-    ? buyers 
-    : buyers.filter(b => b.buyerId && b.buyerId.substring(2, 6) === yearFilter);
+  const MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
-  const filteredBuyers = statusFilter === "all"
-    ? yearFilteredBuyers
-    : statusFilter === "active"
-      ? yearFilteredBuyers.filter(b => b.isActive)
-      : statusFilter === "inactive"
-        ? yearFilteredBuyers.filter(b => !b.isActive)
-        : statusFilter === "negative"
-          ? yearFilteredBuyers.filter(b => b.negativeFlag)
-          : yearFilteredBuyers;
+  const daysInMonths = useMemo(() => {
+    if (selectedMonths.length === 0) return 31;
+    const year = yearFilter !== "all" ? parseInt(yearFilter) : now.getFullYear();
+    return Math.max(...selectedMonths.map(m => new Date(year, parseInt(m), 0).getDate()));
+  }, [selectedMonths, yearFilter]);
+
+  const toggleMonth = (month: string) => {
+    setSelectedMonths(prev => prev.includes(month) ? prev.filter(m => m !== month) : [...prev, month]);
+    setSelectedDays([]);
+  };
+
+  const selectAllMonths = () => {
+    setSelectedMonths([]);
+    setSelectedDays([]);
+    setMonthPopoverOpen(false);
+  };
+
+  const toggleDay = (day: string) => {
+    setSelectedDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
+  };
+
+  const selectAllDays = () => {
+    setSelectedDays([]);
+    setDayPopoverOpen(false);
+  };
+
+  const monthLabel = selectedMonths.length === 0
+    ? t("stockRegister.allMonths")
+    : selectedMonths.length === 1
+      ? MONTH_LABELS[parseInt(selectedMonths[0]) - 1]
+      : `${selectedMonths.length} ${t("stockRegister.nMonths")}`;
+
+  const dayLabel = selectedDays.length === 0
+    ? t("stockRegister.allDays")
+    : selectedDays.length === 1
+      ? selectedDays[0]
+      : `${selectedDays.length} ${t("stockRegister.nDays")}`;
+
+  const filteredBuyers = useMemo(() => {
+    return buyers.filter(b => {
+      if (yearFilter !== "all" && !(b.buyerId && b.buyerId.substring(2, 6) === yearFilter)) return false;
+      if (selectedMonths.length > 0) {
+        const bMonth = b.buyerId ? b.buyerId.substring(6, 8) : "";
+        const bMonthNum = String(parseInt(bMonth));
+        if (!selectedMonths.includes(bMonthNum)) return false;
+      }
+      if (selectedDays.length > 0) {
+        const bDay = b.buyerId ? b.buyerId.substring(8, 10) : "";
+        const bDayNum = String(parseInt(bDay));
+        if (!selectedDays.includes(bDayNum)) return false;
+      }
+      if (statusFilter === "active" && !b.isActive) return false;
+      if (statusFilter === "inactive" && b.isActive) return false;
+      if (statusFilter === "negative" && !b.negativeFlag) return false;
+      return true;
+    });
+  }, [buyers, yearFilter, selectedMonths, selectedDays, statusFilter]);
 
   const sortedBuyers = useMemo(() => {
     const sorted = [...filteredBuyers];
@@ -423,7 +476,7 @@ export default function BuyerLedgerPage() {
           <ShoppingBag className="w-5 h-5 text-primary" />
           {t("buyerLedger.title")}
         </h1>
-        <Select value={yearFilter} onValueChange={setYearFilter}>
+        <Select value={yearFilter} onValueChange={(v) => { setYearFilter(v); setSelectedDays([]); }}>
           <SelectTrigger className="w-[100px]" data-testid="select-year-filter">
             <SelectValue />
           </SelectTrigger>
@@ -434,6 +487,70 @@ export default function BuyerLedgerPage() {
             ))}
           </SelectContent>
         </Select>
+        <Popover open={monthPopoverOpen} onOpenChange={setMonthPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="h-8 text-xs min-w-[65px] justify-between px-2 shrink-0" data-testid="bl-select-month-filter">
+              {monthLabel}
+              <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56 p-2" align="end">
+            <button
+              className="flex items-center gap-2 px-2 py-1.5 rounded text-sm w-full text-left border-b mb-1"
+              data-testid="bl-month-select-all"
+              onClick={selectAllMonths}
+            >
+              <Checkbox checked={selectedMonths.length === 0} />
+              <span>{t("stockRegister.allMonths")}</span>
+            </button>
+            <div className="grid grid-cols-4 gap-0.5">
+              {MONTH_LABELS.map((m, i) => {
+                const val = String(i + 1);
+                return (
+                  <button
+                    key={val}
+                    className={`flex items-center justify-center rounded text-xs p-1.5 ${selectedMonths.includes(val) ? "bg-primary text-primary-foreground" : ""}`}
+                    data-testid={`bl-month-option-${val}`}
+                    onClick={() => toggleMonth(val)}
+                  >
+                    {m}
+                  </button>
+                );
+              })}
+            </div>
+          </PopoverContent>
+        </Popover>
+        <Popover open={dayPopoverOpen} onOpenChange={setDayPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="h-8 text-xs min-w-[65px] justify-between px-2 shrink-0" data-testid="bl-select-day-filter">
+              <Calendar className="w-3 h-3 mr-1" />
+              {dayLabel}
+              <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-56 p-2" align="end">
+            <button
+              className="flex items-center gap-2 px-2 py-1.5 rounded text-sm w-full text-left border-b mb-1"
+              data-testid="bl-day-select-all"
+              onClick={selectAllDays}
+            >
+              <Checkbox checked={selectedDays.length === 0} />
+              <span>{t("stockRegister.allDays")}</span>
+            </button>
+            <div className="grid grid-cols-7 gap-0.5">
+              {Array.from({ length: daysInMonths }, (_, i) => String(i + 1)).map(d => (
+                <button
+                  key={d}
+                  className={`flex items-center justify-center rounded text-xs p-1.5 ${selectedDays.includes(d) ? "bg-primary text-primary-foreground" : ""}`}
+                  data-testid={`bl-day-option-${d}`}
+                  onClick={() => toggleDay(d)}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger data-testid="select-status-filter" className="w-[100px]">
             <SelectValue />
