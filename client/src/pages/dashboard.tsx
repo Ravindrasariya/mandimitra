@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { LayoutDashboard, ChevronDown, Calendar, Users, Package, Landmark, HandCoins, ShoppingBag, TrendingUp, Settings } from "lucide-react";
+import { LayoutDashboard, ChevronDown, Calendar, Users, Package, Landmark, HandCoins, ShoppingBag, TrendingUp, Settings, Hammer } from "lucide-react";
 import type { BusinessChargeSettings } from "@shared/schema";
 import {
   PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
@@ -22,9 +22,10 @@ import {
 type DashboardData = {
   businessName: string;
   lots: { id: number; lotId: string; crop: string; date: string; numberOfBags: number; remainingBags: number; farmerId: number; farmerName: string; initialTotalWeight: string | null }[];
-  transactions: { id: number; transactionId: string; date: string; crop: string; lotId: string; farmerId: number; farmerName: string; buyerId: number; buyerName: string; totalPayableToFarmer: string; totalReceivableFromBuyer: string; mandiCharges: string; aadhatCharges: string; netWeight: string; numberOfBags: number; isReversed: boolean }[];
+  transactions: { id: number; transactionId: string; date: string; crop: string; lotId: string; farmerId: number; farmerName: string; buyerId: number; buyerName: string; totalPayableToFarmer: string; totalReceivableFromBuyer: string; mandiCharges: string; aadhatCharges: string; hammaliCharges: string; gradingCharges: string; netWeight: string; numberOfBags: number; isReversed: boolean }[];
   farmersWithDues: { id: number; name: string; totalPayable: string; totalDue: string }[];
   buyersWithDues: { id: number; name: string; receivableDue: string; overallDue: string }[];
+  txAggregates: { totalHammali: number; totalGrading: number; totalMandiCommission: number; paidHammali: number; paidGrading: number; paidMandiCommission: number };
 };
 
 const PIE_COLORS = ["#2563eb", "#f59e0b", "#10b981", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"];
@@ -201,12 +202,17 @@ export default function DashboardPage() {
     const totalReceivable = filteredTxns.reduce((s, t) => s + parseFloat(t.totalReceivableFromBuyer || "0"), 0);
     const totalMandi = filteredTxns.reduce((s, t) => s + parseFloat(t.mandiCharges || "0"), 0);
     const totalAadhat = filteredTxns.reduce((s, t) => s + parseFloat(t.aadhatCharges || "0"), 0);
+    const totalHammali = filteredTxns.reduce((s, t) => s + parseFloat(t.hammaliCharges || "0"), 0);
+    const totalGrading = filteredTxns.reduce((s, t) => s + parseFloat(t.gradingCharges || "0"), 0);
 
     const farmerDue = filteredFarmersWithDues.reduce((s, f) => s + parseFloat(f.totalDue || "0"), 0);
     const buyerDue = filteredBuyersWithDues.reduce((s, b) => s + parseFloat(b.overallDue || "0"), 0);
 
-    return { farmersCount, lotsCount, txnCount, totalPayable, totalReceivable, totalMandi, totalAadhat, farmerDue, buyerDue };
-  }, [filteredTxns, filteredLots, uniqueFarmerIds, filteredFarmersWithDues, filteredBuyersWithDues]);
+    const hammaliDue = (data?.txAggregates?.totalHammali || 0) - (data?.txAggregates?.paidHammali || 0);
+    const gradingDue = (data?.txAggregates?.totalGrading || 0) - (data?.txAggregates?.paidGrading || 0);
+
+    return { farmersCount, lotsCount, txnCount, totalPayable, totalReceivable, totalMandi, totalAadhat, totalHammali, totalGrading, farmerDue, buyerDue, hammaliDue, gradingDue };
+  }, [filteredTxns, filteredLots, uniqueFarmerIds, filteredFarmersWithDues, filteredBuyersWithDues, data]);
 
   const cropDistribution = useMemo(() => {
     const map = new Map<string, number>();
@@ -463,7 +469,7 @@ export default function DashboardPage() {
         </Popover>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-2" data-testid="dashboard-summary-cards">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2" data-testid="dashboard-summary-cards">
         <Card className="border-blue-200 dark:border-blue-800">
           <CardContent className="p-3">
             <div className="flex items-center gap-1.5 mb-1">
@@ -526,6 +532,26 @@ export default function DashboardPage() {
             </div>
             <div className="text-sm font-bold text-amber-700 dark:text-amber-400" data-testid="text-aadhat-commission">
               ₹{summary.totalAadhat.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-teal-200 dark:border-teal-800">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-1.5 mb-1">
+              <Hammer className="w-3.5 h-3.5 text-teal-600" />
+              <span className="text-[11px] font-medium text-muted-foreground">{t("dash.hammaliGradingDue")}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div data-testid="text-hammali-due">
+                <span className="text-[10px] text-muted-foreground">{t("dash.hammali")}</span>
+                <div className="text-sm font-bold text-teal-700 dark:text-teal-400">₹{summary.hammaliDue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
+              </div>
+              <div className="h-6 w-px bg-border" />
+              <div data-testid="text-grading-due">
+                <span className="text-[10px] text-muted-foreground">{t("dash.grading")}</span>
+                <div className="text-sm font-bold text-teal-700 dark:text-teal-400">₹{summary.gradingDue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
+              </div>
             </div>
           </CardContent>
         </Card>

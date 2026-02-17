@@ -779,10 +779,13 @@ export async function registerRoutes(
       const businessId = req.user!.businessId;
       const business = await storage.getBusiness(businessId);
 
-      const allLots = await storage.getLots(businessId);
-      const allTxns = await storage.getTransactions(businessId);
-      const farmersWithDues = await storage.getFarmersWithDues(businessId);
-      const buyersWithDues = await storage.getBuyersWithDues(businessId);
+      const [allLots, allTxns, farmersWithDues, buyersWithDues, txAggregates] = await Promise.all([
+        storage.getLots(businessId),
+        storage.getTransactions(businessId),
+        storage.getFarmersWithDues(businessId),
+        storage.getBuyersWithDues(businessId),
+        storage.getTransactionAggregates(businessId),
+      ]);
 
       res.json({
         businessName: business?.name || "Mandi Mitra",
@@ -800,6 +803,7 @@ export async function registerRoutes(
           totalPayableToFarmer: t.totalPayableToFarmer,
           totalReceivableFromBuyer: t.totalReceivableFromBuyer,
           mandiCharges: t.mandiCharges, aadhatCharges: t.aadhatCharges,
+          hammaliCharges: t.hammaliCharges, gradingCharges: t.gradingCharges,
           netWeight: t.netWeight, numberOfBags: t.numberOfBags,
           isReversed: t.isReversed,
         })),
@@ -809,6 +813,7 @@ export async function registerRoutes(
         buyersWithDues: buyersWithDues.map(b => ({
           id: b.id, name: b.name, receivableDue: b.receivableDue, overallDue: b.overallDue,
         })),
+        txAggregates,
       });
     } catch (e: any) {
       res.status(400).json({ message: e.message });
