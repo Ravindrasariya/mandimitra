@@ -899,7 +899,7 @@ export default function TransactionsPage() {
                       )}
                     </div>
                   </div>
-                  <p className="text-xs sm:text-sm mb-0.5">{t("transactions.farmer")}: <strong>{group.farmer.name}</strong></p>
+                  <p className="text-sm mb-0.5">{t("transactions.farmer")}: <strong>{group.farmer.name}</strong></p>
                   <p className="text-xs text-muted-foreground mb-2">{group.lot.actualNumberOfBags ?? group.lot.numberOfBags} {t("transactions.bagsTotal")}{(group.lot.actualNumberOfBags != null && group.lot.actualNumberOfBags !== group.lot.numberOfBags) ? ` (Orig: ${group.lot.numberOfBags})` : ""}</p>
 
                   {hasCompleted && (
