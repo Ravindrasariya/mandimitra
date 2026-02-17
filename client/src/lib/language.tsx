@@ -60,6 +60,7 @@ const translations: Record<string, Record<Language, string>> = {
   "nav.logout": { en: "Logout", hi: "लॉगआउट" },
 
   "common.save": { en: "Save", hi: "सहेजें" },
+  "common.saved": { en: "Saved", hi: "सहेज लिया" },
   "common.cancel": { en: "Cancel", hi: "रद्द करें" },
   "common.edit": { en: "Edit", hi: "संपादन" },
   "common.delete": { en: "Delete", hi: "हटाएं" },
