@@ -689,7 +689,7 @@ export class DatabaseStorage implements IStorage {
         if (created.buyerId && created.category === "inward") {
           await this.recalculateBuyerPaymentStatus(entry.businessId, created.buyerId);
         }
-        if (created.farmerId && created.category === "expense") {
+        if (created.farmerId && created.category === "outward") {
           await this.recalculateFarmerPaymentStatus(entry.businessId, created.farmerId);
         }
         return created;
@@ -716,7 +716,7 @@ export class DatabaseStorage implements IStorage {
     if (updated && updated.buyerId && updated.category === "inward") {
       await this.recalculateBuyerPaymentStatus(businessId, updated.buyerId);
     }
-    if (updated && updated.farmerId && updated.category === "expense") {
+    if (updated && updated.farmerId && updated.category === "outward") {
       await this.recalculateFarmerPaymentStatus(businessId, updated.farmerId);
     }
     return updated;
@@ -781,7 +781,7 @@ export class DatabaseStorage implements IStorage {
     }).from(cashEntries).where(and(
       eq(cashEntries.businessId, businessId),
       eq(cashEntries.farmerId, farmerId),
-      eq(cashEntries.category, "expense"),
+      eq(cashEntries.category, "outward"),
       eq(cashEntries.isReversed, false)
     ));
 
