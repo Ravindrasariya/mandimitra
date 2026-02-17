@@ -238,11 +238,11 @@ export class DatabaseStorage implements IStorage {
       const [txSum] = await db.select({
         total: sql<string>`coalesce(sum(cast(${transactions.totalPayableToFarmer} as numeric)), 0)`,
         count: sql<number>`count(*)`,
-      }).from(transactions).where(and(eq(transactions.businessId, businessId), eq(transactions.farmerId, farmer.id)));
+      }).from(transactions).where(and(eq(transactions.businessId, businessId), eq(transactions.farmerId, farmer.id), eq(transactions.isReversed, false)));
 
       const [cashSum] = await db.select({
         total: sql<string>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`
-      }).from(cashEntries).where(and(eq(cashEntries.businessId, businessId), eq(cashEntries.farmerId, farmer.id)));
+      }).from(cashEntries).where(and(eq(cashEntries.businessId, businessId), eq(cashEntries.farmerId, farmer.id), eq(cashEntries.isReversed, false)));
 
       const totalPayable = parseFloat(txSum?.total || "0");
       const totalPaid = parseFloat(cashSum?.total || "0");
@@ -378,11 +378,11 @@ export class DatabaseStorage implements IStorage {
     for (const buyer of buyerList) {
       const [txSum] = await db.select({
         total: sql<string>`coalesce(sum(cast(${transactions.totalReceivableFromBuyer} as numeric)), 0)`
-      }).from(transactions).where(and(eq(transactions.businessId, businessId), eq(transactions.buyerId, buyer.id)));
+      }).from(transactions).where(and(eq(transactions.businessId, businessId), eq(transactions.buyerId, buyer.id), eq(transactions.isReversed, false)));
 
       const [cashSum] = await db.select({
         total: sql<string>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`
-      }).from(cashEntries).where(and(eq(cashEntries.businessId, businessId), eq(cashEntries.buyerId, buyer.id)));
+      }).from(cashEntries).where(and(eq(cashEntries.businessId, businessId), eq(cashEntries.buyerId, buyer.id), eq(cashEntries.isReversed, false)));
 
       const totalReceivable = parseFloat(txSum?.total || "0");
       const totalPaid = parseFloat(cashSum?.total || "0");
