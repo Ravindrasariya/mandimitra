@@ -237,16 +237,69 @@ export default function StockEntryPage() {
 
           {showFarmerForm && (
             <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium text-muted-foreground">
+                  {selectedFarmer ? `${t("stockEntry.selectedFarmer")}: ${selectedFarmer.name}` : t("stockEntry.newFarmer")}
+                </Label>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  data-testid="button-clear-farmer"
+                  onClick={() => {
+                    clearSelectedFarmer();
+                    clearShowFarmerForm();
+                    clearFarmerName();
+                    clearFarmerPhone();
+                    clearVillage();
+                    clearTehsil();
+                    clearDistrict();
+                    setFarmerSearch("");
+                  }}
+                >
+                  <Trash2 className="w-3 h-3 mr-1" />
+                  {t("stockEntry.clearSelection")}
+                </Button>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div className="space-y-1">
+                <div className="space-y-1 relative">
                   <Label>{t("stockEntry.farmerName")}</Label>
                   <Input
                     data-testid="input-farmer-name"
                     value={farmerName}
-                    onChange={(e) => setFarmerName(e.target.value)}
+                    onChange={(e) => {
+                      setFarmerName(e.target.value);
+                      if (!selectedFarmer && e.target.value.length >= 2) {
+                        setFarmerSearch(e.target.value);
+                        setShowSuggestions(true);
+                      } else {
+                        setShowSuggestions(false);
+                      }
+                    }}
+                    onFocus={() => {
+                      if (!selectedFarmer && farmerName.length >= 2) {
+                        setFarmerSearch(farmerName);
+                        setShowSuggestions(true);
+                      }
+                    }}
                     placeholder={t("stockEntry.farmerNamePlaceholder")}
                     className="mobile-touch-target text-sm capitalize"
                   />
+                  {showSuggestions && farmerSuggestions.length > 0 && !selectedFarmer && (
+                    <div className="absolute z-50 w-full bg-popover border rounded-md shadow-lg max-h-48 overflow-y-auto top-full">
+                      {farmerSuggestions.map((f) => (
+                        <button
+                          key={f.id}
+                          data-testid={`inline-suggestion-farmer-${f.id}`}
+                          className="w-full text-left px-3 py-3 hover-elevate text-sm border-b last:border-b-0"
+                          onClick={() => selectFarmer(f)}
+                        >
+                          <span className="font-medium">{f.name}</span>
+                          <span className="text-muted-foreground"> - {f.phone}</span>
+                          {f.village && <span className="text-muted-foreground"> - {f.village}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <Label>{t("stockEntry.mobileNumber")}</Label>
@@ -300,15 +353,6 @@ export default function StockEntryPage() {
                 <Label>{t("common.state")}</Label>
                 <Input value={state} disabled className="mobile-touch-target text-sm bg-muted" />
               </div>
-              {selectedFarmer && (
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => { clearSelectedFarmer(); clearShowFarmerForm(); clearFarmerName(); clearFarmerPhone(); clearVillage(); clearTehsil(); clearDistrict(); }}
-                >
-                  {t("stockEntry.clearSelection")}
-                </Button>
-              )}
             </div>
           )}
         </CardContent>
