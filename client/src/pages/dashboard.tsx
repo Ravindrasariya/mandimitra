@@ -238,93 +238,38 @@ export default function DashboardPage() {
     })).sort((a, b) => b.value - a.value);
   }, [filteredBuyersWithDues]);
 
-  const farmerDueMap = useMemo(() => {
-    const map = new Map<number, number>();
-    if (!data) return map;
-    data.farmersWithDues.forEach(f => {
-      map.set(f.id, parseFloat(f.totalDue || "0"));
-    });
-    return map;
-  }, [data]);
-
-  const buyerDueMap = useMemo(() => {
-    const map = new Map<number, number>();
-    if (!data) return map;
-    data.buyersWithDues.forEach(b => {
-      map.set(b.id, parseFloat(b.overallDue || "0"));
-    });
-    return map;
-  }, [data]);
-
   const timeSeriesData = useMemo(() => {
-    const farmerPayableByDate = new Map<string, Map<number, number>>();
-    const buyerReceivableByDate = new Map<string, Map<number, number>>();
-    const dateAggregates = new Map<string, { volume: number; aadhat: number; count: number }>();
-
-    const farmerTotalPayable = new Map<number, number>();
-    const buyerTotalReceivable = new Map<number, number>();
+    const dateAggregates = new Map<string, { farmerPayable: number; buyerReceivable: number; volume: number; aadhat: number }>();
 
     filteredTxns.forEach(t => {
       const date = t.date || "";
-      const payable = parseFloat(t.totalPayableToFarmer || "0");
-      const receivable = parseFloat(t.totalReceivableFromBuyer || "0");
-
-      if (!farmerPayableByDate.has(date)) farmerPayableByDate.set(date, new Map());
-      const fp = farmerPayableByDate.get(date)!;
-      fp.set(t.farmerId, (fp.get(t.farmerId) || 0) + payable);
-      farmerTotalPayable.set(t.farmerId, (farmerTotalPayable.get(t.farmerId) || 0) + payable);
-
-      if (!buyerReceivableByDate.has(date)) buyerReceivableByDate.set(date, new Map());
-      const br = buyerReceivableByDate.get(date)!;
-      br.set(t.buyerId, (br.get(t.buyerId) || 0) + receivable);
-      buyerTotalReceivable.set(t.buyerId, (buyerTotalReceivable.get(t.buyerId) || 0) + receivable);
-
-      if (!dateAggregates.has(date)) dateAggregates.set(date, { volume: 0, aadhat: 0, count: 0 });
+      if (!dateAggregates.has(date)) dateAggregates.set(date, { farmerPayable: 0, buyerReceivable: 0, volume: 0, aadhat: 0 });
       const agg = dateAggregates.get(date)!;
+      agg.farmerPayable += parseFloat(t.totalPayableToFarmer || "0");
+      agg.buyerReceivable += parseFloat(t.totalReceivableFromBuyer || "0");
       agg.volume += parseFloat(t.netWeight || "0");
       agg.aadhat += parseFloat(t.aadhatCharges || "0");
-      agg.count += 1;
     });
 
-    const dateSet = new Set<string>();
-    farmerPayableByDate.forEach((_, k) => dateSet.add(k));
-    buyerReceivableByDate.forEach((_, k) => dateSet.add(k));
-    const allDates = Array.from(dateSet).sort();
+    const allDates = Array.from(dateAggregates.keys()).sort();
+
+    let cumulativeFarmerDue = 0;
+    let cumulativeBuyerDue = 0;
 
     return allDates.map(date => {
-      let farmerDueForDate = 0;
-      const fp = farmerPayableByDate.get(date);
-      if (fp) {
-        fp.forEach((datePayable, farmerId) => {
-          const totalPayable = farmerTotalPayable.get(farmerId) || 0;
-          const totalDue = farmerDueMap.get(farmerId) || 0;
-          const ratio = totalPayable > 0 ? Math.min(totalDue / totalPayable, 1) : 0;
-          farmerDueForDate += datePayable * ratio;
-        });
-      }
-
-      let buyerDueForDate = 0;
-      const br = buyerReceivableByDate.get(date);
-      if (br) {
-        br.forEach((dateReceivable, buyerId) => {
-          const totalReceivable = buyerTotalReceivable.get(buyerId) || 0;
-          const totalDue = buyerDueMap.get(buyerId) || 0;
-          const ratio = totalReceivable > 0 ? Math.min(totalDue / totalReceivable, 1) : 0;
-          buyerDueForDate += dateReceivable * ratio;
-        });
-      }
-
-      const agg = dateAggregates.get(date) || { volume: 0, aadhat: 0, count: 0 };
+      const agg = dateAggregates.get(date)!;
+      cumulativeFarmerDue += agg.farmerPayable;
+      cumulativeBuyerDue += agg.buyerReceivable;
 
       return {
         date: formatShortDate(date),
-        farmerDue: Math.round(farmerDueForDate),
-        buyerDue: Math.round(buyerDueForDate),
+        farmerDue: Math.round(cumulativeFarmerDue),
+        buyerDue: Math.round(cumulativeBuyerDue),
         totalVolume: Math.round(agg.volume),
         aadhat: Math.round(agg.aadhat),
       };
     });
-  }, [filteredTxns, farmerDueMap, buyerDueMap]);
+  }, [filteredTxns]);
 
   if (isLoading) {
     return (
