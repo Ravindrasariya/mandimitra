@@ -237,29 +237,6 @@ export default function StockEntryPage() {
 
           {showFarmerForm && (
             <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <Label className="text-sm font-medium text-muted-foreground">
-                  {selectedFarmer ? `${t("stockEntry.selectedFarmer")}: ${selectedFarmer.name}` : t("stockEntry.newFarmer")}
-                </Label>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  data-testid="button-clear-farmer"
-                  onClick={() => {
-                    clearSelectedFarmer();
-                    clearShowFarmerForm();
-                    clearFarmerName();
-                    clearFarmerPhone();
-                    clearVillage();
-                    clearTehsil();
-                    clearDistrict();
-                    setFarmerSearch("");
-                  }}
-                >
-                  <Trash2 className="w-3 h-3 mr-1" />
-                  {t("stockEntry.clearSelection")}
-                </Button>
-              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1 relative">
                   <Label>{t("stockEntry.farmerName")}</Label>
@@ -353,6 +330,24 @@ export default function StockEntryPage() {
                 <Label>{t("common.state")}</Label>
                 <Input value={state} disabled className="mobile-touch-target text-sm bg-muted" />
               </div>
+              <Button
+                variant="secondary"
+                size="sm"
+                data-testid="button-clear-farmer"
+                onClick={() => {
+                  clearSelectedFarmer();
+                  clearShowFarmerForm();
+                  clearFarmerName();
+                  clearFarmerPhone();
+                  clearVillage();
+                  clearTehsil();
+                  clearDistrict();
+                  setFarmerSearch("");
+                }}
+              >
+                <Trash2 className="w-3 h-3 mr-1" />
+                {t("stockEntry.clearSelection")}
+              </Button>
             </div>
           )}
         </CardContent>
