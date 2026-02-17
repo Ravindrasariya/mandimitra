@@ -230,6 +230,7 @@ export default function CashPage() {
       const key = query.queryKey[0];
       return typeof key === "string" && key.startsWith("/api/buyers");
     }});
+    queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
     queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
     queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
     queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"] });
