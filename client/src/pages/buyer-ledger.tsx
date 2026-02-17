@@ -19,7 +19,7 @@ import type { Buyer, BuyerEditHistory } from "@shared/schema";
 import { ShoppingBag, Search, Plus, Pencil, ArrowUpDown, ArrowUp, ArrowDown, Printer, RefreshCw, ChevronDown, Calendar } from "lucide-react";
 import { format } from "date-fns";
 
-type BuyerWithDues = Buyer & { receivableDue: string; overallDue: string };
+type BuyerWithDues = Buyer & { receivableDue: string; overallDue: string; bidDates?: string[] };
 type SortField = "buyerId" | "overallDue" | "receivableDue";
 type SortDir = "asc" | "desc";
 
@@ -265,9 +265,9 @@ export default function BuyerLedgerPage() {
   const years = useMemo(() => {
     const yearSet = new Set<string>();
     buyers.forEach(b => {
-      if (b.buyerId && b.buyerId.length >= 6) {
-        yearSet.add(b.buyerId.substring(2, 6));
-      }
+      (b.bidDates || []).forEach(d => {
+        yearSet.add(d.substring(0, 4));
+      });
     });
     return Array.from(yearSet).sort().reverse();
   }, [buyers]);
@@ -314,16 +314,16 @@ export default function BuyerLedgerPage() {
 
   const filteredBuyers = useMemo(() => {
     return buyers.filter(b => {
-      if (yearFilter !== "all" && !(b.buyerId && b.buyerId.substring(2, 6) === yearFilter)) return false;
-      if (selectedMonths.length > 0) {
-        const bMonth = b.buyerId ? b.buyerId.substring(6, 8) : "";
-        const bMonthNum = String(parseInt(bMonth));
-        if (!selectedMonths.includes(bMonthNum)) return false;
-      }
-      if (selectedDays.length > 0) {
-        const bDay = b.buyerId ? b.buyerId.substring(8, 10) : "";
-        const bDayNum = String(parseInt(bDay));
-        if (!selectedDays.includes(bDayNum)) return false;
+      const dates = b.bidDates || [];
+      if (yearFilter !== "all" || selectedMonths.length > 0 || selectedDays.length > 0) {
+        const hasMatchingDate = dates.some(d => {
+          const [y, m, day] = d.split("-");
+          if (yearFilter !== "all" && y !== yearFilter) return false;
+          if (selectedMonths.length > 0 && !selectedMonths.includes(String(parseInt(m)))) return false;
+          if (selectedDays.length > 0 && !selectedDays.includes(String(parseInt(day)))) return false;
+          return true;
+        });
+        if (!hasMatchingDate) return false;
       }
       if (statusFilter === "active" && !b.isActive) return false;
       if (statusFilter === "inactive" && b.isActive) return false;

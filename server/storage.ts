@@ -51,7 +51,7 @@ export interface IStorage {
   getNextBuyerId(businessId: number): Promise<string>;
   getBuyerEditHistory(buyerId: number, businessId: number): Promise<BuyerEditHistory[]>;
   createBuyerEditHistory(entry: InsertBuyerEditHistory): Promise<BuyerEditHistory>;
-  getBuyersWithDues(businessId: number, search?: string): Promise<(Buyer & { receivableDue: string; overallDue: string })[]>;
+  getBuyersWithDues(businessId: number, search?: string): Promise<(Buyer & { receivableDue: string; overallDue: string; bidDates: string[] })[]>;
 
   getLots(businessId: number, filters?: { crop?: string; date?: string; search?: string }): Promise<(Lot & { farmer: Farmer })[]>;
   getLot(id: number, businessId: number): Promise<(Lot & { farmer: Farmer }) | undefined>;
@@ -360,7 +360,7 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async getBuyersWithDues(businessId: number, search?: string): Promise<(Buyer & { receivableDue: string; overallDue: string })[]> {
+  async getBuyersWithDues(businessId: number, search?: string): Promise<(Buyer & { receivableDue: string; overallDue: string; bidDates: string[] })[]> {
     let buyerList: Buyer[];
     if (search) {
       buyerList = await db.select().from(buyers).where(
@@ -377,7 +377,18 @@ export class DatabaseStorage implements IStorage {
       buyerList = await db.select().from(buyers).where(eq(buyers.businessId, businessId)).orderBy(asc(buyers.name));
     }
 
-    const results: (Buyer & { receivableDue: string; overallDue: string })[] = [];
+    const allBidDates = await db.select({
+      buyerId: bids.buyerId,
+      bidDate: sql<string>`to_char(${bids.createdAt}, 'YYYY-MM-DD')`
+    }).from(bids).where(eq(bids.businessId, businessId));
+
+    const bidDateMap = new Map<number, Set<string>>();
+    for (const row of allBidDates) {
+      if (!bidDateMap.has(row.buyerId)) bidDateMap.set(row.buyerId, new Set());
+      bidDateMap.get(row.buyerId)!.add(row.bidDate);
+    }
+
+    const results: (Buyer & { receivableDue: string; overallDue: string; bidDates: string[] })[] = [];
     for (const buyer of buyerList) {
       const [txSum] = await db.select({
         total: sql<string>`coalesce(sum(cast(${transactions.totalReceivableFromBuyer} as numeric)), 0)`
@@ -393,7 +404,8 @@ export class DatabaseStorage implements IStorage {
       const receivableDue = (totalReceivable - totalPaid).toFixed(2);
       const overallDue = (openingBal + totalReceivable - totalPaid).toFixed(2);
 
-      results.push({ ...buyer, receivableDue, overallDue });
+      const buyerBidDates = bidDateMap.get(buyer.id);
+      results.push({ ...buyer, receivableDue, overallDue, bidDates: buyerBidDates ? Array.from(buyerBidDates) : [] });
     }
     return results;
   }
