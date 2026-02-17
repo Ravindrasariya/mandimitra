@@ -557,12 +557,30 @@ export async function registerRoutes(
       const lot = await storage.getLot(tx.lotId, businessId);
       if (!lot) return res.status(404).json({ message: "Lot not found" });
 
+      await storage.updateTransaction(txId, businessId, { isReversed: true } as any);
+
       const actual = lot.actualNumberOfBags ?? lot.numberOfBags;
       const newActual = lot.isReturned ? actual + bagsToReturn : actual;
-      const newRemaining = Math.min(lot.remainingBags + bagsToReturn, newActual);
+
+      const { db } = await import("./db");
+      const { bids: bidsTable, transactions: txTable } = await import("@shared/schema");
+      const { eq: eqOp, and: andOp, sql: sqlOp } = await import("drizzle-orm");
+
+      const [activeBidsResult] = await db.select({
+        totalBags: sqlOp<number>`COALESCE(SUM(${bidsTable.numberOfBags}), 0)`
+      }).from(bidsTable)
+        .leftJoin(txTable, andOp(eqOp(txTable.bidId, bidsTable.id), eqOp(txTable.isReversed, true)))
+        .where(andOp(
+          eqOp(bidsTable.lotId, lot.id),
+          eqOp(bidsTable.businessId, businessId),
+          sqlOp`${txTable.id} IS NULL`
+        ));
+
+      const activeBidBags = Number(activeBidsResult?.totalBags || 0);
+      const newRemaining = Math.max(0, newActual - activeBidBags);
+
       const updateData: any = { remainingBags: newRemaining, actualNumberOfBags: newActual };
       await storage.updateLot(lot.id, businessId, updateData);
-      await storage.updateTransaction(txId, businessId, { isReversed: true } as any);
 
       res.json({ message: "Transaction reversed successfully", bagsReturned: bagsToReturn });
     } catch (err: any) {
