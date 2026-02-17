@@ -7,14 +7,14 @@ import { useLanguage } from "@/lib/language";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import type { Buyer, BuyerEditHistory } from "@shared/schema";
-import { ShoppingBag, Search, Plus, Pencil, Users, ArrowUpDown, ArrowUp, ArrowDown, Printer } from "lucide-react";
+import { ShoppingBag, Search, Plus, Pencil, ArrowUpDown, ArrowUp, ArrowDown, Printer, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 
 type BuyerWithDues = Buyer & { receivableDue: string; overallDue: string };
@@ -124,6 +124,32 @@ function generateBuyerPaanaHtml(
 </body></html>`;
 }
 
+function generateBuyerListPrintHtml(buyers: BuyerWithDues[], summary: { total: number; withDues: number; totalOverallDue: number; totalReceivableDue: number; duesOver15: number; duesOver30: number }) {
+  const rows = buyers.map(b => `<tr>
+<td style="padding:6px 10px;border:1px solid #ddd">${b.buyerId}</td>
+<td style="padding:6px 10px;border:1px solid #ddd">${b.name}</td>
+<td style="padding:6px 10px;border:1px solid #ddd">${b.phone || "-"}</td>
+<td style="padding:6px 10px;border:1px solid #ddd;text-align:right">${formatIndianCurrency(b.overallDue)}</td>
+<td style="padding:6px 10px;border:1px solid #ddd;text-align:right">${formatIndianCurrency(b.receivableDue)}</td>
+</tr>`).join("");
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Buyer Ledger</title>
+<style>body{font-family:Arial,sans-serif;margin:20px}table{border-collapse:collapse;width:100%}th{background:#f3f4f6;padding:8px 10px;border:1px solid #ddd;text-align:left}
+.summary{display:flex;gap:20px;justify-content:center;margin:15px 0}
+.summary-card{padding:10px 20px;border:1px solid #ddd;border-radius:8px;text-align:center}
+@media print{body{margin:5mm}}</style></head><body>
+<h2 style="text-align:center;margin-bottom:5px">Buyer Ledger</h2>
+<div class="summary">
+<div class="summary-card"><div style="font-size:0.8em;color:#666">Total Buyers</div><div style="font-size:1.3em;font-weight:bold">${summary.total}</div></div>
+<div class="summary-card"><div style="font-size:0.8em;color:#666">With Dues</div><div style="font-size:1.3em;font-weight:bold;color:#dc2626">${summary.withDues}</div></div>
+<div class="summary-card"><div style="font-size:0.8em;color:#666">Overall Due</div><div style="font-size:1.3em;font-weight:bold;color:#2563eb">${formatIndianCurrency(summary.totalOverallDue)}</div></div>
+<div class="summary-card"><div style="font-size:0.8em;color:#666">Receivable Due</div><div style="font-size:1.3em;font-weight:bold;color:#dc2626">${formatIndianCurrency(summary.totalReceivableDue)}</div></div>
+</div>
+<table>${rows ? `<thead><tr><th>Buyer ID</th><th>Name</th><th>Phone</th><th style="text-align:right">Overall Due</th><th style="text-align:right">Receivable Due</th></tr></thead><tbody>${rows}</tbody>` : ""}</table>
+<script>window.onload=function(){window.print()}</script>
+</body></html>`;
+}
+
 export default function BuyerLedgerPage() {
   const { toast } = useToast();
   const { t } = useLanguage();
@@ -146,10 +172,15 @@ export default function BuyerLedgerPage() {
   const [newPhone, setNewPhone] = useState("");
   const [newBuyerCode, setNewBuyerCode] = useState("");
   const [newOpeningBalance, setNewOpeningBalance] = useState("");
+  const [yearFilter, setYearFilter] = usePersistedState("bl-yearFilter", "all");
 
   const buyerQueryParams = `?withDues=true${searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : ""}`;
   const { data: buyers = [], isLoading } = useQuery<BuyerWithDues[]>({
     queryKey: ["/api/buyers" + buyerQueryParams],
+  });
+
+  const { data: allTransactions = [] } = useQuery<{ id: number; date: string; buyerId: number; totalReceivableFromBuyer: string; paidAmount: string; paymentStatus: string; isReversed: boolean }[]>({
+    queryKey: ["/api/transactions"],
   });
 
   const { data: editHistory = [] } = useQuery<BuyerEditHistory[]>({
@@ -224,15 +255,29 @@ export default function BuyerLedgerPage() {
     },
   });
 
+  const years = useMemo(() => {
+    const yearSet = new Set<string>();
+    buyers.forEach(b => {
+      if (b.buyerId && b.buyerId.length >= 6) {
+        yearSet.add(b.buyerId.substring(2, 6));
+      }
+    });
+    return Array.from(yearSet).sort().reverse();
+  }, [buyers]);
+
+  const yearFilteredBuyers = yearFilter === "all" 
+    ? buyers 
+    : buyers.filter(b => b.buyerId && b.buyerId.substring(2, 6) === yearFilter);
+
   const filteredBuyers = statusFilter === "all"
-    ? buyers
+    ? yearFilteredBuyers
     : statusFilter === "active"
-      ? buyers.filter(b => b.isActive)
+      ? yearFilteredBuyers.filter(b => b.isActive)
       : statusFilter === "inactive"
-        ? buyers.filter(b => !b.isActive)
+        ? yearFilteredBuyers.filter(b => !b.isActive)
         : statusFilter === "negative"
-          ? buyers.filter(b => b.negativeFlag)
-          : buyers;
+          ? yearFilteredBuyers.filter(b => b.negativeFlag)
+          : yearFilteredBuyers;
 
   const sortedBuyers = useMemo(() => {
     const sorted = [...filteredBuyers];
@@ -249,6 +294,34 @@ export default function BuyerLedgerPage() {
     });
     return sorted;
   }, [filteredBuyers, sortField, sortDir]);
+
+  const summary = useMemo(() => {
+    const total = filteredBuyers.length;
+    const withDues = filteredBuyers.filter(b => parseFloat(b.overallDue) > 0).length;
+    const totalOverallDue = filteredBuyers.reduce((s, b) => s + parseFloat(b.overallDue), 0);
+    const totalReceivableDue = filteredBuyers.reduce((s, b) => s + parseFloat(b.receivableDue), 0);
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const filteredBuyerIds = new Set(filteredBuyers.map(b => b.id));
+    const activeTxns = allTransactions.filter(t => 
+      !t.isReversed && filteredBuyerIds.has(t.buyerId)
+    );
+    
+    let duesOver15 = 0;
+    let duesOver30 = 0;
+    activeTxns.forEach(t => {
+      const due = parseFloat(t.totalReceivableFromBuyer || "0") - parseFloat(t.paidAmount || "0");
+      if (due <= 0) return;
+      const txDate = new Date(t.date + "T00:00:00");
+      const diffDays = Math.floor((today.getTime() - txDate.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays > 30) duesOver30 += due;
+      if (diffDays > 15) duesOver15 += due;
+    });
+    
+    return { total, withDues, totalOverallDue, totalReceivableDue, duesOver15, duesOver30 };
+  }, [filteredBuyers, allTransactions]);
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
@@ -324,64 +397,120 @@ export default function BuyerLedgerPage() {
     });
   };
 
+  const handleSync = () => {
+    queryClient.invalidateQueries({ predicate: (query) => {
+      const key = query.queryKey[0];
+      return typeof key === "string" && key.startsWith("/api/buyers");
+    }});
+    queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+    toast({ title: "Data Synced", variant: "success" });
+  };
+
+  const handlePrintList = () => {
+    const html = generateBuyerListPrintHtml(sortedBuyers, summary);
+    const w = window.open("", "_blank", "width=800,height=600");
+    if (w) {
+      w.document.write(html);
+      w.document.close();
+    }
+  };
+
   return (
     <div className="p-3 md:p-6 max-w-6xl mx-auto space-y-4">
-      <div>
-        <h1 className="text-base md:text-lg font-bold flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
+        <h1 className="text-base md:text-lg font-bold flex items-center gap-2 mr-auto">
           <ShoppingBag className="w-5 h-5 text-primary" />
           {t("buyerLedger.title")}
         </h1>
-        <p data-testid="text-buyer-subtitle" className="text-sm text-muted-foreground">{t("buyerLedger.subtitle")}</p>
+        <Select value={yearFilter} onValueChange={setYearFilter}>
+          <SelectTrigger className="w-[100px]" data-testid="select-year-filter">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t("buyerLedger.allYears")}</SelectItem>
+            {years.map(y => (
+              <SelectItem key={y} value={y}>{y}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger data-testid="select-status-filter" className="w-[100px]">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t("common.all")}...</SelectItem>
+            <SelectItem value="active">{t("common.active")}</SelectItem>
+            <SelectItem value="inactive">{t("common.inactive")}</SelectItem>
+            <SelectItem value="negative">{t("buyerLedger.negative")}</SelectItem>
+          </SelectContent>
+        </Select>
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+          <Input
+            data-testid="input-buyer-search"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder={t("buyerLedger.searchName")}
+            className="pl-8 w-[160px] h-9"
+          />
+        </div>
+        <Button
+          data-testid="button-add-buyer"
+          onClick={() => setShowAddDialog(true)}
+        >
+          <Plus className="w-4 h-4 mr-1" />
+          {t("buyerLedger.addBuyer")}
+        </Button>
+        <Button variant="outline" size="sm" onClick={handleSync} data-testid="button-sync">
+          <RefreshCw className="w-4 h-4" />
+        </Button>
+        <Button variant="outline" size="sm" onClick={handlePrintList} data-testid="button-print-list">
+          <Printer className="w-4 h-4" />
+        </Button>
       </div>
 
-      <Card>
-        <CardHeader className="pb-3">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Users className="w-5 h-5" />
-              {t("buyerLedger.buyerManagement")}
-            </CardTitle>
-            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger data-testid="select-status-filter" className="w-[100px] mobile-touch-target">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t("common.all")}...</SelectItem>
-                  <SelectItem value="active">{t("common.active")}</SelectItem>
-                  <SelectItem value="inactive">{t("common.inactive")}</SelectItem>
-                  <SelectItem value="negative">{t("buyerLedger.negative")}</SelectItem>
-                </SelectContent>
-              </Select>
-              <div className="relative flex-1 sm:flex-none">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                <Input
-                  data-testid="input-buyer-search"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  placeholder={t("buyerLedger.searchName")}
-                  className="pl-9 mobile-touch-target w-full sm:w-[180px]"
-                />
-              </div>
-              <Button
-                data-testid="button-add-buyer"
-                className="mobile-touch-target"
-                onClick={() => setShowAddDialog(true)}
-              >
-                <Plus className="w-4 h-4 mr-1" />
-                {t("buyerLedger.addBuyer")}
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="text-center py-8 text-muted-foreground">{t("app.loading")}</div>
-          ) : sortedBuyers.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">{t("buyerLedger.noBuyers")}</div>
-          ) : (
-            <>
-              <div className="hidden md:block overflow-x-auto">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <Card className="border-l-4 border-l-blue-500">
+          <CardContent className="pt-3 pb-3 text-center">
+            <p className="text-xs text-muted-foreground">{t("buyerLedger.totalBuyers")}</p>
+            <p className="text-base font-bold text-blue-600" data-testid="text-total-buyers">{summary.total}</p>
+            <p className="text-[11px] text-red-600 font-medium" data-testid="text-buyers-with-dues">{t("buyerLedger.buyersWithDues")}: {summary.withDues}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-l-4 border-l-green-500">
+          <CardContent className="pt-3 pb-3 text-center">
+            <p className="text-xs text-muted-foreground">{t("buyerLedger.totalOverallDue")}</p>
+            <p className="text-base font-bold text-green-600" data-testid="text-overall-due">{formatIndianCurrency(summary.totalOverallDue)}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-l-4 border-l-orange-500">
+          <CardContent className="pt-3 pb-3 text-center">
+            <p className="text-xs text-muted-foreground">{t("buyerLedger.totalReceivableDue")}</p>
+            <p className="text-base font-bold text-orange-600" data-testid="text-receivable-due">{formatIndianCurrency(summary.totalReceivableDue)}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-l-4 border-l-red-500">
+          <CardContent className="pt-3 pb-3 text-center">
+            <p className="text-xs text-muted-foreground">{t("buyerLedger.duesOver30")}</p>
+            <p className="text-base font-bold text-red-600" data-testid="text-dues-over-30">{formatIndianCurrency(summary.duesOver30)}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-l-4 border-l-purple-500">
+          <CardContent className="pt-3 pb-3 text-center">
+            <p className="text-xs text-muted-foreground">{t("buyerLedger.duesOver15")}</p>
+            <p className="text-base font-bold text-purple-600" data-testid="text-dues-over-15">{formatIndianCurrency(summary.duesOver15)}</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {isLoading ? (
+        <div className="text-center py-8 text-muted-foreground">{t("app.loading")}</div>
+      ) : sortedBuyers.length === 0 ? (
+        <div className="text-center py-8 text-muted-foreground">{t("buyerLedger.noBuyers")}</div>
+      ) : (
+        <>
+          <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b bg-muted/50">
@@ -520,8 +649,6 @@ export default function BuyerLedgerPage() {
               </div>
             </>
           )}
-        </CardContent>
-      </Card>
 
       <Dialog open={!!editingBuyer} onOpenChange={(open) => !open && setEditingBuyer(null)}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
