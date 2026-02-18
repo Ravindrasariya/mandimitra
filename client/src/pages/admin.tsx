@@ -462,7 +462,7 @@ function UsersTab() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: { username: string; name: string; phone: string; businessId: number }) => {
+    mutationFn: async (data: { username: string; name: string; phone: string; businessId: number; accessLevel: string }) => {
       const res = await apiRequest("POST", "/api/admin/users", data);
       return res.json();
     },
@@ -570,6 +570,8 @@ function UsersTab() {
                       <td className="py-3 px-2">
                         {u.role === "system_admin" ? (
                           <Badge className="bg-green-500 hover:bg-green-600">Full Access</Badge>
+                        ) : u.accessLevel === "view" ? (
+                          <Badge variant="outline">View Only</Badge>
                         ) : (
                           <Badge variant="secondary">Can Edit</Badge>
                         )}
@@ -667,7 +669,7 @@ function AddUserDialog({ open, onClose, businesses, onSubmit, isPending }: {
   open: boolean;
   onClose: () => void;
   businesses: Business[];
-  onSubmit: (data: { username: string; name: string; phone: string; businessId: number }) => void;
+  onSubmit: (data: { username: string; name: string; phone: string; businessId: number; accessLevel: string }) => void;
   isPending: boolean;
 }) {
   const { t } = useLanguage();
@@ -675,16 +677,17 @@ function AddUserDialog({ open, onClose, businesses, onSubmit, isPending }: {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [businessId, setBusinessId] = useState<string>("");
+  const [accessLevel, setAccessLevel] = useState<string>("edit");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({ username, name, phone, businessId: parseInt(businessId) });
+    onSubmit({ username, name, phone, businessId: parseInt(businessId), accessLevel });
   };
 
   const activeBusinesses = businesses.filter(b => b.status === "active");
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) { onClose(); setUsername(""); setName(""); setPhone(""); setBusinessId(""); } }}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) { onClose(); setUsername(""); setName(""); setPhone(""); setBusinessId(""); setAccessLevel("edit"); } }}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{t("admin.addUser")}</DialogTitle>
@@ -716,6 +719,18 @@ function AddUserDialog({ open, onClose, businesses, onSubmit, isPending }: {
               </SelectContent>
             </Select>
           </div>
+          <div className="space-y-2">
+            <Label>Access Level *</Label>
+            <Select value={accessLevel} onValueChange={setAccessLevel}>
+              <SelectTrigger data-testid="select-user-access-level">
+                <SelectValue placeholder="Select access level" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="edit">Can Edit</SelectItem>
+                <SelectItem value="view">View Only</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
             <Button type="submit" data-testid="button-save-user" disabled={isPending || !username || !name || !phone || !businessId}>
@@ -740,10 +755,11 @@ function EditUserDialog({ user, businesses, onClose, onSubmit, isPending }: {
   const [name, setName] = useState(user.name);
   const [phone, setPhone] = useState(user.phone || "");
   const [businessId, setBusinessId] = useState(user.businessId.toString());
+  const [accessLevel, setAccessLevel] = useState(user.accessLevel || "edit");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({ username, name, phone, businessId: parseInt(businessId) });
+    onSubmit({ username, name, phone, businessId: parseInt(businessId), accessLevel });
   };
 
   const activeBusinesses = businesses.filter(b => b.status === "active");
@@ -778,6 +794,18 @@ function EditUserDialog({ user, businesses, onClose, onSubmit, isPending }: {
                 {activeBusinesses.map(b => (
                   <SelectItem key={b.id} value={b.id.toString()}>{b.name}</SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Access Level *</Label>
+            <Select value={accessLevel} onValueChange={setAccessLevel}>
+              <SelectTrigger data-testid="select-edit-user-access-level">
+                <SelectValue placeholder="Select access level" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="edit">Can Edit</SelectItem>
+                <SelectItem value="view">View Only</SelectItem>
               </SelectContent>
             </Select>
           </div>

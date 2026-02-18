@@ -158,6 +158,7 @@ export async function registerRoutes(
         businessId: req.body.businessId,
         role: "user",
         mustChangePassword: true,
+        accessLevel: req.body.accessLevel || "edit",
       };
       const user = await storage.createUser(data);
       const { password, ...safe } = user;
@@ -168,9 +169,9 @@ export async function registerRoutes(
   });
 
   app.patch("/api/admin/users/:id", requireAdmin, async (req, res) => {
-    const { name, phone, businessId, username } = req.body;
+    const { name, phone, businessId, username, accessLevel } = req.body;
     const userId = req.params.id as string;
-    const updated = await storage.updateUser(userId, { name, phone, businessId, username });
+    const updated = await storage.updateUser(userId, { name, phone, businessId, username, accessLevel });
     if (!updated) return res.status(404).json({ message: "User not found" });
     const { password, ...safe } = updated;
     res.json(safe);

@@ -22,6 +22,7 @@ export const users = pgTable("users", {
   phone: text("phone"),
   businessId: integer("business_id").notNull().references(() => businesses.id),
   role: text("role").notNull().default("user"),
+  accessLevel: text("access_level").notNull().default("edit"),
   mustChangePassword: boolean("must_change_password").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
