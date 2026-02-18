@@ -617,13 +617,15 @@ function UsersTab() {
         </CardContent>
       </Card>
 
-      <AddUserDialog
-        open={showAdd}
-        onClose={() => setShowAdd(false)}
-        businesses={businesses}
-        onSubmit={(data) => createMutation.mutate(data)}
-        isPending={createMutation.isPending}
-      />
+      {showAdd && (
+        <AddUserDialog
+          open={showAdd}
+          onClose={() => setShowAdd(false)}
+          businesses={businesses}
+          onSubmit={(data) => createMutation.mutate(data)}
+          isPending={createMutation.isPending}
+        />
+      )}
 
       {editUser && (
         <EditUserDialog
