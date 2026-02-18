@@ -64,7 +64,6 @@ app.use((req, res, next) => {
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
-    const message = err.message || "Internal Server Error";
 
     console.error("Internal Server Error:", err);
 
@@ -72,7 +71,11 @@ app.use((req, res, next) => {
       return next(err);
     }
 
-    return res.status(status).json({ message });
+    const safeMessage = status >= 500
+      ? "Something went wrong. Please try again later."
+      : (err.message || "Something went wrong.");
+
+    return res.status(status).json({ message: safeMessage });
   });
 
   // importantly only setup vite in development and after

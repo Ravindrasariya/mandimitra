@@ -13,7 +13,7 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  setupAuth(app);
+  await setupAuth(app);
 
   async function seedDefaultBusiness() {
     const adminPassword = process.env.ADMIN_PASSWORD;

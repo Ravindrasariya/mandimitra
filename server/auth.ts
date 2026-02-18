@@ -40,8 +40,22 @@ declare global {
   }
 }
 
-export function setupAuth(app: Express): void {
+export async function setupAuth(app: Express): Promise<void> {
   const PgSession = connectPgSimple(session);
+
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS "session" (
+        "sid" varchar NOT NULL COLLATE "default",
+        "sess" json NOT NULL,
+        "expire" timestamp(6) NOT NULL,
+        CONSTRAINT "session_pkey" PRIMARY KEY ("sid")
+      ) WITH (OIDS=FALSE);
+      CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
+    `);
+  } catch (err) {
+    console.error("Failed to create session table, will try createTableIfMissing fallback:", err);
+  }
 
   const sessionMiddleware = session({
     store: new PgSession({
@@ -99,17 +113,23 @@ export function setupAuth(app: Express): void {
     }
   });
 
-  app.post("/api/auth/login", (req, res, next) => {
+  app.post("/api/auth/login", (req, res) => {
     passport.authenticate("local", (err: any, user: Express.User | false, info: any) => {
-      if (err) return next(err);
+      if (err) {
+        console.error("Login error:", err);
+        return res.status(500).json({ message: "Login failed. Please try again later." });
+      }
       if (!user) return res.status(401).json({ message: info?.message || "Login failed" });
 
       req.logIn(user, (err) => {
-        if (err) return next(err);
+        if (err) {
+          console.error("Session error:", err);
+          return res.status(500).json({ message: "Login failed. Please try again later." });
+        }
         const { password, ...safeUser } = user;
         return res.json(safeUser);
       });
-    })(req, res, next);
+    })(req, res);
   });
 
   app.post("/api/auth/logout", (req, res) => {
