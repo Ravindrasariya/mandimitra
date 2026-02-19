@@ -716,7 +716,7 @@ function AddUserDialog({ open, onClose, businesses, onSubmit, isPending }: {
               </SelectTrigger>
               <SelectContent>
                 {activeBusinesses.map(b => (
-                  <SelectItem key={b.id} value={b.id.toString()}>{b.name}</SelectItem>
+                  <SelectItem key={b.id} value={b.id.toString()}>{b.name}{b.address ? ` — ${b.address}` : ""}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -794,7 +794,7 @@ function EditUserDialog({ user, businesses, onClose, onSubmit, isPending }: {
               </SelectTrigger>
               <SelectContent>
                 {activeBusinesses.map(b => (
-                  <SelectItem key={b.id} value={b.id.toString()}>{b.name}</SelectItem>
+                  <SelectItem key={b.id} value={b.id.toString()}>{b.name}{b.address ? ` — ${b.address}` : ""}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
