@@ -233,6 +233,8 @@ export default function TransactionsPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [reverseConfirmOpen, setReverseConfirmOpen] = useState(false);
   const [reversingTxn, setReversingTxn] = useState<TransactionWithDetails | null>(null);
+  const [deleteBidConfirmOpen, setDeleteBidConfirmOpen] = useState(false);
+  const [deletingBid, setDeletingBid] = useState<any>(null);
   const now = new Date();
   const currentYear = String(now.getFullYear());
   const currentMonth = String(now.getMonth() + 1);
@@ -359,6 +361,24 @@ export default function TransactionsPage() {
       setReversingTxn(null);
       setDialogOpen(false);
       toast({ title: "Transaction Reversed", description: `${data.bagsReturned} bags returned to stock`, variant: "success" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const deleteBidMutation = useMutation({
+    mutationFn: async (bidId: number) => {
+      await apiRequest("DELETE", `/api/bids/${bidId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bids"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      setDeleteBidConfirmOpen(false);
+      setDeletingBid(null);
+      setDialogOpen(false);
+      toast({ title: t("transactions.bidDeleted"), description: t("transactions.bidDeletedDesc"), variant: "success" });
     },
     onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -1227,6 +1247,20 @@ export default function TransactionsPage() {
                   {t("transactions.returnToStockRegister")}
                 </Button>
               )}
+              {!isEditing && currentItem && (
+                <Button
+                  variant="destructive"
+                  data-testid="button-return-bid-to-stock"
+                  className="w-full mobile-touch-target"
+                  onClick={() => {
+                    setDeletingBid(currentItem.bid);
+                    setDeleteBidConfirmOpen(true);
+                  }}
+                  disabled={deleteBidMutation.isPending}
+                >
+                  {t("transactions.returnToStockRegister")}
+                </Button>
+              )}
             </div>
           )}
         </DialogContent>
@@ -1254,6 +1288,33 @@ export default function TransactionsPage() {
               disabled={reverseTxMutation.isPending}
             >
               {reverseTxMutation.isPending ? t("transactions.reversing") : t("transactions.yesReverse")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={deleteBidConfirmOpen} onOpenChange={(open) => { setDeleteBidConfirmOpen(open); if (!open) setDeletingBid(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("transactions.bidReturnConfirmTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("transactions.bidReturnConfirmMsg")}
+              {deletingBid && (
+                <span className="block mt-2 text-orange-600 font-medium">
+                  {t("transactions.bidReturnBuyerInfo").replace("{buyer}", deletingBid.buyer?.name || "").replace("{bags}", String(deletingBid.numberOfBags))}
+                </span>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete-bid">{t("common.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              data-testid="button-confirm-delete-bid"
+              className="bg-destructive text-destructive-foreground"
+              onClick={() => deletingBid && deleteBidMutation.mutate(deletingBid.id)}
+              disabled={deleteBidMutation.isPending}
+            >
+              {deleteBidMutation.isPending ? t("transactions.returning") : t("transactions.yesReturn")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
