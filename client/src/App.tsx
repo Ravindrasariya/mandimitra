@@ -19,11 +19,13 @@ import CashPage from "@/pages/cash";
 import FarmerLedgerPage from "@/pages/farmer-ledger";
 import BuyerLedgerPage from "@/pages/buyer-ledger";
 import {
-  LayoutDashboard, Package, ClipboardList, Gavel, Receipt, Wallet, Users, ShoppingBag, LogOut, Wheat, Menu, ChevronLeft, ChevronRight, Globe, Phone,
+  LayoutDashboard, Package, ClipboardList, Gavel, Receipt, Wallet, Users, ShoppingBag, LogOut, Wheat, Menu, ChevronLeft, ChevronRight, Globe, Phone, UserCircle,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Badge } from "@/components/ui/badge";
 
 const navItems = [
   { path: "/", labelKey: "nav.dashboard", icon: LayoutDashboard, shortLabelKey: "nav.dash", testId: "dashboard" },
@@ -52,9 +54,55 @@ function LanguageToggle({ compact }: { compact?: boolean }) {
   );
 }
 
+function ProfileDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  const { user } = useAuth();
+  const { t } = useLanguage();
+  if (!user) return null;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <UserCircle className="w-5 h-5" />
+            {t("nav.profile")}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 pt-2">
+          <div className="flex justify-between items-start gap-2">
+            <span className="text-sm text-muted-foreground">{t("profile.name")}</span>
+            <span className="text-sm font-medium text-right" data-testid="text-profile-name">{user.name}</span>
+          </div>
+          <div className="flex justify-between items-start gap-2">
+            <span className="text-sm text-muted-foreground">{t("profile.mobile")}</span>
+            <span className="text-sm font-medium text-right" data-testid="text-profile-mobile">{user.phone || "—"}</span>
+          </div>
+          <div className="flex justify-between items-start gap-2">
+            <span className="text-sm text-muted-foreground">{t("profile.merchant")}</span>
+            <span className="text-sm font-medium text-right" data-testid="text-profile-merchant">{user.businessName}</span>
+          </div>
+          {user.businessAddress && (
+            <div className="flex justify-between items-start gap-2">
+              <span className="text-sm text-muted-foreground">{t("profile.address")}</span>
+              <span className="text-sm font-medium text-right" data-testid="text-profile-address">{user.businessAddress}</span>
+            </div>
+          )}
+          <div className="flex justify-between items-center gap-2">
+            <span className="text-sm text-muted-foreground">{t("profile.accessType")}</span>
+            <Badge variant={user.accessLevel === "edit" ? "default" : "secondary"} data-testid="badge-profile-access">
+              {user.accessLevel === "edit" ? t("profile.editAccess") : t("profile.viewAccess")}
+            </Badge>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function MobileBottomNav() {
   const [location] = useLocation();
   const [showMore, setShowMore] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const { logout } = useAuth();
   const { t } = useLanguage();
 
@@ -80,6 +128,14 @@ function MobileBottomNav() {
             ))}
             <div className="border-t my-1 pt-1">
               <button
+                data-testid="nav-more-profile"
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-md text-sm hover-elevate"
+                onClick={() => { setShowMore(false); setProfileOpen(true); }}
+              >
+                <UserCircle className="w-5 h-5" />
+                {t("nav.profile")}
+              </button>
+              <button
                 data-testid="nav-more-logout"
                 className="w-full flex items-center gap-3 px-4 py-3 rounded-md text-sm text-destructive hover-elevate"
                 onClick={() => { setShowMore(false); logout(); }}
@@ -91,6 +147,7 @@ function MobileBottomNav() {
           </div>
         </div>
       )}
+      <ProfileDialog open={profileOpen} onOpenChange={setProfileOpen} />
       <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t safe-area-bottom">
         <div className="flex items-stretch">
           {primaryNav.map((item) => {
@@ -125,6 +182,7 @@ function DesktopSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
   const [location] = useLocation();
   const { logout } = useAuth();
   const { t } = useLanguage();
+  const [profileOpen, setProfileOpen] = useState(false);
 
   return (
     <div className={`hidden md:flex flex-col border-r bg-sidebar h-screen sticky top-0 transition-all duration-200 ${collapsed ? "w-16" : "w-56"}`}>
@@ -172,6 +230,15 @@ function DesktopSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
           <LanguageToggle compact={collapsed} />
         </div>
         <button
+          data-testid="button-profile"
+          className={`w-full flex items-center gap-3 rounded-md text-sm px-3 py-2.5 hover-elevate ${collapsed ? "justify-center" : ""}`}
+          onClick={() => setProfileOpen(true)}
+          title={collapsed ? t("nav.profile") : undefined}
+        >
+          <UserCircle className="w-4 h-4 flex-shrink-0" />
+          {!collapsed && <span>{t("nav.profile")}</span>}
+        </button>
+        <button
           data-testid="button-logout"
           className={`w-full flex items-center gap-3 rounded-md text-sm text-destructive px-3 py-2.5 hover-elevate ${collapsed ? "justify-center" : ""}`}
           onClick={logout}
@@ -180,6 +247,7 @@ function DesktopSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
           {!collapsed && <span>{t("nav.logout")}</span>}
         </button>
       </div>
+      <ProfileDialog open={profileOpen} onOpenChange={setProfileOpen} />
     </div>
   );
 }

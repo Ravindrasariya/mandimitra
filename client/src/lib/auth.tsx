@@ -9,7 +9,10 @@ type AuthUser = {
   phone: string | null;
   businessId: number;
   role: string;
+  accessLevel: string;
   mustChangePassword: boolean;
+  businessName: string;
+  businessAddress: string;
 };
 
 type AuthContextType = {

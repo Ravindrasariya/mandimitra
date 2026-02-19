@@ -121,13 +121,18 @@ export async function setupAuth(app: Express): Promise<void> {
       }
       if (!user) return res.status(401).json({ message: info?.message || "Login failed" });
 
-      req.logIn(user, (err) => {
+      req.logIn(user, async (err) => {
         if (err) {
           console.error("Session error:", err);
           return res.status(500).json({ message: "Login failed. Please try again later." });
         }
         const { password, ...safeUser } = user;
-        return res.json(safeUser);
+        const business = await storage.getBusiness(safeUser.businessId);
+        return res.json({
+          ...safeUser,
+          businessName: business?.name || "",
+          businessAddress: business?.address || "",
+        });
       });
     })(req, res);
   });
@@ -139,10 +144,15 @@ export async function setupAuth(app: Express): Promise<void> {
     });
   });
 
-  app.get("/api/auth/me", (req, res) => {
+  app.get("/api/auth/me", async (req, res) => {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
     const { password, ...safeUser } = req.user!;
-    res.json(safeUser);
+    const business = await storage.getBusiness(safeUser.businessId);
+    res.json({
+      ...safeUser,
+      businessName: business?.name || "",
+      businessAddress: business?.address || "",
+    });
   });
 
   app.post("/api/auth/change-password", async (req, res) => {
