@@ -62,7 +62,12 @@ export default function BiddingPage() {
       }});
       toast({ title: "Bid Saved", variant: "success" });
       setPricePerKg("");
-      setBidBags("");
+      const bagsUsed = parseInt(bidBags) || 0;
+      const newRemaining = selectedLot ? Math.max(0, selectedLot.remainingBags - bagsUsed) : 0;
+      setBidBags(newRemaining > 0 ? newRemaining.toString() : "");
+      if (selectedLot) {
+        setSelectedLot({ ...selectedLot, remainingBags: newRemaining });
+      }
       setSelectedBuyerId(null);
       setBuyerSearch("");
     },
@@ -101,6 +106,7 @@ export default function BiddingPage() {
 
   const openBidDialog = (lot: LotWithFarmer) => {
     setSelectedLot(lot);
+    setBidBags(lot.remainingBags.toString());
     setBidDialogOpen(true);
   };
 
