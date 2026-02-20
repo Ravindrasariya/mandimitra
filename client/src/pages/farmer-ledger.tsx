@@ -60,7 +60,7 @@ h2{text-align:center}th{background:#f5f5f5;padding:8px;border:1px solid #ddd;tex
 </div>
 <table><tr><th>Farmer ID</th><th>Name</th><th>Village</th><th>Contact</th><th style="text-align:right">Total Payable</th><th style="text-align:right">Total Due</th><th style="text-align:center">Flag</th></tr>
 ${rows}</table>
-<div style="text-align:center;margin-top:20px;padding-top:10px;border-top:1px dashed #ccc;font-size:12px;color:#666">हमें सेवा का अवसर देने के लिए धन्यवाद!</div>
+<div style="text-align:center;margin-top:20px;padding-top:10px;border-top:1px dashed #ccc;font-size:15px;font-weight:bold;color:#555">हमें सेवा का अवसर देने के लिए धन्यवाद!</div>
 </body></html>`;
 }
 

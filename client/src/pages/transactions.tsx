@@ -164,7 +164,7 @@ ${totalFreight > 0 ? `<div class="ded-row"><span>भाड़ा / Freight:</spa
 ${totalDeduction > 0 ? `<div class="ded-row sub-total"><span>कुल कटौती / Total Deduction:</span><span>₹${totalDeduction.toFixed(2)}</span></div>` : ""}
 <div class="ded-row total-row"><span>किसान को देय राशि / Net Payable:</span><span>₹${totalPayable.toFixed(2)}</span></div>
 </div>
-<div style="text-align:center;margin-top:20px;padding-top:10px;border-top:1px dashed #ccc;font-size:12px;color:#666">हमें सेवा का अवसर देने के लिए धन्यवाद!</div>
+<div style="text-align:center;margin-top:20px;padding-top:10px;border-top:1px dashed #ccc;font-size:15px;font-weight:bold;color:#555">हमें सेवा का अवसर देने के लिए धन्यवाद!</div>
 </body></html>`;
 }
 
@@ -218,7 +218,7 @@ ${aadhatBuyer > 0 ? `<div class="summary-row"><span>Aadhat (${tx.aadhatBuyerPerc
 ${mandiBuyer > 0 ? `<div class="summary-row"><span>Mandi (${tx.mandiBuyerPercent}%):</span><span>Rs.${mandiBuyer.toFixed(2)}</span></div>` : ""}
 <div class="summary-row total"><span>Total Receivable from Buyer:</span><span>Rs.${parseFloat(tx.totalReceivableFromBuyer || "0").toFixed(2)}</span></div>
 </div>
-<div style="text-align:center;margin-top:20px;padding-top:10px;border-top:1px dashed #ccc;font-size:12px;color:#666">हमें सेवा का अवसर देने के लिए धन्यवाद!</div>
+<div style="text-align:center;margin-top:20px;padding-top:10px;border-top:1px dashed #ccc;font-size:15px;font-weight:bold;color:#555">हमें सेवा का अवसर देने के लिए धन्यवाद!</div>
 </body></html>`;
 }
 
