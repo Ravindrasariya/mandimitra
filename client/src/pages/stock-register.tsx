@@ -527,7 +527,7 @@ export default function StockRegisterPage() {
       ) : (
         <div className="space-y-3">
           {filtered.map((lot) => (
-            <Card key={lot.id}>
+            <Card key={lot.id} className={lot.isReturned && (lot.actualNumberOfBags ?? lot.numberOfBags) === 0 ? "opacity-50" : ""}>
               <CardContent className="pt-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
