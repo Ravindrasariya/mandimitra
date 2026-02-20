@@ -298,11 +298,14 @@ export default function StockEntryPage() {
                     data-testid="input-farmer-phone"
                     type="tel"
                     value={farmerPhone}
-                    onChange={(e) => setFarmerPhone(e.target.value)}
+                    onChange={(e) => setFarmerPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                     placeholder={t("stockEntry.mobilePlaceholder")}
                     className="mobile-touch-target text-sm"
                     maxLength={10}
                   />
+                  {farmerPhone && farmerPhone.length !== 10 && (
+                    <p className="text-xs text-orange-600">Please enter a valid 10-digit mobile number</p>
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -542,7 +545,7 @@ export default function StockEntryPage() {
           data-testid="button-submit-stock"
           className="mobile-touch-target flex-1 sm:flex-none"
           onClick={handleSubmit}
-          disabled={createLotMutation.isPending || createFarmerMutation.isPending}
+          disabled={createLotMutation.isPending || createFarmerMutation.isPending || (farmerPhone.length > 0 && farmerPhone.length !== 10)}
         >
           {createLotMutation.isPending ? t("common.saving") : t("stockEntry.saveToRegister")}
         </Button>

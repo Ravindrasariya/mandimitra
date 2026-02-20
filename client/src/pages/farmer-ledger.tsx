@@ -580,9 +580,13 @@ export default function FarmerLedgerPage() {
                 <Input
                   data-testid="input-edit-farmer-phone"
                   value={editPhone}
-                  onChange={(e) => setEditPhone(e.target.value)}
+                  onChange={(e) => setEditPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                   inputMode="tel"
+                  maxLength={10}
                 />
+                {editPhone && editPhone.length !== 10 && (
+                  <p className="text-xs text-orange-600">Please enter a valid 10-digit mobile number</p>
+                )}
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">{t("common.village")}</Label>
@@ -608,7 +612,7 @@ export default function FarmerLedgerPage() {
               <Button
                 className="w-full"
                 onClick={handleSaveEdit}
-                disabled={updateFarmerMutation.isPending}
+                disabled={updateFarmerMutation.isPending || (editPhone.length > 0 && editPhone.length !== 10)}
                 data-testid="button-save-farmer-edit"
               >
                 {updateFarmerMutation.isPending ? t("common.saving") : t("common.saveChanges")}

@@ -131,17 +131,15 @@ export default function BiddingPage() {
   };
 
   const [newBuyerName, setNewBuyerName] = useState("");
-  const [newBuyerPhone, setNewBuyerPhone] = useState("");
   const [showNewBuyer, setShowNewBuyer] = useState(false);
 
   const addNewBuyer = async () => {
     if (!newBuyerName) return;
     try {
-      const buyer = await createBuyerMutation.mutateAsync({ name: newBuyerName, phone: newBuyerPhone || null });
+      const buyer = await createBuyerMutation.mutateAsync({ name: newBuyerName });
       setSelectedBuyerId(buyer.id);
       setShowNewBuyer(false);
       setNewBuyerName("");
-      setNewBuyerPhone("");
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
     }
@@ -299,13 +297,6 @@ export default function BiddingPage() {
                         value={newBuyerName}
                         onChange={(e) => setNewBuyerName(e.target.value)}
                         placeholder={t("bidding.buyerName")}
-                        className="mobile-touch-target"
-                      />
-                      <Input
-                        data-testid="input-new-buyer-phone"
-                        value={newBuyerPhone}
-                        onChange={(e) => setNewBuyerPhone(e.target.value)}
-                        placeholder={t("bidding.phoneOptional")}
                         className="mobile-touch-target"
                       />
                       <div className="flex gap-2">

@@ -813,10 +813,13 @@ export default function BuyerLedgerPage() {
                 data-testid="input-edit-buyer-phone"
                 type="tel"
                 value={editPhone}
-                onChange={(e) => setEditPhone(e.target.value)}
+                onChange={(e) => setEditPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                 className="mobile-touch-target"
                 maxLength={10}
               />
+              {editPhone && editPhone.length !== 10 && (
+                <p className="text-xs text-orange-600">Please enter a valid 10-digit mobile number</p>
+              )}
             </div>
             <div className="space-y-1">
               <Label>{t("buyerLedger.buyerCode")}</Label>
@@ -851,7 +854,7 @@ export default function BuyerLedgerPage() {
               data-testid="button-save-buyer-edit"
               className="w-full mobile-touch-target"
               onClick={saveEdit}
-              disabled={updateBuyerMutation.isPending}
+              disabled={updateBuyerMutation.isPending || (editPhone.length > 0 && editPhone.length !== 10)}
             >
               {updateBuyerMutation.isPending ? t("common.saving") : t("common.saveChanges")}
             </Button>
@@ -920,11 +923,14 @@ export default function BuyerLedgerPage() {
                 data-testid="input-new-buyer-phone"
                 type="tel"
                 value={newPhone}
-                onChange={(e) => setNewPhone(e.target.value)}
+                onChange={(e) => setNewPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                 placeholder={t("common.phone")}
                 className="mobile-touch-target"
                 maxLength={10}
               />
+              {newPhone && newPhone.length !== 10 && (
+                <p className="text-xs text-orange-600">Please enter a valid 10-digit mobile number</p>
+              )}
             </div>
             <div className="space-y-1">
               <Label>{t("buyerLedger.buyerCode")}</Label>
@@ -953,7 +959,7 @@ export default function BuyerLedgerPage() {
               data-testid="button-submit-new-buyer"
               className="w-full mobile-touch-target"
               onClick={addBuyer}
-              disabled={createBuyerMutation.isPending}
+              disabled={createBuyerMutation.isPending || (newPhone.length > 0 && newPhone.length !== 10)}
             >
               {createBuyerMutation.isPending ? t("buyerLedger.adding") : t("buyerLedger.addBuyer")}
             </Button>
