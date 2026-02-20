@@ -17,6 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import type { Farmer, FarmerEditHistory } from "@shared/schema";
 import { Users, Search, Pencil, RefreshCw, Printer, Archive, AlertTriangle, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, Calendar } from "lucide-react";
 import { format } from "date-fns";
+import { printReceipt } from "@/lib/receiptUtils";
 
 type FarmerWithDues = Farmer & { totalPayable: string; totalDue: string; salesCount: number; bidDates?: string[] };
 type SortField = "farmerId" | "totalPayable" | "totalDue";
@@ -59,7 +60,6 @@ h2{text-align:center}th{background:#f5f5f5;padding:8px;border:1px solid #ddd;tex
 </div>
 <table><tr><th>Farmer ID</th><th>Name</th><th>Village</th><th>Contact</th><th style="text-align:right">Total Payable</th><th style="text-align:right">Total Due</th><th style="text-align:center">Flag</th></tr>
 ${rows}</table>
-<script>window.onload=function(){window.print()}</script>
 </body></html>`;
 }
 
@@ -323,11 +323,7 @@ export default function FarmerLedgerPage() {
 
   const handlePrint = () => {
     const html = generateFarmerListPrintHtml(sortedFarmers, summary);
-    const w = window.open("", "_blank", "width=800,height=600");
-    if (w) {
-      w.document.write(html);
-      w.document.close();
-    }
+    printReceipt(html);
   };
 
   return (
