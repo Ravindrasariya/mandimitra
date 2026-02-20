@@ -331,22 +331,24 @@ export default function StockRegisterPage() {
         {t("stockRegister.title")}
       </h1>
 
-      {/* Row 1: Crop toggles left, Year + Month right */}
+      {/* Row 1: Crop dropdown left, Year + Month right */}
       <div className="flex items-center gap-2 flex-wrap">
-        <div className="flex gap-1.5 flex-wrap">
-          {CROPS.map((crop) => (
-            <Button
-              key={crop}
-              variant={activeCrop === crop ? "default" : "secondary"}
-              size="sm"
-              data-testid={`toggle-crop-${crop.toLowerCase()}`}
-              className="mobile-touch-target whitespace-nowrap"
-              onClick={() => setActiveCrop(crop)}
-            >
-              {crop}
-            </Button>
-          ))}
-        </div>
+        <Select value={activeCrop} onValueChange={setActiveCrop}>
+          <SelectTrigger
+            data-testid="select-crop-filter"
+            className="w-[120px] font-medium border-primary/50 bg-primary/10 text-primary"
+          >
+            <Wheat className="w-3.5 h-3.5 mr-1 flex-shrink-0" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {CROPS.map((crop) => (
+              <SelectItem key={crop} value={crop} data-testid={`toggle-crop-${crop.toLowerCase()}`}>
+                {crop}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <div className="flex gap-1.5 ml-auto">
           <Select value={yearFilter} onValueChange={(v) => { setYearFilter(v); setSelectedDays([]); }}>
             <SelectTrigger className="w-[75px] h-8 text-xs" data-testid="select-year-filter">

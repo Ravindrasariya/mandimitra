@@ -154,23 +154,27 @@ export default function BiddingPage() {
         {t("bidding.title")}
       </h1>
 
-      <div className="flex items-center justify-between gap-3">
-        <div className="flex gap-2 flex-wrap">
-          {SIZES.map((size) => (
-            <Button
-              key={size}
-              variant={activeGrade === size ? "default" : "secondary"}
-              size="sm"
-              data-testid={`toggle-size-${size.toLowerCase()}`}
-              className="mobile-touch-target whitespace-nowrap"
-              onClick={() => setActiveGrade(size)}
-            >
-              {size}
-            </Button>
-          ))}
-        </div>
+      <div className="flex items-center gap-2 flex-wrap">
+        <Select value={activeGrade} onValueChange={setActiveGrade}>
+          <SelectTrigger
+            data-testid="select-size-filter"
+            className="w-[120px] font-medium border-primary/50 bg-primary/10 text-primary"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {SIZES.map((size) => (
+              <SelectItem key={size} value={size} data-testid={`toggle-size-${size.toLowerCase()}`}>
+                {size}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         <Select value={activeCrop} onValueChange={setActiveCrop}>
-          <SelectTrigger data-testid="select-bid-crop" className="w-[130px] mobile-touch-target flex-shrink-0">
+          <SelectTrigger
+            data-testid="select-bid-crop"
+            className="w-[120px] font-medium border-primary/50 bg-primary/10 text-primary"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
