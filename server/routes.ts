@@ -280,6 +280,16 @@ export async function registerRoutes(
     res.status(201).json(created);
   });
 
+  app.get("/api/lot-edit-history/:lotId", requireAuth, async (req, res) => {
+    const history = await storage.getLotEditHistory(paramId(req.params.lotId), req.user!.businessId);
+    res.json(history);
+  });
+
+  app.get("/api/transaction-edit-history/:transactionId", requireAuth, async (req, res) => {
+    const history = await storage.getTransactionEditHistory(paramId(req.params.transactionId), req.user!.businessId);
+    res.json(history);
+  });
+
   app.post("/api/farmers/check-duplicate", requireAuth, async (req, res) => {
     const { name, phone, village, excludeId } = req.body;
     const allFarmers = await storage.getFarmers(req.user!.businessId);
@@ -470,6 +480,25 @@ export async function registerRoutes(
       data.remainingBags = data.actualNumberOfBags - soldBags;
     }
 
+    const trackFields = ["numberOfBags", "actualNumberOfBags", "crop", "variety", "size", "bagMarka", "vehicleNumber", "vehicleBhadaRate", "initialTotalWeight"];
+    const changedBy = req.user!.username;
+    for (const field of trackFields) {
+      if (data[field] !== undefined) {
+        const oldVal = String(lot[field as keyof typeof lot] ?? "");
+        const newVal = String(data[field] ?? "");
+        if (oldVal !== newVal) {
+          await storage.createLotEditHistory({
+            lotId: lot.id,
+            businessId,
+            fieldChanged: field,
+            oldValue: oldVal,
+            newValue: newVal,
+            changedBy,
+          });
+        }
+      }
+    }
+
     const updated = await storage.updateLot(lotId, businessId, data);
     if (!updated) return res.status(404).json({ message: "Lot not found" });
     res.json(updated);
@@ -554,6 +583,14 @@ export async function registerRoutes(
       const tx = await storage.createTransaction(data);
       await storage.recalculateBuyerPaymentStatus(req.user!.businessId, tx.buyerId);
       await storage.recalculateFarmerPaymentStatus(req.user!.businessId, tx.farmerId);
+      await storage.createTransactionEditHistory({
+        transactionId: tx.id,
+        businessId: req.user!.businessId,
+        fieldChanged: "created",
+        oldValue: null,
+        newValue: `Transaction ${tx.transactionId} created`,
+        changedBy: req.user!.username,
+      });
       res.status(201).json(tx);
     } catch (e: any) {
       res.status(400).json({ message: e.message });
@@ -561,8 +598,31 @@ export async function registerRoutes(
   });
 
   app.patch("/api/transactions/:id", requireAuth, async (req, res) => {
-    const updated = await storage.updateTransaction(paramId(req.params.id), req.user!.businessId, req.body);
+    const txId = paramId(req.params.id);
+    const businessId = req.user!.businessId;
+    const oldTx = await storage.getTransaction(txId, businessId);
+    if (!oldTx) return res.status(404).json({ message: "Transaction not found" });
+
+    const txTrackFields = ["totalWeight", "numberOfBags", "extraChargesFarmer", "extraChargesBuyer", "netWeight", "pricePerKg", "totalPayableToFarmer", "totalReceivableFromBuyer", "hammaliCharges", "freightCharges", "aadhatCharges", "mandiCharges"];
+    const changedBy = req.user!.username;
+    const updated = await storage.updateTransaction(txId, businessId, req.body);
     if (!updated) return res.status(404).json({ message: "Transaction not found" });
+
+    for (const field of txTrackFields) {
+      const oldVal = String((oldTx as any)[field] ?? "");
+      const newVal = String((updated as any)[field] ?? "");
+      if (oldVal !== newVal) {
+        await storage.createTransactionEditHistory({
+          transactionId: txId,
+          businessId,
+          fieldChanged: field,
+          oldValue: oldVal,
+          newValue: newVal,
+          changedBy,
+        });
+      }
+    }
+
     res.json(updated);
   });
 
@@ -580,6 +640,14 @@ export async function registerRoutes(
       if (!lot) return res.status(404).json({ message: "Lot not found" });
 
       await storage.updateTransaction(txId, businessId, { isReversed: true } as any);
+      await storage.createTransactionEditHistory({
+        transactionId: txId,
+        businessId,
+        fieldChanged: "reversed",
+        oldValue: "false",
+        newValue: "true",
+        changedBy: req.user!.username,
+      });
       await storage.recalculateBuyerPaymentStatus(businessId, tx.buyerId);
       await storage.recalculateFarmerPaymentStatus(businessId, tx.farmerId);
 

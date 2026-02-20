@@ -5,6 +5,8 @@ import {
   type FarmerEditHistory, type InsertFarmerEditHistory,
   type Buyer, type InsertBuyer,
   type BuyerEditHistory, type InsertBuyerEditHistory,
+  type LotEditHistory, type InsertLotEditHistory,
+  type TransactionEditHistory, type InsertTransactionEditHistory,
   type Lot, type InsertLot,
   type Bid, type InsertBid,
   type Transaction, type InsertTransaction,
@@ -12,7 +14,7 @@ import {
   type CashSettings, type InsertCashSettings,
   type CashEntry, type InsertCashEntry,
   type BusinessChargeSettings, type InsertBusinessChargeSettings,
-  users, businesses, farmers, farmerEditHistory, buyers, buyerEditHistory, lots, bids, transactions, bankAccounts, cashSettings, cashEntries, businessChargeSettings,
+  users, businesses, farmers, farmerEditHistory, buyers, buyerEditHistory, lotEditHistory, transactionEditHistory, lots, bids, transactions, bankAccounts, cashSettings, cashEntries, businessChargeSettings,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, ilike, or, sql, desc, asc, gte, lte, ne, isNotNull } from "drizzle-orm";
@@ -53,6 +55,11 @@ export interface IStorage {
   getBuyerEditHistory(buyerId: number, businessId: number): Promise<BuyerEditHistory[]>;
   createBuyerEditHistory(entry: InsertBuyerEditHistory): Promise<BuyerEditHistory>;
   getBuyersWithDues(businessId: number, search?: string): Promise<(Buyer & { receivableDue: string; overallDue: string; bidDates: string[] })[]>;
+
+  getLotEditHistory(lotId: number, businessId: number): Promise<LotEditHistory[]>;
+  createLotEditHistory(entry: InsertLotEditHistory): Promise<LotEditHistory>;
+  getTransactionEditHistory(transactionId: number, businessId: number): Promise<TransactionEditHistory[]>;
+  createTransactionEditHistory(entry: InsertTransactionEditHistory): Promise<TransactionEditHistory>;
 
   getLots(businessId: number, filters?: { crop?: string; date?: string; search?: string }): Promise<(Lot & { farmer: Farmer })[]>;
   getLot(id: number, businessId: number): Promise<(Lot & { farmer: Farmer }) | undefined>;
@@ -388,6 +395,28 @@ export class DatabaseStorage implements IStorage {
 
   async createBuyerEditHistory(entry: InsertBuyerEditHistory): Promise<BuyerEditHistory> {
     const [created] = await db.insert(buyerEditHistory).values(entry).returning();
+    return created;
+  }
+
+  async getLotEditHistory(lotId: number, businessId: number): Promise<LotEditHistory[]> {
+    return db.select().from(lotEditHistory)
+      .where(and(eq(lotEditHistory.lotId, lotId), eq(lotEditHistory.businessId, businessId)))
+      .orderBy(desc(lotEditHistory.createdAt));
+  }
+
+  async createLotEditHistory(entry: InsertLotEditHistory): Promise<LotEditHistory> {
+    const [created] = await db.insert(lotEditHistory).values(entry).returning();
+    return created;
+  }
+
+  async getTransactionEditHistory(transactionId: number, businessId: number): Promise<TransactionEditHistory[]> {
+    return db.select().from(transactionEditHistory)
+      .where(and(eq(transactionEditHistory.transactionId, transactionId), eq(transactionEditHistory.businessId, businessId)))
+      .orderBy(desc(transactionEditHistory.createdAt));
+  }
+
+  async createTransactionEditHistory(entry: InsertTransactionEditHistory): Promise<TransactionEditHistory> {
+    const [created] = await db.insert(transactionEditHistory).values(entry).returning();
     return created;
   }
 

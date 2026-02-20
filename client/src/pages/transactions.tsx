@@ -12,11 +12,12 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import type { Bid, Buyer, Lot, Farmer, Transaction, BusinessChargeSettings } from "@shared/schema";
+import type { Bid, Buyer, Lot, Farmer, Transaction, BusinessChargeSettings, TransactionEditHistory } from "@shared/schema";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Receipt, Pencil, Printer, ChevronDown, Calendar, Package, Users, Landmark, HandCoins, Download } from "lucide-react";
+import { Receipt, Pencil, Printer, ChevronDown, ChevronRight, Calendar, Package, Users, Landmark, HandCoins, Download, History } from "lucide-react";
 import { format } from "date-fns";
 import { useAuth } from "@/lib/auth";
 
@@ -257,6 +258,7 @@ export default function TransactionsPage() {
   const [reversingTxn, setReversingTxn] = useState<TransactionWithDetails | null>(null);
   const [deleteBidConfirmOpen, setDeleteBidConfirmOpen] = useState(false);
   const [deletingBid, setDeletingBid] = useState<any>(null);
+  const [txHistoryOpen, setTxHistoryOpen] = useState(false);
   const now = new Date();
   const currentYear = String(now.getFullYear());
   const currentMonth = String(now.getMonth() + 1);
@@ -310,6 +312,12 @@ export default function TransactionsPage() {
     queryKey: ["/api/transaction-aggregates"],
   });
 
+  const editingTxnId = dialogItems[selectedIdx]?.txn?.id;
+  const { data: txEditHistory = [] } = useQuery<TransactionEditHistory[]>({
+    queryKey: ["/api/transaction-edit-history", editingTxnId],
+    enabled: !!editingTxnId && dialogOpen,
+  });
+
   const createTxMutation = useMutation({
     mutationFn: async (data: any) => {
       const res = await apiRequest("POST", "/api/transactions", data);
@@ -327,6 +335,7 @@ export default function TransactionsPage() {
       }});
       queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transaction-edit-history"] });
       setDialogOpen(false);
       setDialogItems([]);
       toast({ title: "Transaction Created", variant: "success" });
@@ -353,6 +362,7 @@ export default function TransactionsPage() {
       }});
       queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transaction-edit-history"] });
       setDialogOpen(false);
       setDialogItems([]);
       toast({ title: "Transaction Updated", variant: "success" });
@@ -1255,6 +1265,70 @@ export default function TransactionsPage() {
               >
                 {isSaving ? t("common.saving") : isEditing ? t("transactions.updateTransaction") : t("transactions.createTransaction")}
               </Button>
+
+              {txEditHistory.length > 0 && (
+                <Collapsible open={txHistoryOpen} onOpenChange={setTxHistoryOpen}>
+                  <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground w-full py-1" data-testid="toggle-tx-history">
+                    {txHistoryOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                    <History className="h-3 w-3" />
+                    <span>Edit History ({txEditHistory.length})</span>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent>
+                    <div className="space-y-2 mt-1 max-h-40 overflow-y-auto">
+                      {(() => {
+                        const fieldLabels: Record<string, string> = {
+                          created: "Created",
+                          reversed: "Reversed",
+                          totalWeight: "Total Weight",
+                          numberOfBags: "Bags",
+                          extraChargesFarmer: "Extra (Farmer)",
+                          extraChargesBuyer: "Extra (Buyer)",
+                          netWeight: "Net Weight",
+                          pricePerKg: "Price/Kg",
+                          totalPayableToFarmer: "Farmer Payable",
+                          totalReceivableFromBuyer: "Buyer Receivable",
+                          hammaliCharges: "Hammali",
+                          freightCharges: "Freight",
+                          aadhatCharges: "Aadhat",
+                          mandiCharges: "Mandi",
+                        };
+                        const grouped = txEditHistory.reduce((acc, h) => {
+                          const key = new Date(h.createdAt).toISOString();
+                          if (!acc[key]) acc[key] = { changedBy: h.changedBy, createdAt: h.createdAt, fields: [] };
+                          acc[key].fields.push(h);
+                          return acc;
+                        }, {} as Record<string, { changedBy: string | null; createdAt: Date; fields: TransactionEditHistory[] }>);
+                        const sortedGroups = Object.values(grouped).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                        return sortedGroups.map((group, i) => (
+                          <div key={i} className="bg-muted/50 rounded p-2 text-xs space-y-0.5">
+                            <div className="flex justify-between text-muted-foreground">
+                              <span className="font-medium">{group.changedBy}</span>
+                              <span>{format(new Date(group.createdAt), "dd MMM yyyy, hh:mm a")}</span>
+                            </div>
+                            {group.fields.map((h, j) => (
+                              <div key={j} className="flex gap-1 flex-wrap">
+                                {h.fieldChanged === "created" ? (
+                                  <span className="text-green-600 font-medium">{h.newValue}</span>
+                                ) : h.fieldChanged === "reversed" ? (
+                                  <span className="text-red-500 font-medium">Transaction Reversed</span>
+                                ) : (
+                                  <>
+                                    <span className="text-muted-foreground">{fieldLabels[h.fieldChanged] || h.fieldChanged}:</span>
+                                    <span className="line-through text-red-500">{h.oldValue || "—"}</span>
+                                    <span>→</span>
+                                    <span className="text-green-600 font-medium">{h.newValue || "—"}</span>
+                                  </>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
+              )}
+
               {isEditing && currentItem?.txn && !currentItem.txn.isReversed && (
                 <Button
                   variant="destructive"

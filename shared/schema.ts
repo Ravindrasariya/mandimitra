@@ -89,6 +89,28 @@ export const buyerEditHistory = pgTable("buyer_edit_history", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const lotEditHistory = pgTable("lot_edit_history", {
+  id: serial("id").primaryKey(),
+  lotId: integer("lot_id").notNull().references(() => lots.id),
+  businessId: integer("business_id").notNull().references(() => businesses.id),
+  fieldChanged: text("field_changed").notNull(),
+  oldValue: text("old_value"),
+  newValue: text("new_value"),
+  changedBy: text("changed_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const transactionEditHistory = pgTable("transaction_edit_history", {
+  id: serial("id").primaryKey(),
+  transactionId: integer("transaction_id").notNull().references(() => transactions.id),
+  businessId: integer("business_id").notNull().references(() => businesses.id),
+  fieldChanged: text("field_changed").notNull(),
+  oldValue: text("old_value"),
+  newValue: text("new_value"),
+  changedBy: text("changed_by"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 export const lots = pgTable("lots", {
   id: serial("id").primaryKey(),
   businessId: integer("business_id").notNull().references(() => businesses.id),
@@ -220,6 +242,8 @@ export const insertFarmerSchema = createInsertSchema(farmers).omit({ id: true, c
 export const insertFarmerEditHistorySchema = createInsertSchema(farmerEditHistory).omit({ id: true, createdAt: true });
 export const insertBuyerSchema = createInsertSchema(buyers).omit({ id: true, createdAt: true });
 export const insertBuyerEditHistorySchema = createInsertSchema(buyerEditHistory).omit({ id: true, createdAt: true });
+export const insertLotEditHistorySchema = createInsertSchema(lotEditHistory).omit({ id: true, createdAt: true });
+export const insertTransactionEditHistorySchema = createInsertSchema(transactionEditHistory).omit({ id: true, createdAt: true });
 export const insertLotSchema = createInsertSchema(lots).omit({ id: true, createdAt: true });
 export const insertBidSchema = createInsertSchema(bids).omit({ id: true, createdAt: true });
 export const insertTransactionSchema = createInsertSchema(transactions).omit({ id: true, transactionId: true, createdAt: true });
@@ -240,6 +264,10 @@ export type Buyer = typeof buyers.$inferSelect;
 export type InsertBuyer = z.infer<typeof insertBuyerSchema>;
 export type BuyerEditHistory = typeof buyerEditHistory.$inferSelect;
 export type InsertBuyerEditHistory = z.infer<typeof insertBuyerEditHistorySchema>;
+export type LotEditHistory = typeof lotEditHistory.$inferSelect;
+export type InsertLotEditHistory = z.infer<typeof insertLotEditHistorySchema>;
+export type TransactionEditHistory = typeof transactionEditHistory.$inferSelect;
+export type InsertTransactionEditHistory = z.infer<typeof insertTransactionEditHistorySchema>;
 export type Lot = typeof lots.$inferSelect;
 export type InsertLot = z.infer<typeof insertLotSchema>;
 export type Bid = typeof bids.$inferSelect;

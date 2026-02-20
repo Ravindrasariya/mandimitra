@@ -15,8 +15,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CROPS, SIZES } from "@shared/schema";
-import type { Lot, Farmer } from "@shared/schema";
-import { Search, Edit, Package, Wheat, X, ChevronDown, Calendar, Download } from "lucide-react";
+import type { Lot, Farmer, LotEditHistory } from "@shared/schema";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Search, Edit, Package, Wheat, X, ChevronDown, ChevronRight, Calendar, Download, History } from "lucide-react";
 import { format } from "date-fns";
 
 type LotWithFarmer = Lot & { farmer: Farmer };
@@ -56,6 +57,12 @@ export default function StockRegisterPage() {
   const [editActualNumberOfBags, setEditActualNumberOfBags] = useState("");
   const [editNumberOfBags, setEditNumberOfBags] = useState("");
   const [returnConfirmOpen, setReturnConfirmOpen] = useState(false);
+  const [lotHistoryOpen, setLotHistoryOpen] = useState(false);
+
+  const { data: lotEditHistory = [] } = useQuery<LotEditHistory[]>({
+    queryKey: ["/api/lot-edit-history", editingLot?.id],
+    enabled: !!editingLot,
+  });
 
   const { data: allLots = [], isLoading } = useQuery<LotWithFarmer[]>({
     queryKey: ["/api/lots", `?crop=${activeCrop}`],
@@ -196,6 +203,7 @@ export default function StockRegisterPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/bids"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/lot-edit-history"] });
       setEditingLot(null);
       toast({ title: "Lot Updated", variant: "success" });
     },
@@ -584,7 +592,7 @@ export default function StockRegisterPage() {
       )}
 
       <Dialog open={!!editingLot} onOpenChange={(open) => !open && setEditingLot(null)}>
-        <DialogContent className="max-w-sm">
+        <DialogContent className="max-w-sm max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{t("stockRegister.editLot")} - {editingLot?.lotId}</DialogTitle>
           </DialogHeader>
@@ -724,6 +732,57 @@ export default function StockRegisterPage() {
             >
               {updateLotMutation.isPending ? t("common.saving") : t("common.saveChanges")}
             </Button>
+
+            {lotEditHistory.length > 0 && (
+              <Collapsible open={lotHistoryOpen} onOpenChange={setLotHistoryOpen}>
+                <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground w-full py-1" data-testid="toggle-lot-history">
+                  {lotHistoryOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+                  <History className="h-3 w-3" />
+                  <span>Edit History ({lotEditHistory.length})</span>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="space-y-2 mt-1 max-h-40 overflow-y-auto">
+                    {(() => {
+                      const fieldLabels: Record<string, string> = {
+                        numberOfBags: "Original Bags",
+                        actualNumberOfBags: "Actual Bags",
+                        crop: "Crop",
+                        variety: "Variety",
+                        size: "Size",
+                        bagMarka: "Bag Marka",
+                        vehicleNumber: "Vehicle Number",
+                        vehicleBhadaRate: "Bhada Rate",
+                        initialTotalWeight: "Initial Weight",
+                      };
+                      const grouped = lotEditHistory.reduce((acc, h) => {
+                        const key = new Date(h.createdAt).toISOString();
+                        if (!acc[key]) acc[key] = { changedBy: h.changedBy, createdAt: h.createdAt, fields: [] };
+                        acc[key].fields.push(h);
+                        return acc;
+                      }, {} as Record<string, { changedBy: string | null; createdAt: Date; fields: LotEditHistory[] }>);
+                      const sortedGroups = Object.values(grouped).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+                      return sortedGroups.map((group, i) => (
+                        <div key={i} className="bg-muted/50 rounded p-2 text-xs space-y-0.5">
+                          <div className="flex justify-between text-muted-foreground">
+                            <span className="font-medium">{group.changedBy}</span>
+                            <span>{format(new Date(group.createdAt), "dd MMM yyyy, hh:mm a")}</span>
+                          </div>
+                          {group.fields.map((h, j) => (
+                            <div key={j} className="flex gap-1">
+                              <span className="text-muted-foreground">{fieldLabels[h.fieldChanged] || h.fieldChanged}:</span>
+                              <span className="line-through text-red-500">{h.oldValue || "—"}</span>
+                              <span>→</span>
+                              <span className="text-green-600 font-medium">{h.newValue || "—"}</span>
+                            </div>
+                          ))}
+                        </div>
+                      ));
+                    })()}
+                  </div>
+                </CollapsibleContent>
+              </Collapsible>
+            )}
+
             <Button
               variant="destructive"
               data-testid="button-return-lot"

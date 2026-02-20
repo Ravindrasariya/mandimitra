@@ -77,7 +77,9 @@ client/src/
 ## Database
 - PostgreSQL with Drizzle ORM
 - Schema push: `npm run db:push`
-- Tables: businesses, users, farmers, farmer_edit_history, buyers, buyer_edit_history, lots, bids, transactions, bank_accounts, cash_settings, cash_entries, business_charge_settings
+- Tables: businesses, users, farmers, farmer_edit_history, buyers, buyer_edit_history, lot_edit_history, transaction_edit_history, lots, bids, transactions, bank_accounts, cash_settings, cash_entries, business_charge_settings
+- LotEditHistory: tracks lot field changes (numberOfBags, actualNumberOfBags, crop, variety, size, bagMarka, vehicleNumber, vehicleBhadaRate, initialTotalWeight) with old/new values, changedBy, timestamp
+- TransactionEditHistory: tracks transaction lifecycle (created, reversed) and field changes (totalWeight, extraCharges, etc.) with old/new values, changedBy username, timestamp
 - Farmer fields: farmerId (auto-generated FM+YYYYMMDD+seq, unique per business), name, phone, village, tehsil, district, state, openingBalance, negativeFlag, isArchived
 - Business fields: merchantId (unique), name, phone, address, status (active/inactive/archived)
 - User fields: username, name, phone, password, businessId, role (system_admin/user), mustChangePassword
