@@ -333,7 +333,7 @@ export default function StockRegisterPage() {
 
       {/* Row 1: Crop toggles left, Year + Month right */}
       <div className="flex items-center gap-2 flex-wrap">
-        <div className="flex gap-1.5 overflow-x-auto">
+        <div className="flex gap-1.5 flex-wrap">
           {CROPS.map((crop) => (
             <Button
               key={crop}

@@ -34,7 +34,7 @@ export default function BiddingPage() {
     queryKey: ["/api/lots", `?crop=${activeCrop}`],
   });
 
-  const availableLots = lots.filter(l => l.remainingBags > 0 && !l.isReturned);
+  const availableLots = lots.filter(l => l.remainingBags > 0 && !l.isReturned && l.size === activeGrade);
 
   const { data: buyers = [] } = useQuery<Buyer[]>({
     queryKey: ["/api/buyers", buyerSearch ? `?search=${buyerSearch}` : ""],
@@ -155,7 +155,7 @@ export default function BiddingPage() {
       </h1>
 
       <div className="flex items-center justify-between gap-3">
-        <div className="flex gap-2 overflow-x-auto pb-1">
+        <div className="flex gap-2 flex-wrap">
           {SIZES.map((size) => (
             <Button
               key={size}
