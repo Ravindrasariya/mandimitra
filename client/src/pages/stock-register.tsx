@@ -54,6 +54,7 @@ export default function StockRegisterPage() {
   const [editVehicleBhadaRate, setEditVehicleBhadaRate] = useState("");
   const [editInitialTotalWeight, setEditInitialTotalWeight] = useState("");
   const [editActualNumberOfBags, setEditActualNumberOfBags] = useState("");
+  const [editNumberOfBags, setEditNumberOfBags] = useState("");
   const [returnConfirmOpen, setReturnConfirmOpen] = useState(false);
 
   const { data: allLots = [], isLoading } = useQuery<LotWithFarmer[]>({
@@ -238,10 +239,13 @@ export default function StockRegisterPage() {
     setEditVehicleBhadaRate(lot.vehicleBhadaRate || "");
     setEditInitialTotalWeight(lot.initialTotalWeight || "");
     setEditActualNumberOfBags(String(lot.actualNumberOfBags ?? lot.numberOfBags));
+    setEditNumberOfBags(String(lot.numberOfBags));
   };
 
   const saveEdit = () => {
     if (!editingLot) return;
+    const origBags = editNumberOfBags ? parseInt(editNumberOfBags) : editingLot.numberOfBags;
+    const actualBags = editActualNumberOfBags ? parseInt(editActualNumberOfBags) : origBags;
     updateLotMutation.mutate({
       id: editingLot.id,
       data: {
@@ -251,7 +255,8 @@ export default function StockRegisterPage() {
         vehicleNumber: editVehicleNumber ? editVehicleNumber.toUpperCase() : null,
         vehicleBhadaRate: editVehicleBhadaRate || null,
         initialTotalWeight: editInitialTotalWeight || null,
-        actualNumberOfBags: editActualNumberOfBags ? parseInt(editActualNumberOfBags) : (editingLot?.numberOfBags ?? null),
+        numberOfBags: origBags,
+        actualNumberOfBags: Math.min(actualBags, origBags),
       },
     });
   };
@@ -589,9 +594,18 @@ export default function StockRegisterPage() {
                 <Label>Original # of Bags</Label>
                 <Input
                   data-testid="input-original-bags"
-                  value={editingLot?.numberOfBags ?? ""}
-                  disabled
-                  className="mobile-touch-target bg-muted"
+                  type="text"
+                  inputMode="numeric"
+                  value={editNumberOfBags}
+                  onChange={(e) => {
+                    const val = e.target.value.replace(/\D/g, '');
+                    setEditNumberOfBags(val);
+                    if (val && editActualNumberOfBags && parseInt(editActualNumberOfBags) > parseInt(val)) {
+                      setEditActualNumberOfBags(val);
+                    }
+                  }}
+                  onFocus={(e) => e.target.select()}
+                  className="mobile-touch-target"
                 />
               </div>
               <div className="space-y-1">
@@ -603,7 +617,8 @@ export default function StockRegisterPage() {
                   value={editActualNumberOfBags}
                   onChange={(e) => {
                     const val = e.target.value.replace(/\D/g, '');
-                    if (val === '' || parseInt(val) <= (editingLot?.numberOfBags ?? 0)) {
+                    const maxBags = editNumberOfBags ? parseInt(editNumberOfBags) : (editingLot?.numberOfBags ?? 0);
+                    if (val === '' || parseInt(val) <= maxBags) {
                       setEditActualNumberOfBags(val);
                     }
                   }}
@@ -611,12 +626,14 @@ export default function StockRegisterPage() {
                   className="mobile-touch-target"
                 />
                 {editingLot && (() => {
+                  const origBags = editNumberOfBags ? parseInt(editNumberOfBags) : editingLot.numberOfBags;
                   const actual = editingLot.actualNumberOfBags ?? editingLot.numberOfBags;
                   const soldBags = actual - editingLot.remainingBags;
+                  const currentActual = editActualNumberOfBags ? parseInt(editActualNumberOfBags) : origBags;
                   return (
                     <>
-                      {editActualNumberOfBags && parseInt(editActualNumberOfBags) < editingLot.numberOfBags && (
-                        <p className="text-xs text-orange-600">Reduced from {editingLot.numberOfBags} due to damaged/graded harvest</p>
+                      {currentActual < origBags && (
+                        <p className="text-xs text-orange-600">Reduced from {origBags} due to damaged/grading/partial returned harvest</p>
                       )}
                       {soldBags > 0 && (
                         <p className="text-xs text-muted-foreground">Min: {soldBags} (already sold)</p>

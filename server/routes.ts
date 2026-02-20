@@ -441,19 +441,33 @@ export async function registerRoutes(
     const businessId = req.user!.businessId;
     const data = { ...req.body };
 
+    const lot = await storage.getLot(lotId, businessId);
+    if (!lot) return res.status(404).json({ message: "Lot not found" });
+
+    const oldActual = lot.actualNumberOfBags ?? lot.numberOfBags;
+    const soldBags = oldActual - lot.remainingBags;
+
+    const newOriginal = data.numberOfBags ?? lot.numberOfBags;
+
+    if (data.numberOfBags != null) {
+      if (data.numberOfBags < soldBags) {
+        return res.status(400).json({ message: `Cannot reduce original bags below already sold bags (${soldBags})` });
+      }
+      if (data.actualNumberOfBags == null) {
+        const effectiveActual = Math.min(oldActual, data.numberOfBags);
+        data.actualNumberOfBags = effectiveActual;
+        data.remainingBags = effectiveActual - soldBags;
+      }
+    }
+
     if (data.actualNumberOfBags != null) {
-      const lot = await storage.getLot(lotId, businessId);
-      if (!lot) return res.status(404).json({ message: "Lot not found" });
-
-      const oldActual = lot.actualNumberOfBags ?? lot.numberOfBags;
-      const newActual = data.actualNumberOfBags;
-      const soldBags = oldActual - lot.remainingBags;
-
-      if (newActual < soldBags) {
+      if (data.actualNumberOfBags > newOriginal) {
+        data.actualNumberOfBags = newOriginal;
+      }
+      if (data.actualNumberOfBags < soldBags) {
         return res.status(400).json({ message: `Cannot reduce below already sold bags (${soldBags})` });
       }
-
-      data.remainingBags = newActual - soldBags;
+      data.remainingBags = data.actualNumberOfBags - soldBags;
     }
 
     const updated = await storage.updateLot(lotId, businessId, data);
