@@ -43,6 +43,8 @@ export default function StockEntryPage() {
   const [selectedFarmer, setSelectedFarmer, clearSelectedFarmer] = usePersistedState<Farmer | null>("se-selectedFarmer", null);
   const [showFarmerForm, setShowFarmerForm, clearShowFarmerForm] = usePersistedState("se-showFarmerForm", false);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [showVillageSuggestions, setShowVillageSuggestions] = useState(false);
+  const [showTehsilSuggestions, setShowTehsilSuggestions] = useState(false);
 
   const [farmerName, setFarmerName, clearFarmerName] = usePersistedState("se-farmerName", "");
   const [farmerPhone, setFarmerPhone, clearFarmerPhone] = usePersistedState("se-farmerPhone", "");
@@ -56,8 +58,19 @@ export default function StockEntryPage() {
 
   const { data: farmerSuggestions = [] } = useQuery<Farmer[]>({
     queryKey: ["/api/farmers", `?search=${farmerSearch}`],
-    enabled: farmerSearch.length >= 2 && !selectedFarmer,
+    enabled: farmerSearch.length >= 1 && !selectedFarmer,
   });
+
+  const { data: locationData } = useQuery<{ villages: string[]; tehsils: string[] }>({
+    queryKey: ["/api/farmers/locations"],
+  });
+
+  const filteredVillages = (locationData?.villages || []).filter(
+    (v) => village.length >= 1 && v.toLowerCase().includes(village.toLowerCase()) && v.toLowerCase() !== village.toLowerCase()
+  );
+  const filteredTehsils = (locationData?.tehsils || []).filter(
+    (t) => tehsil.length >= 1 && t.toLowerCase().includes(tehsil.toLowerCase()) && t.toLowerCase() !== tehsil.toLowerCase()
+  );
 
   const createFarmerMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -66,6 +79,7 @@ export default function StockEntryPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/farmers/locations"] });
     },
   });
 
@@ -292,25 +306,61 @@ export default function StockEntryPage() {
                 </div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="space-y-1">
+                <div className="space-y-1 relative">
                   <Label>{t("common.village")}</Label>
                   <Input
                     data-testid="input-village"
                     value={village}
-                    onChange={(e) => setVillage(e.target.value)}
+                    onChange={(e) => { setVillage(e.target.value); setShowVillageSuggestions(true); }}
+                    onFocus={() => setShowVillageSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowVillageSuggestions(false), 150)}
                     placeholder={t("common.village")}
                     className="mobile-touch-target text-sm capitalize"
+                    autoComplete="off"
                   />
+                  {showVillageSuggestions && filteredVillages.length > 0 && (
+                    <div className="absolute z-50 w-full bg-popover border rounded-md shadow-lg mt-1 max-h-40 overflow-y-auto">
+                      {filteredVillages.map((v) => (
+                        <button
+                          key={v}
+                          type="button"
+                          data-testid={`suggestion-village-${v}`}
+                          className="w-full text-left px-3 py-2 text-sm hover-elevate border-b last:border-b-0"
+                          onMouseDown={() => { setVillage(v); setShowVillageSuggestions(false); }}
+                        >
+                          {v}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div className="space-y-1">
+                <div className="space-y-1 relative">
                   <Label>{t("common.tehsil")}</Label>
                   <Input
                     data-testid="input-tehsil"
                     value={tehsil}
-                    onChange={(e) => setTehsil(e.target.value)}
+                    onChange={(e) => { setTehsil(e.target.value); setShowTehsilSuggestions(true); }}
+                    onFocus={() => setShowTehsilSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowTehsilSuggestions(false), 150)}
                     placeholder={t("common.tehsil")}
                     className="mobile-touch-target text-sm capitalize"
+                    autoComplete="off"
                   />
+                  {showTehsilSuggestions && filteredTehsils.length > 0 && (
+                    <div className="absolute z-50 w-full bg-popover border rounded-md shadow-lg mt-1 max-h-40 overflow-y-auto">
+                      {filteredTehsils.map((th) => (
+                        <button
+                          key={th}
+                          type="button"
+                          data-testid={`suggestion-tehsil-${th}`}
+                          className="w-full text-left px-3 py-2 text-sm hover-elevate border-b last:border-b-0"
+                          onMouseDown={() => { setTehsil(th); setShowTehsilSuggestions(false); }}
+                        >
+                          {th}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-1">
                   <Label>{t("common.district")}</Label>

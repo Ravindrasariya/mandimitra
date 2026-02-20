@@ -15,7 +15,7 @@ import {
   users, businesses, farmers, farmerEditHistory, buyers, buyerEditHistory, lots, bids, transactions, bankAccounts, cashSettings, cashEntries, businessChargeSettings,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, ilike, or, sql, desc, asc, gte, lte, ne } from "drizzle-orm";
+import { eq, and, ilike, or, sql, desc, asc, gte, lte, ne, isNotNull } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -43,6 +43,7 @@ export interface IStorage {
   mergeFarmers(businessId: number, keepId: number, mergeId: number, changedBy: string): Promise<Farmer>;
 
   getNextFarmerId(businessId: number): Promise<string>;
+  getFarmerLocations(businessId: number): Promise<{ villages: string[]; tehsils: string[] }>;
 
   getBuyers(businessId: number, search?: string): Promise<Buyer[]>;
   getBuyer(id: number, businessId: number): Promise<Buyer | undefined>;
@@ -205,6 +206,21 @@ export class DatabaseStorage implements IStorage {
       .where(and(eq(farmers.businessId, businessId), ilike(farmers.farmerId, `${prefix}%`)));
     const seq = parseInt(result?.count || "0", 10) + 1;
     return `${prefix}${seq}`;
+  }
+
+  async getFarmerLocations(businessId: number): Promise<{ villages: string[]; tehsils: string[] }> {
+    const villageRows = await db.selectDistinct({ village: farmers.village })
+      .from(farmers)
+      .where(and(eq(farmers.businessId, businessId), isNotNull(farmers.village), sql`${farmers.village} != ''`))
+      .orderBy(asc(farmers.village));
+    const tehsilRows = await db.selectDistinct({ tehsil: farmers.tehsil })
+      .from(farmers)
+      .where(and(eq(farmers.businessId, businessId), isNotNull(farmers.tehsil), sql`${farmers.tehsil} != ''`))
+      .orderBy(asc(farmers.tehsil));
+    return {
+      villages: villageRows.map(r => r.village!),
+      tehsils: tehsilRows.map(r => r.tehsil!),
+    };
   }
 
   async createFarmer(farmer: InsertFarmer): Promise<Farmer> {

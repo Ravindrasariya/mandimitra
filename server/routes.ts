@@ -202,6 +202,11 @@ export async function registerRoutes(
     res.json(result);
   });
 
+  app.get("/api/farmers/locations", requireAuth, async (req, res) => {
+    const locations = await storage.getFarmerLocations(req.user!.businessId);
+    res.json(locations);
+  });
+
   app.get("/api/farmers/:id", requireAuth, async (req, res) => {
     const farmer = await storage.getFarmer(paramId(req.params.id), req.user!.businessId);
     if (!farmer) return res.status(404).json({ message: "Farmer not found" });
