@@ -107,7 +107,6 @@ export const lots = pgTable("lots", {
   vehicleBhadaRate: decimal("vehicle_bhada_rate", { precision: 10, scale: 2 }),
   initialTotalWeight: decimal("initial_total_weight", { precision: 12, scale: 2 }),
   isReturned: boolean("is_returned").default(false).notNull(),
-  returnedBags: integer("returned_bags").default(0).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   uniqueLotPerBusiness: uniqueIndex("lots_business_lot_id_unique").on(table.businessId, table.lotId),

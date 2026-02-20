@@ -471,25 +471,20 @@ export async function registerRoutes(
 
       const actual = lot.actualNumberOfBags ?? lot.numberOfBags;
       const soldBags = actual - lot.remainingBags;
-      const returnedBags = lot.remainingBags;
 
       if (soldBags > 0) {
         await storage.updateLot(lotId, businessId, {
           actualNumberOfBags: soldBags,
           remainingBags: 0,
-          returnedBags,
           isReturned: true,
         } as any);
       } else {
         await storage.updateLot(lotId, businessId, {
-          returnedBags: actual,
-          remainingBags: 0,
-          actualNumberOfBags: 0,
           isReturned: true,
         } as any);
       }
 
-      res.json({ message: "Lot returned successfully", soldBags, returnedBags });
+      res.json({ message: "Lot returned successfully", soldBags });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
@@ -595,9 +590,6 @@ export async function registerRoutes(
       const newRemaining = Math.max(0, newActual - activeBidBags);
 
       const updateData: any = { remainingBags: newRemaining, actualNumberOfBags: newActual };
-      if (lot.isReturned && lot.returnedBags > 0) {
-        updateData.returnedBags = Math.max(0, (lot.returnedBags || 0) - bagsToReturn);
-      }
       await storage.updateLot(lot.id, businessId, updateData);
 
       res.json({ message: "Transaction reversed successfully", bagsReturned: bagsToReturn });
