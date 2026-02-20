@@ -18,6 +18,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { Receipt, Pencil, Printer, ChevronDown, Calendar, Package, Users, Landmark, HandCoins, Download } from "lucide-react";
 import { format } from "date-fns";
+import { useAuth } from "@/lib/auth";
 
 type BidWithDetails = Bid & { buyer: Buyer; lot: Lot; farmer: Farmer };
 type TransactionWithDetails = Transaction & { farmer: Farmer; buyer: Buyer; lot: Lot; bid: Bid };
@@ -61,7 +62,7 @@ function buildUnifiedLotGroups(
   return Array.from(map.values());
 }
 
-function generateFarmerReceiptHtml(lot: Lot, farmer: Farmer, txns: TransactionWithDetails[], businessName?: string) {
+function generateFarmerReceiptHtml(lot: Lot, farmer: Farmer, txns: TransactionWithDetails[], businessName?: string, businessAddress?: string) {
   const dateStr = txns[0]?.date || format(new Date(), "yyyy-MM-dd");
   const originalBags = lot.numberOfBags;
   const cropLabel: Record<string, string> = { Potato: "आलू / Potato", Onion: "प्याज / Onion", Garlic: "लहसुन / Garlic" };
@@ -113,8 +114,9 @@ h2{text-align:center;margin-bottom:2px}
 @media print{body{margin:10mm}}
 </style></head><body>
 <div class="header">
-<h2>किसान रसीद / Farmer Receipt</h2>
-${businessName ? `<p style="font-size:0.9em;color:#666;margin:2px 0">${businessName}</p>` : ""}
+${businessName ? `<h2 style="margin-bottom:2px">${businessName}</h2>` : ""}
+${businessAddress ? `<p style="font-size:0.85em;color:#555;margin:2px 0">${businessAddress}</p>` : ""}
+<h3 style="margin:8px 0 2px 0;font-size:1.1em">किसान रसीद / Farmer Receipt</h3>
 </div>
 
 <table class="info-table">
@@ -164,7 +166,7 @@ ${totalDeduction > 0 ? `<div class="ded-row sub-total"><span>कुल कटौ
 </body></html>`;
 }
 
-function generateBuyerReceiptHtml(lot: Lot, farmer: Farmer, tx: TransactionWithDetails, businessName?: string) {
+function generateBuyerReceiptHtml(lot: Lot, farmer: Farmer, tx: TransactionWithDetails, businessName?: string, businessAddress?: string) {
   const grossAmount = parseFloat(tx.netWeight || "0") * parseFloat(tx.pricePerKg || "0");
   const dateStr = tx.date || format(new Date(), "yyyy-MM-dd");
   const bags = tx.numberOfBags || 0;
@@ -186,8 +188,9 @@ h2{text-align:center;margin-bottom:5px}
 @media print{body{margin:10mm}}
 </style></head><body>
 <div class="header">
-<h2>Buyer Receipt</h2>
-${businessName ? `<p style="font-size:0.9em;color:#666">${businessName}</p>` : ""}
+${businessName ? `<h2 style="margin-bottom:2px">${businessName}</h2>` : ""}
+${businessAddress ? `<p style="font-size:0.85em;color:#555;margin:2px 0">${businessAddress}</p>` : ""}
+<h3 style="margin:8px 0 5px 0;font-size:1.1em">Buyer Receipt</h3>
 </div>
 <table class="detail-table">
 <tr><td><strong>Lot No:</strong> ${lot.lotId}</td><td><strong>Date:</strong> ${dateStr}</td></tr>
@@ -228,6 +231,7 @@ function openPrintWindow(html: string) {
 export default function TransactionsPage() {
   const { toast } = useToast();
   const { t } = useLanguage();
+  const { user } = useAuth();
   const [dialogItems, setDialogItems] = useState<DialogItem[]>([]);
   const [selectedIdx, setSelectedIdx] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -637,12 +641,12 @@ export default function TransactionsPage() {
 
   const handlePrintFarmerReceipt = (group: UnifiedLotGroup) => {
     const activeTxns = group.completedTxns.filter(t => !t.isReversed);
-    const html = generateFarmerReceiptHtml(group.lot, group.farmer, activeTxns);
+    const html = generateFarmerReceiptHtml(group.lot, group.farmer, activeTxns, user?.businessName, user?.businessAddress);
     openPrintWindow(html);
   };
 
   const handlePrintBuyerReceipt = (tx: TransactionWithDetails, group: UnifiedLotGroup) => {
-    const html = generateBuyerReceiptHtml(group.lot, group.farmer, tx);
+    const html = generateBuyerReceiptHtml(group.lot, group.farmer, tx, user?.businessName, user?.businessAddress);
     openPrintWindow(html);
   };
 

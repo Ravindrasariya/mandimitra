@@ -763,6 +763,7 @@ export async function registerRoutes(
 
       res.json({
         businessName: business?.name || "Mandi Mitra",
+        businessAddress: business?.address || "",
         buyer: { id: buyer.id, buyerId: buyer.buyerId, name: buyer.name, address: buyer.address, phone: buyer.phone, openingBalance: buyer.openingBalance },
         transactions: buyerTxns,
       });

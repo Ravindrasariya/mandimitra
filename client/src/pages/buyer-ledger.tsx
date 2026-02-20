@@ -44,6 +44,7 @@ type PaanaTxn = {
 
 function generateBuyerPaanaHtml(
   businessName: string,
+  businessAddress: string,
   buyer: { name: string; address?: string | null; phone?: string | null; openingBalance?: string | null },
   txns: PaanaTxn[],
   overallDue: string
@@ -102,6 +103,7 @@ function generateBuyerPaanaHtml(
 </style></head><body>
   <div style="text-align:center;margin-bottom:16px">
     <h2 style="margin:0;color:#2e7d32">${businessName}</h2>
+    ${businessAddress ? `<p style="margin:2px 0;color:#555;font-size:0.85em">${businessAddress}</p>` : ""}
     <p style="margin:4px 0;color:#666;font-size:0.85em">Date: ${today}</p>
   </div>
   <div style="background:#f8f8f8;padding:12px;border-radius:6px;margin-bottom:16px">
@@ -406,6 +408,7 @@ export default function BuyerLedgerPage() {
       const data = await res.json();
       const html = generateBuyerPaanaHtml(
         data.businessName,
+        data.businessAddress || "",
         data.buyer,
         data.transactions,
         buyer.overallDue
