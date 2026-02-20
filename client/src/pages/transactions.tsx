@@ -168,11 +168,91 @@ ${totalDeduction > 0 ? `<div class="ded-row sub-total"><span>कुल कटौ
 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
 Print / PDF
 </button>
-<a href="https://wa.me/?text=${encodeURIComponent(`${businessName ? businessName + "\n" : ""}किसान रसीद / Farmer Receipt\nLot: ${lot.lotId}\nकिसान: ${farmer.name}\nदिनांक: ${dateStr}\nNet Payable: ₹${totalPayable.toFixed(2)}`)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:8px;padding:10px 20px;background:#25D366;color:white;text-decoration:none;border-radius:8px;font-size:15px;font-weight:600">
+<button id="wa-share-btn" disabled onclick="shareAsPdf()" style="display:inline-flex;align-items:center;gap:8px;padding:10px 20px;background:#25D366;color:white;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;opacity:0.6">
 <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.611.611l4.458-1.495A11.96 11.96 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.387 0-4.588-.832-6.32-2.222l-.44-.367-3.12 1.046 1.046-3.12-.367-.44A9.96 9.96 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>
-Share via WhatsApp
-</a>
+Preparing PDF...
+</button>
 </div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"><\/script>
+<script>
+var pdfFileName = "Farmer_Receipt_${lot.lotId}.pdf";
+var cachedPdfBlob = null;
+var libAttempts = 0;
+function waitForLibs(cb) {
+  if (typeof html2canvas !== "undefined" && typeof jspdf !== "undefined") { cb(); return; }
+  libAttempts++;
+  if (libAttempts > 100) {
+    var btn = document.getElementById("wa-share-btn");
+    btn.disabled = false; btn.style.opacity = "1";
+    btn.lastChild.textContent = "Share via WhatsApp";
+    return;
+  }
+  setTimeout(function() { waitForLibs(cb); }, 100);
+}
+function buildPdf(canvas) {
+  var pdf = new jspdf.jsPDF({ orientation: "p", unit: "mm", format: "a4" });
+  var pageW = pdf.internal.pageSize.getWidth();
+  var pageH = pdf.internal.pageSize.getHeight();
+  var margin = 10;
+  var usableW = pageW - margin * 2;
+  var usableH = pageH - margin * 2;
+  var imgW = usableW;
+  var imgH = (canvas.height * imgW) / canvas.width;
+  var pageImgH = (usableH / imgW) * canvas.width;
+  if (imgH <= usableH) {
+    pdf.addImage(canvas.toDataURL("image/jpeg", 0.95), "JPEG", margin, margin, imgW, imgH);
+  } else {
+    var pages = Math.ceil(imgH / usableH);
+    for (var p = 0; p < pages; p++) {
+      if (p > 0) pdf.addPage();
+      var srcY = p * pageImgH;
+      var srcH = Math.min(pageImgH, canvas.height - srcY);
+      var sc = document.createElement("canvas");
+      sc.width = canvas.width; sc.height = srcH;
+      sc.getContext("2d").drawImage(canvas, 0, srcY, canvas.width, srcH, 0, 0, canvas.width, srcH);
+      pdf.addImage(sc.toDataURL("image/jpeg", 0.95), "JPEG", margin, margin, imgW, (srcH * imgW) / canvas.width);
+    }
+  }
+  return pdf;
+}
+function generatePdf() {
+  var noPrintEls = document.querySelectorAll(".no-print");
+  noPrintEls.forEach(function(el) { el.style.display = "none"; });
+  html2canvas(document.body, { scale: 2, useCORS: true, logging: false }).then(function(canvas) {
+    noPrintEls.forEach(function(el) { el.style.display = ""; });
+    cachedPdfBlob = buildPdf(canvas).output("blob");
+    var btn = document.getElementById("wa-share-btn");
+    btn.disabled = false;
+    btn.style.opacity = "1";
+    btn.lastChild.textContent = "Share via WhatsApp";
+  }).catch(function() {
+    document.querySelectorAll(".no-print").forEach(function(el) { el.style.display = ""; });
+    var btn = document.getElementById("wa-share-btn");
+    btn.disabled = false;
+    btn.style.opacity = "1";
+    btn.lastChild.textContent = "Share via WhatsApp";
+  });
+}
+waitForLibs(function() { setTimeout(generatePdf, 200); });
+function shareAsPdf() {
+  if (!cachedPdfBlob) {
+    if (typeof html2canvas !== "undefined" && typeof jspdf !== "undefined") { generatePdf(); }
+    else { window.print(); }
+    return;
+  }
+  var pdfFile = new File([cachedPdfBlob], pdfFileName, { type: "application/pdf" });
+  if (navigator.share && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+    navigator.share({ files: [pdfFile], title: pdfFileName }).catch(function() {});
+  } else {
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(cachedPdfBlob);
+    a.download = pdfFileName;
+    a.click();
+    setTimeout(function() { URL.revokeObjectURL(a.href); }, 1000);
+  }
+}
+<\/script>
 </body></html>`;
 }
 
@@ -231,11 +311,91 @@ ${mandiBuyer > 0 ? `<div class="summary-row"><span>Mandi (${tx.mandiBuyerPercent
 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
 Print / PDF
 </button>
-<a href="https://wa.me/?text=${encodeURIComponent(`${businessName ? businessName + "\n" : ""}Buyer Receipt\nLot: ${lot.lotId}\nBuyer: ${tx.buyer.name}\nDate: ${dateStr}\nTotal Receivable: Rs.${parseFloat(tx.totalReceivableFromBuyer || "0").toFixed(2)}`)}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:8px;padding:10px 20px;background:#25D366;color:white;text-decoration:none;border-radius:8px;font-size:15px;font-weight:600">
+<button id="wa-share-btn" disabled onclick="shareAsPdf()" style="display:inline-flex;align-items:center;gap:8px;padding:10px 20px;background:#25D366;color:white;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;opacity:0.6">
 <svg width="20" height="20" viewBox="0 0 24 24" fill="white"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.611.611l4.458-1.495A11.96 11.96 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.387 0-4.588-.832-6.32-2.222l-.44-.367-3.12 1.046 1.046-3.12-.367-.44A9.96 9.96 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>
-Share via WhatsApp
-</a>
+Preparing PDF...
+</button>
 </div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"><\/script>
+<script>
+var pdfFileName = "Buyer_Receipt_${lot.lotId}_${tx.buyer.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf";
+var cachedPdfBlob = null;
+var libAttempts = 0;
+function waitForLibs(cb) {
+  if (typeof html2canvas !== "undefined" && typeof jspdf !== "undefined") { cb(); return; }
+  libAttempts++;
+  if (libAttempts > 100) {
+    var btn = document.getElementById("wa-share-btn");
+    btn.disabled = false; btn.style.opacity = "1";
+    btn.lastChild.textContent = "Share via WhatsApp";
+    return;
+  }
+  setTimeout(function() { waitForLibs(cb); }, 100);
+}
+function buildPdf(canvas) {
+  var pdf = new jspdf.jsPDF({ orientation: "p", unit: "mm", format: "a4" });
+  var pageW = pdf.internal.pageSize.getWidth();
+  var pageH = pdf.internal.pageSize.getHeight();
+  var margin = 10;
+  var usableW = pageW - margin * 2;
+  var usableH = pageH - margin * 2;
+  var imgW = usableW;
+  var imgH = (canvas.height * imgW) / canvas.width;
+  var pageImgH = (usableH / imgW) * canvas.width;
+  if (imgH <= usableH) {
+    pdf.addImage(canvas.toDataURL("image/jpeg", 0.95), "JPEG", margin, margin, imgW, imgH);
+  } else {
+    var pages = Math.ceil(imgH / usableH);
+    for (var p = 0; p < pages; p++) {
+      if (p > 0) pdf.addPage();
+      var srcY = p * pageImgH;
+      var srcH = Math.min(pageImgH, canvas.height - srcY);
+      var sc = document.createElement("canvas");
+      sc.width = canvas.width; sc.height = srcH;
+      sc.getContext("2d").drawImage(canvas, 0, srcY, canvas.width, srcH, 0, 0, canvas.width, srcH);
+      pdf.addImage(sc.toDataURL("image/jpeg", 0.95), "JPEG", margin, margin, imgW, (srcH * imgW) / canvas.width);
+    }
+  }
+  return pdf;
+}
+function generatePdf() {
+  var noPrintEls = document.querySelectorAll(".no-print");
+  noPrintEls.forEach(function(el) { el.style.display = "none"; });
+  html2canvas(document.body, { scale: 2, useCORS: true, logging: false }).then(function(canvas) {
+    noPrintEls.forEach(function(el) { el.style.display = ""; });
+    cachedPdfBlob = buildPdf(canvas).output("blob");
+    var btn = document.getElementById("wa-share-btn");
+    btn.disabled = false;
+    btn.style.opacity = "1";
+    btn.lastChild.textContent = "Share via WhatsApp";
+  }).catch(function() {
+    document.querySelectorAll(".no-print").forEach(function(el) { el.style.display = ""; });
+    var btn = document.getElementById("wa-share-btn");
+    btn.disabled = false;
+    btn.style.opacity = "1";
+    btn.lastChild.textContent = "Share via WhatsApp";
+  });
+}
+waitForLibs(function() { setTimeout(generatePdf, 200); });
+function shareAsPdf() {
+  if (!cachedPdfBlob) {
+    if (typeof html2canvas !== "undefined" && typeof jspdf !== "undefined") { generatePdf(); }
+    else { window.print(); }
+    return;
+  }
+  var pdfFile = new File([cachedPdfBlob], pdfFileName, { type: "application/pdf" });
+  if (navigator.share && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+    navigator.share({ files: [pdfFile], title: pdfFileName }).catch(function() {});
+  } else {
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(cachedPdfBlob);
+    a.download = pdfFileName;
+    a.click();
+    setTimeout(function() { URL.revokeObjectURL(a.href); }, 1000);
+  }
+}
+<\/script>
 </body></html>`;
 }
 
