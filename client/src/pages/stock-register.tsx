@@ -163,11 +163,11 @@ export default function StockRegisterPage() {
     }
 
     if (saleFilter === "sold") {
-      result = result.filter(l => !l.isReturned && l.remainingBags === 0);
+      result = result.filter(l => l.remainingBags === 0 && (l.actualNumberOfBags ?? l.numberOfBags) > 0);
     } else if (saleFilter === "unsold") {
-      result = result.filter(l => !l.isReturned && l.remainingBags > 0);
+      result = result.filter(l => l.remainingBags > 0 && !l.isReturned);
     } else if (saleFilter === "returned") {
-      result = result.filter(l => l.isReturned);
+      result = result.filter(l => l.isReturned && (l.actualNumberOfBags ?? l.numberOfBags) === 0);
     }
 
     return result;
@@ -257,10 +257,10 @@ export default function StockRegisterPage() {
   };
 
   const getLotStatus = (lot: LotWithFarmer) => {
-    if (lot.isReturned) return "Returned";
     const actual = lot.actualNumberOfBags ?? lot.numberOfBags;
-    if (lot.remainingBags === 0) return "Sold Out";
+    if (lot.remainingBags === 0 && actual > 0) return "Sold Out";
     if (lot.remainingBags < actual) return "Partially Sold";
+    if (lot.isReturned) return "Returned";
     return "Unsold";
   };
 
@@ -296,7 +296,7 @@ export default function StockRegisterPage() {
     const headers = [
       "Lot ID", "Serial #", "Date", "Crop", "Variety", "Size",
       "Farmer ID", "Farmer Name", "Farmer Phone", "Farmer Village", "Farmer Tehsil", "Farmer District",
-      "No. of Bags", "Remaining Bags", "Bag Marka", "Initial Total Weight",
+      "No. of Bags", "Actual Bags", "Remaining Bags", "Returned Bags", "Bag Marka", "Initial Total Weight",
       "Vehicle Number", "Vehicle Bhada Rate",
       "Status"
     ];
@@ -309,7 +309,7 @@ export default function StockRegisterPage() {
     const rows = filtered.map(lot => [
       lot.lotId, lot.serialNumber, lot.date, lot.crop, lot.variety || "", lot.size || "",
       lot.farmer.farmerId, lot.farmer.name, lot.farmer.phone, lot.farmer.village || "", lot.farmer.tehsil || "", lot.farmer.district || "",
-      lot.numberOfBags, lot.remainingBags, lot.bagMarka || "", lot.initialTotalWeight || "",
+      lot.numberOfBags, lot.actualNumberOfBags ?? lot.numberOfBags, lot.remainingBags, lot.returnedBags ?? 0, lot.bagMarka || "", lot.initialTotalWeight || "",
       lot.vehicleNumber || "", lot.vehicleBhadaRate || "",
       getLotStatus(lot)
     ].map(escCSV).join(","));
@@ -527,7 +527,7 @@ export default function StockRegisterPage() {
       ) : (
         <div className="space-y-3">
           {filtered.map((lot) => (
-            <Card key={lot.id} className={lot.isReturned ? "opacity-50" : ""}>
+            <Card key={lot.id}>
               <CardContent className="pt-4">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex-1 min-w-0">
@@ -552,6 +552,9 @@ export default function StockRegisterPage() {
                           <span>Actual: <strong className="text-orange-600">{lot.actualNumberOfBags}</strong></span>
                         )}
                         <span>{t("common.remaining")}: <strong className={lot.remainingBags > 0 ? "text-primary" : "text-destructive"}>{lot.remainingBags}</strong></span>
+                        {(lot.returnedBags != null && lot.returnedBags > 0) && (
+                          <span>Returned: <strong className="text-orange-600">{lot.returnedBags}</strong></span>
+                        )}
                       </div>
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                         {lot.bagMarka && <span>{t("stockRegister.marka")}: {lot.bagMarka}</span>}
@@ -728,7 +731,7 @@ export default function StockRegisterPage() {
               {t("stockRegister.returnConfirmMsg")}
               {editingLot && editingLot.remainingBags < (editingLot.actualNumberOfBags ?? editingLot.numberOfBags) ? (
                 <span className="block mt-2 text-orange-600 font-medium">
-                  {t("stockRegister.returnPartialMsg")} ({(editingLot.actualNumberOfBags ?? editingLot.numberOfBags) - editingLot.remainingBags} bags sold). The bag count will be adjusted to the sold amount and marked as sold out.
+                  {t("stockRegister.returnPartialMsg")} ({(editingLot.actualNumberOfBags ?? editingLot.numberOfBags) - editingLot.remainingBags} bags sold, {editingLot.remainingBags} bags will be returned). The bag count will be adjusted to the sold amount and marked as sold out.
                 </span>
               ) : (
                 <span className="block mt-2">
