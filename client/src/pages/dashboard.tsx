@@ -232,6 +232,23 @@ export default function DashboardPage() {
     })).sort((a, b) => b.value - a.value);
   }, [filteredBuyersWithDues]);
 
+  const buyerLabelPositions = useMemo(() => {
+    if (buyerDuesDistribution.length === 0) return [];
+    const RADIAN = Math.PI / 180;
+    const total = buyerDuesDistribution.reduce((s, d) => s + d.value, 0);
+    if (total === 0) return [];
+    const items: { i: number; midAngle: number; side: "left" | "right" }[] = [];
+    let startA = 90;
+    for (let i = 0; i < buyerDuesDistribution.length; i++) {
+      const sweep = (buyerDuesDistribution[i].value / total) * 360;
+      const mid = startA - sweep / 2;
+      const side: "left" | "right" = Math.cos(-mid * RADIAN) >= 0 ? "right" : "left";
+      items.push({ i, midAngle: mid, side });
+      startA -= sweep;
+    }
+    return items;
+  }, [buyerDuesDistribution]);
+
   const timeSeriesData = useMemo(() => {
     const dateAggregates = new Map<string, { farmerDue: number; buyerDue: number; volume: number; aadhat: number }>();
 
@@ -543,24 +560,59 @@ export default function DashboardPage() {
             {buyerDuesDistribution.length === 0 ? (
               <div className="h-48 flex items-center justify-center text-muted-foreground text-sm">{t("dash.noData")}</div>
             ) : (
-              <ResponsiveContainer width="100%" height={220}>
-                <PieChart margin={{ top: 5, right: 5, bottom: 5, left: 5 }}>
+              <ResponsiveContainer width="100%" height={Math.max(280, buyerDuesDistribution.length * 36)}>
+                <PieChart margin={{ top: 20, right: 90, bottom: 20, left: 90 }}>
                   <Pie
                     data={buyerDuesDistribution}
                     dataKey="value"
                     nameKey="name"
                     cx="50%"
                     cy="50%"
-                    outerRadius={60}
-                    label={({ name, pct, value, cx: pieCx, x, y, midAngle }) => {
-                      const isRight = x > pieCx;
+                    outerRadius={55}
+                    startAngle={90}
+                    endAngle={-270}
+                    labelLine={false}
+                    label={(props: any) => {
+                      const { name, pct, value, cx: pieCx, cy: pieCy, midAngle, outerRadius: oR, index } = props;
+                      const RADIAN = Math.PI / 180;
+                      const labelRadius = (oR || 55) + 20;
+                      const isRight = Math.cos(-midAngle * RADIAN) >= 0;
+                      const MIN_GAP = 22;
+
+                      const withPixelY = buyerLabelPositions.map(p => ({
+                        ...p,
+                        y: pieCy + labelRadius * Math.sin(-p.midAngle * RADIAN),
+                      }));
+                      const sameSide = withPixelY
+                        .filter(p => p.side === (isRight ? "right" : "left"))
+                        .sort((a, b) => a.y - b.y);
+                      for (let pass = 0; pass < 5; pass++) {
+                        for (let k = 1; k < sameSide.length; k++) {
+                          const gap = sameSide[k].y - sameSide[k - 1].y;
+                          if (gap < MIN_GAP) {
+                            const shift = (MIN_GAP - gap) / 2;
+                            sameSide[k - 1].y -= shift;
+                            sameSide[k].y += shift;
+                          }
+                        }
+                      }
+
+                      const resolved = sameSide.find(p => p.i === index);
+                      const adjustedY = resolved ? resolved.y : pieCy + labelRadius * Math.sin(-midAngle * RADIAN);
+                      const labelX = isRight ? pieCx + labelRadius + 8 : pieCx - labelRadius - 8;
                       const anchor = isRight ? "start" : "end";
-                      const xOffset = isRight ? 4 : -4;
+                      const truncName = name.length > 16 ? name.slice(0, 15) + "…" : name;
+                      const edgeX = pieCx + (oR || 55) * Math.cos(-midAngle * RADIAN);
+                      const edgeY = pieCy + (oR || 55) * Math.sin(-midAngle * RADIAN);
+                      const elbowX = isRight ? pieCx + labelRadius : pieCx - labelRadius;
                       return (
-                        <text x={x + xOffset} y={y} textAnchor={anchor} fontSize={10} fill="#374151">
-                          <tspan x={x + xOffset} dy="-0.4em">{name}</tspan>
-                          <tspan x={x + xOffset} dy="1.2em">{Number(value).toLocaleString("en-IN")} ({pct}%)</tspan>
-                        </text>
+                        <g key={index}>
+                          <path d={`M${edgeX},${edgeY} L${elbowX},${adjustedY} L${labelX},${adjustedY}`} fill="none" stroke="#94a3b8" strokeWidth={0.8} />
+                          <text x={labelX + (isRight ? 3 : -3)} y={adjustedY} textAnchor={anchor} fontSize={9} fill="#374151" dominantBaseline="central">
+                            <tspan fontWeight="500">{truncName}</tspan>
+                            <tspan dx="3" fontSize={8} fill="#666">{Number(value).toLocaleString("en-IN")} ({pct}%)</tspan>
+                          </text>
+                        </g>
                       );
                     }}
                   >
