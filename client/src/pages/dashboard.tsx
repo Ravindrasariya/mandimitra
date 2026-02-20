@@ -28,7 +28,7 @@ type DashboardData = {
   txAggregates: { totalHammali: number; totalExtraCharges: number; totalMandiCommission: number; paidHammali: number; paidExtraCharges: number; paidMandiCommission: number };
 };
 
-const PIE_COLORS = ["#2563eb", "#f59e0b", "#10b981", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316"];
+const PIE_COLORS = ["#2563eb", "#f59e0b", "#10b981", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316", "#14532d", "#dc2626", "#7c3aed", "#0891b2", "#ca8a04", "#be185d", "#334155"];
 
 type ChargeSettingsData = {
   mandiCommissionFarmerPercent: string;
