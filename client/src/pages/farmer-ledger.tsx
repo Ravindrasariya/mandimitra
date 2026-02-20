@@ -18,7 +18,7 @@ import type { Farmer, FarmerEditHistory } from "@shared/schema";
 import { Users, Search, Pencil, RefreshCw, Printer, Archive, AlertTriangle, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, Calendar } from "lucide-react";
 import { format } from "date-fns";
 
-type FarmerWithDues = Farmer & { totalPayable: string; totalDue: string; salesCount: number };
+type FarmerWithDues = Farmer & { totalPayable: string; totalDue: string; salesCount: number; bidDates?: string[] };
 type SortField = "farmerId" | "totalPayable" | "totalDue";
 type SortDir = "asc" | "desc";
 
@@ -148,7 +148,17 @@ export default function FarmerLedgerPage() {
   });
 
   const now = new Date();
-  const years = Array.from({ length: 5 }, (_, i) => String(now.getFullYear() - i));
+  const years = useMemo(() => {
+    const yearSet = new Set<string>();
+    farmersWithDues.forEach(f => {
+      (f.bidDates || []).forEach(d => {
+        yearSet.add(d.substring(0, 4));
+      });
+    });
+    const fromData = Array.from(yearSet).sort().reverse();
+    if (fromData.length === 0) return [String(now.getFullYear())];
+    return fromData;
+  }, [farmersWithDues]);
 
   const MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -196,17 +206,16 @@ export default function FarmerLedgerPage() {
       if (showArchived && !f.isArchived) return false;
       if (searchName && !f.name.toLowerCase().includes(searchName.toLowerCase())) return false;
       if (searchVillage && !(f.village || "").toLowerCase().includes(searchVillage.toLowerCase())) return false;
-      const createdDate = new Date(f.createdAt);
-      if (yearFilter !== "all") {
-        if (createdDate.getFullYear() !== parseInt(yearFilter)) return false;
-      }
-      if (selectedMonths.length > 0) {
-        const fMonth = String(createdDate.getMonth() + 1);
-        if (!selectedMonths.includes(fMonth)) return false;
-      }
-      if (selectedDays.length > 0) {
-        const fDay = String(createdDate.getDate());
-        if (!selectedDays.includes(fDay)) return false;
+      const dates = f.bidDates || [];
+      if (yearFilter !== "all" || selectedMonths.length > 0 || selectedDays.length > 0) {
+        const hasMatchingDate = dates.some(d => {
+          const [y, m, day] = d.split("-");
+          if (yearFilter !== "all" && y !== yearFilter) return false;
+          if (selectedMonths.length > 0 && !selectedMonths.includes(String(parseInt(m)))) return false;
+          if (selectedDays.length > 0 && !selectedDays.includes(String(parseInt(day)))) return false;
+          return true;
+        });
+        if (!hasMatchingDate) return false;
       }
       return true;
     });

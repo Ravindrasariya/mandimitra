@@ -458,16 +458,18 @@ export default function TransactionsPage() {
   const filteredGroups = useMemo(() => {
     return unifiedGroups.filter(g => {
       if (cropFilter !== "all" && g.lot.crop !== cropFilter) return false;
-      const lotDate = new Date(g.lot.createdAt);
-      if (lotDate.getFullYear() !== parseInt(yearFilter)) return false;
-      if (selectedMonths.length > 0) {
-        const lotMonth = String(lotDate.getMonth() + 1);
-        if (!selectedMonths.includes(lotMonth)) return false;
-      }
-      if (selectedDays.length > 0) {
-        const lotDay = String(lotDate.getDate());
-        if (!selectedDays.includes(lotDay)) return false;
-      }
+      const bidDates: Date[] = [
+        ...g.pendingBids.map(b => new Date(b.createdAt)),
+        ...g.completedTxns.map(t => new Date(t.bid.createdAt)),
+      ];
+      if (bidDates.length === 0) bidDates.push(new Date(g.lot.createdAt));
+      const hasMatchingDate = bidDates.some(bd => {
+        if (bd.getFullYear() !== parseInt(yearFilter)) return false;
+        if (selectedMonths.length > 0 && !selectedMonths.includes(String(bd.getMonth() + 1))) return false;
+        if (selectedDays.length > 0 && !selectedDays.includes(String(bd.getDate()))) return false;
+        return true;
+      });
+      if (!hasMatchingDate) return false;
       if (buyerPaymentFilter !== "all") {
         const activeTxns = g.completedTxns.filter(t => !t.isReversed);
         if (activeTxns.length === 0) return false;

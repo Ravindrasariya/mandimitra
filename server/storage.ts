@@ -37,7 +37,7 @@ export interface IStorage {
   getFarmer(id: number, businessId: number): Promise<Farmer | undefined>;
   createFarmer(farmer: InsertFarmer): Promise<Farmer>;
   updateFarmer(id: number, businessId: number, data: Partial<InsertFarmer>): Promise<Farmer | undefined>;
-  getFarmersWithDues(businessId: number, search?: string): Promise<(Farmer & { totalPayable: string; totalDue: string; salesCount: number })[]>;
+  getFarmersWithDues(businessId: number, search?: string): Promise<(Farmer & { totalPayable: string; totalDue: string; salesCount: number; bidDates: string[] })[]>;
   getFarmerEditHistory(farmerId: number, businessId: number): Promise<FarmerEditHistory[]>;
   createFarmerEditHistory(entry: InsertFarmerEditHistory): Promise<FarmerEditHistory>;
   mergeFarmers(businessId: number, keepId: number, mergeId: number, changedBy: string): Promise<Farmer>;
@@ -234,7 +234,7 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async getFarmersWithDues(businessId: number, search?: string): Promise<(Farmer & { totalPayable: string; totalDue: string; salesCount: number })[]> {
+  async getFarmersWithDues(businessId: number, search?: string): Promise<(Farmer & { totalPayable: string; totalDue: string; salesCount: number; bidDates: string[] })[]> {
     let farmerList: Farmer[];
     if (search) {
       farmerList = await db.select().from(farmers).where(
@@ -252,7 +252,20 @@ export class DatabaseStorage implements IStorage {
       farmerList = await db.select().from(farmers).where(eq(farmers.businessId, businessId)).orderBy(asc(farmers.id));
     }
 
-    const results: (Farmer & { totalPayable: string; totalDue: string; salesCount: number })[] = [];
+    const allBidDates = await db.select({
+      farmerId: lots.farmerId,
+      bidDate: sql<string>`to_char(${bids.createdAt}, 'YYYY-MM-DD')`
+    }).from(bids)
+      .innerJoin(lots, eq(bids.lotId, lots.id))
+      .where(eq(bids.businessId, businessId));
+
+    const bidDateMap = new Map<number, Set<string>>();
+    for (const row of allBidDates) {
+      if (!bidDateMap.has(row.farmerId)) bidDateMap.set(row.farmerId, new Set());
+      bidDateMap.get(row.farmerId)!.add(row.bidDate);
+    }
+
+    const results: (Farmer & { totalPayable: string; totalDue: string; salesCount: number; bidDates: string[] })[] = [];
     for (const farmer of farmerList) {
       const [txSum] = await db.select({
         total: sql<string>`coalesce(sum(cast(${transactions.totalPayableToFarmer} as numeric)), 0)`,
@@ -269,11 +282,13 @@ export class DatabaseStorage implements IStorage {
       const totalDue = openingBal + totalPayable - totalPaid;
       const salesCount = Number(txSum?.count || 0);
 
+      const farmerBidDates = bidDateMap.get(farmer.id);
       results.push({
         ...farmer,
         totalPayable: totalPayable.toFixed(2),
         totalDue: totalDue.toFixed(2),
         salesCount,
+        bidDates: farmerBidDates ? Array.from(farmerBidDates) : [],
       });
     }
     return results;
