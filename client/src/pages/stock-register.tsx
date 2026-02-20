@@ -600,7 +600,7 @@ export default function StockRegisterPage() {
                   onChange={(e) => {
                     const val = e.target.value.replace(/\D/g, '');
                     setEditNumberOfBags(val);
-                    if (val && editActualNumberOfBags && parseInt(editActualNumberOfBags) > parseInt(val)) {
+                    if (val) {
                       setEditActualNumberOfBags(val);
                     }
                   }}
