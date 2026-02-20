@@ -155,25 +155,10 @@ export default function BiddingPage() {
       </h1>
 
       <div className="flex items-center gap-2 flex-wrap">
-        <Select value={activeGrade} onValueChange={setActiveGrade}>
-          <SelectTrigger
-            data-testid="select-size-filter"
-            className="w-[120px] font-medium border-primary/50 bg-primary/10 text-primary"
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {SIZES.map((size) => (
-              <SelectItem key={size} value={size} data-testid={`toggle-size-${size.toLowerCase()}`}>
-                {size}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
         <Select value={activeCrop} onValueChange={setActiveCrop}>
           <SelectTrigger
             data-testid="select-bid-crop"
-            className="w-[120px] font-medium border-primary/50 bg-primary/10 text-primary"
+            className="w-auto font-medium border-primary/50 bg-primary/10 text-primary"
           >
             <SelectValue />
           </SelectTrigger>
@@ -181,6 +166,21 @@ export default function BiddingPage() {
             {CROPS.map((crop) => (
               <SelectItem key={crop} value={crop} data-testid={`toggle-bid-crop-${crop.toLowerCase()}`}>
                 {crop}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={activeGrade} onValueChange={setActiveGrade}>
+          <SelectTrigger
+            data-testid="select-size-filter"
+            className="w-auto font-medium border-orange-500/50 bg-orange-500/10 text-orange-600 dark:text-orange-400"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {SIZES.map((size) => (
+              <SelectItem key={size} value={size} data-testid={`toggle-size-${size.toLowerCase()}`}>
+                {size}
               </SelectItem>
             ))}
           </SelectContent>

@@ -336,7 +336,7 @@ export default function StockRegisterPage() {
         <Select value={activeCrop} onValueChange={setActiveCrop}>
           <SelectTrigger
             data-testid="select-crop-filter"
-            className="w-[120px] font-medium border-primary/50 bg-primary/10 text-primary"
+            className="w-auto font-medium border-primary/50 bg-primary/10 text-primary"
           >
             <Wheat className="w-3.5 h-3.5 mr-1 flex-shrink-0" />
             <SelectValue />
