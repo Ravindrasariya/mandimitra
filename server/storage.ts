@@ -281,7 +281,7 @@ export class DatabaseStorage implements IStorage {
 
       const [cashSum] = await db.select({
         total: sql<string>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`
-      }).from(cashEntries).where(and(eq(cashEntries.businessId, businessId), eq(cashEntries.farmerId, farmer.id), eq(cashEntries.isReversed, false)));
+      }).from(cashEntries).where(and(eq(cashEntries.businessId, businessId), eq(cashEntries.farmerId, farmer.id), eq(cashEntries.category, "outward"), eq(cashEntries.isReversed, false)));
 
       const totalPayable = parseFloat(txSum?.total || "0");
       const totalPaid = parseFloat(cashSum?.total || "0");
@@ -456,7 +456,7 @@ export class DatabaseStorage implements IStorage {
 
       const [cashSum] = await db.select({
         total: sql<string>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`
-      }).from(cashEntries).where(and(eq(cashEntries.businessId, businessId), eq(cashEntries.buyerId, buyer.id), eq(cashEntries.isReversed, false)));
+      }).from(cashEntries).where(and(eq(cashEntries.businessId, businessId), eq(cashEntries.buyerId, buyer.id), eq(cashEntries.category, "inward"), eq(cashEntries.isReversed, false)));
 
       const totalReceivable = parseFloat(txSum?.total || "0");
       const totalPaid = parseFloat(cashSum?.total || "0");
