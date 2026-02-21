@@ -40,7 +40,7 @@ function generateFarmerListPrintHtml(farmers: FarmerWithDues[], summary: { total
       <td style="padding:6px;border:1px solid #ddd">${f.phone}</td>
       <td style="padding:6px;border:1px solid #ddd;text-align:right">${formatIndianCurrency(f.totalPayable)}</td>
       <td style="padding:6px;border:1px solid #ddd;text-align:right;color:${parseFloat(f.totalDue) > 0 ? '#dc2626' : '#16a34a'}">${formatIndianCurrency(f.totalDue)}</td>
-      <td style="padding:6px;border:1px solid #ddd;text-align:center">${f.negativeFlag ? "FLAG" : "-"}</td>
+      <td style="padding:6px;border:1px solid #ddd;text-align:center">${f.redFlag ? "FLAG" : "-"}</td>
     </tr>
   `).join("");
 
@@ -77,7 +77,7 @@ export default function FarmerLedgerPage() {
   const [editName, setEditName] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editVillage, setEditVillage] = useState("");
-  const [editNegativeFlag, setEditNegativeFlag] = useState("false");
+  const [editRedFlag, setEditRedFlag] = useState("false");
 
   const [mergeConfirmOpen, setMergeConfirmOpen] = useState(false);
   const [duplicateFarmer, setDuplicateFarmer] = useState<Farmer | null>(null);
@@ -265,17 +265,17 @@ export default function FarmerLedgerPage() {
     setEditName(farmer.name);
     setEditPhone(farmer.phone);
     setEditVillage(farmer.village || "");
-    setEditNegativeFlag(farmer.negativeFlag ? "true" : "false");
+    setEditRedFlag(farmer.redFlag ? "true" : "false");
     setHistoryFarmerId(farmer.id);
     setEditDialogOpen(true);
   };
 
   const saveEdit = () => {
     if (!editingFarmer) return;
-    const newNeg = editNegativeFlag === "true";
+    const newRedFlag = editRedFlag === "true";
     updateFarmerMutation.mutate({
       id: editingFarmer.id,
-      data: { name: editName, phone: editPhone, village: editVillage, negativeFlag: newNeg },
+      data: { name: editName, phone: editPhone, village: editVillage, redFlag: newRedFlag },
     });
   };
 
@@ -537,7 +537,7 @@ export default function FarmerLedgerPage() {
                       {formatIndianCurrency(farmer.totalDue)}
                     </td>
                     <td className="p-2 text-center">
-                      {farmer.negativeFlag && (
+                      {farmer.redFlag && (
                         <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
                           <AlertTriangle className="w-3 h-3 mr-0.5" />
                           Flag
@@ -603,9 +603,9 @@ export default function FarmerLedgerPage() {
                 />
               </div>
               <div className="space-y-1">
-                <Label className="text-xs">{t("farmerLedger.negativeFlag")}</Label>
-                <Select value={editNegativeFlag} onValueChange={setEditNegativeFlag}>
-                  <SelectTrigger data-testid="select-edit-negative-flag">
+                <Label className="text-xs">{t("farmerLedger.redFlag")}</Label>
+                <Select value={editRedFlag} onValueChange={setEditRedFlag}>
+                  <SelectTrigger data-testid="select-edit-red-flag">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>

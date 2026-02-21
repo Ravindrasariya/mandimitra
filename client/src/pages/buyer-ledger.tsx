@@ -170,7 +170,7 @@ export default function BuyerLedgerPage() {
   const [editAddress, setEditAddress] = useState("");
   const [editPhone, setEditPhone] = useState("");
   const [editBuyerCode, setEditBuyerCode] = useState("");
-  const [editNegativeFlag, setEditNegativeFlag] = useState(false);
+  const [editRedFlag, setEditRedFlag] = useState(false);
   const [editOpeningBalance, setEditOpeningBalance] = useState("");
 
   const [newName, setNewName] = useState("");
@@ -331,7 +331,7 @@ export default function BuyerLedgerPage() {
       }
       if (statusFilter === "active" && !b.isActive) return false;
       if (statusFilter === "inactive" && b.isActive) return false;
-      if (statusFilter === "negative" && !b.negativeFlag) return false;
+      if (statusFilter === "redFlag" && !b.redFlag) return false;
       return true;
     });
   }, [buyers, yearFilter, selectedMonths, selectedDays, statusFilter]);
@@ -400,7 +400,7 @@ export default function BuyerLedgerPage() {
     setEditAddress(buyer.address || "");
     setEditPhone(buyer.phone || "");
     setEditBuyerCode(buyer.buyerCode || "");
-    setEditNegativeFlag(buyer.negativeFlag);
+    setEditRedFlag(buyer.redFlag);
     setEditOpeningBalance(buyer.openingBalance || "0");
   };
 
@@ -444,7 +444,7 @@ export default function BuyerLedgerPage() {
         address: editAddress || null,
         phone: editPhone || null,
         buyerCode: editBuyerCode || null,
-        negativeFlag: editNegativeFlag,
+        redFlag: editRedFlag,
         openingBalance: editOpeningBalance || "0",
       },
     });
@@ -569,7 +569,7 @@ export default function BuyerLedgerPage() {
             <SelectItem value="all">{t("common.all")}...</SelectItem>
             <SelectItem value="active">{t("common.active")}</SelectItem>
             <SelectItem value="inactive">{t("common.inactive")}</SelectItem>
-            <SelectItem value="negative">{t("buyerLedger.negative")}</SelectItem>
+            <SelectItem value="redFlag">{t("buyerLedger.redFlag")}</SelectItem>
           </SelectContent>
         </Select>
         <div className="relative">
@@ -653,7 +653,7 @@ export default function BuyerLedgerPage() {
                       <th className="text-left p-3 font-medium">{t("common.address")}</th>
                       <th className="text-left p-3 font-medium">{t("buyerLedger.mandiCode")}</th>
                       <th className="text-left p-3 font-medium">{t("common.contact")}</th>
-                      <th className="text-center p-3 font-medium">{t("buyerLedger.negative")}</th>
+                      <th className="text-center p-3 font-medium">{t("buyerLedger.redFlag")}</th>
                       <th className="text-center p-3 font-medium">{t("common.active")}</th>
                       <th
                         className="text-right p-3 font-medium cursor-pointer select-none"
@@ -690,8 +690,8 @@ export default function BuyerLedgerPage() {
                         <td className="p-3 text-muted-foreground">{buyer.buyerCode || "-"}</td>
                         <td className="p-3">{buyer.phone || "-"}</td>
                         <td className="p-3 text-center">
-                          <span className={`text-xs font-medium ${buyer.negativeFlag ? "text-destructive" : "text-muted-foreground"}`}>
-                            {buyer.negativeFlag ? t("common.yes") : t("common.no")}
+                          <span className={`text-xs font-medium ${buyer.redFlag ? "text-destructive" : "text-muted-foreground"}`}>
+                            {buyer.redFlag ? t("common.yes") : t("common.no")}
                           </span>
                         </td>
                         <td className="p-3 text-center">
@@ -743,7 +743,7 @@ export default function BuyerLedgerPage() {
                         <div className="flex-1 min-w-0 space-y-1">
                           <div className="flex items-center gap-2">
                             <span className="font-mono text-xs text-muted-foreground">{buyer.buyerId}</span>
-                            {buyer.negativeFlag && <Badge variant="destructive" className="text-xs">{t("buyerLedger.negative")}</Badge>}
+                            {buyer.redFlag && <Badge variant="destructive" className="text-xs">{t("buyerLedger.redFlag")}</Badge>}
                             {!buyer.isActive && <Badge variant="secondary" className="text-xs">{t("common.inactive")}</Badge>}
                           </div>
                           <p className="font-medium">{buyer.name}</p>
@@ -859,11 +859,11 @@ export default function BuyerLedgerPage() {
               />
             </div>
             <div className="flex items-center justify-between">
-              <Label>{t("buyerLedger.negativeFlag")}</Label>
+              <Label>{t("buyerLedger.redFlagLabel")}</Label>
               <Switch
-                data-testid="switch-edit-negative"
-                checked={editNegativeFlag}
-                onCheckedChange={setEditNegativeFlag}
+                data-testid="switch-edit-red-flag"
+                checked={editRedFlag}
+                onCheckedChange={setEditRedFlag}
               />
             </div>
             <Button

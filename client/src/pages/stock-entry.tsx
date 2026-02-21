@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DISTRICTS, CROPS, SIZES } from "@shared/schema";
 import type { Farmer } from "@shared/schema";
-import { Plus, Trash2, Search, Wheat } from "lucide-react";
+import { Plus, Trash2, Search, Wheat, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 
 type LotEntry = {
@@ -251,6 +251,12 @@ export default function StockEntryPage() {
 
           {showFarmerForm && (
             <div className="space-y-3">
+              {selectedFarmer?.redFlag && (
+                <div className="flex items-center gap-2 p-3 rounded-md bg-orange-50 border border-orange-300 text-orange-800 text-sm" data-testid="warning-red-flag-farmer">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0 text-orange-600" />
+                  <span className="font-medium">{t("stockEntry.redFlagWarningFarmer")}</span>
+                </div>
+              )}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div className="space-y-1 relative">
                   <Label>{t("stockEntry.farmerName")}</Label>

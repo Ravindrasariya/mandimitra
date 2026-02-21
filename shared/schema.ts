@@ -44,7 +44,7 @@ export const farmers = pgTable("farmers", {
   district: text("district"),
   state: text("state").default("Madhya Pradesh"),
   openingBalance: decimal("opening_balance", { precision: 12, scale: 2 }).default("0"),
-  negativeFlag: boolean("negative_flag").notNull().default(false),
+  redFlag: boolean("negative_flag").notNull().default(false),
   isArchived: boolean("is_archived").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
@@ -59,7 +59,7 @@ export const buyers = pgTable("buyers", {
   phone: text("phone"),
   address: text("address"),
   buyerCode: text("buyer_code"),
-  negativeFlag: boolean("negative_flag").notNull().default(false),
+  redFlag: boolean("negative_flag").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
   openingBalance: decimal("opening_balance", { precision: 12, scale: 2 }).default("0"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

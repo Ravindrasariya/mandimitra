@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CROPS, SIZES } from "@shared/schema";
 import type { Lot, Farmer, Buyer, Bid } from "@shared/schema";
-import { Gavel, Plus, Trash2, Search } from "lucide-react";
+import { Gavel, Plus, Trash2, Search, AlertTriangle } from "lucide-react";
 
 type LotWithFarmer = Lot & { farmer: Farmer };
 type BidWithDetails = Bid & { buyer: Buyer; lot: Lot };
@@ -303,6 +303,12 @@ export default function BiddingPage() {
                         <Button size="sm" data-testid="button-save-buyer" onClick={addNewBuyer} className="mobile-touch-target">{t("common.save")}</Button>
                         <Button size="sm" variant="secondary" onClick={() => setShowNewBuyer(false)} className="mobile-touch-target">{t("common.cancel")}</Button>
                       </div>
+                    </div>
+                  )}
+                  {selectedBuyerId && buyers.find(b => b.id === selectedBuyerId)?.redFlag && (
+                    <div className="flex items-center gap-2 p-3 rounded-md bg-orange-50 border border-orange-300 text-orange-800 text-sm" data-testid="warning-red-flag-buyer">
+                      <AlertTriangle className="w-4 h-4 flex-shrink-0 text-orange-600" />
+                      <span className="font-medium">{t("bidding.redFlagWarningBuyer")}</span>
                     </div>
                   )}
                 </div>
