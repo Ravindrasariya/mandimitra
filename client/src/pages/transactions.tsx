@@ -1334,22 +1334,6 @@ export default function TransactionsPage() {
                 </Collapsible>
               )}
 
-              {isEditing && currentItem?.txn && !currentItem.txn.isReversed && (
-                <Button
-                  variant="destructive"
-                  data-testid="button-reverse-tx"
-                  className="w-full mobile-touch-target"
-                  onClick={() => {
-                    const txn = currentItem.txn!;
-                    const fullTxn = { ...txn, buyer: currentItem.bid.buyer, lot: currentItem.bid.lot, farmer: currentItem.bid.farmer } as TransactionWithDetails;
-                    setReversingTxn(fullTxn);
-                    setReverseConfirmOpen(true);
-                  }}
-                  disabled={reverseTxMutation.isPending}
-                >
-                  {t("transactions.returnToStockRegister")}
-                </Button>
-              )}
               {!isEditing && currentItem && (
                 <Button
                   variant="destructive"
