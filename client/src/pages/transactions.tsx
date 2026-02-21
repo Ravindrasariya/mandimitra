@@ -681,7 +681,8 @@ export default function TransactionsPage() {
       "Hammali Farmer/Bag", "Hammali Buyer/Bag", "Extra Charges Farmer", "Extra Charges Buyer",
       "Aadhat Farmer %", "Aadhat Buyer %", "Mandi Farmer %", "Mandi Buyer %",
       "Freight Charges",
-      "Payable to Farmer", "Receivable from Buyer", "Status"
+      "Payable to Farmer", "Receivable from Buyer",
+      "Farmer Payment Status", "Buyer Payment Status", "Status"
     ];
 
     const escCSV = (val: any) => {
@@ -691,6 +692,10 @@ export default function TransactionsPage() {
 
     const rows = allTxns.map(tx => {
       const bid = bidForTxn(tx);
+      const farmerPaid = parseFloat(tx.farmerPaidAmount || "0");
+      const farmerPayable = parseFloat(tx.totalPayableToFarmer || "0");
+      const farmerStatus = farmerPaid >= farmerPayable ? "Paid" : farmerPaid > 0 ? "Partial" : "Due";
+      const buyerStatus = tx.paymentStatus === "paid" ? "Paid" : tx.paymentStatus === "partial" ? "Partial" : "Due";
       return [
         tx.transactionId, tx.date, tx.lot.lotId, tx.lot.serialNumber, tx.lot.crop, tx.lot.variety || "",
         tx.farmer.name, tx.farmer.phone, tx.farmer.village || "",
@@ -702,7 +707,8 @@ export default function TransactionsPage() {
         tx.aadhatFarmerPercent || "0", tx.aadhatBuyerPercent || "0",
         tx.mandiFarmerPercent || "0", tx.mandiBuyerPercent || "0",
         tx.freightCharges || "0",
-        tx.totalPayableToFarmer, tx.totalReceivableFromBuyer, tx.isReversed ? "Reversed" : "Active"
+        tx.totalPayableToFarmer, tx.totalReceivableFromBuyer,
+        farmerStatus, buyerStatus, tx.isReversed ? "Reversed" : "Active"
       ].map(escCSV).join(",");
     });
 
