@@ -111,7 +111,9 @@ export default function StockEntryPage() {
   };
 
   const addLot = () => {
-    setLots([...lots, { ...emptyLot }]);
+    const lastLot = lots[lots.length - 1];
+    const newLot = { ...emptyLot, vehicleNumber: lastLot?.vehicleNumber || "", vehicleBhadaRate: lastLot?.vehicleBhadaRate || "" };
+    setLots([...lots, newLot]);
   };
 
   const removeLot = (index: number) => {
