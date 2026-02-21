@@ -51,15 +51,16 @@ export default function BiddingPage() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/bids"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bids"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/lots"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"], refetchType: "all" });
       queryClient.invalidateQueries({ predicate: (query) => {
         const key = query.queryKey[0];
         return typeof key === "string" && key.startsWith("/api/buyers");
-      }});
+      }, refetchType: "all" });
       toast({ title: "Bid Saved", variant: "success" });
       setPricePerKg("");
       const bagsUsed = parseInt(bidBags) || 0;
@@ -81,15 +82,16 @@ export default function BiddingPage() {
       await apiRequest("DELETE", `/api/bids/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/bids"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bids"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/lots"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"], refetchType: "all" });
+      queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"], refetchType: "all" });
       queryClient.invalidateQueries({ predicate: (query) => {
         const key = query.queryKey[0];
         return typeof key === "string" && key.startsWith("/api/buyers");
-      }});
+      }, refetchType: "all" });
       toast({ title: "Bid Deleted", variant: "success" });
     },
   });
