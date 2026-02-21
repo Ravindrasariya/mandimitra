@@ -712,14 +712,6 @@ export default function BuyerLedgerPage() {
                         <td className="p-3">
                           <div className="flex items-center gap-1">
                             <button
-                              data-testid={`button-print-buyer-${buyer.id}`}
-                              className="p-1.5 rounded hover:bg-muted"
-                              onClick={() => printBuyerPaana(buyer)}
-                              title="Print"
-                            >
-                              <Printer className="w-4 h-4 text-muted-foreground" />
-                            </button>
-                            <button
                               data-testid={`button-share-buyer-${buyer.id}`}
                               className="p-1.5 rounded hover:bg-muted"
                               onClick={() => shareBuyerPaana(buyer)}
@@ -763,13 +755,6 @@ export default function BuyerLedgerPage() {
                               onClick={() => openEdit(buyer)}
                             >
                               <Pencil className="w-4 h-4 text-muted-foreground" />
-                            </button>
-                            <button
-                              data-testid={`button-print-buyer-mobile-${buyer.id}`}
-                              className="p-1.5 rounded hover:bg-muted"
-                              onClick={() => printBuyerPaana(buyer)}
-                            >
-                              <Printer className="w-4 h-4 text-muted-foreground" />
                             </button>
                             <button
                               data-testid={`button-share-buyer-mobile-${buyer.id}`}
