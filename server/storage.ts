@@ -461,7 +461,8 @@ export class DatabaseStorage implements IStorage {
       const totalReceivable = parseFloat(txSum?.total || "0");
       const totalPaid = parseFloat(cashSum?.total || "0");
       const openingBal = parseFloat(buyer.openingBalance || "0");
-      const receivableDue = (totalReceivable - totalPaid).toFixed(2);
+      const paidAfterOpening = Math.max(0, totalPaid - Math.max(0, openingBal));
+      const receivableDue = Math.max(0, totalReceivable - paidAfterOpening).toFixed(2);
       const overallDue = (openingBal + totalReceivable - totalPaid).toFixed(2);
 
       const buyerBidDates = bidDateMap.get(buyer.id);
@@ -795,6 +796,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async recalculateBuyerPaymentStatus(businessId: number, buyerId: number): Promise<void> {
+    const buyer = await this.getBuyer(buyerId, businessId);
+    if (!buyer) return;
+
     const buyerTxns = await db.select()
       .from(transactions)
       .where(and(
@@ -814,6 +818,11 @@ export class DatabaseStorage implements IStorage {
     ));
 
     let remaining = parseFloat(cashSum?.total || "0");
+
+    const openingBal = parseFloat(buyer.openingBalance || "0");
+    if (openingBal > 0) {
+      remaining = Math.max(0, remaining - openingBal);
+    }
 
     for (const txn of buyerTxns) {
       const receivable = parseFloat(txn.totalReceivableFromBuyer || "0");
@@ -839,6 +848,9 @@ export class DatabaseStorage implements IStorage {
   }
 
   async recalculateFarmerPaymentStatus(businessId: number, farmerId: number): Promise<void> {
+    const farmer = await this.getFarmer(farmerId, businessId);
+    if (!farmer) return;
+
     const farmerTxns = await db.select()
       .from(transactions)
       .where(and(
@@ -858,6 +870,11 @@ export class DatabaseStorage implements IStorage {
     ));
 
     let remaining = parseFloat(cashSum?.total || "0");
+
+    const openingBal = parseFloat(farmer.openingBalance || "0");
+    if (openingBal > 0) {
+      remaining = Math.max(0, remaining - openingBal);
+    }
 
     for (const txn of farmerTxns) {
       const payable = parseFloat(txn.totalPayableToFarmer || "0");
