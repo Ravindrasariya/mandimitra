@@ -343,6 +343,14 @@ export default function CashPage() {
       toast({ title: t("common.error"), description: "Select a farmer", variant: "destructive" });
       return;
     }
+    if (outwardOutflowType === "Farmer-Harvest Sale" && outwardFarmerId) {
+      const farmer = farmersWithDues.find(f => f.id === parseInt(outwardFarmerId));
+      const maxDue = farmer ? parseFloat(farmer.totalDue) : 0;
+      if (parseFloat(outwardAmount) > maxDue) {
+        toast({ title: t("common.error"), description: `Amount cannot exceed farmer's due of ₹${maxDue.toLocaleString("en-IN")}`, variant: "destructive" });
+        return;
+      }
+    }
     if (outwardOutflowType === "Salary" && !outwardReceiverName.trim()) {
       toast({ title: t("common.error"), description: "Enter receiver name", variant: "destructive" });
       return;
@@ -845,7 +853,7 @@ export default function CashPage() {
                         <span className="truncate flex-1" data-testid="text-outward-farmer-selected">
                           {(() => { const f = farmersWithDues.find(f => f.id === parseInt(outwardFarmerId)); return f ? (parseFloat(f.totalDue) > 0 ? `${f.name} - Due: ₹${parseFloat(f.totalDue).toLocaleString("en-IN")}` : f.name) : ""; })()}
                         </span>
-                        <button onClick={() => { setOutwardFarmerId(""); setOutwardFarmerSearch(""); }} className="shrink-0" data-testid="button-clear-outward-farmer"><X className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => { setOutwardFarmerId(""); setOutwardFarmerSearch(""); if (outwardOutflowType === "Farmer-Harvest Sale") setOutwardAmount(""); }} className="shrink-0" data-testid="button-clear-outward-farmer"><X className="w-3.5 h-3.5" /></button>
                       </div>
                     ) : (
                       <>
@@ -874,7 +882,7 @@ export default function CashPage() {
                                 : farmerList.slice(0, 20);
                               return list.length > 0 ? list.map(f => (
                                 <button key={f.id} className="flex items-center gap-1.5 px-3 py-2 text-sm w-full text-left hover:bg-accent" data-testid={`outward-farmer-opt-${f.id}`}
-                                  onMouseDown={(e) => { e.preventDefault(); setOutwardFarmerId(f.id.toString()); setOutwardFarmerSearch(""); setOutwardFarmerOpen(false); }}>
+                                  onMouseDown={(e) => { e.preventDefault(); setOutwardFarmerId(f.id.toString()); setOutwardFarmerSearch(""); setOutwardFarmerOpen(false); if (outwardOutflowType === "Farmer-Harvest Sale" && parseFloat(f.totalDue) > 0) { setOutwardAmount(parseFloat(f.totalDue).toString()); } }}>
                                   <span className="font-medium">{f.name}</span>
                                   <span className="text-muted-foreground text-xs">{f.phone}</span>
                                   {f.village && <span className="text-muted-foreground text-xs">({f.village})</span>}
@@ -908,7 +916,23 @@ export default function CashPage() {
               )}
               <div className="space-y-1">
                 <Label className="text-xs">{t("cash.amount")}</Label>
-                <Input type="number" inputMode="decimal" value={outwardAmount} onChange={e => setOutwardAmount(e.target.value)} onFocus={e => e.target.select()} placeholder="0" className="h-9 text-sm" data-testid="outward-amount" />
+                <Input type="number" inputMode="decimal" value={outwardAmount} onChange={e => {
+                  const val = e.target.value;
+                  if (outwardOutflowType === "Farmer-Harvest Sale" && outwardFarmerId) {
+                    const farmer = farmersWithDues.find(f => f.id === parseInt(outwardFarmerId));
+                    const maxDue = farmer ? parseFloat(farmer.totalDue) : 0;
+                    if (val && parseFloat(val) > maxDue) {
+                      setOutwardAmount(maxDue.toString());
+                      return;
+                    }
+                  }
+                  setOutwardAmount(val);
+                }} onFocus={e => e.target.select()} placeholder="0" className="h-9 text-sm" data-testid="outward-amount" />
+                {outwardOutflowType === "Farmer-Harvest Sale" && outwardFarmerId && (() => {
+                  const farmer = farmersWithDues.find(f => f.id === parseInt(outwardFarmerId));
+                  const maxDue = farmer ? parseFloat(farmer.totalDue) : 0;
+                  return maxDue > 0 ? <p className="text-[11px] text-muted-foreground">Max: ₹{maxDue.toLocaleString("en-IN")}</p> : null;
+                })()}
               </div>
               <div className="space-y-1">
                 <Label className="text-xs">{t("cash.paidOn")}</Label>
