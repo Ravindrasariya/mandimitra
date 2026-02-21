@@ -16,7 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import type { Buyer, BuyerEditHistory } from "@shared/schema";
-import { ShoppingBag, Search, Plus, Pencil, ArrowUpDown, ArrowUp, ArrowDown, Printer, RefreshCw, ChevronDown, Calendar, Share2 } from "lucide-react";
+import { ShoppingBag, Search, Plus, Pencil, ArrowUpDown, ArrowUp, ArrowDown, Printer, RefreshCw, ChevronDown, Calendar, Share2, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { printReceipt, shareReceiptAsPdf } from "@/lib/receiptUtils";
 
@@ -690,9 +690,12 @@ export default function BuyerLedgerPage() {
                         <td className="p-3 text-muted-foreground">{buyer.buyerCode || "-"}</td>
                         <td className="p-3">{buyer.phone || "-"}</td>
                         <td className="p-3 text-center">
-                          <span className={`text-xs font-medium ${buyer.redFlag ? "text-destructive" : "text-muted-foreground"}`}>
-                            {buyer.redFlag ? t("common.yes") : t("common.no")}
-                          </span>
+                          {buyer.redFlag && (
+                            <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                              <AlertTriangle className="w-3 h-3 mr-0.5" />
+                              Flag
+                            </Badge>
+                          )}
                         </td>
                         <td className="p-3 text-center">
                           <Switch
