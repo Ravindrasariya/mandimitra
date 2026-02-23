@@ -481,14 +481,16 @@ export default function TransactionsPage() {
       ? selectedDays[0]
       : `${selectedDays.length} ${t("stockRegister.nDays")}`;
 
-  const filteredGroups = useMemo(() => {
-    return unifiedGroups.filter(g => {
-      if (cropFilter !== "all" && g.lot.crop !== cropFilter) return false;
+  const filteredSerialGroups = useMemo(() => {
+    return serialGroups.filter(sg => {
+      if (cropFilter !== "all" && !sg.lotGroups.some(lg => lg.lot.crop === cropFilter)) return false;
       const bidDates: Date[] = [
-        ...g.pendingBids.map(b => new Date(b.createdAt)),
-        ...g.completedTxns.map(t => new Date(t.bid.createdAt)),
+        ...sg.allPendingBids.map(b => new Date(b.createdAt)),
+        ...sg.allCompletedTxns.map(t => new Date(t.bid.createdAt)),
       ];
-      if (bidDates.length === 0) bidDates.push(new Date(g.lot.createdAt));
+      if (bidDates.length === 0) {
+        bidDates.push(...sg.lotGroups.map(lg => new Date(lg.lot.createdAt)));
+      }
       const hasMatchingDate = bidDates.some(bd => {
         if (bd.getFullYear() !== parseInt(yearFilter)) return false;
         if (selectedMonths.length > 0 && !selectedMonths.includes(String(bd.getMonth() + 1))) return false;
@@ -497,13 +499,13 @@ export default function TransactionsPage() {
       });
       if (!hasMatchingDate) return false;
       if (buyerPaymentFilter !== "all") {
-        const activeTxns = g.completedTxns.filter(t => !t.isReversed);
+        const activeTxns = sg.allCompletedTxns.filter(t => !t.isReversed);
         if (activeTxns.length === 0) return false;
         const hasMatch = activeTxns.some(t => t.paymentStatus === buyerPaymentFilter);
         if (!hasMatch) return false;
       }
       if (farmerPaymentFilter !== "all") {
-        const activeTxns = g.completedTxns.filter(t => !t.isReversed);
+        const activeTxns = sg.allCompletedTxns.filter(t => !t.isReversed);
         if (activeTxns.length === 0) return false;
         const totalPayable = activeTxns.reduce((s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0);
         const totalPaid = activeTxns.reduce((s, t) => s + parseFloat(t.farmerPaidAmount || "0"), 0);
@@ -512,11 +514,15 @@ export default function TransactionsPage() {
       }
       return true;
     });
-  }, [unifiedGroups, cropFilter, yearFilter, selectedMonths, selectedDays, buyerPaymentFilter, farmerPaymentFilter]);
+  }, [serialGroups, cropFilter, yearFilter, selectedMonths, selectedDays, buyerPaymentFilter, farmerPaymentFilter]);
+
+  const filteredGroups = useMemo(() => {
+    return filteredSerialGroups.flatMap(sg => sg.lotGroups);
+  }, [filteredSerialGroups]);
 
   const summaryStats = useMemo(() => {
-    const allActiveTxns = filteredGroups.flatMap(g => g.completedTxns.filter(t => !t.isReversed));
-    const lotsCount = filteredGroups.length;
+    const allActiveTxns = filteredSerialGroups.flatMap(sg => sg.allCompletedTxns.filter(t => !t.isReversed));
+    const lotsCount = filteredSerialGroups.length;
     const txnCount = allActiveTxns.length;
     const totalPayableToFarmer = allActiveTxns.reduce((s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0);
     const totalReceivableFromBuyer = allActiveTxns.reduce((s, t) => s + parseFloat(t.totalReceivableFromBuyer || "0"), 0);
@@ -710,7 +716,7 @@ export default function TransactionsPage() {
   };
 
   const exportCSV = () => {
-    const allTxns = filteredGroups.flatMap(g => g.completedTxns.filter(t => !t.isReversed));
+    const allTxns = filteredSerialGroups.flatMap(sg => sg.allCompletedTxns.filter(t => !t.isReversed));
     if (allTxns.length === 0) return;
 
     const headers = [
@@ -885,7 +891,7 @@ export default function TransactionsPage() {
           className="h-8 w-8 p-0 shrink-0"
           data-testid="button-export-csv"
           onClick={exportCSV}
-          disabled={filteredGroups.flatMap(g => g.completedTxns.filter(t => !t.isReversed)).length === 0}
+          disabled={filteredSerialGroups.flatMap(sg => sg.allCompletedTxns.filter(t => !t.isReversed)).length === 0}
           title="Download CSV"
         >
           <Download className="w-4 h-4" />
@@ -962,39 +968,41 @@ export default function TransactionsPage() {
         </Card>
       </div>
 
-      {filteredGroups.length > 0 ? (
+      {filteredSerialGroups.length > 0 ? (
         <div className="space-y-3">
-          {filteredGroups.map((group) => {
-            const activeTxns = group.completedTxns.filter(t => !t.isReversed);
+          {filteredSerialGroups.map((sg) => {
+            const activeTxns = sg.allCompletedTxns.filter(t => !t.isReversed);
             const hasCompleted = activeTxns.length > 0;
             const totalFarmerPayable = activeTxns.reduce(
               (s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0
             );
 
             return (
-              <Card key={group.lot.id} data-testid={`card-lot-${group.lot.id}`}>
+              <Card key={`${sg.date}-${sg.serialNumber}`} data-testid={`card-serial-${sg.serialNumber}`}>
                 <CardContent className="pt-4">
                   <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Badge variant="secondary" className="text-xs">#{group.lot.serialNumber}</Badge>
-                      <Badge variant="secondary" className="text-xs">{group.lotId}</Badge>
-                      <Badge variant="outline" className="text-xs">{group.lot.crop}</Badge>
+                      <Badge variant="secondary" className="text-xs font-semibold">SR #{sg.serialNumber}</Badge>
+                      <span className="text-xs text-muted-foreground">{sg.date}</span>
                     </div>
                     <div className="flex items-center gap-1">
-                      <Button
-                        data-testid={`button-edit-lot-${group.lot.id}`}
-                        size="sm"
-                        className="mobile-touch-target"
-                        onClick={() => openEditDialog(group)}
-                      >
-                        <Pencil className="w-4 h-4 mr-1" />
-                        {t("common.edit")}
-                      </Button>
+                      {sg.lotGroups.map((lg) => (
+                        <Button
+                          key={lg.lot.id}
+                          data-testid={`button-edit-lot-${lg.lot.id}`}
+                          size="sm"
+                          className="mobile-touch-target"
+                          onClick={() => openEditDialog(lg)}
+                        >
+                          <Pencil className="w-4 h-4 mr-1" />
+                          {sg.lotGroups.length > 1 ? lg.lot.crop : t("common.edit")}
+                        </Button>
+                      ))}
                       {hasCompleted && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
                             <Button
-                              data-testid={`button-print-lot-${group.lot.id}`}
+                              data-testid={`button-print-serial-${sg.serialNumber}`}
                               variant="outline"
                               size="sm"
                               className="mobile-touch-target"
@@ -1004,45 +1012,57 @@ export default function TransactionsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              data-testid={`button-print-farmer-${group.lot.id}`}
-                              onClick={() => handlePrintFarmerReceipt(group)}
-                            >
-                              <Printer className="w-4 h-4 mr-2" />
-                              Print किसान रसीद (Farmer)
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              data-testid={`button-share-farmer-${group.lot.id}`}
-                              onClick={() => handleShareFarmerReceipt(group)}
-                            >
-                              <Share2 className="w-4 h-4 mr-2" />
-                              Share किसान रसीद (WhatsApp)
-                            </DropdownMenuItem>
-                            {group.completedTxns.filter(t => !t.isReversed).map((tx) => (
-                              <div key={tx.id}>
-                                <DropdownMenuItem
-                                  data-testid={`button-print-buyer-${tx.id}`}
-                                  onClick={() => handlePrintBuyerReceipt(tx, group)}
-                                >
-                                  <Printer className="w-4 h-4 mr-2" />
-                                  Print Buyer - {tx.buyer.name}
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  data-testid={`button-share-buyer-${tx.id}`}
-                                  onClick={() => handleShareBuyerReceipt(tx, group)}
-                                >
-                                  <Share2 className="w-4 h-4 mr-2" />
-                                  Share Buyer - {tx.buyer.name} (WhatsApp)
-                                </DropdownMenuItem>
-                              </div>
-                            ))}
+                            {sg.lotGroups.map((lg) => {
+                              const lgActiveTxns = lg.completedTxns.filter(t => !t.isReversed);
+                              if (lgActiveTxns.length === 0) return null;
+                              return (
+                                <div key={lg.lot.id}>
+                                  <DropdownMenuItem
+                                    data-testid={`button-print-farmer-${lg.lot.id}`}
+                                    onClick={() => handlePrintFarmerReceipt(lg)}
+                                  >
+                                    <Printer className="w-4 h-4 mr-2" />
+                                    Print किसान रसीद - {lg.lot.crop}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem
+                                    data-testid={`button-share-farmer-${lg.lot.id}`}
+                                    onClick={() => handleShareFarmerReceipt(lg)}
+                                  >
+                                    <Share2 className="w-4 h-4 mr-2" />
+                                    Share किसान रसीद - {lg.lot.crop}
+                                  </DropdownMenuItem>
+                                  {lgActiveTxns.map((tx) => (
+                                    <div key={tx.id}>
+                                      <DropdownMenuItem
+                                        data-testid={`button-print-buyer-${tx.id}`}
+                                        onClick={() => handlePrintBuyerReceipt(tx, lg)}
+                                      >
+                                        <Printer className="w-4 h-4 mr-2" />
+                                        Print Buyer - {tx.buyer.name} ({lg.lot.crop})
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        data-testid={`button-share-buyer-${tx.id}`}
+                                        onClick={() => handleShareBuyerReceipt(tx, lg)}
+                                      >
+                                        <Share2 className="w-4 h-4 mr-2" />
+                                        Share Buyer - {tx.buyer.name} ({lg.lot.crop})
+                                      </DropdownMenuItem>
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            })}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       )}
                     </div>
                   </div>
-                  <p className="text-sm mb-0.5">{t("transactions.farmer")}: <strong>{group.farmer.name}</strong></p>
-                  <p className="text-xs text-muted-foreground mb-2">{group.lot.actualNumberOfBags ?? group.lot.numberOfBags} {t("transactions.bagsTotal")}{(group.lot.actualNumberOfBags != null && group.lot.actualNumberOfBags !== group.lot.numberOfBags) ? ` (Orig: ${group.lot.numberOfBags})` : ""}</p>
+                  <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                    <span className="text-sm font-medium">{sg.farmer.name}</span>
+                    {sg.farmer.phone && <span className="text-xs text-muted-foreground">{sg.farmer.phone}</span>}
+                    {sg.farmer.village && <span className="text-xs text-muted-foreground">{sg.farmer.village}</span>}
+                  </div>
+                  <p className="text-xs text-muted-foreground mb-2">{sg.totalBags} {t("transactions.bagsTotal")}</p>
 
                   {hasCompleted && (() => {
                     const farmerTotalPayable = activeTxns.reduce((s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0);
@@ -1062,40 +1082,52 @@ export default function TransactionsPage() {
                   })()}
 
                   <div className="border-t pt-2 space-y-1">
-                    {group.completedTxns.map((tx) => (
-                      <div key={tx.id} className={`text-sm py-1 ${tx.isReversed ? "opacity-40" : ""}`}>
-                        <div className="flex items-center justify-between flex-wrap gap-x-2 gap-y-0.5">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-muted-foreground">{t("transactions.buyer")}:</span>
-                            <strong className="truncate">{tx.buyer.name}</strong>
-                            <span className="text-green-600 font-semibold whitespace-nowrap">₹{tx.pricePerKg}/kg</span>
-                            {tx.isReversed && <Badge variant="outline" className="text-xs border-orange-400 text-orange-600 bg-orange-50">{t("transactions.reversed")}</Badge>}
-                            {!tx.isReversed && tx.paymentStatus === "paid" && <Badge variant="outline" className="text-xs border-green-400 text-green-700 bg-green-50">Paid</Badge>}
-                            {!tx.isReversed && tx.paymentStatus === "partial" && <Badge variant="outline" className="text-xs border-orange-400 text-orange-600 bg-orange-50">Partial</Badge>}
-                            {!tx.isReversed && tx.paymentStatus === "due" && <Badge variant="outline" className="text-xs border-red-400 text-red-600 bg-red-50">Due</Badge>}
+                    {sg.lotGroups.map((lg) => (
+                      <div key={lg.lot.id}>
+                        {sg.lotGroups.length > 1 && (lg.completedTxns.length > 0 || lg.pendingBids.length > 0) && (
+                          <div className="flex items-center gap-2 mt-1 mb-0.5">
+                            <Badge className="text-xs">{lg.lot.crop}</Badge>
+                            {lg.lot.size && <Badge variant="outline" className="text-xs">{lg.lot.size}</Badge>}
+                            <span className="text-xs text-muted-foreground">{lg.lot.actualNumberOfBags ?? lg.lot.numberOfBags} bags</span>
                           </div>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span>{tx.numberOfBags} bags</span>
-                            <span>{tx.lot.size || ""}</span>
-                            <span>Net: {tx.netWeight}kg</span>
-                            <span className="text-chart-2 font-medium text-sm">Rs.{tx.totalReceivableFromBuyer}</span>
+                        )}
+                        {lg.completedTxns.map((tx) => (
+                          <div key={tx.id} className={`text-sm py-1 ${tx.isReversed ? "opacity-40" : ""}`}>
+                            <div className="flex items-center justify-between flex-wrap gap-x-2 gap-y-0.5">
+                              <div className="flex items-center gap-2 min-w-0">
+                                {sg.lotGroups.length === 1 && <Badge className="text-xs">{tx.lot.crop}</Badge>}
+                                <span className="text-muted-foreground">{t("transactions.buyer")}:</span>
+                                <strong className="truncate">{tx.buyer.name}</strong>
+                                <span className="text-green-600 font-semibold whitespace-nowrap">₹{tx.pricePerKg}/kg</span>
+                                {tx.isReversed && <Badge variant="outline" className="text-xs border-orange-400 text-orange-600 bg-orange-50">{t("transactions.reversed")}</Badge>}
+                                {!tx.isReversed && tx.paymentStatus === "paid" && <Badge variant="outline" className="text-xs border-green-400 text-green-700 bg-green-50">Paid</Badge>}
+                                {!tx.isReversed && tx.paymentStatus === "partial" && <Badge variant="outline" className="text-xs border-orange-400 text-orange-600 bg-orange-50">Partial</Badge>}
+                                {!tx.isReversed && tx.paymentStatus === "due" && <Badge variant="outline" className="text-xs border-red-400 text-red-600 bg-red-50">Due</Badge>}
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <span>{tx.numberOfBags} bags</span>
+                                <span>Net: {tx.netWeight}kg</span>
+                                <span className="text-chart-2 font-medium text-sm">Rs.{tx.totalReceivableFromBuyer}</span>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    ))}
-                    {group.pendingBids.map((bid) => (
-                      <div key={bid.id} className="text-sm py-1">
-                        <div className="flex items-center justify-between flex-wrap gap-x-2 gap-y-0.5">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-muted-foreground">{t("transactions.buyer")}:</span>
-                            <strong className="truncate">{bid.buyer.name}</strong>
-                            <span className="text-green-600 font-semibold whitespace-nowrap">₹{bid.pricePerKg}/kg</span>
+                        ))}
+                        {lg.pendingBids.map((bid) => (
+                          <div key={bid.id} className="text-sm py-1">
+                            <div className="flex items-center justify-between flex-wrap gap-x-2 gap-y-0.5">
+                              <div className="flex items-center gap-2 min-w-0">
+                                {sg.lotGroups.length === 1 && <Badge className="text-xs">{bid.lot.crop}</Badge>}
+                                <span className="text-muted-foreground">{t("transactions.buyer")}:</span>
+                                <strong className="truncate">{bid.buyer.name}</strong>
+                                <span className="text-green-600 font-semibold whitespace-nowrap">₹{bid.pricePerKg}/kg</span>
+                              </div>
+                              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <span>{bid.numberOfBags} bags</span>
+                                <span>{bid.grade || "N/A"}</span>
+                              </div>
+                            </div>
                           </div>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span>{bid.numberOfBags} bags</span>
-                            <span>{bid.grade || "N/A"}</span>
-                          </div>
-                        </div>
+                        ))}
                       </div>
                     ))}
                   </div>
