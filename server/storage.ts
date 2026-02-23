@@ -73,6 +73,7 @@ export interface IStorage {
   updateBid(id: number, businessId: number, data: Partial<InsertBid>): Promise<Bid | undefined>;
   deleteBid(id: number, businessId: number): Promise<void>;
 
+  getBuyerPendingTransactions(businessId: number, buyerId: number): Promise<any[]>;
   getTransactions(businessId: number, filters?: { farmerId?: number; buyerId?: number; dateFrom?: string; dateTo?: string }): Promise<(Transaction & { farmer: Farmer; buyer: Buyer; lot: Lot; bid: Bid })[]>;
   getTransaction(id: number, businessId: number): Promise<(Transaction & { farmer: Farmer; buyer: Buyer; lot: Lot; bid: Bid }) | undefined>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
@@ -626,6 +627,74 @@ export class DatabaseStorage implements IStorage {
     return results.map(r => ({ ...r.transaction, farmer: r.farmer, buyer: r.buyer, lot: r.lot, bid: r.bid }));
   }
 
+  async getBuyerPendingTransactions(businessId: number, buyerId: number): Promise<any[]> {
+    const results = await db.select({
+      transaction: transactions,
+      lot: lots,
+      bid: bids,
+    }).from(transactions)
+      .innerJoin(lots, eq(transactions.lotId, lots.id))
+      .innerJoin(bids, eq(transactions.bidId, bids.id))
+      .where(and(
+        eq(transactions.businessId, businessId),
+        eq(transactions.buyerId, buyerId),
+        eq(transactions.isReversed, false),
+      ))
+      .orderBy(transactions.date, transactions.id);
+
+    const pendingTxns = results
+      .map(r => {
+        const receivable = parseFloat(r.transaction.totalReceivableFromBuyer || "0");
+        const paid = parseFloat(r.transaction.paidAmount || "0");
+        const due = receivable - paid;
+        return {
+          id: r.transaction.id,
+          transactionId: r.transaction.transactionId,
+          serialNumber: r.lot.serialNumber,
+          date: r.transaction.date,
+          numberOfBags: r.transaction.numberOfBags,
+          crop: r.lot.crop,
+          totalReceivableFromBuyer: r.transaction.totalReceivableFromBuyer,
+          paidAmount: r.transaction.paidAmount,
+          due: due.toFixed(2),
+          bidCreatedAt: r.bid.createdAt,
+        };
+      })
+      .filter(t => parseFloat(t.due) > 0);
+
+    const buyer = await this.getBuyer(buyerId, businessId);
+    const openingBal = parseFloat(buyer?.openingBalance || "0");
+    if (openingBal > 0) {
+      const totalCashEntries = await db.select({
+        total: sql<string>`coalesce(sum(cast(${cashEntries.amount} as numeric) + cast(${cashEntries.discount} as numeric) + cast(${cashEntries.pettyAdj} as numeric)), 0)`
+      }).from(cashEntries).where(and(
+        eq(cashEntries.businessId, businessId),
+        eq(cashEntries.buyerId, buyerId),
+        eq(cashEntries.category, "inward"),
+        eq(cashEntries.isReversed, false),
+        sql`${cashEntries.transactionId} IS NULL`,
+      ));
+      const paidTowardsOpening = parseFloat(totalCashEntries[0]?.total || "0");
+      const openingDue = Math.max(0, openingBal - paidTowardsOpening);
+      if (openingDue > 0) {
+        pendingTxns.unshift({
+          id: 0,
+          transactionId: "PY_OPENING",
+          serialNumber: 0,
+          date: "Previous Year",
+          numberOfBags: 0,
+          crop: "",
+          totalReceivableFromBuyer: openingBal.toFixed(2),
+          paidAmount: paidTowardsOpening.toFixed(2),
+          due: openingDue.toFixed(2),
+          bidCreatedAt: new Date(0),
+        });
+      }
+    }
+
+    return pendingTxns;
+  }
+
   async getTransaction(id: number, businessId: number): Promise<(Transaction & { farmer: Farmer; buyer: Buyer; lot: Lot; bid: Bid }) | undefined> {
     const [result] = await db.select({
       transaction: transactions,
@@ -793,6 +862,47 @@ export class DatabaseStorage implements IStorage {
     throw new Error("Failed to generate unique cash flow ID after retries");
   }
 
+  async createCashEntryBatch(baseEntry: InsertCashEntry, allocations: { transactionId: number | null; amount: string; discount: string; pettyAdj: string }[]): Promise<CashEntry[]> {
+    const txDate = baseEntry.date ? new Date(baseEntry.date + "T00:00:00") : new Date();
+    const dateStr = `${txDate.getFullYear()}${String(txDate.getMonth() + 1).padStart(2, "0")}${String(txDate.getDate()).padStart(2, "0")}`;
+    const prefix = `CF${dateStr}`;
+
+    const existing = await db.select({ cashFlowId: cashEntries.cashFlowId })
+      .from(cashEntries)
+      .where(and(
+        eq(cashEntries.businessId, baseEntry.businessId),
+        sql`${cashEntries.cashFlowId} like ${prefix + "%"}`
+      ));
+
+    let maxSeq = 0;
+    for (const row of existing) {
+      const suffix = (row.cashFlowId || "").substring(prefix.length);
+      const num = parseInt(suffix, 10);
+      if (!isNaN(num) && num > maxSeq) maxSeq = num;
+    }
+
+    const cashFlowId = `${prefix}${maxSeq + 1}`;
+    const created: CashEntry[] = [];
+
+    for (const alloc of allocations) {
+      const [entry] = await db.insert(cashEntries).values({
+        ...baseEntry,
+        cashFlowId,
+        transactionId: alloc.transactionId,
+        amount: alloc.amount,
+        discount: alloc.discount,
+        pettyAdj: alloc.pettyAdj,
+      }).returning();
+      created.push(entry);
+    }
+
+    if (baseEntry.buyerId) {
+      await this.recalculateBuyerPaymentStatus(baseEntry.businessId, baseEntry.buyerId);
+    }
+
+    return created;
+  }
+
   async reverseCashEntry(id: number, businessId: number, reason?: string | null): Promise<CashEntry | undefined> {
     const [existing] = await db.select().from(cashEntries).where(and(eq(cashEntries.id, id), eq(cashEntries.businessId, businessId)));
     if (!existing) return undefined;
@@ -827,34 +937,20 @@ export class DatabaseStorage implements IStorage {
       ))
       .orderBy(transactions.date, transactions.id);
 
-    const [cashSum] = await db.select({
-      total: sql<string>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`
-    }).from(cashEntries).where(and(
-      eq(cashEntries.businessId, businessId),
-      eq(cashEntries.buyerId, buyerId),
-      eq(cashEntries.category, "inward"),
-      eq(cashEntries.isReversed, false)
-    ));
-
-    let remaining = parseFloat(cashSum?.total || "0");
-
-    const openingBal = parseFloat(buyer.openingBalance || "0");
-    if (openingBal > 0) {
-      remaining = Math.max(0, remaining - openingBal);
-    }
-
     for (const txn of buyerTxns) {
       const receivable = parseFloat(txn.totalReceivableFromBuyer || "0");
-      let paidForThis = 0;
 
-      if (remaining >= receivable) {
-        paidForThis = receivable;
-        remaining -= receivable;
-      } else if (remaining > 0) {
-        paidForThis = remaining;
-        remaining = 0;
-      }
+      const [entrySum] = await db.select({
+        total: sql<string>`coalesce(sum(cast(${cashEntries.amount} as numeric) + cast(${cashEntries.discount} as numeric) + cast(${cashEntries.pettyAdj} as numeric)), 0)`
+      }).from(cashEntries).where(and(
+        eq(cashEntries.businessId, businessId),
+        eq(cashEntries.buyerId, buyerId),
+        eq(cashEntries.transactionId, txn.id),
+        eq(cashEntries.category, "inward"),
+        eq(cashEntries.isReversed, false)
+      ));
 
+      const paidForThis = parseFloat(entrySum?.total || "0");
       const status = paidForThis >= receivable ? "paid" : paidForThis > 0 ? "partial" : "due";
 
       await db.update(transactions)

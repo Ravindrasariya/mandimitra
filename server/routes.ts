@@ -393,6 +393,15 @@ export async function registerRoutes(
     res.json(result);
   });
 
+  app.get("/api/buyers/:id/pending-transactions", requireAuth, async (req, res) => {
+    try {
+      const result = await storage.getBuyerPendingTransactions(req.user!.businessId, paramId(req.params.id));
+      res.json(result);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
   app.get("/api/lots", requireAuth, async (req, res) => {
     const filters = {
       crop: req.query.crop as string | undefined,
@@ -839,9 +848,21 @@ export async function registerRoutes(
 
   app.post("/api/cash-entries", requireAuth, async (req, res) => {
     try {
-      const data = { ...req.body, businessId: req.user!.businessId };
-      const entry = await storage.createCashEntry(data);
-      res.status(201).json(entry);
+      const { allocations, ...rest } = req.body;
+      const data = { ...rest, businessId: req.user!.businessId };
+
+      if (allocations && Array.isArray(allocations) && allocations.length > 0 && data.category === "inward" && data.buyerId) {
+        const entries = await storage.createCashEntryBatch(data, allocations.map((a: any) => ({
+          transactionId: a.transactionId || null,
+          amount: String(a.amount || "0"),
+          discount: String(a.discount || "0"),
+          pettyAdj: String(a.pettyAdj || "0"),
+        })));
+        res.status(201).json(entries);
+      } else {
+        const entry = await storage.createCashEntry(data);
+        res.status(201).json(entry);
+      }
     } catch (e: any) {
       res.status(400).json({ message: e.message });
     }

@@ -103,8 +103,9 @@ client/src/
 - WhatsApp sharing: All receipts share as PDF files via Web Share API (mobile) or download PDF (desktop). Uses html2canvas + jsPDF (CDN-loaded in print windows). PDF is pre-generated on window open; button shows "Preparing PDF..." then "Share via WhatsApp" when ready. Falls back to print dialog if CDN fails.
 - BankAccount fields: name, accountType (Limit/Current/Saving), openingBalance
 - CashSettings: cashInHandOpening (per business, upserted)
-- CashEntry fields: cashFlowId (auto-generated CF+YYYYMMDD+seq, unique per business+date), category (inward/expense/transfer), type, partyType (Buyer/Farmer/Others/Transfer), bankAccountId, isReversed, reversedAt
+- CashEntry fields: cashFlowId (auto-generated CF+YYYYMMDD+seq, shared across batch allocations), category (inward/expense/transfer), type, partyType (Buyer/Farmer/Others/Transfer), bankAccountId, transactionId (links to specific transaction for buyer allocations), discount (decimal, default 0), pettyAdj (decimal, default 0), isReversed, reversedAt
 - Cash Management: 3-tab layout (Inward/Expense/Transfer), summary cards, filter bar, cash flow history with CSV export
+- Buyer Inward Payment: Manual transaction-level allocation (not FIFO). User selects specific transactions and enters amount/discount/pettyAdj per transaction. Multiple cash entries created per submission sharing one cashFlowId. Payment status (due/partial/paid) computed as sum(amount+discount+pettyAdj) of linked entries per transaction.
 
 ## Running
 - `npm run dev` starts both Express backend and Vite frontend on port 5000

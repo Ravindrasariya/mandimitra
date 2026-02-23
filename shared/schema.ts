@@ -228,6 +228,8 @@ export const cashEntries = pgTable("cash_entries", {
   transactionId: integer("transaction_id").references(() => transactions.id),
   bankAccountId: integer("bank_account_id").references(() => bankAccounts.id),
   amount: decimal("amount", { precision: 12, scale: 2 }).notNull(),
+  discount: decimal("discount", { precision: 12, scale: 2 }).default("0"),
+  pettyAdj: decimal("petty_adj", { precision: 12, scale: 2 }).default("0"),
   paymentMode: text("payment_mode").notNull().default("Cash"),
   chequeNumber: text("cheque_number"),
   chequeDate: date("cheque_date"),
@@ -238,9 +240,7 @@ export const cashEntries = pgTable("cash_entries", {
   isReversed: boolean("is_reversed").default(false).notNull(),
   reversedAt: timestamp("reversed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-}, (table) => ({
-  uniqueCashFlowPerBusiness: uniqueIndex("cash_entries_business_cash_flow_id_unique").on(table.businessId, table.cashFlowId),
-}));
+});
 
 export const insertBusinessSchema = createInsertSchema(businesses).omit({ id: true, createdAt: true });
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
