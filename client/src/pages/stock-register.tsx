@@ -686,8 +686,6 @@ export default function StockRegisterPage() {
             const farmer = first.farmer;
             const allReturned = group.lots.every(l => l.isReturned);
             const totalBags = group.lots.reduce((sum, l) => sum + (l.actualNumberOfBags ?? l.numberOfBags), 0);
-            const commonVariety = getCommonValue(group.lots, "variety");
-            const commonSize = getCommonValue(group.lots, "size");
             const hasVehicleInfo = first.vehicleNumber || first.driverName || first.vehicleBhadaRate || first.freightType || first.driverContact;
 
             return (
@@ -714,13 +712,6 @@ export default function StockRegisterPage() {
                         </span>
                       </div>
 
-                      {(commonVariety || commonSize) && (
-                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                          {commonVariety && <span>{t("stockRegister.variety")}: {commonVariety}</span>}
-                          {commonSize && <span>{t("stockRegister.size")}: {commonSize}</span>}
-                        </div>
-                      )}
-
                       <div className="border-t pt-1.5 mt-1.5">
                         {group.lots.map((lot, lotIdx) => {
                           const actual = lot.actualNumberOfBags ?? lot.numberOfBags;
@@ -731,8 +722,8 @@ export default function StockRegisterPage() {
                               <span className={lot.remainingBags > 0 ? "text-primary" : "text-destructive"}>
                                 {t("common.remaining")}: <strong>{lot.remainingBags}</strong>
                               </span>
-                              {lot.variety && lot.variety !== commonVariety && <span className="text-muted-foreground">{lot.variety}</span>}
-                              {lot.size && lot.size !== commonSize && <span className="text-muted-foreground">{lot.size}</span>}
+                              {lot.variety && <span className="text-muted-foreground">{lot.variety}</span>}
+                              {lot.size && <span className="text-muted-foreground">{lot.size}</span>}
                               {lot.bagMarka && <span className="text-muted-foreground">{t("stockRegister.marka")}: {lot.bagMarka}</span>}
                               {getStatusBadge(lot)}
                             </div>
