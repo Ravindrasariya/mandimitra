@@ -415,11 +415,12 @@ export async function registerRoutes(
       const dateStr = req.body.date || format(new Date(), "yyyy-MM-dd");
       const crop = req.body.crop;
 
-      const serialNum = await storage.getNextSerialNumber(businessId, crop, dateStr);
+      const serialNum = await storage.getNextSerialNumber(businessId, dateStr);
+      const lotSeq = await storage.getNextLotSequence(businessId, crop, dateStr);
 
       const cropPrefix = crop === "Potato" ? "POT" : crop === "Onion" ? "ONI" : "GAR";
       const dateFormatted = dateStr.replace(/-/g, "");
-      const lotId = `${cropPrefix}${dateFormatted}${serialNum}`;
+      const lotId = `${cropPrefix}${dateFormatted}${lotSeq}`;
 
       const data = {
         businessId,
@@ -432,15 +433,77 @@ export async function registerRoutes(
         numberOfBags: parseInt(req.body.numberOfBags),
         actualNumberOfBags: parseInt(req.body.numberOfBags),
         remainingBags: parseInt(req.body.numberOfBags),
-        size: req.body.size,
+        size: req.body.size || null,
         bagMarka: req.body.bagMarka || null,
         vehicleNumber: req.body.vehicleNumber ? req.body.vehicleNumber.toUpperCase() : null,
         vehicleBhadaRate: req.body.vehicleBhadaRate || null,
+        driverName: req.body.driverName || null,
+        driverContact: req.body.driverContact || null,
+        freightType: req.body.freightType || null,
+        totalBagsInVehicle: req.body.totalBagsInVehicle ? parseInt(req.body.totalBagsInVehicle) : null,
         initialTotalWeight: req.body.initialTotalWeight || null,
       };
 
       const lot = await storage.createLot(data);
       res.status(201).json(lot);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  app.post("/api/lots/batch", requireAuth, async (req, res) => {
+    try {
+      const businessId = req.user!.businessId;
+      const { farmerId, date, vehicleNumber, driverName, driverContact, vehicleBhadaRate, freightType, totalBagsInVehicle, lots: lotItems } = req.body;
+      const dateStr = date || format(new Date(), "yyyy-MM-dd");
+
+      if (!lotItems || !Array.isArray(lotItems) || lotItems.length === 0) {
+        return res.status(400).json({ message: "At least one lot is required" });
+      }
+
+      const totalLotBags = lotItems.reduce((sum: number, l: any) => sum + parseInt(l.numberOfBags || 0), 0);
+      if (totalBagsInVehicle && totalLotBags > parseInt(totalBagsInVehicle)) {
+        return res.status(400).json({ message: "Sum of lot bags exceeds total bags in vehicle" });
+      }
+
+      const serialNum = await storage.getNextSerialNumber(businessId, dateStr);
+      const dateFormatted = dateStr.replace(/-/g, "");
+      const createdLots = [];
+
+      for (const item of lotItems) {
+        const crop = item.crop;
+        const lotSeq = await storage.getNextLotSequence(businessId, crop, dateStr);
+        const cropPrefix = crop === "Potato" ? "POT" : crop === "Onion" ? "ONI" : "GAR";
+        const lotId = `${cropPrefix}${dateFormatted}${lotSeq}`;
+        const bags = parseInt(item.numberOfBags);
+
+        const data = {
+          businessId,
+          lotId,
+          serialNumber: serialNum,
+          date: dateStr,
+          farmerId: parseInt(farmerId),
+          crop,
+          variety: item.variety || null,
+          numberOfBags: bags,
+          actualNumberOfBags: bags,
+          remainingBags: bags,
+          size: item.size || null,
+          bagMarka: item.bagMarka || null,
+          vehicleNumber: vehicleNumber ? vehicleNumber.toUpperCase() : null,
+          vehicleBhadaRate: vehicleBhadaRate || null,
+          driverName: driverName || null,
+          driverContact: driverContact || null,
+          freightType: freightType || null,
+          totalBagsInVehicle: totalBagsInVehicle ? parseInt(totalBagsInVehicle) : null,
+          initialTotalWeight: item.initialTotalWeight || null,
+        };
+
+        const lot = await storage.createLot(data);
+        createdLots.push(lot);
+      }
+
+      res.status(201).json(createdLots);
     } catch (e: any) {
       res.status(400).json({ message: e.message });
     }

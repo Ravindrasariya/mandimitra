@@ -15,12 +15,27 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CROPS, SIZES } from "@shared/schema";
-import type { Lot, Farmer, LotEditHistory } from "@shared/schema";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Search, Edit, Package, Wheat, X, ChevronDown, ChevronRight, Calendar, Download, History } from "lucide-react";
+import type { Lot, Farmer } from "@shared/schema";
+import { Search, Edit, Package, Wheat, X, ChevronDown, Calendar, Download, Truck } from "lucide-react";
 import { format } from "date-fns";
 
 type LotWithFarmer = Lot & { farmer: Farmer };
+
+type VehicleGroup = {
+  key: string;
+  serialNumber: number;
+  date: string;
+  lots: LotWithFarmer[];
+};
+
+type LotEditState = {
+  variety: string;
+  size: string;
+  bagMarka: string;
+  initialTotalWeight: string;
+  actualNumberOfBags: string;
+  numberOfBags: string;
+};
 
 const MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -33,7 +48,7 @@ export default function StockRegisterPage() {
   const currentMonth = (now.getMonth() + 1).toString();
   const currentDay = now.getDate().toString();
 
-  const [activeCrop, setActiveCrop] = usePersistedState("sr-activeCrop", "Garlic");
+  const [activeCrop, setActiveCrop] = usePersistedState("sr-activeCrop", "All");
   const [yearFilter, setYearFilter] = usePersistedState("sr-yearFilter", currentYear);
   const [selectedMonths, setSelectedMonths] = usePersistedState<string[]>("sr-selectedMonths", [currentMonth]);
   const [selectedDays, setSelectedDays] = usePersistedState<string[]>("sr-selectedDays", [currentDay]);
@@ -47,25 +62,19 @@ export default function StockRegisterPage() {
   const [showSuggestions, setShowSuggestions] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
 
-  const [editingLot, setEditingLot] = useState<LotWithFarmer | null>(null);
-  const [editVariety, setEditVariety] = useState("");
-  const [editSize, setEditSize] = useState("");
-  const [editBagMarka, setEditBagMarka] = useState("");
+  const [editingGroup, setEditingGroup] = useState<LotWithFarmer[] | null>(null);
   const [editVehicleNumber, setEditVehicleNumber] = useState("");
+  const [editDriverName, setEditDriverName] = useState("");
+  const [editDriverContact, setEditDriverContact] = useState("");
   const [editVehicleBhadaRate, setEditVehicleBhadaRate] = useState("");
-  const [editInitialTotalWeight, setEditInitialTotalWeight] = useState("");
-  const [editActualNumberOfBags, setEditActualNumberOfBags] = useState("");
-  const [editNumberOfBags, setEditNumberOfBags] = useState("");
+  const [editFreightType, setEditFreightType] = useState("");
+  const [editTotalBagsInVehicle, setEditTotalBagsInVehicle] = useState("");
+  const [editLotFields, setEditLotFields] = useState<Record<number, LotEditState>>({});
   const [returnConfirmOpen, setReturnConfirmOpen] = useState(false);
-  const [lotHistoryOpen, setLotHistoryOpen] = useState(false);
-
-  const { data: lotEditHistory = [] } = useQuery<LotEditHistory[]>({
-    queryKey: ["/api/lot-edit-history", editingLot?.id],
-    enabled: !!editingLot,
-  });
+  const [returningLot, setReturningLot] = useState<LotWithFarmer | null>(null);
 
   const { data: allLots = [], isLoading } = useQuery<LotWithFarmer[]>({
-    queryKey: ["/api/lots", `?crop=${activeCrop}`],
+    queryKey: activeCrop === "All" ? ["/api/lots"] : ["/api/lots", `?crop=${activeCrop}`],
   });
 
   const { data: allFarmers = [] } = useQuery<Farmer[]>({
@@ -181,6 +190,26 @@ export default function StockRegisterPage() {
     return result;
   }, [allLots, yearFilter, selectedMonths, selectedDays, selectedFarmer, saleFilter]);
 
+  const grouped = useMemo(() => {
+    const groups = new Map<string, LotWithFarmer[]>();
+    for (const lot of filtered) {
+      const key = `${lot.serialNumber}-${lot.date}-${lot.farmerId}`;
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key)!.push(lot);
+    }
+    return Array.from(groups.entries())
+      .map(([key, lots]) => ({
+        key,
+        serialNumber: lots[0].serialNumber,
+        date: lots[0].date,
+        lots,
+      } as VehicleGroup))
+      .sort((a, b) => {
+        if (a.date !== b.date) return b.date.localeCompare(a.date);
+        return b.serialNumber - a.serialNumber;
+      });
+  }, [filtered]);
+
   const selectFarmer = (farmer: Farmer) => {
     setSelectedFarmer(farmer);
     setFarmerSearch("");
@@ -192,10 +221,41 @@ export default function StockRegisterPage() {
     setFarmerSearch("");
   };
 
-  const updateLotMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: any }) => {
-      const res = await apiRequest("PATCH", `/api/lots/${id}`, data);
-      return res.json();
+  const saveGroupMutation = useMutation({
+    mutationFn: async () => {
+      if (!editingGroup) throw new Error("No group");
+
+      const sharedData: Record<string, any> = {
+        vehicleNumber: editVehicleNumber ? editVehicleNumber.toUpperCase() : null,
+        driverName: editDriverName || null,
+        driverContact: editDriverContact || null,
+        vehicleBhadaRate: editVehicleBhadaRate || null,
+        freightType: editFreightType || null,
+        totalBagsInVehicle: editTotalBagsInVehicle ? parseInt(editTotalBagsInVehicle) : null,
+      };
+
+      const updates = editingGroup
+        .filter(lot => !lot.isReturned)
+        .map(lot => {
+          const lotState = editLotFields[lot.id];
+          if (!lotState) return null;
+
+          const origBags = lotState.numberOfBags ? parseInt(lotState.numberOfBags) : lot.numberOfBags;
+          const actualBags = lotState.actualNumberOfBags ? parseInt(lotState.actualNumberOfBags) : origBags;
+
+          return apiRequest("PATCH", `/api/lots/${lot.id}`, {
+            ...sharedData,
+            variety: lotState.variety || null,
+            size: lotState.size || null,
+            bagMarka: lotState.bagMarka || null,
+            initialTotalWeight: lotState.initialTotalWeight || null,
+            numberOfBags: origBags,
+            actualNumberOfBags: Math.min(actualBags, origBags),
+          });
+        })
+        .filter(Boolean);
+
+      await Promise.all(updates);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
@@ -204,8 +264,11 @@ export default function StockRegisterPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
       queryClient.invalidateQueries({ queryKey: ["/api/lot-edit-history"] });
-      setEditingLot(null);
-      toast({ title: "Lot Updated", variant: "success" });
+      setEditingGroup(null);
+      toast({ title: "Group Updated", variant: "success" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
 
@@ -226,7 +289,8 @@ export default function StockRegisterPage() {
       }});
       queryClient.invalidateQueries({ queryKey: ["/api/cash-entries"] });
       setReturnConfirmOpen(false);
-      setEditingLot(null);
+      setReturningLot(null);
+      setEditingGroup(null);
       if (data.soldBags > 0) {
         toast({ title: "Lot Returned", description: `Partially sold lot adjusted to ${data.soldBags} bags and marked as sold`, variant: "success" });
       } else {
@@ -238,35 +302,36 @@ export default function StockRegisterPage() {
     },
   });
 
-  const openEdit = (lot: LotWithFarmer) => {
-    setEditingLot(lot);
-    setEditVariety(lot.variety || "");
-    setEditSize(lot.size || "");
-    setEditBagMarka(lot.bagMarka || "");
-    setEditVehicleNumber(lot.vehicleNumber || "");
-    setEditVehicleBhadaRate(lot.vehicleBhadaRate || "");
-    setEditInitialTotalWeight(lot.initialTotalWeight || "");
-    setEditActualNumberOfBags(String(lot.actualNumberOfBags ?? lot.numberOfBags));
-    setEditNumberOfBags(String(lot.numberOfBags));
+  const openGroupEdit = (group: VehicleGroup) => {
+    const lots = group.lots;
+    setEditingGroup(lots);
+    const first = lots[0];
+    setEditVehicleNumber(first.vehicleNumber || "");
+    setEditDriverName(first.driverName || "");
+    setEditDriverContact(first.driverContact || "");
+    setEditVehicleBhadaRate(first.vehicleBhadaRate || "");
+    setEditFreightType(first.freightType || "");
+    setEditTotalBagsInVehicle(first.totalBagsInVehicle != null ? String(first.totalBagsInVehicle) : "");
+
+    const fields: Record<number, LotEditState> = {};
+    for (const lot of lots) {
+      fields[lot.id] = {
+        variety: lot.variety || "",
+        size: lot.size || "",
+        bagMarka: lot.bagMarka || "",
+        initialTotalWeight: lot.initialTotalWeight || "",
+        actualNumberOfBags: String(lot.actualNumberOfBags ?? lot.numberOfBags),
+        numberOfBags: String(lot.numberOfBags),
+      };
+    }
+    setEditLotFields(fields);
   };
 
-  const saveEdit = () => {
-    if (!editingLot) return;
-    const origBags = editNumberOfBags ? parseInt(editNumberOfBags) : editingLot.numberOfBags;
-    const actualBags = editActualNumberOfBags ? parseInt(editActualNumberOfBags) : origBags;
-    updateLotMutation.mutate({
-      id: editingLot.id,
-      data: {
-        variety: editVariety || null,
-        size: editSize,
-        bagMarka: editBagMarka || null,
-        vehicleNumber: editVehicleNumber ? editVehicleNumber.toUpperCase() : null,
-        vehicleBhadaRate: editVehicleBhadaRate || null,
-        initialTotalWeight: editInitialTotalWeight || null,
-        numberOfBags: origBags,
-        actualNumberOfBags: Math.min(actualBags, origBags),
-      },
-    });
+  const updateLotField = (lotId: number, field: keyof LotEditState, value: string) => {
+    setEditLotFields(prev => ({
+      ...prev,
+      [lotId]: { ...prev[lotId], [field]: value },
+    }));
   };
 
   const getLotStatus = (lot: LotWithFarmer) => {
@@ -279,6 +344,30 @@ export default function StockRegisterPage() {
 
   const getStatusBadge = (lot: LotWithFarmer) => {
     const status = getLotStatus(lot);
+    switch (status) {
+      case "Returned":
+        return <Badge variant="outline" className="text-xs border-orange-400 text-orange-600 bg-orange-50">{t("stockRegister.returned")}</Badge>;
+      case "Sold Out":
+        return <Badge variant="destructive" className="text-xs">{t("stockRegister.soldOut")}</Badge>;
+      case "Partially Sold":
+        return <Badge variant="secondary" className="text-xs border-blue-400 text-blue-600 bg-blue-50">{t("stockRegister.partiallySold")}</Badge>;
+      case "Unsold":
+        return <Badge variant="outline" className="text-xs border-green-400 text-green-600 bg-green-50">{t("stockRegister.unsold")}</Badge>;
+    }
+  };
+
+  const getGroupStatus = (group: VehicleGroup) => {
+    const nonReturned = group.lots.filter(l => !l.isReturned);
+    if (nonReturned.length === 0) return "Returned";
+    const allSold = nonReturned.every(l => l.remainingBags === 0);
+    if (allSold) return "Sold Out";
+    const anySold = nonReturned.some(l => l.remainingBags < (l.actualNumberOfBags ?? l.numberOfBags));
+    if (anySold) return "Partially Sold";
+    return "Unsold";
+  };
+
+  const getGroupStatusBadge = (group: VehicleGroup) => {
+    const status = getGroupStatus(group);
     switch (status) {
       case "Returned":
         return <Badge variant="outline" className="text-xs border-orange-400 text-orange-600 bg-orange-50">{t("stockRegister.returned")}</Badge>;
@@ -307,10 +396,10 @@ export default function StockRegisterPage() {
     if (filtered.length === 0) return;
 
     const headers = [
-      "Lot ID", "Serial #", "Date", "Crop", "Variety", "Size",
+      "SR #", "Lot ID", "Date", "Crop", "Variety", "Size",
       "Farmer ID", "Farmer Name", "Farmer Phone", "Farmer Village", "Farmer Tehsil", "Farmer District",
       "No. of Bags", "Remaining Bags", "Bag Marka", "Initial Total Weight",
-      "Vehicle Number", "Vehicle Bhada Rate",
+      "Vehicle Number", "Vehicle Bhada Rate", "Driver Name", "Driver Contact", "Freight Type", "Total Bags In Vehicle",
       "Status"
     ];
 
@@ -320,10 +409,10 @@ export default function StockRegisterPage() {
     };
 
     const rows = filtered.map(lot => [
-      lot.lotId, lot.serialNumber, lot.date, lot.crop, lot.variety || "", lot.size || "",
+      lot.serialNumber, lot.lotId, lot.date, lot.crop, lot.variety || "", lot.size || "",
       lot.farmer.farmerId, lot.farmer.name, lot.farmer.phone, lot.farmer.village || "", lot.farmer.tehsil || "", lot.farmer.district || "",
       lot.numberOfBags, lot.remainingBags, lot.bagMarka || "", lot.initialTotalWeight || "",
-      lot.vehicleNumber || "", lot.vehicleBhadaRate || "",
+      lot.vehicleNumber || "", lot.vehicleBhadaRate || "", lot.driverName || "", lot.driverContact || "", lot.freightType || "", lot.totalBagsInVehicle ?? "",
       getLotStatus(lot)
     ].map(escCSV).join(","));
 
@@ -332,9 +421,18 @@ export default function StockRegisterPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `stock_register_${activeCrop}_${format(new Date(), "yyyy-MM-dd")}.csv`;
+    const cropLabel = activeCrop === "All" ? "all_crops" : activeCrop;
+    a.download = `stock_register_${cropLabel}_${format(new Date(), "yyyy-MM-dd")}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const getCommonValue = (lots: LotWithFarmer[], field: keyof LotWithFarmer): string | null => {
+    const values = lots.map(l => l[field]).filter(v => v != null && v !== "");
+    if (values.length === 0) return null;
+    const unique = Array.from(new Set(values.map(String)));
+    if (unique.length === 1) return unique[0];
+    return null;
   };
 
   return (
@@ -344,7 +442,6 @@ export default function StockRegisterPage() {
         {t("stockRegister.title")}
       </h1>
 
-      {/* Row 1: Crop dropdown left, Year + Month right */}
       <div className="flex items-center gap-2 flex-wrap">
         <Select value={activeCrop} onValueChange={setActiveCrop}>
           <SelectTrigger
@@ -355,6 +452,7 @@ export default function StockRegisterPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value="All" data-testid="toggle-crop-all">{t("common.all")}</SelectItem>
             {CROPS.map((crop) => (
               <SelectItem key={crop} value={crop} data-testid={`toggle-crop-${crop.toLowerCase()}`}>
                 {crop}
@@ -421,7 +519,6 @@ export default function StockRegisterPage() {
         </div>
       </div>
 
-      {/* Row 2: Farmer search left, Sold/Unsold + Day filter right */}
       <div className="flex items-center gap-2">
         <div className="flex-1 min-w-0" ref={searchRef}>
           {selectedFarmer ? (
@@ -473,7 +570,7 @@ export default function StockRegisterPage() {
           )}
         </div>
 
-        <Select value={saleFilter} onValueChange={(v) => setSaleFilter(v as "all" | "sold" | "unsold")}>
+        <Select value={saleFilter} onValueChange={(v) => setSaleFilter(v as "all" | "sold" | "unsold" | "returned")}>
           <SelectTrigger className="w-[75px] h-8 text-xs shrink-0" data-testid="select-sale-filter">
             <SelectValue />
           </SelectTrigger>
@@ -533,264 +630,315 @@ export default function StockRegisterPage() {
 
       {isLoading ? (
         <div className="text-center py-8 text-muted-foreground">{t("app.loading")}</div>
-      ) : filtered.length === 0 ? (
+      ) : grouped.length === 0 ? (
         <div className="text-center py-8 text-muted-foreground">
-          {t("stockRegister.noLots")} {activeCrop}
+          {t("stockRegister.noLots")} {activeCrop === "All" ? "" : activeCrop}
         </div>
       ) : (
         <div className="space-y-3">
-          {filtered.map((lot) => (
-            <Card key={lot.id} className={lot.isReturned ? "opacity-50" : ""}>
-              <CardContent className="pt-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2 mb-2">
-                      <Badge variant="secondary" className="text-xs">SR #{lot.serialNumber}</Badge>
-                      <Badge className="text-xs">{lot.lotId}</Badge>
-                      {getStatusBadge(lot)}
-                    </div>
-                    <div className="text-sm space-y-1">
-                      <p className="font-medium truncate">{lot.farmer.name} - {lot.farmer.phone}</p>
-                      {lot.farmer.village && (
-                        <p className="text-muted-foreground text-xs">{lot.farmer.village}</p>
+          {grouped.map((group) => {
+            const first = group.lots[0];
+            const farmer = first.farmer;
+            const allReturned = group.lots.every(l => l.isReturned);
+            const totalBags = group.lots.reduce((sum, l) => sum + (l.actualNumberOfBags ?? l.numberOfBags), 0);
+            const commonVariety = getCommonValue(group.lots, "variety");
+            const commonSize = getCommonValue(group.lots, "size");
+            const hasVehicleInfo = first.vehicleNumber || first.driverName || first.vehicleBhadaRate || first.freightType || first.driverContact;
+
+            return (
+              <Card key={group.key} className={allReturned ? "opacity-50" : ""} data-testid={`card-group-${group.serialNumber}`}>
+                <CardContent className="pt-4">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0 space-y-1.5">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge variant="secondary" className="text-xs" data-testid={`badge-sr-${group.serialNumber}`}>SR #{group.serialNumber}</Badge>
+                        {getGroupStatusBadge(group)}
+                      </div>
+
+                      {hasVehicleInfo && (
+                        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                          {first.vehicleNumber && (
+                            <span className="flex items-center gap-1">
+                              <Truck className="w-3 h-3" />
+                              {first.vehicleNumber}
+                            </span>
+                          )}
+                          {first.driverName && <span>Driver: {first.driverName}</span>}
+                          {first.vehicleBhadaRate && <span>{t("stockRegister.bhada")}: Rs.{first.vehicleBhadaRate}/bag</span>}
+                          {first.freightType && <span>{first.freightType}</span>}
+                          {first.driverContact && <span>{first.driverContact}</span>}
+                        </div>
                       )}
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                        <span>{t("common.date")}: {lot.date}</span>
-                        {lot.variety && <span>{t("stockRegister.variety")}: {lot.variety}</span>}
-                        <span>{t("stockRegister.size")}: {lot.size}</span>
+
+                      <div className="text-sm">
+                        <p className="font-medium truncate" data-testid={`text-farmer-${group.key}`}>
+                          {farmer.name} - {farmer.phone}
+                          {farmer.village && <span className="text-muted-foreground text-xs ml-1">({farmer.village})</span>}
+                        </p>
+                        <span className="text-xs text-muted-foreground">
+                          Total: <strong>{totalBags}</strong> {t("common.bags")}
+                          {first.totalBagsInVehicle != null && first.totalBagsInVehicle !== totalBags && (
+                            <span className="ml-1">(Vehicle: {first.totalBagsInVehicle})</span>
+                          )}
+                        </span>
                       </div>
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs">
-                        <span>Bags: <strong>{lot.numberOfBags}</strong></span>
-                        {(lot.actualNumberOfBags != null && lot.actualNumberOfBags !== lot.numberOfBags) && (
-                          <span>Actual: <strong className="text-orange-600">{lot.actualNumberOfBags}</strong></span>
-                        )}
-                        <span>{t("common.remaining")}: <strong className={lot.remainingBags > 0 ? "text-primary" : "text-destructive"}>{lot.remainingBags}</strong></span>
-                      </div>
+
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                        {lot.bagMarka && <span>{t("stockRegister.marka")}: {lot.bagMarka}</span>}
-                        {lot.vehicleNumber && <span>{t("stockRegister.vehicle")}: {lot.vehicleNumber}</span>}
-                        {lot.vehicleBhadaRate && <span>{t("stockRegister.bhada")}: Rs.{lot.vehicleBhadaRate}/bag</span>}
-                        {lot.initialTotalWeight && <span>{t("stockRegister.initWt")}: {lot.initialTotalWeight} kg</span>}
+                        <span>{t("common.date")}: {group.date}</span>
+                        {commonVariety && <span>{t("stockRegister.variety")}: {commonVariety}</span>}
+                        {commonSize && <span>{t("stockRegister.size")}: {commonSize}</span>}
+                      </div>
+
+                      <div className="border-t pt-1.5 mt-1.5 space-y-1">
+                        {group.lots.map((lot) => {
+                          const actual = lot.actualNumberOfBags ?? lot.numberOfBags;
+                          return (
+                            <div key={lot.id} className={`flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs ${lot.isReturned ? "opacity-50" : ""}`} data-testid={`lot-row-${lot.id}`}>
+                              <Badge variant="outline" className="text-xs py-0 px-1.5">{lot.crop}</Badge>
+                              <span><strong>{actual}</strong> {t("common.bags")}</span>
+                              <span className={lot.remainingBags > 0 ? "text-primary" : "text-destructive"}>
+                                {t("common.remaining")}: <strong>{lot.remainingBags}</strong>
+                              </span>
+                              {lot.variety && lot.variety !== commonVariety && <span className="text-muted-foreground">{lot.variety}</span>}
+                              {lot.size && lot.size !== commonSize && <span className="text-muted-foreground">{lot.size}</span>}
+                              {lot.bagMarka && <span className="text-muted-foreground">{t("stockRegister.marka")}: {lot.bagMarka}</span>}
+                              {getStatusBadge(lot)}
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
+                    {!allReturned && (
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        data-testid={`button-edit-group-${group.serialNumber}`}
+                        onClick={() => openGroupEdit(group)}
+                      >
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                    )}
                   </div>
-                  {!lot.isReturned && (
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      data-testid={`button-edit-lot-${lot.id}`}
-                      onClick={() => openEdit(lot)}
-                    >
-                      <Edit className="w-4 h-4" />
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
-      <Dialog open={!!editingLot} onOpenChange={(open) => !open && setEditingLot(null)}>
-        <DialogContent className="max-w-sm max-h-[90vh] overflow-y-auto">
+      <Dialog open={!!editingGroup} onOpenChange={(open) => !open && setEditingGroup(null)}>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{t("stockRegister.editLot")} - {editingLot?.lotId}</DialogTitle>
+            <DialogTitle>Edit Group - SR #{editingGroup?.[0]?.serialNumber}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label>Original # of Bags</Label>
-                <Input
-                  data-testid="input-original-bags"
-                  type="text"
-                  inputMode="numeric"
-                  value={editNumberOfBags}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(/\D/g, '');
-                    setEditNumberOfBags(val);
-                    if (val) {
-                      setEditActualNumberOfBags(val);
-                    }
-                  }}
-                  onFocus={(e) => e.target.select()}
-                  className="mobile-touch-target"
-                />
+          <div className="space-y-4">
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium flex items-center gap-1.5">
+                <Truck className="w-3.5 h-3.5" />
+                Vehicle Info
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>{t("stockRegister.vehicleNumber")}</Label>
+                  <Input
+                    data-testid="input-edit-vehicle-number"
+                    value={editVehicleNumber}
+                    onChange={(e) => setEditVehicleNumber(e.target.value.toUpperCase())}
+                    className="mobile-touch-target"
+                    style={{ textTransform: 'uppercase' }}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Driver Name</Label>
+                  <Input
+                    data-testid="input-edit-driver-name"
+                    value={editDriverName}
+                    onChange={(e) => setEditDriverName(e.target.value)}
+                    className="mobile-touch-target"
+                  />
+                </div>
               </div>
-              <div className="space-y-1">
-                <Label>Actual # of Bags</Label>
-                <Input
-                  data-testid="input-actual-bags"
-                  type="text"
-                  inputMode="numeric"
-                  value={editActualNumberOfBags}
-                  onChange={(e) => {
-                    const val = e.target.value.replace(/\D/g, '');
-                    const maxBags = editNumberOfBags ? parseInt(editNumberOfBags) : (editingLot?.numberOfBags ?? 0);
-                    if (val === '' || parseInt(val) <= maxBags) {
-                      setEditActualNumberOfBags(val);
-                    }
-                  }}
-                  onFocus={(e) => e.target.select()}
-                  className="mobile-touch-target"
-                />
-                {editingLot && (() => {
-                  const origBags = editNumberOfBags ? parseInt(editNumberOfBags) : editingLot.numberOfBags;
-                  const actual = editingLot.actualNumberOfBags ?? editingLot.numberOfBags;
-                  const soldBags = actual - editingLot.remainingBags;
-                  const currentActual = editActualNumberOfBags ? parseInt(editActualNumberOfBags) : origBags;
-                  return (
-                    <>
-                      {currentActual < origBags && (
-                        <p className="text-xs text-orange-600">Reduced from {origBags} due to damaged/grading/partial returned harvest</p>
-                      )}
-                      {soldBags > 0 && (
-                        <p className="text-xs text-muted-foreground">Min: {soldBags} (already sold)</p>
-                      )}
-                    </>
-                  );
-                })()}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>Driver Contact</Label>
+                  <Input
+                    data-testid="input-edit-driver-contact"
+                    value={editDriverContact}
+                    onChange={(e) => setEditDriverContact(e.target.value)}
+                    className="mobile-touch-target"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>{t("stockRegister.vehicleBhadaRate")}</Label>
+                  <Input
+                    data-testid="input-edit-bhada-rate"
+                    type="text"
+                    inputMode="decimal"
+                    value={editVehicleBhadaRate}
+                    onChange={(e) => setEditVehicleBhadaRate(e.target.value)}
+                    onFocus={(e) => e.target.select()}
+                    placeholder="0.00"
+                    className="mobile-touch-target"
+                  />
+                </div>
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label>{t("stockRegister.variety")}</Label>
-                <Input
-                  data-testid="input-edit-variety"
-                  value={editVariety}
-                  onChange={(e) => setEditVariety(e.target.value)}
-                  className="mobile-touch-target"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label>{t("stockRegister.size")}</Label>
-                <Select value={editSize} onValueChange={setEditSize}>
-                  <SelectTrigger data-testid="select-edit-size" className="mobile-touch-target">
-                    <SelectValue placeholder={t("stockEntry.selectSize")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {SIZES.map((s) => (
-                      <SelectItem key={s} value={s}>{s}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label>{t("stockRegister.bagMarka")}</Label>
-                <Input
-                  data-testid="input-edit-bag-marka"
-                  value={editBagMarka}
-                  onChange={(e) => setEditBagMarka(e.target.value)}
-                  className="mobile-touch-target"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label>{t("stockRegister.vehicleNumber")}</Label>
-                <Input
-                  data-testid="input-edit-vehicle-number"
-                  value={editVehicleNumber}
-                  onChange={(e) => setEditVehicleNumber(e.target.value.toUpperCase())}
-                  className="mobile-touch-target"
-                  style={{ textTransform: 'uppercase' }}
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>Freight Type</Label>
+                  <Select value={editFreightType || "none"} onValueChange={(v) => setEditFreightType(v === "none" ? "" : v)}>
+                    <SelectTrigger data-testid="select-edit-freight-type" className="mobile-touch-target">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">--</SelectItem>
+                      <SelectItem value="Advance">Advance</SelectItem>
+                      <SelectItem value="Credit">Credit</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Total Bags (Vehicle)</Label>
+                  <Input
+                    data-testid="input-edit-total-bags-vehicle"
+                    type="text"
+                    inputMode="numeric"
+                    value={editTotalBagsInVehicle}
+                    onChange={(e) => setEditTotalBagsInVehicle(e.target.value.replace(/\D/g, ''))}
+                    onFocus={(e) => e.target.select()}
+                    className="mobile-touch-target"
+                  />
+                </div>
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label>{t("stockRegister.vehicleBhadaRate")}</Label>
-                <Input
-                  data-testid="input-edit-bhada-rate"
-                  type="text"
-                  inputMode="decimal"
-                  value={editVehicleBhadaRate}
-                  onChange={(e) => setEditVehicleBhadaRate(e.target.value)}
-                  onFocus={(e) => e.target.select()}
-                  placeholder="0.00"
-                  className="mobile-touch-target"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label>{t("stockRegister.initialWeight")}</Label>
-                <Input
-                  data-testid="input-edit-initial-weight"
-                  type="text"
-                  inputMode="decimal"
-                  value={editInitialTotalWeight}
-                  onChange={(e) => setEditInitialTotalWeight(e.target.value)}
-                  onFocus={(e) => e.target.select()}
-                  placeholder="0.00"
-                  className="mobile-touch-target"
-                />
-              </div>
-            </div>
-            <Button
-              data-testid="button-save-edit"
-              className="w-full mobile-touch-target"
-              onClick={saveEdit}
-              disabled={updateLotMutation.isPending}
-            >
-              {updateLotMutation.isPending ? t("common.saving") : t("common.saveChanges")}
-            </Button>
 
-            {lotEditHistory.length > 0 && (
-              <Collapsible open={lotHistoryOpen} onOpenChange={setLotHistoryOpen}>
-                <CollapsibleTrigger className="flex items-center gap-1 text-xs text-muted-foreground w-full py-1" data-testid="toggle-lot-history">
-                  {lotHistoryOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
-                  <History className="h-3 w-3" />
-                  <span>Edit History ({lotEditHistory.length})</span>
-                </CollapsibleTrigger>
-                <CollapsibleContent>
-                  <div className="space-y-2 mt-1 max-h-40 overflow-y-auto">
-                    {(() => {
-                      const fieldLabels: Record<string, string> = {
-                        numberOfBags: "Original Bags",
-                        actualNumberOfBags: "Actual Bags",
-                        crop: "Crop",
-                        variety: "Variety",
-                        size: "Size",
-                        bagMarka: "Bag Marka",
-                        vehicleNumber: "Vehicle Number",
-                        vehicleBhadaRate: "Bhada Rate",
-                        initialTotalWeight: "Initial Weight",
-                      };
-                      const grouped = lotEditHistory.reduce((acc, h) => {
-                        const key = new Date(h.createdAt).toISOString();
-                        if (!acc[key]) acc[key] = { changedBy: h.changedBy, createdAt: h.createdAt, fields: [] };
-                        acc[key].fields.push(h);
-                        return acc;
-                      }, {} as Record<string, { changedBy: string | null; createdAt: Date; fields: LotEditHistory[] }>);
-                      const sortedGroups = Object.values(grouped).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-                      return sortedGroups.map((group, i) => (
-                        <div key={i} className="bg-muted/50 rounded p-2 text-xs space-y-0.5">
-                          <div className="flex justify-between text-muted-foreground">
-                            <span className="font-medium">{group.changedBy}</span>
-                            <span>{format(new Date(group.createdAt), "dd MMM yyyy, hh:mm a")}</span>
+            <div className="space-y-3">
+              <h3 className="text-sm font-medium">Lots</h3>
+              {editingGroup?.map((lot) => {
+                const lotState = editLotFields[lot.id];
+                if (!lotState) return null;
+                const isReturned = lot.isReturned;
+
+                return (
+                  <div key={lot.id} className={`border rounded-md p-3 space-y-2 ${isReturned ? "opacity-50" : ""}`} data-testid={`edit-lot-section-${lot.id}`}>
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <Badge variant="outline" className="text-xs">{lot.crop}</Badge>
+                        {getStatusBadge(lot)}
+                      </div>
+                      {!isReturned && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-7 text-xs text-destructive border-destructive/30"
+                          data-testid={`button-return-lot-${lot.id}`}
+                          onClick={() => { setReturningLot(lot); setReturnConfirmOpen(true); }}
+                        >
+                          {t("stockRegister.returnToFarmer")}
+                        </Button>
+                      )}
+                    </div>
+
+                    {!isReturned && (
+                      <>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <Label className="text-xs">Original Bags</Label>
+                            <Input
+                              data-testid={`input-original-bags-${lot.id}`}
+                              type="text"
+                              inputMode="numeric"
+                              value={lotState.numberOfBags}
+                              onChange={(e) => {
+                                const val = e.target.value.replace(/\D/g, '');
+                                updateLotField(lot.id, "numberOfBags", val);
+                                if (val) updateLotField(lot.id, "actualNumberOfBags", val);
+                              }}
+                              onFocus={(e) => e.target.select()}
+                              className="h-8 text-sm"
+                            />
                           </div>
-                          {group.fields.map((h, j) => (
-                            <div key={j} className="flex gap-1">
-                              <span className="text-muted-foreground">{fieldLabels[h.fieldChanged] || h.fieldChanged}:</span>
-                              <span className="line-through text-red-500">{h.oldValue || "—"}</span>
-                              <span>→</span>
-                              <span className="text-green-600 font-medium">{h.newValue || "—"}</span>
-                            </div>
-                          ))}
+                          <div className="space-y-1">
+                            <Label className="text-xs">Actual Bags</Label>
+                            <Input
+                              data-testid={`input-actual-bags-${lot.id}`}
+                              type="text"
+                              inputMode="numeric"
+                              value={lotState.actualNumberOfBags}
+                              onChange={(e) => {
+                                const val = e.target.value.replace(/\D/g, '');
+                                const maxBags = lotState.numberOfBags ? parseInt(lotState.numberOfBags) : lot.numberOfBags;
+                                if (val === '' || parseInt(val) <= maxBags) {
+                                  updateLotField(lot.id, "actualNumberOfBags", val);
+                                }
+                              }}
+                              onFocus={(e) => e.target.select()}
+                              className="h-8 text-sm"
+                            />
+                          </div>
                         </div>
-                      ));
-                    })()}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <Label className="text-xs">{t("stockRegister.variety")}</Label>
+                            <Input
+                              data-testid={`input-edit-variety-${lot.id}`}
+                              value={lotState.variety}
+                              onChange={(e) => updateLotField(lot.id, "variety", e.target.value)}
+                              className="h-8 text-sm"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">{t("stockRegister.size")}</Label>
+                            <Select value={lotState.size || "none"} onValueChange={(v) => updateLotField(lot.id, "size", v === "none" ? "" : v)}>
+                              <SelectTrigger data-testid={`select-edit-size-${lot.id}`} className="h-8 text-sm">
+                                <SelectValue placeholder={t("stockEntry.selectSize")} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="none">--</SelectItem>
+                                {SIZES.map((s) => (
+                                  <SelectItem key={s} value={s}>{s}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <Label className="text-xs">{t("stockRegister.bagMarka")}</Label>
+                            <Input
+                              data-testid={`input-edit-bag-marka-${lot.id}`}
+                              value={lotState.bagMarka}
+                              onChange={(e) => updateLotField(lot.id, "bagMarka", e.target.value)}
+                              className="h-8 text-sm"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs">{t("stockRegister.initialWeight")}</Label>
+                            <Input
+                              data-testid={`input-edit-initial-weight-${lot.id}`}
+                              type="text"
+                              inputMode="decimal"
+                              value={lotState.initialTotalWeight}
+                              onChange={(e) => updateLotField(lot.id, "initialTotalWeight", e.target.value)}
+                              onFocus={(e) => e.target.select()}
+                              placeholder="0.00"
+                              className="h-8 text-sm"
+                            />
+                          </div>
+                        </div>
+                      </>
+                    )}
                   </div>
-                </CollapsibleContent>
-              </Collapsible>
-            )}
+                );
+              })}
+            </div>
 
             <Button
-              variant="destructive"
-              data-testid="button-return-lot"
+              data-testid="button-save-group-edit"
               className="w-full mobile-touch-target"
-              onClick={() => setReturnConfirmOpen(true)}
-              disabled={returnLotMutation.isPending}
+              onClick={() => saveGroupMutation.mutate()}
+              disabled={saveGroupMutation.isPending}
             >
-              {t("stockRegister.returnToFarmer")}
+              {saveGroupMutation.isPending ? t("common.saving") : t("common.saveChanges")}
             </Button>
           </div>
         </DialogContent>
@@ -802,9 +950,14 @@ export default function StockRegisterPage() {
             <AlertDialogTitle>{t("stockRegister.returnConfirmTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
               {t("stockRegister.returnConfirmMsg")}
-              {editingLot && editingLot.remainingBags < (editingLot.actualNumberOfBags ?? editingLot.numberOfBags) ? (
+              {returningLot && (
+                <span className="block mt-1 text-xs text-muted-foreground">
+                  {returningLot.crop} - {returningLot.lotId}
+                </span>
+              )}
+              {returningLot && returningLot.remainingBags < (returningLot.actualNumberOfBags ?? returningLot.numberOfBags) ? (
                 <span className="block mt-2 text-orange-600 font-medium">
-                  {t("stockRegister.returnPartialMsg")} ({(editingLot.actualNumberOfBags ?? editingLot.numberOfBags) - editingLot.remainingBags} bags sold). The bag count will be adjusted to the sold amount and marked as sold out.
+                  {t("stockRegister.returnPartialMsg")} ({(returningLot.actualNumberOfBags ?? returningLot.numberOfBags) - returningLot.remainingBags} bags sold). The bag count will be adjusted to the sold amount and marked as sold out.
                 </span>
               ) : (
                 <span className="block mt-2">
@@ -818,7 +971,7 @@ export default function StockRegisterPage() {
             <AlertDialogAction
               data-testid="button-confirm-return"
               className="bg-destructive text-destructive-foreground"
-              onClick={() => editingLot && returnLotMutation.mutate(editingLot.id)}
+              onClick={() => returningLot && returnLotMutation.mutate(returningLot.id)}
               disabled={returnLotMutation.isPending}
             >
               {returnLotMutation.isPending ? t("stockRegister.returning") : t("stockRegister.yesReturn")}

@@ -65,7 +65,8 @@ export interface IStorage {
   getLot(id: number, businessId: number): Promise<(Lot & { farmer: Farmer }) | undefined>;
   createLot(lot: InsertLot): Promise<Lot>;
   updateLot(id: number, businessId: number, data: Partial<InsertLot>): Promise<Lot | undefined>;
-  getNextSerialNumber(businessId: number, crop: string, date: string): Promise<number>;
+  getNextSerialNumber(businessId: number, date: string): Promise<number>;
+  getNextLotSequence(businessId: number, crop: string, date: string): Promise<number>;
   getBids(businessId: number, lotId?: number): Promise<(Bid & { buyer: Buyer; lot: Lot; farmer: Farmer })[]>;
   createBid(bid: InsertBid): Promise<Bid>;
   updateBid(id: number, businessId: number, data: Partial<InsertBid>): Promise<Bid | undefined>;
@@ -520,10 +521,20 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async getNextSerialNumber(businessId: number, crop: string, date: string): Promise<number> {
+  async getNextSerialNumber(businessId: number, date: string): Promise<number> {
     const [result] = await db.select({ max: sql<string>`coalesce(max(${lots.serialNumber}), 0)` })
       .from(lots)
-      .where(and(eq(lots.businessId, businessId), eq(lots.crop, crop), eq(lots.date, date)));
+      .where(and(eq(lots.businessId, businessId), eq(lots.date, date)));
+    return parseInt(result?.max || "0", 10) + 1;
+  }
+
+  async getNextLotSequence(businessId: number, crop: string, date: string): Promise<number> {
+    const cropPrefix = crop === "Potato" ? "POT" : crop === "Onion" ? "ONI" : "GAR";
+    const dateFormatted = date.replace(/-/g, "");
+    const pattern = `${cropPrefix}${dateFormatted}%`;
+    const [result] = await db.select({ max: sql<string>`coalesce(max(cast(substring(${lots.lotId} from ${cropPrefix.length + dateFormatted.length + 1}) as integer)), 0)` })
+      .from(lots)
+      .where(and(eq(lots.businessId, businessId), sql`${lots.lotId} like ${pattern}`));
     return parseInt(result?.max || "0", 10) + 1;
   }
 

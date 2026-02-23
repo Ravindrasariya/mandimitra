@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DISTRICTS, CROPS, SIZES } from "@shared/schema";
 import type { Farmer } from "@shared/schema";
-import { Plus, Trash2, Search, Wheat, AlertTriangle } from "lucide-react";
+import { Plus, Trash2, Search, Wheat, AlertTriangle, Truck } from "lucide-react";
 import { format } from "date-fns";
 
 type LotEntry = {
@@ -20,8 +20,6 @@ type LotEntry = {
   numberOfBags: string;
   size: string;
   bagMarka: string;
-  vehicleNumber: string;
-  vehicleBhadaRate: string;
   initialTotalWeight: string;
 };
 
@@ -31,8 +29,6 @@ const emptyLot: LotEntry = {
   numberOfBags: "",
   size: "",
   bagMarka: "",
-  vehicleNumber: "",
-  vehicleBhadaRate: "",
   initialTotalWeight: "",
 };
 
@@ -53,6 +49,13 @@ export default function StockEntryPage() {
   const [district, setDistrict, clearDistrict] = usePersistedState("se-district", "");
   const [state] = useState("Madhya Pradesh");
   const [entryDate, setEntryDate, clearEntryDate] = usePersistedState("se-entryDate", format(new Date(), "yyyy-MM-dd"));
+
+  const [vehicleNumber, setVehicleNumber, clearVehicleNumber] = usePersistedState("se-vehicleNumber", "");
+  const [driverName, setDriverName, clearDriverName] = usePersistedState("se-driverName", "");
+  const [driverContact, setDriverContact, clearDriverContact] = usePersistedState("se-driverContact", "");
+  const [vehicleBhadaRate, setVehicleBhadaRate, clearVehicleBhadaRate] = usePersistedState("se-vehicleBhadaRate", "");
+  const [freightType, setFreightType, clearFreightType] = usePersistedState("se-freightType", "");
+  const [totalBagsInVehicle, setTotalBagsInVehicle, clearTotalBagsInVehicle] = usePersistedState("se-totalBagsInVehicle", "");
 
   const [lots, setLots, clearLots] = usePersistedState<LotEntry[]>("se-lots", [{ ...emptyLot }]);
 
@@ -83,9 +86,9 @@ export default function StockEntryPage() {
     },
   });
 
-  const createLotMutation = useMutation({
+  const createBatchMutation = useMutation({
     mutationFn: async (data: any) => {
-      const res = await apiRequest("POST", "/api/lots", data);
+      const res = await apiRequest("POST", "/api/lots/batch", data);
       return res.json();
     },
     onSuccess: () => {
@@ -110,10 +113,13 @@ export default function StockEntryPage() {
     setShowFarmerForm(true);
   };
 
+  const totalLotBags = lots.reduce((sum, l) => sum + (parseInt(l.numberOfBags) || 0), 0);
+  const totalBagsLimit = parseInt(totalBagsInVehicle) || 0;
+  const canAddMore = totalBagsLimit === 0 || totalLotBags < totalBagsLimit;
+
   const addLot = () => {
-    const lastLot = lots[lots.length - 1];
-    const newLot = { ...emptyLot, vehicleNumber: lastLot?.vehicleNumber || "", vehicleBhadaRate: lastLot?.vehicleBhadaRate || "" };
-    setLots([...lots, newLot]);
+    if (!canAddMore) return;
+    setLots([...lots, { ...emptyLot }]);
   };
 
   const removeLot = (index: number) => {
@@ -133,9 +139,29 @@ export default function StockEntryPage() {
       return;
     }
 
-    const invalidLots = lots.filter(l => !l.crop || !l.numberOfBags || !l.size);
+    if (!vehicleBhadaRate) {
+      toast({ title: "Error", description: "Freight/Bhada rate is required", variant: "destructive" });
+      return;
+    }
+
+    if (!freightType) {
+      toast({ title: "Error", description: "Advance/Credit selection is required", variant: "destructive" });
+      return;
+    }
+
+    if (!totalBagsInVehicle || parseInt(totalBagsInVehicle) <= 0) {
+      toast({ title: "Error", description: "Total number of bags is required", variant: "destructive" });
+      return;
+    }
+
+    const invalidLots = lots.filter(l => !l.crop || !l.numberOfBags);
     if (invalidLots.length > 0) {
-      toast({ title: "Error", description: "Each lot needs crop, number of bags, and size", variant: "destructive" });
+      toast({ title: "Error", description: "Each lot needs crop and number of bags", variant: "destructive" });
+      return;
+    }
+
+    if (totalLotBags > totalBagsLimit) {
+      toast({ title: "Error", description: `Sum of lot bags (${totalLotBags}) exceeds total bags (${totalBagsLimit})`, variant: "destructive" });
       return;
     }
 
@@ -154,20 +180,24 @@ export default function StockEntryPage() {
         farmerId = farmer.id;
       }
 
-      for (const lot of lots) {
-        await createLotMutation.mutateAsync({
-          farmerId,
-          date: entryDate,
+      await createBatchMutation.mutateAsync({
+        farmerId,
+        date: entryDate,
+        vehicleNumber: vehicleNumber || null,
+        driverName: driverName || null,
+        driverContact: driverContact || null,
+        vehicleBhadaRate: vehicleBhadaRate || null,
+        freightType,
+        totalBagsInVehicle: parseInt(totalBagsInVehicle),
+        lots: lots.map(lot => ({
           crop: lot.crop,
           variety: lot.variety || null,
           numberOfBags: parseInt(lot.numberOfBags),
-          size: lot.size,
+          size: lot.size || null,
           bagMarka: lot.bagMarka || null,
-          vehicleNumber: lot.vehicleNumber ? lot.vehicleNumber.toUpperCase() : null,
-          vehicleBhadaRate: lot.vehicleBhadaRate || null,
           initialTotalWeight: lot.initialTotalWeight || null,
-        });
-      }
+        })),
+      });
 
       toast({ title: "Stock Entry Saved", description: `${lots.length} lot(s) added to stock register`, variant: "success" });
 
@@ -180,6 +210,12 @@ export default function StockEntryPage() {
       clearTehsil();
       clearDistrict();
       clearEntryDate();
+      clearVehicleNumber();
+      clearDriverName();
+      clearDriverContact();
+      clearVehicleBhadaRate();
+      clearFreightType();
+      clearTotalBagsInVehicle();
       clearLots();
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -414,6 +450,100 @@ export default function StockEntryPage() {
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Truck className="w-4 h-4" />
+            Vehicle Information
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label>Vehicle #</Label>
+              <Input
+                data-testid="input-vehicle-number"
+                value={vehicleNumber}
+                onChange={(e) => setVehicleNumber(e.target.value.toUpperCase())}
+                placeholder="e.g. MP09AB1234"
+                className="mobile-touch-target text-sm"
+                style={{ textTransform: 'uppercase' }}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Driver Name</Label>
+              <Input
+                data-testid="input-driver-name"
+                value={driverName}
+                onChange={(e) => setDriverName(e.target.value)}
+                placeholder="Optional"
+                className="mobile-touch-target text-sm capitalize"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label>Driver Contact</Label>
+              <Input
+                data-testid="input-driver-contact"
+                type="tel"
+                value={driverContact}
+                onChange={(e) => setDriverContact(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                placeholder="Optional"
+                className="mobile-touch-target text-sm"
+                maxLength={10}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Freight/Bhada (₹) <span className="text-red-500">*</span></Label>
+              <Input
+                data-testid="input-bhada-rate"
+                type="text"
+                inputMode="decimal"
+                value={vehicleBhadaRate}
+                onChange={(e) => setVehicleBhadaRate(e.target.value)}
+                onFocus={(e) => e.target.select()}
+                placeholder="0.00"
+                className="mobile-touch-target text-sm"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label>Advance / Credit <span className="text-red-500">*</span></Label>
+              <Select value={freightType} onValueChange={setFreightType}>
+                <SelectTrigger data-testid="select-freight-type" className="mobile-touch-target text-sm">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Advance">Advance</SelectItem>
+                  <SelectItem value="Credit">Credit</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label>Total # of Bags <span className="text-red-500">*</span></Label>
+              <Input
+                data-testid="input-total-bags"
+                type="text"
+                inputMode="numeric"
+                value={totalBagsInVehicle}
+                onChange={(e) => setTotalBagsInVehicle(e.target.value.replace(/\D/g, ''))}
+                onFocus={(e) => e.target.select()}
+                placeholder="0"
+                className="mobile-touch-target text-sm"
+              />
+              {totalBagsLimit > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Allocated: {totalLotBags} / {totalBagsLimit}
+                  {totalLotBags > totalBagsLimit && <span className="text-red-500 ml-1">(exceeds limit)</span>}
+                </p>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
       <div className="space-y-3">
         <h2 className="text-base font-semibold">{t("stockEntry.lotInfo")}</h2>
         {lots.map((lot, index) => (
@@ -434,7 +564,7 @@ export default function StockEntryPage() {
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <div className="space-y-1">
-                  <Label>{t("stockEntry.crop")}</Label>
+                  <Label>{t("stockEntry.crop")} <span className="text-red-500">*</span></Label>
                   <Select value={lot.crop} onValueChange={(v) => updateLot(index, "crop", v)}>
                     <SelectTrigger data-testid={`select-crop-${index}`} className="mobile-touch-target text-sm">
                       <SelectValue placeholder={t("stockEntry.selectCrop")} />
@@ -447,18 +577,34 @@ export default function StockEntryPage() {
                   </Select>
                 </div>
                 <div className="space-y-1">
+                  <Label># of Bags <span className="text-red-500">*</span></Label>
+                  <Input
+                    data-testid={`input-bags-${index}`}
+                    type="text"
+                    inputMode="numeric"
+                    value={lot.numberOfBags}
+                    onChange={(e) => updateLot(index, "numberOfBags", e.target.value.replace(/\D/g, ''))}
+                    onFocus={(e) => e.target.select()}
+                    placeholder="0"
+                    className="mobile-touch-target text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
                   <Label>{t("stockEntry.size")}</Label>
-                  <Select value={lot.size} onValueChange={(v) => updateLot(index, "size", v)}>
+                  <Select value={lot.size} onValueChange={(v) => updateLot(index, "size", v === "__none__" ? "" : v)}>
                     <SelectTrigger data-testid={`select-size-${index}`} className="mobile-touch-target text-sm">
-                      <SelectValue placeholder={t("stockEntry.selectSize")} />
+                      <SelectValue placeholder={t("common.optional")} />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="__none__">—</SelectItem>
                       {SIZES.map((s) => (
                         <SelectItem key={s} value={s}>{s}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <div className="space-y-1">
                   <Label>{t("stockEntry.variety")}</Label>
                   <Input
@@ -466,21 +612,6 @@ export default function StockEntryPage() {
                     value={lot.variety}
                     onChange={(e) => updateLot(index, "variety", e.target.value)}
                     placeholder={t("common.optional")}
-                    className="mobile-touch-target text-sm"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="space-y-1">
-                  <Label>{t("stockEntry.numberOfBags")}</Label>
-                  <Input
-                    data-testid={`input-bags-${index}`}
-                    type="text"
-                    inputMode="numeric"
-                    value={lot.numberOfBags}
-                    onChange={(e) => updateLot(index, "numberOfBags", e.target.value)}
-                    onFocus={(e) => e.target.select()}
-                    placeholder="0"
                     className="mobile-touch-target text-sm"
                   />
                 </div>
@@ -494,32 +625,6 @@ export default function StockEntryPage() {
                     className="mobile-touch-target text-sm"
                   />
                 </div>
-                <div className="space-y-1">
-                  <Label>{t("stockEntry.vehicleNumber")}</Label>
-                  <Input
-                    data-testid={`input-vehicle-number-${index}`}
-                    value={lot.vehicleNumber}
-                    onChange={(e) => updateLot(index, "vehicleNumber", e.target.value.toUpperCase())}
-                    placeholder="e.g. MP09AB1234"
-                    className="mobile-touch-target text-sm"
-                    style={{ textTransform: 'uppercase' }}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>{t("stockEntry.bhadaRate")}</Label>
-                  <Input
-                    data-testid={`input-bhada-rate-${index}`}
-                    type="text"
-                    inputMode="decimal"
-                    value={lot.vehicleBhadaRate}
-                    onChange={(e) => updateLot(index, "vehicleBhadaRate", e.target.value)}
-                    onFocus={(e) => e.target.select()}
-                    placeholder="0.00"
-                    className="mobile-touch-target text-sm"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="space-y-1">
                   <Label>{t("stockEntry.initialWeight")}</Label>
                   <Input
@@ -545,6 +650,7 @@ export default function StockEntryPage() {
           data-testid="button-add-lot"
           className="mobile-touch-target text-sm"
           onClick={addLot}
+          disabled={!canAddMore}
         >
           <Plus className="w-4 h-4 mr-2" />
           {t("stockEntry.addLot")}
@@ -553,9 +659,9 @@ export default function StockEntryPage() {
           data-testid="button-submit-stock"
           className="mobile-touch-target flex-1 sm:flex-none"
           onClick={handleSubmit}
-          disabled={createLotMutation.isPending || createFarmerMutation.isPending || (farmerPhone.length > 0 && farmerPhone.length !== 10)}
+          disabled={createBatchMutation.isPending || createFarmerMutation.isPending || (farmerPhone.length > 0 && farmerPhone.length !== 10)}
         >
-          {createLotMutation.isPending ? t("common.saving") : t("stockEntry.saveToRegister")}
+          {createBatchMutation.isPending ? t("common.saving") : t("stockEntry.saveToRegister")}
         </Button>
       </div>
     </div>

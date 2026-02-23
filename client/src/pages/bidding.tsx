@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -13,16 +13,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CROPS, SIZES } from "@shared/schema";
 import type { Lot, Farmer, Buyer, Bid } from "@shared/schema";
-import { Gavel, Plus, Trash2, Search, AlertTriangle } from "lucide-react";
+import { Gavel, Plus, Trash2, AlertTriangle } from "lucide-react";
 
 type LotWithFarmer = Lot & { farmer: Farmer };
 type BidWithDetails = Bid & { buyer: Buyer; lot: Lot };
 
+const ALL_VALUE = "__all__";
+
 export default function BiddingPage() {
   const { toast } = useToast();
   const { t } = useLanguage();
-  const [activeCrop, setActiveCrop] = usePersistedState("bid-activeCrop", "Garlic");
-  const [activeGrade, setActiveGrade] = usePersistedState("bid-activeGrade", "Large");
+  const [activeCrop, setActiveCrop] = usePersistedState("bid-activeCrop", ALL_VALUE);
+  const [activeGrade, setActiveGrade] = usePersistedState("bid-activeGrade", ALL_VALUE);
   const [selectedLot, setSelectedLot] = useState<LotWithFarmer | null>(null);
   const [bidDialogOpen, setBidDialogOpen] = useState(false);
   const [buyerSearch, setBuyerSearch] = useState("");
@@ -30,11 +32,29 @@ export default function BiddingPage() {
   const [pricePerKg, setPricePerKg] = useState("");
   const [bidBags, setBidBags] = useState("");
 
+  const cropQueryParam = activeCrop === ALL_VALUE ? "" : `?crop=${activeCrop}`;
   const { data: lots = [], isLoading } = useQuery<LotWithFarmer[]>({
-    queryKey: ["/api/lots", `?crop=${activeCrop}`],
+    queryKey: ["/api/lots", cropQueryParam],
   });
 
-  const availableLots = lots.filter(l => l.remainingBags > 0 && !l.isReturned && l.size === activeGrade);
+  const availableLots = useMemo(() => {
+    return lots.filter(l => {
+      if (l.remainingBags <= 0 || l.isReturned) return false;
+      if (activeGrade !== ALL_VALUE && l.size !== activeGrade) return false;
+      return true;
+    });
+  }, [lots, activeGrade]);
+
+  const groupedBySerial = useMemo(() => {
+    const groups = new Map<number, LotWithFarmer[]>();
+    for (const lot of availableLots) {
+      const sr = lot.serialNumber;
+      if (!groups.has(sr)) groups.set(sr, []);
+      groups.get(sr)!.push(lot);
+    }
+    const sorted = Array.from(groups.entries()).sort((a, b) => a[0] - b[0]);
+    return sorted;
+  }, [availableLots]);
 
   const { data: buyers = [] } = useQuery<Buyer[]>({
     queryKey: ["/api/buyers", buyerSearch ? `?search=${buyerSearch}` : ""],
@@ -128,7 +148,7 @@ export default function BiddingPage() {
       buyerId: selectedBuyerId,
       pricePerKg,
       numberOfBags: bags,
-      grade: activeGrade,
+      grade: selectedLot.size || activeGrade,
     });
   };
 
@@ -163,6 +183,9 @@ export default function BiddingPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value={ALL_VALUE} data-testid="toggle-bid-crop-all">
+              {t("common.all")}
+            </SelectItem>
             {CROPS.map((crop) => (
               <SelectItem key={crop} value={crop} data-testid={`toggle-bid-crop-${crop.toLowerCase()}`}>
                 {crop}
@@ -178,6 +201,9 @@ export default function BiddingPage() {
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
+            <SelectItem value={ALL_VALUE} data-testid="toggle-size-all">
+              {t("common.all")}
+            </SelectItem>
             {SIZES.map((size) => (
               <SelectItem key={size} value={size} data-testid={`toggle-size-${size.toLowerCase()}`}>
                 {size}
@@ -189,39 +215,79 @@ export default function BiddingPage() {
 
       {isLoading ? (
         <div className="text-center py-8 text-muted-foreground">{t("app.loading")}</div>
-      ) : availableLots.length === 0 ? (
-        <div className="text-center py-8 text-muted-foreground">
-          {t("bidding.noLots")} {activeCrop}
+      ) : groupedBySerial.length === 0 ? (
+        <div className="text-center py-8 text-muted-foreground" data-testid="text-no-lots">
+          {t("bidding.noLots")}
         </div>
       ) : (
-        <div className="space-y-3">
-          {availableLots.map((lot) => (
-            <Card key={lot.id}>
-              <CardContent className="pt-4">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2 mb-1">
-                      <Badge variant="secondary" className="text-xs">SR #{lot.serialNumber}</Badge>
-                      <Badge className="text-xs">{lot.lotId}</Badge>
-                    </div>
-                    <p className="text-sm font-medium truncate">{lot.farmer.name}</p>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground mt-1">
-                      <span>{t("common.remaining")}: <strong className="text-foreground">{lot.remainingBags}</strong> / {lot.actualNumberOfBags ?? lot.numberOfBags} {t("common.bags")}</span>
-                      {lot.initialTotalWeight && <span>{t("stockRegister.initWt")}: {lot.initialTotalWeight} kg</span>}
-                    </div>
+        <div className="space-y-4">
+          {groupedBySerial.map(([serialNumber, groupLots]) => {
+            const firstLot = groupLots[0];
+            return (
+              <Card key={serialNumber} data-testid={`card-serial-group-${serialNumber}`}>
+                <CardContent className="pt-4 space-y-3">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge variant="secondary" className="text-xs font-semibold" data-testid={`badge-sr-${serialNumber}`}>
+                      SR #{serialNumber}
+                    </Badge>
+                    <span className="text-sm font-medium truncate" data-testid={`text-farmer-${serialNumber}`}>
+                      {firstLot.farmer.name}
+                    </span>
+                    {firstLot.farmer.phone && (
+                      <span className="text-xs text-muted-foreground">{firstLot.farmer.phone}</span>
+                    )}
+                    {firstLot.vehicleNumber && (
+                      <span className="text-xs text-muted-foreground">
+                        {t("stockRegister.vehicle")}: {firstLot.vehicleNumber}
+                      </span>
+                    )}
                   </div>
-                  <Button
-                    data-testid={`button-bid-lot-${lot.id}`}
-                    className="mobile-touch-target"
-                    onClick={() => openBidDialog(lot)}
-                  >
-                    <Gavel className="w-4 h-4 mr-1" />
-                    {t("bidding.bid")}
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+
+                  <div className="space-y-2">
+                    {groupLots.map((lot) => (
+                      <div
+                        key={lot.id}
+                        className="flex items-center justify-between gap-2 rounded-md bg-muted/50 p-2"
+                        data-testid={`row-lot-${lot.id}`}
+                      >
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                            <Badge className="text-xs">{lot.crop}</Badge>
+                            {lot.size && (
+                              <Badge variant="outline" className="text-xs">{lot.size}</Badge>
+                            )}
+                            {lot.variety && (
+                              <span className="text-xs text-muted-foreground">{lot.variety}</span>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                            <span>
+                              {t("common.remaining")}: <strong className="text-foreground">{lot.remainingBags}</strong> / {lot.actualNumberOfBags ?? lot.numberOfBags} {t("common.bags")}
+                            </span>
+                            {lot.initialTotalWeight && (
+                              <span>{t("stockRegister.initWt")}: {lot.initialTotalWeight} kg</span>
+                            )}
+                            {lot.bagMarka && (
+                              <span>{t("stockRegister.marka")}: {lot.bagMarka}</span>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          data-testid={`button-bid-lot-${lot.id}`}
+                          size="sm"
+                          className="mobile-touch-target"
+                          onClick={() => openBidDialog(lot)}
+                        >
+                          <Gavel className="w-4 h-4 mr-1" />
+                          {t("bidding.bid")}
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
@@ -229,7 +295,7 @@ export default function BiddingPage() {
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
-              Bid on {selectedLot?.lotId} - {selectedLot?.farmer.name}
+              Bid on {selectedLot?.crop} - {selectedLot?.farmer.name}
             </DialogTitle>
           </DialogHeader>
 
@@ -237,7 +303,9 @@ export default function BiddingPage() {
             <div className="space-y-4">
               <div className="bg-muted rounded-md p-3 text-sm space-y-1">
                 <p>{t("bidding.remainingBags")}: <strong>{selectedLot.remainingBags}</strong></p>
-                <p>{t("stockRegister.size")}: <strong>{activeGrade}</strong></p>
+                <p>{t("stockEntry.crop")}: <strong>{selectedLot.crop}</strong></p>
+                {selectedLot.size && <p>{t("stockRegister.size")}: <strong>{selectedLot.size}</strong></p>}
+                {selectedLot.variety && <p>{t("stockRegister.variety")}: <strong>{selectedLot.variety}</strong></p>}
               </div>
 
               {lotBids.length > 0 && (
