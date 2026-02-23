@@ -677,7 +677,12 @@ export default function BiddingPage() {
                 <div className="border-t pt-4 space-y-3">
                   <Label className="font-medium">{t("bidding.newBid")}</Label>
                   <div className="space-y-2">
-                    <Label>{t("bidding.buyer")}</Label>
+                    <div className="flex items-center gap-2">
+                      <Label>{t("bidding.buyer")}</Label>
+                      {buyerSearch.trim() && !selectedBuyerId && filteredBuyers.length === 0 && (
+                        <span className="text-[11px] text-orange-500">New buyer "{buyerSearch.trim()}" will be created</span>
+                      )}
+                    </div>
                     <div className="relative">
                       <Input
                         ref={buyerInputRef}
@@ -711,11 +716,6 @@ export default function BiddingPage() {
                               {b.redFlag && <AlertTriangle className="w-3 h-3 text-orange-500 ml-auto" />}
                             </button>
                           ))}
-                        </div>
-                      )}
-                      {showBuyerDropdown && buyerSearch.trim() && filteredBuyers.length === 0 && (
-                        <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-md px-3 py-2 text-sm text-muted-foreground">
-                          New buyer "{buyerSearch.trim()}" will be created
                         </div>
                       )}
                     </div>
