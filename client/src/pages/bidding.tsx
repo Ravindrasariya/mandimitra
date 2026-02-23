@@ -51,12 +51,14 @@ export default function BiddingPage() {
 
   const [activeCrop, setActiveCrop] = usePersistedState("bid-activeCrop", ALL_VALUE);
   const [activeGrade, setActiveGrade] = usePersistedState("bid-activeGrade", ALL_VALUE);
-  const [saleStatusFilter, setSaleStatusFilter] = usePersistedState("bid-saleStatus", ALL_VALUE);
+  const [selectedStatuses, setSelectedStatuses] = usePersistedState<string[]>("bid-selectedStatuses", ["sold", "partial"]);
   const [yearFilter, setYearFilter] = usePersistedState("bid-yearFilter", ALL_VALUE);
   const [selectedMonths, setSelectedMonths] = usePersistedState<string[]>("bid-selectedMonths", []);
   const [selectedDays, setSelectedDays] = usePersistedState<string[]>("bid-selectedDays", []);
   const [monthPopoverOpen, setMonthPopoverOpen] = useState(false);
   const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
+  const [statusPopoverOpen, setStatusPopoverOpen] = useState(false);
+  const [farmerSearch, setFarmerSearch] = usePersistedState("bid-farmerSearch", "");
 
   const [selectedLot, setSelectedLot] = useState<LotWithFarmer | null>(null);
   const [bidDialogOpen, setBidDialogOpen] = useState(false);
@@ -111,7 +113,29 @@ export default function BiddingPage() {
       ? selectedDays[0]
       : `${selectedDays.length} ${t("stockRegister.nDays")}`;
 
+  const toggleStatus = (status: string) => {
+    setSelectedStatuses(prev => prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]);
+  };
+
+  const selectAllStatuses = () => {
+    setSelectedStatuses([]);
+    setStatusPopoverOpen(false);
+  };
+
+  const STATUS_OPTIONS = [
+    { value: "sold", label: "Sold" },
+    { value: "unsold", label: "Unsold" },
+    { value: "partial", label: "Partially Sold" },
+  ];
+
+  const statusLabel = selectedStatuses.length === 0
+    ? t("common.all")
+    : selectedStatuses.length === 1
+      ? STATUS_OPTIONS.find(s => s.value === selectedStatuses[0])?.label || selectedStatuses[0]
+      : `${selectedStatuses.length} statuses`;
+
   const filteredLots = useMemo(() => {
+    const searchLower = farmerSearch.trim().toLowerCase();
     return lots.filter(l => {
       if (l.isReturned) return false;
       if (activeGrade !== ALL_VALUE && l.size !== activeGrade) return false;
@@ -121,9 +145,16 @@ export default function BiddingPage() {
         if (selectedMonths.length > 0 && !selectedMonths.includes(String(d.getMonth() + 1))) return false;
         if (selectedDays.length > 0 && !selectedDays.includes(String(d.getDate()))) return false;
       }
+      if (searchLower) {
+        const f = l.farmer;
+        const match = f.name.toLowerCase().includes(searchLower) ||
+          (f.phone && f.phone.includes(searchLower)) ||
+          (f.village && f.village.toLowerCase().includes(searchLower));
+        if (!match) return false;
+      }
       return true;
     });
-  }, [lots, activeGrade, yearFilter, selectedMonths, selectedDays]);
+  }, [lots, activeGrade, yearFilter, selectedMonths, selectedDays, farmerSearch]);
 
   const groupedBySerial = useMemo(() => {
     const groups = new Map<string, { serialNumber: number; date: string; lots: LotWithFarmer[] }>();
@@ -134,8 +165,8 @@ export default function BiddingPage() {
       groups.get(key)!.lots.push(lot);
     }
     let result = Array.from(groups.values());
-    if (saleStatusFilter !== ALL_VALUE) {
-      result = result.filter(g => g.lots.some(lot => getLotStatus(lot) === saleStatusFilter));
+    if (selectedStatuses.length > 0) {
+      result = result.filter(g => g.lots.some(lot => selectedStatuses.includes(getLotStatus(lot))));
     }
     result.sort((a, b) => {
       const dateCompare = b.date.localeCompare(a.date);
@@ -143,7 +174,7 @@ export default function BiddingPage() {
       return a.serialNumber - b.serialNumber;
     });
     return result;
-  }, [filteredLots, saleStatusFilter]);
+  }, [filteredLots, selectedStatuses]);
 
   const { data: buyers = [] } = useQuery<Buyer[]>({
     queryKey: ["/api/buyers", buyerSearch ? `?search=${buyerSearch}` : ""],
@@ -284,10 +315,18 @@ export default function BiddingPage() {
   return (
     <div className="p-3 md:p-6 max-w-4xl mx-auto space-y-4">
       <div className="flex items-center gap-2 flex-wrap">
-        <h1 className="text-base md:text-lg font-bold flex items-center gap-2 mr-2">
+        <h1 className="text-base md:text-lg font-bold flex items-center gap-2 mr-1">
           <Gavel className="w-5 h-5 text-primary" />
           {t("bidding.title")}
         </h1>
+
+        <Input
+          data-testid="input-farmer-search"
+          value={farmerSearch}
+          onChange={(e) => setFarmerSearch(e.target.value)}
+          placeholder="Farmer / Phone / Village"
+          className="w-40 md:w-48 h-8 text-xs"
+        />
 
         <Select value={yearFilter} onValueChange={(v) => { setYearFilter(v); setSelectedMonths([]); setSelectedDays([]); }}>
           <SelectTrigger data-testid="select-year" className="w-auto text-xs">
@@ -404,20 +443,37 @@ export default function BiddingPage() {
             ))}
           </SelectContent>
         </Select>
-        <Select value={saleStatusFilter} onValueChange={setSaleStatusFilter}>
-          <SelectTrigger
-            data-testid="select-sale-status"
-            className="w-auto font-medium border-violet-500/50 bg-violet-500/10 text-violet-600 dark:text-violet-400"
-          >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={ALL_VALUE} data-testid="toggle-status-all">{t("common.all")}</SelectItem>
-            <SelectItem value="sold" data-testid="toggle-status-sold">Sold</SelectItem>
-            <SelectItem value="unsold" data-testid="toggle-status-unsold">Unsold</SelectItem>
-            <SelectItem value="partial" data-testid="toggle-status-partial">Partially Sold</SelectItem>
-          </SelectContent>
-        </Select>
+        <Popover open={statusPopoverOpen} onOpenChange={setStatusPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="text-xs gap-1 font-medium border-violet-500/50 bg-violet-500/10 text-violet-600 dark:text-violet-400" data-testid="button-status-filter">
+              {statusLabel}
+              <ChevronDown className="w-3 h-3" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-2" align="start">
+            <div
+              className="flex items-center gap-2 w-full px-2 py-1 text-xs hover:bg-accent rounded cursor-pointer"
+              onClick={selectAllStatuses}
+              data-testid="button-all-statuses"
+            >
+              <Checkbox checked={selectedStatuses.length === 0} />
+              <span>{t("common.all")}</span>
+            </div>
+            <div className="space-y-1 mt-1">
+              {STATUS_OPTIONS.map(opt => (
+                <div
+                  key={opt.value}
+                  className="flex items-center gap-2 w-full px-2 py-1 text-xs hover:bg-accent rounded cursor-pointer"
+                  onClick={() => toggleStatus(opt.value)}
+                  data-testid={`toggle-status-${opt.value}`}
+                >
+                  <Checkbox checked={selectedStatuses.includes(opt.value)} />
+                  <span>{opt.label}</span>
+                </div>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
 
       {isLoading ? (
