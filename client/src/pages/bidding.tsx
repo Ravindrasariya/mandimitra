@@ -51,8 +51,9 @@ export default function BiddingPage() {
 
   const [activeCrop, setActiveCrop] = usePersistedState("bid-activeCrop", ALL_VALUE);
   const [activeGrade, setActiveGrade] = usePersistedState("bid-activeGrade", ALL_VALUE);
-  const [yearFilter, setYearFilter] = usePersistedState("bid-yearFilter", currentYear);
-  const [selectedMonths, setSelectedMonths] = usePersistedState<string[]>("bid-selectedMonths", [currentMonth]);
+  const [saleStatusFilter, setSaleStatusFilter] = usePersistedState("bid-saleStatus", ALL_VALUE);
+  const [yearFilter, setYearFilter] = usePersistedState("bid-yearFilter", ALL_VALUE);
+  const [selectedMonths, setSelectedMonths] = usePersistedState<string[]>("bid-selectedMonths", []);
   const [selectedDays, setSelectedDays] = usePersistedState<string[]>("bid-selectedDays", []);
   const [monthPopoverOpen, setMonthPopoverOpen] = useState(false);
   const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
