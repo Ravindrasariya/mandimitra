@@ -68,6 +68,7 @@ export interface IStorage {
   getNextSerialNumber(businessId: number, date: string): Promise<number>;
   getNextLotSequence(businessId: number, crop: string, date: string): Promise<number>;
   getBids(businessId: number, lotId?: number): Promise<(Bid & { buyer: Buyer; lot: Lot; farmer: Farmer; hasTransaction: boolean })[]>;
+  getBid(id: number, businessId: number): Promise<Bid | undefined>;
   createBid(bid: InsertBid): Promise<Bid>;
   updateBid(id: number, businessId: number, data: Partial<InsertBid>): Promise<Bid | undefined>;
   deleteBid(id: number, businessId: number): Promise<void>;
@@ -569,6 +570,11 @@ export class DatabaseStorage implements IStorage {
       remainingBags: sql`${lots.remainingBags} - ${bid.numberOfBags}`
     }).where(eq(lots.id, bid.lotId));
     return created;
+  }
+
+  async getBid(id: number, businessId: number): Promise<Bid | undefined> {
+    const [bid] = await db.select().from(bids).where(and(eq(bids.id, id), eq(bids.businessId, businessId)));
+    return bid;
   }
 
   async updateBid(id: number, businessId: number, data: Partial<InsertBid>): Promise<Bid | undefined> {

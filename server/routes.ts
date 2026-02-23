@@ -643,6 +643,12 @@ export async function registerRoutes(
   app.post("/api/transactions", requireAuth, async (req, res) => {
     try {
       const data = { ...req.body, businessId: req.user!.businessId };
+      if (data.bidId) {
+        const bid = await storage.getBid(data.bidId, req.user!.businessId);
+        if (bid && bid.paymentType === "Cash" && parseFloat(bid.advanceAmount || "0") > 0) {
+          data.paidAmount = bid.advanceAmount;
+        }
+      }
       const tx = await storage.createTransaction(data);
       await storage.recalculateBuyerPaymentStatus(req.user!.businessId, tx.buyerId);
       await storage.recalculateFarmerPaymentStatus(req.user!.businessId, tx.farmerId);

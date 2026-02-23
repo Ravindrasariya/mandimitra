@@ -1219,6 +1219,9 @@ export default function TransactionsPage() {
               <div className="bg-muted/50 rounded-md p-2 text-sm">
                 <p>{t("transactions.buyer")}: <strong>{selectedBid.buyer.name}</strong></p>
                 <p>Price: <strong>Rs.{selectedBid.pricePerKg}/kg</strong> | Bags: <strong>{selectedBid.numberOfBags}</strong>{selectedBid.grade && selectedBid.grade !== "__all__" && <> | Grade: <strong>{selectedBid.grade}</strong></>}</p>
+                {selectedBid.paymentType === "Cash" && parseFloat(selectedBid.advanceAmount || "0") > 0 && (
+                  <p className="text-green-600 font-medium">Cash | Advance: ₹{selectedBid.advanceAmount}</p>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">

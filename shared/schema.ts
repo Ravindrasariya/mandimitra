@@ -146,6 +146,8 @@ export const bids = pgTable("bids", {
   pricePerKg: decimal("price_per_kg", { precision: 10, scale: 2 }).notNull(),
   numberOfBags: integer("number_of_bags").notNull(),
   grade: text("grade").default("Large"),
+  paymentType: text("payment_type").default("Credit").notNull(),
+  advanceAmount: decimal("advance_amount", { precision: 10, scale: 2 }).default("0"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

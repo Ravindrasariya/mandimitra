@@ -70,6 +70,8 @@ export default function BiddingPage() {
   const [pricePerKg, setPricePerKg] = useState("");
   const [bidBags, setBidBags] = useState("");
   const [showBuyerDropdown, setShowBuyerDropdown] = useState(false);
+  const [paymentType, setPaymentType] = useState("Credit");
+  const [advanceAmount, setAdvanceAmount] = useState("500");
   const buyerInputRef = useRef<HTMLInputElement>(null);
   const buyerDropdownRef = useRef<HTMLDivElement>(null);
 
@@ -238,6 +240,8 @@ export default function BiddingPage() {
       }
       setSelectedBuyerId(null);
       setBuyerSearch("");
+      setPaymentType("Credit");
+      setAdvanceAmount("500");
     },
     onError: (err: any) => {
       toast({ title: "Error", description: err.message, variant: "destructive" });
@@ -273,6 +277,8 @@ export default function BiddingPage() {
     setSelectedBuyerId(null);
     setBuyerSearch("");
     setPricePerKg("");
+    setPaymentType("Credit");
+    setAdvanceAmount("500");
   };
 
   const selectBuyer = (buyer: Buyer) => {
@@ -313,6 +319,8 @@ export default function BiddingPage() {
       pricePerKg,
       numberOfBags: bags,
       grade: selectedLot.size || null,
+      paymentType,
+      advanceAmount: paymentType === "Cash" ? advanceAmount : "0",
     });
   };
 
@@ -656,6 +664,7 @@ export default function BiddingPage() {
                         <span className="font-medium">{bid.buyer.name}</span>
                         <span className="text-muted-foreground"> - Rs.{bid.pricePerKg}/kg x {bid.numberOfBags} bags</span>
                         {bid.grade && bid.grade !== "__all__" && <Badge variant="secondary" className="ml-2 text-xs">{bid.grade}</Badge>}
+                        {bid.paymentType === "Cash" && <Badge variant="outline" className="ml-2 text-xs border-blue-400 text-blue-600 bg-blue-50">Cash ₹{bid.advanceAmount || "0"}</Badge>}
                         {bid.hasTransaction && <Badge variant="outline" className="ml-2 text-xs border-green-400 text-green-600 bg-green-50">Transacted</Badge>}
                       </div>
                       {!bid.hasTransaction && (
@@ -755,6 +764,36 @@ export default function BiddingPage() {
                         max={selectedLot.remainingBags}
                       />
                     </div>
+                  </div>
+                  <div className={`grid ${paymentType === "Cash" ? "grid-cols-2" : "grid-cols-1"} gap-3`}>
+                    <div className="space-y-1">
+                      <Label>Payment Type</Label>
+                      <Select value={paymentType} onValueChange={setPaymentType}>
+                        <SelectTrigger data-testid="select-payment-type" className="mobile-touch-target">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Credit">Credit</SelectItem>
+                          <SelectItem value="Cash">Cash</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {paymentType === "Cash" && (
+                      <div className="space-y-1">
+                        <Label>Advance (₹)</Label>
+                        <Input
+                          data-testid="input-advance-amount"
+                          type="number"
+                          inputMode="decimal"
+                          step="0.01"
+                          value={advanceAmount}
+                          onChange={(e) => setAdvanceAmount(e.target.value)}
+                          onFocus={(e) => e.target.select()}
+                          placeholder="500"
+                          className="mobile-touch-target"
+                        />
+                      </div>
+                    )}
                   </div>
                   <Button
                     data-testid="button-submit-bid"
