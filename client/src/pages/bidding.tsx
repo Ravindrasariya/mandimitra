@@ -148,7 +148,7 @@ export default function BiddingPage() {
       buyerId: selectedBuyerId,
       pricePerKg,
       numberOfBags: bags,
-      grade: selectedLot.size || activeGrade,
+      grade: selectedLot.size || null,
     });
   };
 
@@ -316,7 +316,7 @@ export default function BiddingPage() {
                       <div>
                         <span className="font-medium">{bid.buyer.name}</span>
                         <span className="text-muted-foreground"> - Rs.{bid.pricePerKg}/kg x {bid.numberOfBags} bags</span>
-                        {bid.grade && <Badge variant="secondary" className="ml-2 text-xs">{bid.grade}</Badge>}
+                        {bid.grade && bid.grade !== "__all__" && <Badge variant="secondary" className="ml-2 text-xs">{bid.grade}</Badge>}
                       </div>
                       <Button
                         variant="destructive"

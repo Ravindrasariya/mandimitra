@@ -109,7 +109,7 @@ const translations: Record<string, Record<Language, string>> = {
   "stockEntry.selectedFarmer": { en: "Selected Farmer", hi: "चयनित किसान" },
   "stockEntry.lotInfo": { en: "Lot Information", hi: "लॉट जानकारी" },
   "stockEntry.crop": { en: "Crop *", hi: "फसल *" },
-  "stockEntry.size": { en: "Size *", hi: "साइज़ *" },
+  "stockEntry.size": { en: "Size", hi: "साइज़" },
   "stockEntry.variety": { en: "Variety", hi: "किस्म" },
   "stockEntry.numberOfBags": { en: "No. of Bags *", hi: "थैलों की संख्या *" },
   "stockEntry.bagMarka": { en: "Bag Marka", hi: "बैग मार्का" },

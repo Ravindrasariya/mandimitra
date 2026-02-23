@@ -564,7 +564,7 @@ export default function StockEntryPage() {
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <div className="space-y-1">
-                  <Label>{t("stockEntry.crop")} <span className="text-red-500">*</span></Label>
+                  <Label>{t("stockEntry.crop")}</Label>
                   <Select value={lot.crop} onValueChange={(v) => updateLot(index, "crop", v)}>
                     <SelectTrigger data-testid={`select-crop-${index}`} className="mobile-touch-target text-sm">
                       <SelectValue placeholder={t("stockEntry.selectCrop")} />
@@ -577,7 +577,7 @@ export default function StockEntryPage() {
                   </Select>
                 </div>
                 <div className="space-y-1">
-                  <Label># of Bags <span className="text-red-500">*</span></Label>
+                  <Label>{t("stockEntry.numberOfBags")}</Label>
                   <Input
                     data-testid={`input-bags-${index}`}
                     type="text"

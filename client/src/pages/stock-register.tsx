@@ -652,23 +652,9 @@ export default function StockRegisterPage() {
                     <div className="flex-1 min-w-0 space-y-1.5">
                       <div className="flex flex-wrap items-center gap-2">
                         <Badge variant="secondary" className="text-xs" data-testid={`badge-sr-${group.serialNumber}`}>SR #{group.serialNumber}</Badge>
+                        <span className="text-xs text-muted-foreground">{group.date}</span>
                         {getGroupStatusBadge(group)}
                       </div>
-
-                      {hasVehicleInfo && (
-                        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                          {first.vehicleNumber && (
-                            <span className="flex items-center gap-1">
-                              <Truck className="w-3 h-3" />
-                              {first.vehicleNumber}
-                            </span>
-                          )}
-                          {first.driverName && <span>Driver: {first.driverName}</span>}
-                          {first.vehicleBhadaRate && <span>{t("stockRegister.bhada")}: Rs.{first.vehicleBhadaRate}/bag</span>}
-                          {first.freightType && <span>{first.freightType}</span>}
-                          {first.driverContact && <span>{first.driverContact}</span>}
-                        </div>
-                      )}
 
                       <div className="text-sm">
                         <p className="font-medium truncate" data-testid={`text-farmer-${group.key}`}>
@@ -683,17 +669,18 @@ export default function StockRegisterPage() {
                         </span>
                       </div>
 
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                        <span>{t("common.date")}: {group.date}</span>
-                        {commonVariety && <span>{t("stockRegister.variety")}: {commonVariety}</span>}
-                        {commonSize && <span>{t("stockRegister.size")}: {commonSize}</span>}
-                      </div>
+                      {(commonVariety || commonSize) && (
+                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                          {commonVariety && <span>{t("stockRegister.variety")}: {commonVariety}</span>}
+                          {commonSize && <span>{t("stockRegister.size")}: {commonSize}</span>}
+                        </div>
+                      )}
 
-                      <div className="border-t pt-1.5 mt-1.5 space-y-1">
-                        {group.lots.map((lot) => {
+                      <div className="border-t pt-1.5 mt-1.5">
+                        {group.lots.map((lot, lotIdx) => {
                           const actual = lot.actualNumberOfBags ?? lot.numberOfBags;
                           return (
-                            <div key={lot.id} className={`flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs ${lot.isReturned ? "opacity-50" : ""}`} data-testid={`lot-row-${lot.id}`}>
+                            <div key={lot.id} className={`flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs py-1.5 ${lotIdx > 0 ? "border-t border-dashed" : ""} ${lot.isReturned ? "opacity-50" : ""}`} data-testid={`lot-row-${lot.id}`}>
                               <Badge variant="outline" className="text-xs py-0 px-1.5">{lot.crop}</Badge>
                               <span><strong>{actual}</strong> {t("common.bags")}</span>
                               <span className={lot.remainingBags > 0 ? "text-primary" : "text-destructive"}>
@@ -707,6 +694,21 @@ export default function StockRegisterPage() {
                           );
                         })}
                       </div>
+
+                      {hasVehicleInfo && (
+                        <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground border-t pt-1.5 mt-1.5">
+                          {first.vehicleNumber && (
+                            <span className="flex items-center gap-1">
+                              <Truck className="w-3 h-3" />
+                              {first.vehicleNumber}
+                            </span>
+                          )}
+                          {first.driverName && <span>Driver: {first.driverName}</span>}
+                          {first.vehicleBhadaRate && <span>{t("stockRegister.bhada")}: Rs.{first.vehicleBhadaRate}/bag</span>}
+                          {first.freightType && <span>{first.freightType}</span>}
+                          {first.driverContact && <span>{first.driverContact}</span>}
+                        </div>
+                      )}
                     </div>
                     {!allReturned && (
                       <Button
