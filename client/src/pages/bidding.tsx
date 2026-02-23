@@ -15,7 +15,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { CROPS, SIZES } from "@shared/schema";
 import type { Lot, Farmer, Buyer, Bid } from "@shared/schema";
-import { Gavel, Trash2, AlertTriangle, Pencil, ChevronDown } from "lucide-react";
+import { Gavel, Trash2, AlertTriangle, Pencil, ChevronDown, Search } from "lucide-react";
 
 type LotWithFarmer = Lot & { farmer: Farmer };
 type BidWithDetails = Bid & { buyer: Buyer; lot: Lot; hasTransaction: boolean };
@@ -46,12 +46,10 @@ export default function BiddingPage() {
   const { t } = useLanguage();
   const now = new Date();
   const currentYear = String(now.getFullYear());
-  const currentMonth = String(now.getMonth() + 1);
-  const currentDay = String(now.getDate());
 
   const [activeCrop, setActiveCrop] = usePersistedState("bid-activeCrop", ALL_VALUE);
   const [activeGrade, setActiveGrade] = usePersistedState("bid-activeGrade", ALL_VALUE);
-  const [selectedStatuses, setSelectedStatuses] = usePersistedState<string[]>("bid-selectedStatuses", ["sold", "partial"]);
+  const [selectedStatuses, setSelectedStatuses] = usePersistedState<string[]>("bid-selectedStatuses2", ["unsold", "partial"]);
   const [yearFilter, setYearFilter] = usePersistedState("bid-yearFilter", ALL_VALUE);
   const [selectedMonths, setSelectedMonths] = usePersistedState<string[]>("bid-selectedMonths", []);
   const [selectedDays, setSelectedDays] = usePersistedState<string[]>("bid-selectedDays", []);
@@ -59,8 +57,13 @@ export default function BiddingPage() {
   const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
   const [statusPopoverOpen, setStatusPopoverOpen] = useState(false);
   const [farmerSearch, setFarmerSearch] = usePersistedState("bid-farmerSearch", "");
+  const [showFarmerDropdown, setShowFarmerDropdown] = useState(false);
+  const farmerInputRef = useRef<HTMLInputElement>(null);
+  const farmerDropdownRef = useRef<HTMLDivElement>(null);
 
   const [selectedLot, setSelectedLot] = useState<LotWithFarmer | null>(null);
+  const [dialogSerialNumber, setDialogSerialNumber] = useState<number | null>(null);
+  const [dialogDate, setDialogDate] = useState<string>("");
   const [bidDialogOpen, setBidDialogOpen] = useState(false);
   const [buyerSearch, setBuyerSearch] = useState("");
   const [selectedBuyerId, setSelectedBuyerId] = useState<number | null>(null);
@@ -75,9 +78,23 @@ export default function BiddingPage() {
     queryKey: ["/api/lots", cropQueryParam],
   });
 
+  const { data: allFarmers = [] } = useQuery<Farmer[]>({
+    queryKey: ["/api/farmers"],
+  });
+
+  const farmerSuggestions = useMemo(() => {
+    if (!farmerSearch || farmerSearch.length < 1) return [];
+    const s = farmerSearch.toLowerCase();
+    return allFarmers.filter(f =>
+      f.name.toLowerCase().includes(s) ||
+      (f.phone && f.phone.includes(s)) ||
+      (f.village && f.village.toLowerCase().includes(s))
+    ).slice(0, 10);
+  }, [farmerSearch, allFarmers]);
+
   const daysInMonths = useMemo(() => {
     if (selectedMonths.length === 0) return 31;
-    const year = parseInt(yearFilter);
+    const year = yearFilter !== ALL_VALUE ? parseInt(yearFilter) : now.getFullYear();
     return Math.max(...selectedMonths.map(m => new Date(year, parseInt(m), 0).getDate()));
   }, [selectedMonths, yearFilter]);
 
@@ -247,8 +264,10 @@ export default function BiddingPage() {
     },
   });
 
-  const openBidDialog = (lot: LotWithFarmer) => {
+  const openBidDialog = (lot: LotWithFarmer, serialNumber: number, date: string) => {
     setSelectedLot(lot);
+    setDialogSerialNumber(serialNumber);
+    setDialogDate(date);
     setBidBags(lot.remainingBags > 0 ? lot.remainingBags.toString() : "");
     setBidDialogOpen(true);
     setSelectedBuyerId(null);
@@ -305,6 +324,12 @@ export default function BiddingPage() {
       ) {
         setShowBuyerDropdown(false);
       }
+      if (
+        farmerDropdownRef.current && !farmerDropdownRef.current.contains(e.target as Node) &&
+        farmerInputRef.current && !farmerInputRef.current.contains(e.target as Node)
+      ) {
+        setShowFarmerDropdown(false);
+      }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
@@ -320,13 +345,46 @@ export default function BiddingPage() {
           {t("bidding.title")}
         </h1>
 
-        <Input
-          data-testid="input-farmer-search"
-          value={farmerSearch}
-          onChange={(e) => setFarmerSearch(e.target.value)}
-          placeholder="Farmer / Phone / Village"
-          className="w-40 md:w-48 h-8 text-xs"
-        />
+        <div className="relative">
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+            <Input
+              ref={farmerInputRef}
+              data-testid="input-farmer-search"
+              value={farmerSearch}
+              onChange={(e) => {
+                setFarmerSearch(e.target.value);
+                setShowFarmerDropdown(true);
+              }}
+              onFocus={() => { if (farmerSearch.length >= 1) setShowFarmerDropdown(true); }}
+              placeholder="Farmer / Phone / Village"
+              className="w-44 md:w-52 h-8 text-xs pl-7"
+              autoComplete="off"
+            />
+          </div>
+          {showFarmerDropdown && farmerSearch.length >= 1 && farmerSuggestions.length > 0 && (
+            <div
+              ref={farmerDropdownRef}
+              className="absolute z-50 w-64 mt-1 bg-popover border border-border rounded-md shadow-md max-h-48 overflow-y-auto"
+            >
+              {farmerSuggestions.map((f) => (
+                <div
+                  key={f.id}
+                  className="px-3 py-2 text-xs hover:bg-accent cursor-pointer"
+                  data-testid={`option-farmer-${f.id}`}
+                  onClick={() => {
+                    setFarmerSearch(f.name);
+                    setShowFarmerDropdown(false);
+                  }}
+                >
+                  <span className="font-medium">{f.name}</span>
+                  {f.phone && <span className="text-muted-foreground"> — {f.phone}</span>}
+                  {f.village && <span className="text-muted-foreground"> — {f.village}</span>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         <Select value={yearFilter} onValueChange={(v) => { setYearFilter(v); setSelectedMonths([]); setSelectedDays([]); }}>
           <SelectTrigger data-testid="select-year" className="w-auto text-xs">
@@ -501,9 +559,9 @@ export default function BiddingPage() {
                     {firstLot.farmer.phone && (
                       <span className="text-xs text-muted-foreground">{firstLot.farmer.phone}</span>
                     )}
-                    {firstLot.vehicleNumber && (
+                    {firstLot.farmer.village && (
                       <span className="text-xs text-muted-foreground">
-                        {t("stockRegister.vehicle")}: {firstLot.vehicleNumber}
+                        {firstLot.farmer.village}
                       </span>
                     )}
                   </div>
@@ -546,7 +604,7 @@ export default function BiddingPage() {
                               size="icon"
                               variant="outline"
                               className="mobile-touch-target"
-                              onClick={() => openBidDialog(lot)}
+                              onClick={() => openBidDialog(lot, serialNumber, date)}
                             >
                               <Pencil className="w-4 h-4" />
                             </Button>
@@ -555,7 +613,7 @@ export default function BiddingPage() {
                               data-testid={`button-bid-lot-${lot.id}`}
                               size="sm"
                               className="mobile-touch-target"
-                              onClick={() => openBidDialog(lot)}
+                              onClick={() => openBidDialog(lot, serialNumber, date)}
                             >
                               <Gavel className="w-4 h-4 mr-1" />
                               {t("bidding.bid")}
@@ -575,14 +633,14 @@ export default function BiddingPage() {
       <Dialog open={bidDialogOpen} onOpenChange={setBidDialogOpen}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              Bid on {selectedLot?.crop} - {selectedLot?.farmer.name}
+            <DialogTitle className="text-sm">
+              Bid on SR #{dialogSerialNumber} | {dialogDate} | {selectedLot?.farmer.name}
             </DialogTitle>
           </DialogHeader>
 
           {selectedLot && (
             <div className="space-y-4">
-              <div className="bg-muted rounded-md p-3 text-sm space-y-1">
+              <div className="bg-muted rounded-md p-3 text-sm grid grid-cols-2 gap-x-4 gap-y-1">
                 <p>{t("bidding.remainingBags")}: <strong>{selectedLot.remainingBags}</strong></p>
                 <p>Crop: <strong>{selectedLot.crop}</strong></p>
                 {selectedLot.size && <p>{t("stockRegister.size")}: <strong>{selectedLot.size}</strong></p>}
