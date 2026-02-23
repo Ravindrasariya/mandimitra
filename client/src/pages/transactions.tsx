@@ -986,18 +986,6 @@ export default function TransactionsPage() {
                       <span className="text-xs text-muted-foreground">{sg.date}</span>
                     </div>
                     <div className="flex items-center gap-1">
-                      {sg.lotGroups.map((lg) => (
-                        <Button
-                          key={lg.lot.id}
-                          data-testid={`button-edit-lot-${lg.lot.id}`}
-                          size="sm"
-                          className="mobile-touch-target"
-                          onClick={() => openEditDialog(lg)}
-                        >
-                          <Pencil className="w-4 h-4 mr-1" />
-                          {sg.lotGroups.length > 1 ? lg.lot.crop : t("common.edit")}
-                        </Button>
-                      ))}
                       {hasCompleted && (
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -1084,18 +1072,26 @@ export default function TransactionsPage() {
                   <div className="border-t pt-2 space-y-1">
                     {sg.lotGroups.map((lg) => (
                       <div key={lg.lot.id}>
-                        {sg.lotGroups.length > 1 && (lg.completedTxns.length > 0 || lg.pendingBids.length > 0) && (
+                        {(lg.completedTxns.length > 0 || lg.pendingBids.length > 0) && (
                           <div className="flex items-center gap-2 mt-1 mb-0.5">
                             <Badge className="text-xs">{lg.lot.crop}</Badge>
                             {lg.lot.size && <Badge variant="outline" className="text-xs">{lg.lot.size}</Badge>}
                             <span className="text-xs text-muted-foreground">{lg.lot.actualNumberOfBags ?? lg.lot.numberOfBags} bags</span>
+                            <Button
+                              data-testid={`button-edit-lot-${lg.lot.id}`}
+                              size="icon"
+                              variant="ghost"
+                              className="h-5 w-5"
+                              onClick={() => openEditDialog(lg)}
+                            >
+                              <Pencil className="w-3 h-3" />
+                            </Button>
                           </div>
                         )}
                         {lg.completedTxns.map((tx) => (
                           <div key={tx.id} className={`text-sm py-1 ${tx.isReversed ? "opacity-40" : ""}`}>
                             <div className="flex items-center justify-between flex-wrap gap-x-2 gap-y-0.5">
                               <div className="flex items-center gap-2 min-w-0">
-                                {sg.lotGroups.length === 1 && <Badge className="text-xs">{tx.lot.crop}</Badge>}
                                 <span className="text-muted-foreground">{t("transactions.buyer")}:</span>
                                 <strong className="truncate">{tx.buyer.name}</strong>
                                 <span className="text-green-600 font-semibold whitespace-nowrap">₹{tx.pricePerKg}/kg</span>
@@ -1116,14 +1112,13 @@ export default function TransactionsPage() {
                           <div key={bid.id} className="text-sm py-1">
                             <div className="flex items-center justify-between flex-wrap gap-x-2 gap-y-0.5">
                               <div className="flex items-center gap-2 min-w-0">
-                                {sg.lotGroups.length === 1 && <Badge className="text-xs">{bid.lot.crop}</Badge>}
                                 <span className="text-muted-foreground">{t("transactions.buyer")}:</span>
                                 <strong className="truncate">{bid.buyer.name}</strong>
                                 <span className="text-green-600 font-semibold whitespace-nowrap">₹{bid.pricePerKg}/kg</span>
                               </div>
                               <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                 <span>{bid.numberOfBags} bags</span>
-                                <span>{bid.grade || "N/A"}</span>
+                                {bid.grade && bid.grade !== "__all__" && <span>{bid.grade}</span>}
                               </div>
                             </div>
                           </div>
@@ -1188,7 +1183,7 @@ export default function TransactionsPage() {
 
               <div className="bg-muted/50 rounded-md p-2 text-sm">
                 <p>{t("transactions.buyer")}: <strong>{selectedBid.buyer.name}</strong></p>
-                <p>Price: <strong>Rs.{selectedBid.pricePerKg}/kg</strong> | Bags: <strong>{selectedBid.numberOfBags}</strong> | Grade: <strong>{selectedBid.grade || "N/A"}</strong></p>
+                <p>Price: <strong>Rs.{selectedBid.pricePerKg}/kg</strong> | Bags: <strong>{selectedBid.numberOfBags}</strong>{selectedBid.grade && selectedBid.grade !== "__all__" && <> | Grade: <strong>{selectedBid.grade}</strong></>}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
