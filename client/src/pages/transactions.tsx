@@ -100,33 +100,37 @@ function buildSerialGroups(lotGroups: UnifiedLotGroup[]): UnifiedSerialGroup[] {
   return Array.from(map.values());
 }
 
-function generateFarmerReceiptHtml(lot: Lot, farmer: Farmer, txns: TransactionWithDetails[], businessName?: string, businessAddress?: string) {
-  const dateStr = txns[0]?.date || format(new Date(), "yyyy-MM-dd");
-  const originalBags = lot.numberOfBags;
+function generateFarmerReceiptHtml(sg: UnifiedSerialGroup, businessName?: string, businessAddress?: string) {
+  const farmer = sg.farmer;
+  const allTxns = sg.lotGroups.flatMap(lg => lg.completedTxns.filter(t => !t.isReversed));
+  const dateStr = sg.date || format(new Date(), "yyyy-MM-dd");
+  const firstLot = sg.lotGroups[0]?.lot;
+  const totalOriginalBags = sg.totalBags;
   const cropLabel: Record<string, string> = { Potato: "आलू / Potato", Onion: "प्याज / Onion", Garlic: "लहसुन / Garlic" };
 
-  const totalHammali = txns.reduce((s, t) => s + parseFloat(t.hammaliCharges || "0"), 0);
-  const totalExtraCharges = txns.reduce((s, t) => s + parseFloat(t.extraChargesFarmer || "0"), 0);
-  const totalFreight = txns.reduce((s, t) => s + parseFloat(t.freightCharges || "0"), 0);
-  const totalAadhatFarmer = txns.reduce((s, t) => {
+  const totalHammali = allTxns.reduce((s, t) => s + parseFloat(t.hammaliCharges || "0"), 0);
+  const totalExtraCharges = allTxns.reduce((s, t) => s + parseFloat(t.extraChargesFarmer || "0"), 0);
+  const totalFreight = allTxns.reduce((s, t) => s + parseFloat(t.freightCharges || "0"), 0);
+  const totalAadhatFarmer = allTxns.reduce((s, t) => {
     const gross = parseFloat(t.netWeight || "0") * parseFloat(t.pricePerKg || "0");
     return s + gross * parseFloat(t.aadhatFarmerPercent || "0") / 100;
   }, 0);
-  const totalMandiFarmer = txns.reduce((s, t) => {
+  const totalMandiFarmer = allTxns.reduce((s, t) => {
     const gross = parseFloat(t.netWeight || "0") * parseFloat(t.pricePerKg || "0");
     return s + gross * parseFloat(t.mandiFarmerPercent || "0") / 100;
   }, 0);
 
   const totalDeduction = totalHammali + totalExtraCharges + totalFreight + totalAadhatFarmer + totalMandiFarmer;
-  const totalPayable = txns.reduce((s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0);
-  const totalGross = txns.reduce((s, t) => s + (parseFloat(t.netWeight || "0") * parseFloat(t.pricePerKg || "0")), 0);
+  const totalPayable = allTxns.reduce((s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0);
+  const totalGross = allTxns.reduce((s, t) => s + (parseFloat(t.netWeight || "0") * parseFloat(t.pricePerKg || "0")), 0);
 
-  const txnRows = txns.map(t => {
+  const txnRows = allTxns.map(t => {
     const nw = parseFloat(t.netWeight || "0");
     const ppk = parseFloat(t.pricePerKg || "0");
     const gross = nw * ppk;
+    const crop = t.lot?.crop || firstLot?.crop || "";
     return `<tr>
-      <td style="padding:6px;border:1px solid #999;text-align:center">${cropLabel[lot.crop] || lot.crop}</td>
+      <td style="padding:6px;border:1px solid #999;text-align:center">${cropLabel[crop] || crop}</td>
       <td style="padding:6px;border:1px solid #999;text-align:center">${t.numberOfBags || 0}</td>
       <td style="padding:6px;border:1px solid #999;text-align:right">${nw.toFixed(2)}</td>
       <td style="padding:6px;border:1px solid #999;text-align:right">₹${ppk.toFixed(2)}</td>
@@ -134,8 +138,17 @@ function generateFarmerReceiptHtml(lot: Lot, farmer: Farmer, txns: TransactionWi
     </tr>`;
   }).join("");
 
-  const totalActualBags = txns.reduce((s, t) => s + (t.numberOfBags || 0), 0);
-  const totalNetWeight = txns.reduce((s, t) => s + parseFloat(t.netWeight || "0"), 0);
+  const totalActualBags = allTxns.reduce((s, t) => s + (t.numberOfBags || 0), 0);
+  const totalNetWeight = allTxns.reduce((s, t) => s + parseFloat(t.netWeight || "0"), 0);
+
+  const hammaliPerBag = allTxns.length > 0 ? parseFloat(allTxns[0].hammaliFarmerPerBag || "0") : 0;
+  const aadhatPct = allTxns.length > 0 ? parseFloat(allTxns[0].aadhatFarmerPercent || "0") : 0;
+  const mandiPct = allTxns.length > 0 ? parseFloat(allTxns[0].mandiFarmerPercent || "0") : 0;
+
+  const hammaliDetail = hammaliPerBag > 0 ? ` (${totalActualBags} × ₹${hammaliPerBag.toFixed(2)}/bag)` : "";
+  const freightDetail = totalFreight > 0 && firstLot?.vehicleBhadaRate ? ` (कुल भाड़ा / Total Freight)` : "";
+  const aadhatDetail = aadhatPct > 0 ? ` (${aadhatPct}%)` : "";
+  const mandiDetail = mandiPct > 0 ? ` (${mandiPct}%)` : "";
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>किसान रसीद</title>
 <style>body{font-family:'Noto Sans Devanagari',sans-serif;margin:20px;color:#333;font-size:14px}
@@ -158,14 +171,14 @@ ${businessAddress ? `<p style="font-size:0.85em;color:#555;margin:2px 0">${busin
 </div>
 
 <table class="info-table">
-<tr><td><strong>रसीद / Lot नं:</strong> ${lot.lotId}</td><td style="text-align:right"><strong>दिनांक:</strong> ${dateStr}</td></tr>
+<tr><td><strong>SR #:</strong> ${sg.serialNumber}</td><td style="text-align:right"><strong>दिनांक:</strong> ${dateStr}</td></tr>
 </table>
 
 <table class="info-table">
 <tr><td><strong>किसान / Farmer:</strong> ${farmer.name}</td><td><strong>फोन:</strong> ${farmer.phone || "-"}</td></tr>
 <tr><td><strong>गाँव:</strong> ${farmer.village || "-"}</td><td><strong>तहसील:</strong> ${farmer.tehsil || "-"}</td></tr>
 <tr><td><strong>जिला:</strong> ${farmer.district || "-"}</td><td><strong>राज्य:</strong> ${farmer.state || "-"}</td></tr>
-<tr><td><strong>गाड़ी नं:</strong> ${lot.vehicleNumber || "-"}</td><td><strong>थैले (Original):</strong> ${originalBags}</td></tr>
+<tr><td><strong>गाड़ी नं:</strong> ${firstLot?.vehicleNumber || "-"}</td><td><strong>थैले / Total Bags:</strong> ${totalOriginalBags}</td></tr>
 </table>
 
 <table class="txn-table">
@@ -192,11 +205,11 @@ ${txnRows}
 
 <div class="ded-section">
 <div class="ded-row" style="font-weight:bold;margin-bottom:4px"><span>कटौती / Deductions:</span><span></span></div>
-${totalHammali > 0 ? `<div class="ded-row"><span>हम्माली / Hammali:</span><span>₹${totalHammali.toFixed(2)}</span></div>` : ""}
+${totalHammali > 0 ? `<div class="ded-row"><span>हम्माली / Hammali${hammaliDetail}:</span><span>₹${totalHammali.toFixed(2)}</span></div>` : ""}
 ${totalExtraCharges > 0 ? `<div class="ded-row"><span>अतिरिक्त शुल्क / Extra Charges:</span><span>₹${totalExtraCharges.toFixed(2)}</span></div>` : ""}
-${totalAadhatFarmer > 0 ? `<div class="ded-row"><span>आढ़त / Aadhat:</span><span>₹${totalAadhatFarmer.toFixed(2)}</span></div>` : ""}
-${totalMandiFarmer > 0 ? `<div class="ded-row"><span>मण्डी शुल्क / Mandi:</span><span>₹${totalMandiFarmer.toFixed(2)}</span></div>` : ""}
-${totalFreight > 0 ? `<div class="ded-row"><span>भाड़ा / Freight:</span><span>₹${totalFreight.toFixed(2)}</span></div>` : ""}
+${totalAadhatFarmer > 0 ? `<div class="ded-row"><span>आढ़त / Aadhat${aadhatDetail}:</span><span>₹${totalAadhatFarmer.toFixed(2)}</span></div>` : ""}
+${totalMandiFarmer > 0 ? `<div class="ded-row"><span>मण्डी शुल्क / Mandi${mandiDetail}:</span><span>₹${totalMandiFarmer.toFixed(2)}</span></div>` : ""}
+${totalFreight > 0 ? `<div class="ded-row"><span>भाड़ा / Freight${freightDetail}:</span><span>₹${totalFreight.toFixed(2)}</span></div>` : ""}
 ${totalDeduction > 0 ? `<div class="ded-row sub-total"><span>कुल कटौती / Total Deduction:</span><span>₹${totalDeduction.toFixed(2)}</span></div>` : ""}
 <div class="ded-row total-row"><span>किसान को देय राशि / Net Payable:</span><span>₹${totalPayable.toFixed(2)}</span></div>
 </div>
@@ -691,16 +704,15 @@ export default function TransactionsPage() {
 
   const isSaving = createTxMutation.isPending || updateTxMutation.isPending;
 
-  const handlePrintFarmerReceipt = (group: UnifiedLotGroup) => {
-    const activeTxns = group.completedTxns.filter(t => !t.isReversed);
-    const html = generateFarmerReceiptHtml(group.lot, group.farmer, activeTxns, user?.businessName, user?.businessAddress);
+  const handlePrintFarmerReceipt = (sg: UnifiedSerialGroup) => {
+    const html = generateFarmerReceiptHtml(sg, user?.businessName, user?.businessAddress);
     printReceipt(html);
   };
 
-  const handleShareFarmerReceipt = (group: UnifiedLotGroup) => {
-    const activeTxns = group.completedTxns.filter(t => !t.isReversed);
-    const html = generateFarmerReceiptHtml(group.lot, group.farmer, activeTxns, user?.businessName, user?.businessAddress);
-    const fileName = `Farmer_Receipt_${group.lotId}.pdf`;
+  const handleShareFarmerReceipt = (sg: UnifiedSerialGroup) => {
+    const html = generateFarmerReceiptHtml(sg, user?.businessName, user?.businessAddress);
+    const farmerShortName = sg.farmer.name.split(/\s+/).slice(0, 2).join("");
+    const fileName = `Farmer_Receipt_${farmerShortName}_${sg.date}.pdf`;
     shareReceiptAsPdf(html, fileName);
   };
 
@@ -1000,25 +1012,25 @@ export default function TransactionsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
+                            <DropdownMenuItem
+                              data-testid={`button-print-farmer-${sg.serialNumber}`}
+                              onClick={() => handlePrintFarmerReceipt(sg)}
+                            >
+                              <Printer className="w-4 h-4 mr-2" />
+                              Print किसान रसीद
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              data-testid={`button-share-farmer-${sg.serialNumber}`}
+                              onClick={() => handleShareFarmerReceipt(sg)}
+                            >
+                              <Share2 className="w-4 h-4 mr-2" />
+                              Share किसान रसीद
+                            </DropdownMenuItem>
                             {sg.lotGroups.map((lg) => {
                               const lgActiveTxns = lg.completedTxns.filter(t => !t.isReversed);
                               if (lgActiveTxns.length === 0) return null;
                               return (
                                 <div key={lg.lot.id}>
-                                  <DropdownMenuItem
-                                    data-testid={`button-print-farmer-${lg.lot.id}`}
-                                    onClick={() => handlePrintFarmerReceipt(lg)}
-                                  >
-                                    <Printer className="w-4 h-4 mr-2" />
-                                    Print किसान रसीद - {lg.lot.crop}
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    data-testid={`button-share-farmer-${lg.lot.id}`}
-                                    onClick={() => handleShareFarmerReceipt(lg)}
-                                  >
-                                    <Share2 className="w-4 h-4 mr-2" />
-                                    Share किसान रसीद - {lg.lot.crop}
-                                  </DropdownMenuItem>
                                   {lgActiveTxns.map((tx) => (
                                     <div key={tx.id}>
                                       <DropdownMenuItem
