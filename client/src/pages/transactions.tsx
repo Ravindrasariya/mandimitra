@@ -587,7 +587,7 @@ export default function TransactionsPage() {
   const vehicleBhadaRate = parseFloat(selectedBid?.lot.vehicleBhadaRate || "0");
   const originalBags = selectedBid?.lot.numberOfBags || 1;
   const actualBags = selectedBid?.lot.actualNumberOfBags ?? originalBags;
-  const freightFarmerTotal = actualBags > 0 ? ((bags * originalBags) / actualBags) * vehicleBhadaRate : 0;
+  const freightFarmerTotal = actualBags > 0 ? (vehicleBhadaRate * bags) / actualBags : 0;
 
   const hammaliFarmerTotal = hammaliFarmerRate * bags;
   const hammaliBuyerTotal = hammaliBuyerRate * bags;
@@ -1158,7 +1158,7 @@ export default function TransactionsPage() {
                     />
                   </div>
                   {vehicleBhadaRate > 0 && (
-                    <div className="flex justify-between"><span>Freight/Bhada:</span><span>₹{vehicleBhadaRate}/bag</span></div>
+                    <div className="flex justify-between"><span>Freight/Bhada (Total):</span><span>₹{vehicleBhadaRate}</span></div>
                   )}
                 </div>
                 <div className="bg-muted/50 rounded p-2 space-y-1">
@@ -1215,7 +1215,7 @@ export default function TransactionsPage() {
                   )}
                   {freightFarmerTotal > 0 && (
                     <div className="flex justify-between text-muted-foreground">
-                      <span>Freight ({originalBags !== actualBags ? `${bags}×${originalBags}/${actualBags}` : bags} × ₹{vehicleBhadaRate}):</span>
+                      <span>Freight (₹{vehicleBhadaRate} × {bags}/{actualBags}):</span>
                       <span>-Rs.{freightFarmerTotal.toFixed(2)}</span>
                     </div>
                   )}

@@ -704,7 +704,7 @@ export default function StockRegisterPage() {
                             </span>
                           )}
                           {first.driverName && <span>Driver: {first.driverName}</span>}
-                          {first.vehicleBhadaRate && <span>{t("stockRegister.bhada")}: Rs.{first.vehicleBhadaRate}/bag</span>}
+                          {first.vehicleBhadaRate && <span>{t("stockRegister.bhada")}: Rs.{first.vehicleBhadaRate}</span>}
                           {first.freightType && <span>{first.freightType}</span>}
                           {first.driverContact && <span>{first.driverContact}</span>}
                         </div>
