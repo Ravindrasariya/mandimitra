@@ -11,14 +11,17 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { CROPS, SIZES } from "@shared/schema";
 import type { Lot, Farmer, Buyer, Bid } from "@shared/schema";
-import { Gavel, Trash2, AlertTriangle, Pencil } from "lucide-react";
+import { Gavel, Trash2, AlertTriangle, Pencil, ChevronDown } from "lucide-react";
 
 type LotWithFarmer = Lot & { farmer: Farmer };
-type BidWithDetails = Bid & { buyer: Buyer; lot: Lot };
+type BidWithDetails = Bid & { buyer: Buyer; lot: Lot; hasTransaction: boolean };
 
 const ALL_VALUE = "__all__";
+const MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
 function getLotStatus(lot: LotWithFarmer) {
   const actual = lot.actualNumberOfBags ?? lot.numberOfBags;
@@ -30,19 +33,30 @@ function getLotStatus(lot: LotWithFarmer) {
 function LotStatusBadge({ lot }: { lot: LotWithFarmer }) {
   const status = getLotStatus(lot);
   if (status === "sold") {
-    return <Badge variant="destructive" className="text-xs" data-testid={`badge-status-${lot.id}`}>Sold</Badge>;
+    return <Badge variant="destructive" className="text-xs" data-testid={`badge-status-${lot.id}`}>Sold Out</Badge>;
   }
   if (status === "partial") {
-    return <Badge className="text-xs bg-orange-500 hover:bg-orange-600" data-testid={`badge-status-${lot.id}`}>Partially Sold</Badge>;
+    return <Badge variant="secondary" className="text-xs border-blue-400 text-blue-600 bg-blue-50" data-testid={`badge-status-${lot.id}`}>Partially Sold</Badge>;
   }
-  return <Badge variant="secondary" className="text-xs" data-testid={`badge-status-${lot.id}`}>Unsold</Badge>;
+  return <Badge variant="outline" className="text-xs border-green-400 text-green-600 bg-green-50" data-testid={`badge-status-${lot.id}`}>Unsold</Badge>;
 }
 
 export default function BiddingPage() {
   const { toast } = useToast();
   const { t } = useLanguage();
+  const now = new Date();
+  const currentYear = String(now.getFullYear());
+  const currentMonth = String(now.getMonth() + 1);
+  const currentDay = String(now.getDate());
+
   const [activeCrop, setActiveCrop] = usePersistedState("bid-activeCrop", ALL_VALUE);
   const [activeGrade, setActiveGrade] = usePersistedState("bid-activeGrade", ALL_VALUE);
+  const [yearFilter, setYearFilter] = usePersistedState("bid-yearFilter", currentYear);
+  const [selectedMonths, setSelectedMonths] = usePersistedState<string[]>("bid-selectedMonths", [currentMonth]);
+  const [selectedDays, setSelectedDays] = usePersistedState<string[]>("bid-selectedDays", []);
+  const [monthPopoverOpen, setMonthPopoverOpen] = useState(false);
+  const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
+
   const [selectedLot, setSelectedLot] = useState<LotWithFarmer | null>(null);
   const [bidDialogOpen, setBidDialogOpen] = useState(false);
   const [buyerSearch, setBuyerSearch] = useState("");
@@ -58,22 +72,69 @@ export default function BiddingPage() {
     queryKey: ["/api/lots", cropQueryParam],
   });
 
+  const daysInMonths = useMemo(() => {
+    if (selectedMonths.length === 0) return 31;
+    const year = parseInt(yearFilter);
+    return Math.max(...selectedMonths.map(m => new Date(year, parseInt(m), 0).getDate()));
+  }, [selectedMonths, yearFilter]);
+
+  const toggleMonth = (month: string) => {
+    setSelectedMonths(prev => prev.includes(month) ? prev.filter(m => m !== month) : [...prev, month]);
+    setSelectedDays([]);
+  };
+
+  const selectAllMonths = () => {
+    setSelectedMonths([]);
+    setSelectedDays([]);
+    setMonthPopoverOpen(false);
+  };
+
+  const toggleDay = (day: string) => {
+    setSelectedDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
+  };
+
+  const selectAllDays = () => {
+    setSelectedDays([]);
+    setDayPopoverOpen(false);
+  };
+
+  const monthLabel = selectedMonths.length === 0
+    ? t("stockRegister.allMonths")
+    : selectedMonths.length === 1
+      ? MONTH_LABELS[parseInt(selectedMonths[0]) - 1]
+      : `${selectedMonths.length} ${t("stockRegister.nMonths")}`;
+
+  const dayLabel = selectedDays.length === 0
+    ? t("stockRegister.allDays")
+    : selectedDays.length === 1
+      ? selectedDays[0]
+      : `${selectedDays.length} ${t("stockRegister.nDays")}`;
+
   const filteredLots = useMemo(() => {
     return lots.filter(l => {
       if (l.isReturned) return false;
       if (activeGrade !== ALL_VALUE && l.size !== activeGrade) return false;
+      const d = new Date(l.date);
+      if (d.getFullYear() !== parseInt(yearFilter)) return false;
+      if (selectedMonths.length > 0 && !selectedMonths.includes(String(d.getMonth() + 1))) return false;
+      if (selectedDays.length > 0 && !selectedDays.includes(String(d.getDate()))) return false;
       return true;
     });
-  }, [lots, activeGrade]);
+  }, [lots, activeGrade, yearFilter, selectedMonths, selectedDays]);
 
   const groupedBySerial = useMemo(() => {
-    const groups = new Map<number, LotWithFarmer[]>();
+    const groups = new Map<string, { serialNumber: number; date: string; lots: LotWithFarmer[] }>();
     for (const lot of filteredLots) {
       const sr = lot.serialNumber;
-      if (!groups.has(sr)) groups.set(sr, []);
-      groups.get(sr)!.push(lot);
+      const key = `${lot.date}-${sr}`;
+      if (!groups.has(key)) groups.set(key, { serialNumber: sr, date: lot.date, lots: [] });
+      groups.get(key)!.lots.push(lot);
     }
-    const sorted = Array.from(groups.entries()).sort((a, b) => a[0] - b[0]);
+    const sorted = Array.from(groups.values()).sort((a, b) => {
+      const dateCompare = b.date.localeCompare(a.date);
+      if (dateCompare !== 0) return dateCompare;
+      return a.serialNumber - b.serialNumber;
+    });
     return sorted;
   }, [filteredLots]);
 
@@ -259,6 +320,84 @@ export default function BiddingPage() {
         </Select>
       </div>
 
+      <div className="flex items-center gap-2 flex-wrap">
+        <Select value={yearFilter} onValueChange={(v) => { setYearFilter(v); setSelectedDays([]); }}>
+          <SelectTrigger data-testid="select-year" className="w-auto text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {Array.from({ length: 5 }, (_, i) => String(now.getFullYear() - i)).map(y => (
+              <SelectItem key={y} value={y} data-testid={`option-year-${y}`}>{y}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Popover open={monthPopoverOpen} onOpenChange={setMonthPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="text-xs gap-1" data-testid="button-month-filter">
+              {monthLabel}
+              <ChevronDown className="w-3 h-3" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-2" align="start">
+            <button
+              className="flex items-center gap-2 w-full px-2 py-1 text-xs hover:bg-accent rounded"
+              onClick={selectAllMonths}
+              data-testid="button-all-months"
+            >
+              <Checkbox checked={selectedMonths.length === 0} />
+              <span>{t("stockRegister.allMonths")}</span>
+            </button>
+            <div className="grid grid-cols-4 gap-1 mt-1">
+              {MONTH_LABELS.map((m, i) => {
+                const val = String(i + 1);
+                return (
+                  <button
+                    key={val}
+                    className={`flex items-center justify-center rounded text-xs p-1.5 ${selectedMonths.includes(val) ? "bg-primary text-primary-foreground" : ""}`}
+                    data-testid={`toggle-month-${val}`}
+                    onClick={() => toggleMonth(val)}
+                  >
+                    {m}
+                  </button>
+                );
+              })}
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        <Popover open={dayPopoverOpen} onOpenChange={setDayPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="text-xs gap-1" data-testid="button-day-filter">
+              {dayLabel}
+              <ChevronDown className="w-3 h-3" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-2" align="start">
+            <button
+              className="flex items-center gap-2 w-full px-2 py-1 text-xs hover:bg-accent rounded"
+              onClick={selectAllDays}
+              data-testid="button-all-days"
+            >
+              <Checkbox checked={selectedDays.length === 0} />
+              <span>{t("stockRegister.allDays")}</span>
+            </button>
+            <div className="grid grid-cols-7 gap-1 mt-1">
+              {Array.from({ length: daysInMonths }, (_, i) => String(i + 1)).map(d => (
+                <button
+                  key={d}
+                  className={`flex items-center justify-center rounded text-xs p-1.5 ${selectedDays.includes(d) ? "bg-primary text-primary-foreground" : ""}`}
+                  data-testid={`toggle-day-${d}`}
+                  onClick={() => toggleDay(d)}
+                >
+                  {d}
+                </button>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
+
       {isLoading ? (
         <div className="text-center py-8 text-muted-foreground">{t("app.loading")}</div>
       ) : groupedBySerial.length === 0 ? (
@@ -267,15 +406,17 @@ export default function BiddingPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {groupedBySerial.map(([serialNumber, groupLots]) => {
+          {groupedBySerial.map((group) => {
+            const { serialNumber, date, lots: groupLots } = group;
             const firstLot = groupLots[0];
             return (
-              <Card key={serialNumber} data-testid={`card-serial-group-${serialNumber}`}>
+              <Card key={`${date}-${serialNumber}`} data-testid={`card-serial-group-${serialNumber}`}>
                 <CardContent className="pt-4 space-y-3">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="secondary" className="text-xs font-semibold" data-testid={`badge-sr-${serialNumber}`}>
                       SR #{serialNumber}
                     </Badge>
+                    <span className="text-xs text-muted-foreground">{date}</span>
                     <span className="text-sm font-medium truncate" data-testid={`text-farmer-${serialNumber}`}>
                       {firstLot.farmer.name}
                     </span>
@@ -379,15 +520,18 @@ export default function BiddingPage() {
                         <span className="font-medium">{bid.buyer.name}</span>
                         <span className="text-muted-foreground"> - Rs.{bid.pricePerKg}/kg x {bid.numberOfBags} bags</span>
                         {bid.grade && bid.grade !== "__all__" && <Badge variant="secondary" className="ml-2 text-xs">{bid.grade}</Badge>}
+                        {bid.hasTransaction && <Badge variant="outline" className="ml-2 text-xs border-green-400 text-green-600 bg-green-50">Transacted</Badge>}
                       </div>
-                      <Button
-                        variant="destructive"
-                        size="icon"
-                        data-testid={`button-delete-bid-${bid.id}`}
-                        onClick={() => deleteBidMutation.mutate(bid.id)}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
+                      {!bid.hasTransaction && (
+                        <Button
+                          variant="destructive"
+                          size="icon"
+                          data-testid={`button-delete-bid-${bid.id}`}
+                          onClick={() => deleteBidMutation.mutate(bid.id)}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      )}
                     </div>
                   ))}
                 </div>

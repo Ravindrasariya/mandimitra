@@ -67,7 +67,7 @@ export interface IStorage {
   updateLot(id: number, businessId: number, data: Partial<InsertLot>): Promise<Lot | undefined>;
   getNextSerialNumber(businessId: number, date: string): Promise<number>;
   getNextLotSequence(businessId: number, crop: string, date: string): Promise<number>;
-  getBids(businessId: number, lotId?: number): Promise<(Bid & { buyer: Buyer; lot: Lot; farmer: Farmer })[]>;
+  getBids(businessId: number, lotId?: number): Promise<(Bid & { buyer: Buyer; lot: Lot; farmer: Farmer; hasTransaction: boolean })[]>;
   createBid(bid: InsertBid): Promise<Bid>;
   updateBid(id: number, businessId: number, data: Partial<InsertBid>): Promise<Bid | undefined>;
   deleteBid(id: number, businessId: number): Promise<void>;
@@ -539,7 +539,7 @@ export class DatabaseStorage implements IStorage {
     return parseInt(result?.max || "0", 10) + 1;
   }
 
-  async getBids(businessId: number, lotId?: number): Promise<(Bid & { buyer: Buyer; lot: Lot; farmer: Farmer })[]> {
+  async getBids(businessId: number, lotId?: number): Promise<(Bid & { buyer: Buyer; lot: Lot; farmer: Farmer; hasTransaction: boolean })[]> {
     let conditions: any[] = [eq(bids.businessId, businessId)];
     if (lotId) conditions.push(eq(bids.lotId, lotId));
 
@@ -552,6 +552,7 @@ export class DatabaseStorage implements IStorage {
       buyer: buyers,
       lot: lots,
       farmer: farmers,
+      hasTransaction: sql<boolean>`EXISTS (SELECT 1 FROM ${transactions} WHERE ${transactions.bidId} = ${bids.id} AND ${transactions.businessId} = ${businessId} AND ${transactions.isReversed} = false)`.as("has_transaction"),
     }).from(bids)
       .innerJoin(buyers, eq(bids.buyerId, buyers.id))
       .innerJoin(lots, eq(bids.lotId, lots.id))
@@ -559,7 +560,7 @@ export class DatabaseStorage implements IStorage {
       .where(and(...conditions))
       .orderBy(desc(bids.createdAt));
 
-    return results.map(r => ({ ...r.bid, buyer: r.buyer, lot: r.lot, farmer: r.farmer }));
+    return results.map(r => ({ ...r.bid, buyer: r.buyer, lot: r.lot, farmer: r.farmer, hasTransaction: r.hasTransaction }));
   }
 
   async createBid(bid: InsertBid): Promise<Bid> {
