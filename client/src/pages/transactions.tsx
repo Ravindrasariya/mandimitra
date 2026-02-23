@@ -293,6 +293,7 @@ export default function TransactionsPage() {
   const [cropFilter, setCropFilter] = usePersistedState("txn-cropFilter", "all");
   const [buyerPaymentFilter, setBuyerPaymentFilter] = usePersistedState("txn-buyerPaymentFilter", "all");
   const [farmerPaymentFilter, setFarmerPaymentFilter] = usePersistedState("txn-farmerPaymentFilter", "all");
+  const [billingFilter, setBillingFilter] = usePersistedState("txn-billingFilter", "all");
   const [monthPopoverOpen, setMonthPopoverOpen] = useState(false);
   const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
 
@@ -495,7 +496,7 @@ export default function TransactionsPage() {
       : `${selectedDays.length} ${t("stockRegister.nDays")}`;
 
   const filteredSerialGroups = useMemo(() => {
-    return serialGroups.filter(sg => {
+    const filtered = serialGroups.filter(sg => {
       if (cropFilter !== "all" && !sg.lotGroups.some(lg => lg.lot.crop === cropFilter)) return false;
       const bidDates: Date[] = [
         ...sg.allPendingBids.map(b => new Date(b.createdAt)),
@@ -525,9 +526,20 @@ export default function TransactionsPage() {
         const groupFarmerStatus = totalPaid >= totalPayable ? "paid" : totalPaid > 0 ? "partial" : "due";
         if (groupFarmerStatus !== farmerPaymentFilter) return false;
       }
+      if (billingFilter !== "all") {
+        const isBilled = sg.lotGroups.every(lg => lg.lot.remainingBags === 0) && sg.allPendingBids.length === 0;
+        if (billingFilter === "billed" && !isBilled) return false;
+        if (billingFilter === "unbilled" && isBilled) return false;
+      }
       return true;
     });
-  }, [serialGroups, cropFilter, yearFilter, selectedMonths, selectedDays, buyerPaymentFilter, farmerPaymentFilter]);
+    filtered.sort((a, b) => {
+      const dateCompare = b.date.localeCompare(a.date);
+      if (dateCompare !== 0) return dateCompare;
+      return a.serialNumber - b.serialNumber;
+    });
+    return filtered;
+  }, [serialGroups, cropFilter, yearFilter, selectedMonths, selectedDays, buyerPaymentFilter, farmerPaymentFilter, billingFilter]);
 
   const filteredGroups = useMemo(() => {
     return filteredSerialGroups.flatMap(sg => sg.lotGroups);
@@ -896,6 +908,16 @@ export default function TransactionsPage() {
             <SelectItem value="partial">Farmer: Partial</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={billingFilter} onValueChange={setBillingFilter}>
+          <SelectTrigger className="w-[110px]" data-testid="select-billing-filter">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All</SelectItem>
+            <SelectItem value="billed">Billed</SelectItem>
+            <SelectItem value="unbilled">Unbilled</SelectItem>
+          </SelectContent>
+        </Select>
         <Button
           variant="outline"
           size="sm"
@@ -987,6 +1009,7 @@ export default function TransactionsPage() {
             const totalFarmerPayable = activeTxns.reduce(
               (s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0
             );
+            const isBilled = sg.lotGroups.every(lg => lg.lot.remainingBags === 0) && sg.allPendingBids.length === 0;
 
             return (
               <Card key={`${sg.date}-${sg.serialNumber}`} data-testid={`card-serial-${sg.serialNumber}`}>
@@ -995,6 +1018,7 @@ export default function TransactionsPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="secondary" className="text-xs font-semibold">SR #{sg.serialNumber}</Badge>
                       <span className="text-xs text-muted-foreground">{sg.date}</span>
+                      {isBilled && <Badge variant="outline" className="text-xs border-green-400 text-green-700 bg-green-50">Billed</Badge>}
                     </div>
                     <div className="flex items-center gap-1">
                       {hasCompleted && (
