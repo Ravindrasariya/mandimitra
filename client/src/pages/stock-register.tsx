@@ -202,18 +202,8 @@ export default function StockRegisterPage() {
       result = result.filter(l => l.farmerId === selectedFarmer.id);
     }
 
-    if (selectedStatuses.length > 0) {
-      result = result.filter(l => {
-        const actual = l.actualNumberOfBags ?? l.numberOfBags;
-        if (l.isReturned) return selectedStatuses.includes("returned");
-        if (l.remainingBags === 0) return selectedStatuses.includes("sold");
-        if (l.remainingBags < actual) return selectedStatuses.includes("partial");
-        return selectedStatuses.includes("unsold");
-      });
-    }
-
     return result;
-  }, [allLots, yearFilter, selectedMonths, selectedDays, selectedFarmer, selectedStatuses]);
+  }, [allLots, yearFilter, selectedMonths, selectedDays, selectedFarmer]);
 
   const grouped = useMemo(() => {
     const groups = new Map<string, LotWithFarmer[]>();
@@ -222,18 +212,30 @@ export default function StockRegisterPage() {
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key)!.push(lot);
     }
-    return Array.from(groups.entries())
+    const statusMap: Record<string, string> = { "Sold Out": "sold", "Partially Sold": "partial", "Unsold": "unsold", "Returned": "returned" };
+    let result = Array.from(groups.entries())
       .map(([key, lots]) => ({
         key,
         serialNumber: lots[0].serialNumber,
         date: lots[0].date,
         lots,
-      } as VehicleGroup))
-      .sort((a, b) => {
-        if (a.date !== b.date) return b.date.localeCompare(a.date);
-        return b.serialNumber - a.serialNumber;
+      } as VehicleGroup));
+    if (selectedStatuses.length > 0) {
+      result = result.filter(group => {
+        const nonReturned = group.lots.filter(l => !l.isReturned);
+        let groupStatus: string;
+        if (nonReturned.length === 0) groupStatus = "returned";
+        else if (nonReturned.every(l => l.remainingBags === 0)) groupStatus = "sold";
+        else if (nonReturned.some(l => l.remainingBags < (l.actualNumberOfBags ?? l.numberOfBags))) groupStatus = "partial";
+        else groupStatus = "unsold";
+        return selectedStatuses.includes(groupStatus);
       });
-  }, [filtered]);
+    }
+    return result.sort((a, b) => {
+      if (a.date !== b.date) return b.date.localeCompare(a.date);
+      return b.serialNumber - a.serialNumber;
+    });
+  }, [filtered, selectedStatuses]);
 
   const selectFarmer = (farmer: Farmer) => {
     setSelectedFarmer(farmer);
