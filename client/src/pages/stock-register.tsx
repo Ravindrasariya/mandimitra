@@ -55,7 +55,8 @@ export default function StockRegisterPage() {
   const [monthPopoverOpen, setMonthPopoverOpen] = useState(false);
   const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
 
-  const [saleFilter, setSaleFilter] = usePersistedState<"all" | "sold" | "unsold" | "returned">("sr-saleFilter", "all");
+  const [selectedStatuses, setSelectedStatuses] = usePersistedState<string[]>("sr-selectedStatuses", []);
+  const [statusPopoverOpen, setStatusPopoverOpen] = useState(false);
 
   const [farmerSearch, setFarmerSearch] = useState("");
   const [selectedFarmer, setSelectedFarmer] = useState<Farmer | null>(null);
@@ -142,7 +143,7 @@ export default function StockRegisterPage() {
   const isDefaultFilters = yearFilter === currentYear &&
     selectedMonths.length === 1 && selectedMonths[0] === currentMonth &&
     selectedDays.length === 1 && selectedDays[0] === currentDay &&
-    !selectedFarmer && saleFilter === "all";
+    !selectedFarmer && selectedStatuses.length === 0;
 
   const clearFilters = () => {
     setYearFilter(currentYear);
@@ -150,8 +151,30 @@ export default function StockRegisterPage() {
     setSelectedDays([currentDay]);
     setSelectedFarmer(null);
     setFarmerSearch("");
-    setSaleFilter("all");
+    setSelectedStatuses([]);
   };
+
+  const statusOptions = [
+    { value: "sold", label: t("stockRegister.sold") },
+    { value: "partial", label: t("stockRegister.partiallySold") },
+    { value: "unsold", label: t("stockRegister.unsoldFilter") },
+    { value: "returned", label: t("stockRegister.returned") },
+  ];
+
+  const toggleStatus = (val: string) => {
+    setSelectedStatuses(prev => prev.includes(val) ? prev.filter(s => s !== val) : [...prev, val]);
+  };
+
+  const selectAllStatuses = () => {
+    setSelectedStatuses([]);
+    setStatusPopoverOpen(false);
+  };
+
+  const statusLabel = selectedStatuses.length === 0
+    ? t("stockRegister.all")
+    : selectedStatuses.length === 1
+      ? statusOptions.find(o => o.value === selectedStatuses[0])?.label || selectedStatuses[0]
+      : `${selectedStatuses.length} selected`;
 
   const filtered = useMemo(() => {
     let result = allLots;
@@ -179,16 +202,18 @@ export default function StockRegisterPage() {
       result = result.filter(l => l.farmerId === selectedFarmer.id);
     }
 
-    if (saleFilter === "sold") {
-      result = result.filter(l => !l.isReturned && l.remainingBags === 0);
-    } else if (saleFilter === "unsold") {
-      result = result.filter(l => !l.isReturned && l.remainingBags > 0);
-    } else if (saleFilter === "returned") {
-      result = result.filter(l => l.isReturned);
+    if (selectedStatuses.length > 0) {
+      result = result.filter(l => {
+        const actual = l.actualNumberOfBags ?? l.numberOfBags;
+        if (l.isReturned) return selectedStatuses.includes("returned");
+        if (l.remainingBags === 0) return selectedStatuses.includes("sold");
+        if (l.remainingBags < actual) return selectedStatuses.includes("partial");
+        return selectedStatuses.includes("unsold");
+      });
     }
 
     return result;
-  }, [allLots, yearFilter, selectedMonths, selectedDays, selectedFarmer, saleFilter]);
+  }, [allLots, yearFilter, selectedMonths, selectedDays, selectedFarmer, selectedStatuses]);
 
   const grouped = useMemo(() => {
     const groups = new Map<string, LotWithFarmer[]>();
@@ -350,7 +375,7 @@ export default function StockRegisterPage() {
       case "Sold Out":
         return <Badge variant="destructive" className="text-xs">{t("stockRegister.soldOut")}</Badge>;
       case "Partially Sold":
-        return <Badge variant="secondary" className="text-xs border-blue-400 text-blue-600 bg-blue-50">{t("stockRegister.partiallySold")}</Badge>;
+        return <Badge variant="secondary" className="text-xs border-orange-400 text-orange-600 bg-orange-50">{t("stockRegister.partiallySold")}</Badge>;
       case "Unsold":
         return <Badge variant="outline" className="text-xs border-green-400 text-green-600 bg-green-50">{t("stockRegister.unsold")}</Badge>;
     }
@@ -374,7 +399,7 @@ export default function StockRegisterPage() {
       case "Sold Out":
         return <Badge variant="destructive" className="text-xs">{t("stockRegister.soldOut")}</Badge>;
       case "Partially Sold":
-        return <Badge variant="secondary" className="text-xs border-blue-400 text-blue-600 bg-blue-50">{t("stockRegister.partiallySold")}</Badge>;
+        return <Badge variant="secondary" className="text-xs border-orange-400 text-orange-600 bg-orange-50">{t("stockRegister.partiallySold")}</Badge>;
       case "Unsold":
         return <Badge variant="outline" className="text-xs border-green-400 text-green-600 bg-green-50">{t("stockRegister.unsold")}</Badge>;
     }
@@ -570,17 +595,35 @@ export default function StockRegisterPage() {
           )}
         </div>
 
-        <Select value={saleFilter} onValueChange={(v) => setSaleFilter(v as "all" | "sold" | "unsold" | "returned")}>
-          <SelectTrigger className="w-[75px] h-8 text-xs shrink-0" data-testid="select-sale-filter">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("stockRegister.all")}</SelectItem>
-            <SelectItem value="sold">{t("stockRegister.sold")}</SelectItem>
-            <SelectItem value="unsold">{t("stockRegister.unsoldFilter")}</SelectItem>
-            <SelectItem value="returned">{t("stockRegister.returned")}</SelectItem>
-          </SelectContent>
-        </Select>
+        <Popover open={statusPopoverOpen} onOpenChange={setStatusPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="h-8 text-xs min-w-[75px] justify-between px-2 shrink-0" data-testid="select-sale-filter">
+              {statusLabel}
+              <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-48 p-2" align="end">
+            <button
+              className="flex items-center gap-2 px-2 py-1.5 rounded text-sm w-full text-left border-b mb-1"
+              data-testid="status-select-all"
+              onClick={selectAllStatuses}
+            >
+              <Checkbox checked={selectedStatuses.length === 0} />
+              {t("stockRegister.all")}
+            </button>
+            {statusOptions.map(opt => (
+              <button
+                key={opt.value}
+                className="flex items-center gap-2 px-2 py-1.5 rounded text-sm w-full text-left hover:bg-accent"
+                data-testid={`status-option-${opt.value}`}
+                onClick={() => toggleStatus(opt.value)}
+              >
+                <Checkbox checked={selectedStatuses.includes(opt.value)} />
+                {opt.label}
+              </button>
+            ))}
+          </PopoverContent>
+        </Popover>
 
         <Popover open={dayPopoverOpen} onOpenChange={setDayPopoverOpen}>
           <PopoverTrigger asChild>

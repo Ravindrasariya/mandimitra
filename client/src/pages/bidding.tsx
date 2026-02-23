@@ -36,7 +36,7 @@ function LotStatusBadge({ lot }: { lot: LotWithFarmer }) {
     return <Badge variant="destructive" className="text-xs" data-testid={`badge-status-${lot.id}`}>Sold Out</Badge>;
   }
   if (status === "partial") {
-    return <Badge variant="secondary" className="text-xs border-blue-400 text-blue-600 bg-blue-50" data-testid={`badge-status-${lot.id}`}>Partially Sold</Badge>;
+    return <Badge variant="secondary" className="text-xs border-orange-400 text-orange-600 bg-orange-50" data-testid={`badge-status-${lot.id}`}>Partially Sold</Badge>;
   }
   return <Badge variant="outline" className="text-xs border-green-400 text-green-600 bg-green-50" data-testid={`badge-status-${lot.id}`}>Unsold</Badge>;
 }
