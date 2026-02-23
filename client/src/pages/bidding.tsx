@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -13,12 +13,30 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { CROPS, SIZES } from "@shared/schema";
 import type { Lot, Farmer, Buyer, Bid } from "@shared/schema";
-import { Gavel, Plus, Trash2, AlertTriangle } from "lucide-react";
+import { Gavel, Trash2, AlertTriangle, Pencil } from "lucide-react";
 
 type LotWithFarmer = Lot & { farmer: Farmer };
 type BidWithDetails = Bid & { buyer: Buyer; lot: Lot };
 
 const ALL_VALUE = "__all__";
+
+function getLotStatus(lot: LotWithFarmer) {
+  const actual = lot.actualNumberOfBags ?? lot.numberOfBags;
+  if (lot.remainingBags <= 0) return "sold";
+  if (lot.remainingBags < actual) return "partial";
+  return "unsold";
+}
+
+function LotStatusBadge({ lot }: { lot: LotWithFarmer }) {
+  const status = getLotStatus(lot);
+  if (status === "sold") {
+    return <Badge variant="destructive" className="text-xs" data-testid={`badge-status-${lot.id}`}>Sold</Badge>;
+  }
+  if (status === "partial") {
+    return <Badge className="text-xs bg-orange-500 hover:bg-orange-600" data-testid={`badge-status-${lot.id}`}>Partially Sold</Badge>;
+  }
+  return <Badge variant="secondary" className="text-xs" data-testid={`badge-status-${lot.id}`}>Unsold</Badge>;
+}
 
 export default function BiddingPage() {
   const { toast } = useToast();
@@ -31,15 +49,18 @@ export default function BiddingPage() {
   const [selectedBuyerId, setSelectedBuyerId] = useState<number | null>(null);
   const [pricePerKg, setPricePerKg] = useState("");
   const [bidBags, setBidBags] = useState("");
+  const [showBuyerDropdown, setShowBuyerDropdown] = useState(false);
+  const buyerInputRef = useRef<HTMLInputElement>(null);
+  const buyerDropdownRef = useRef<HTMLDivElement>(null);
 
   const cropQueryParam = activeCrop === ALL_VALUE ? "" : `?crop=${activeCrop}`;
   const { data: lots = [], isLoading } = useQuery<LotWithFarmer[]>({
     queryKey: ["/api/lots", cropQueryParam],
   });
 
-  const availableLots = useMemo(() => {
+  const filteredLots = useMemo(() => {
     return lots.filter(l => {
-      if (l.remainingBags <= 0 || l.isReturned) return false;
+      if (l.isReturned) return false;
       if (activeGrade !== ALL_VALUE && l.size !== activeGrade) return false;
       return true;
     });
@@ -47,23 +68,42 @@ export default function BiddingPage() {
 
   const groupedBySerial = useMemo(() => {
     const groups = new Map<number, LotWithFarmer[]>();
-    for (const lot of availableLots) {
+    for (const lot of filteredLots) {
       const sr = lot.serialNumber;
       if (!groups.has(sr)) groups.set(sr, []);
       groups.get(sr)!.push(lot);
     }
     const sorted = Array.from(groups.entries()).sort((a, b) => a[0] - b[0]);
     return sorted;
-  }, [availableLots]);
+  }, [filteredLots]);
 
   const { data: buyers = [] } = useQuery<Buyer[]>({
     queryKey: ["/api/buyers", buyerSearch ? `?search=${buyerSearch}` : ""],
   });
 
+  const filteredBuyers = useMemo(() => {
+    if (!buyerSearch.trim()) return buyers;
+    const search = buyerSearch.toLowerCase();
+    return buyers.filter(b => b.name.toLowerCase().includes(search) || (b.phone && b.phone.includes(search)));
+  }, [buyers, buyerSearch]);
+
   const { data: lotBids = [] } = useQuery<BidWithDetails[]>({
     queryKey: ["/api/bids", selectedLot ? `?lotId=${selectedLot.id}` : ""],
     enabled: !!selectedLot,
   });
+
+  const invalidateAll = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/bids"], refetchType: "all" });
+    queryClient.invalidateQueries({ queryKey: ["/api/lots"], refetchType: "all" });
+    queryClient.invalidateQueries({ queryKey: ["/api/transactions"], refetchType: "all" });
+    queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"], refetchType: "all" });
+    queryClient.invalidateQueries({ queryKey: ["/api/dashboard"], refetchType: "all" });
+    queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"], refetchType: "all" });
+    queryClient.invalidateQueries({ predicate: (query) => {
+      const key = query.queryKey[0];
+      return typeof key === "string" && key.startsWith("/api/buyers");
+    }, refetchType: "all" });
+  };
 
   const createBidMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -71,16 +111,7 @@ export default function BiddingPage() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/bids"], refetchType: "all" });
-      queryClient.invalidateQueries({ queryKey: ["/api/lots"], refetchType: "all" });
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions"], refetchType: "all" });
-      queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"], refetchType: "all" });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"], refetchType: "all" });
-      queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"], refetchType: "all" });
-      queryClient.invalidateQueries({ predicate: (query) => {
-        const key = query.queryKey[0];
-        return typeof key === "string" && key.startsWith("/api/buyers");
-      }, refetchType: "all" });
+      invalidateAll();
       toast({ title: "Bid Saved", variant: "success" });
       setPricePerKg("");
       const bagsUsed = parseInt(bidBags) || 0;
@@ -102,16 +133,7 @@ export default function BiddingPage() {
       await apiRequest("DELETE", `/api/bids/${id}`);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/bids"], refetchType: "all" });
-      queryClient.invalidateQueries({ queryKey: ["/api/lots"], refetchType: "all" });
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions"], refetchType: "all" });
-      queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"], refetchType: "all" });
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"], refetchType: "all" });
-      queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"], refetchType: "all" });
-      queryClient.invalidateQueries({ predicate: (query) => {
-        const key = query.queryKey[0];
-        return typeof key === "string" && key.startsWith("/api/buyers");
-      }, refetchType: "all" });
+      invalidateAll();
       toast({ title: "Bid Deleted", variant: "success" });
     },
   });
@@ -128,13 +150,26 @@ export default function BiddingPage() {
 
   const openBidDialog = (lot: LotWithFarmer) => {
     setSelectedLot(lot);
-    setBidBags(lot.remainingBags.toString());
+    setBidBags(lot.remainingBags > 0 ? lot.remainingBags.toString() : "");
     setBidDialogOpen(true);
+    setSelectedBuyerId(null);
+    setBuyerSearch("");
+    setPricePerKg("");
   };
 
-  const submitBid = () => {
-    if (!selectedLot || !selectedBuyerId || !pricePerKg || !bidBags) {
+  const selectBuyer = (buyer: Buyer) => {
+    setSelectedBuyerId(buyer.id);
+    setBuyerSearch(buyer.name);
+    setShowBuyerDropdown(false);
+  };
+
+  const submitBid = async () => {
+    if (!selectedLot || !pricePerKg || !bidBags) {
       toast({ title: "Error", description: "All bid fields are required", variant: "destructive" });
+      return;
+    }
+    if (!selectedBuyerId && !buyerSearch.trim()) {
+      toast({ title: "Error", description: "Please enter a buyer name", variant: "destructive" });
       return;
     }
     const bags = parseInt(bidBags);
@@ -143,29 +178,40 @@ export default function BiddingPage() {
       return;
     }
 
+    let buyerId = selectedBuyerId;
+    if (!buyerId) {
+      try {
+        const newBuyer = await createBuyerMutation.mutateAsync({ name: buyerSearch.trim() });
+        buyerId = newBuyer.id;
+      } catch (err: any) {
+        toast({ title: "Error", description: err.message, variant: "destructive" });
+        return;
+      }
+    }
+
     createBidMutation.mutate({
       lotId: selectedLot.id,
-      buyerId: selectedBuyerId,
+      buyerId,
       pricePerKg,
       numberOfBags: bags,
       grade: selectedLot.size || null,
     });
   };
 
-  const [newBuyerName, setNewBuyerName] = useState("");
-  const [showNewBuyer, setShowNewBuyer] = useState(false);
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        buyerDropdownRef.current && !buyerDropdownRef.current.contains(e.target as Node) &&
+        buyerInputRef.current && !buyerInputRef.current.contains(e.target as Node)
+      ) {
+        setShowBuyerDropdown(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
-  const addNewBuyer = async () => {
-    if (!newBuyerName) return;
-    try {
-      const buyer = await createBuyerMutation.mutateAsync({ name: newBuyerName });
-      setSelectedBuyerId(buyer.id);
-      setShowNewBuyer(false);
-      setNewBuyerName("");
-    } catch (err: any) {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
-    }
-  };
+  const lotHasRemainingBags = selectedLot && selectedLot.remainingBags > 0;
 
   return (
     <div className="p-3 md:p-6 max-w-4xl mx-auto space-y-4">
@@ -244,45 +290,61 @@ export default function BiddingPage() {
                   </div>
 
                   <div className="space-y-2">
-                    {groupLots.map((lot) => (
-                      <div
-                        key={lot.id}
-                        className="flex items-center justify-between gap-2 rounded-md bg-muted/50 p-2"
-                        data-testid={`row-lot-${lot.id}`}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex flex-wrap items-center gap-2 mb-0.5">
-                            <Badge className="text-xs">{lot.crop}</Badge>
-                            {lot.size && (
-                              <Badge variant="outline" className="text-xs">{lot.size}</Badge>
-                            )}
-                            {lot.variety && (
-                              <span className="text-xs text-muted-foreground">{lot.variety}</span>
-                            )}
-                          </div>
-                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
-                            <span>
-                              {t("common.remaining")}: <strong className="text-foreground">{lot.remainingBags}</strong> / {lot.actualNumberOfBags ?? lot.numberOfBags} {t("common.bags")}
-                            </span>
-                            {lot.initialTotalWeight && (
-                              <span>{t("stockRegister.initWt")}: {lot.initialTotalWeight} kg</span>
-                            )}
-                            {lot.bagMarka && (
-                              <span>{t("stockRegister.marka")}: {lot.bagMarka}</span>
-                            )}
-                          </div>
-                        </div>
-                        <Button
-                          data-testid={`button-bid-lot-${lot.id}`}
-                          size="sm"
-                          className="mobile-touch-target"
-                          onClick={() => openBidDialog(lot)}
+                    {groupLots.map((lot) => {
+                      const isSold = lot.remainingBags <= 0;
+                      return (
+                        <div
+                          key={lot.id}
+                          className={`flex items-center justify-between gap-2 rounded-md bg-muted/50 p-2 ${isSold ? "opacity-70" : ""}`}
+                          data-testid={`row-lot-${lot.id}`}
                         >
-                          <Gavel className="w-4 h-4 mr-1" />
-                          {t("bidding.bid")}
-                        </Button>
-                      </div>
-                    ))}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-2 mb-0.5">
+                              <Badge className="text-xs">{lot.crop}</Badge>
+                              {lot.size && (
+                                <Badge variant="outline" className="text-xs">{lot.size}</Badge>
+                              )}
+                              {lot.variety && (
+                                <span className="text-xs text-muted-foreground">{lot.variety}</span>
+                              )}
+                              <LotStatusBadge lot={lot} />
+                            </div>
+                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                              <span>
+                                {t("common.remaining")}: <strong className="text-foreground">{lot.remainingBags}</strong> / {lot.actualNumberOfBags ?? lot.numberOfBags} {t("common.bags")}
+                              </span>
+                              {lot.initialTotalWeight && (
+                                <span>{t("stockRegister.initWt")}: {lot.initialTotalWeight} kg</span>
+                              )}
+                              {lot.bagMarka && (
+                                <span>{t("stockRegister.marka")}: {lot.bagMarka}</span>
+                              )}
+                            </div>
+                          </div>
+                          {isSold ? (
+                            <Button
+                              data-testid={`button-edit-lot-${lot.id}`}
+                              size="icon"
+                              variant="outline"
+                              className="mobile-touch-target"
+                              onClick={() => openBidDialog(lot)}
+                            >
+                              <Pencil className="w-4 h-4" />
+                            </Button>
+                          ) : (
+                            <Button
+                              data-testid={`button-bid-lot-${lot.id}`}
+                              size="sm"
+                              className="mobile-touch-target"
+                              onClick={() => openBidDialog(lot)}
+                            >
+                              <Gavel className="w-4 h-4 mr-1" />
+                              {t("bidding.bid")}
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>
@@ -303,7 +365,7 @@ export default function BiddingPage() {
             <div className="space-y-4">
               <div className="bg-muted rounded-md p-3 text-sm space-y-1">
                 <p>{t("bidding.remainingBags")}: <strong>{selectedLot.remainingBags}</strong></p>
-                <p>{t("stockEntry.crop")}: <strong>{selectedLot.crop}</strong></p>
+                <p>Crop: <strong>{selectedLot.crop}</strong></p>
                 {selectedLot.size && <p>{t("stockRegister.size")}: <strong>{selectedLot.size}</strong></p>}
                 {selectedLot.variety && <p>{t("stockRegister.variety")}: <strong>{selectedLot.variety}</strong></p>}
               </div>
@@ -331,96 +393,99 @@ export default function BiddingPage() {
                 </div>
               )}
 
-              <div className="border-t pt-4 space-y-3">
-                <Label className="font-medium">{t("bidding.newBid")}</Label>
-                <div className="space-y-2">
-                  <Label>{t("bidding.buyer")}</Label>
-                  {!showNewBuyer ? (
-                    <div className="space-y-2">
-                      <Select
-                        value={selectedBuyerId?.toString() || ""}
-                        onValueChange={(v) => setSelectedBuyerId(parseInt(v))}
-                      >
-                        <SelectTrigger data-testid="select-buyer" className="mobile-touch-target">
-                          <SelectValue placeholder={t("bidding.selectBuyer")} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {buyers.map((b) => (
-                            <SelectItem key={b.id} value={b.id.toString()}>{b.name}{b.phone ? ` (${b.phone})` : ""}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        data-testid="button-new-buyer"
-                        onClick={() => setShowNewBuyer(true)}
-                        className="mobile-touch-target"
-                      >
-                        <Plus className="w-3 h-3 mr-1" /> {t("bidding.newBuyer")}
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-2 bg-muted/50 rounded-md p-3">
+              {lotHasRemainingBags && (
+                <div className="border-t pt-4 space-y-3">
+                  <Label className="font-medium">{t("bidding.newBid")}</Label>
+                  <div className="space-y-2">
+                    <Label>{t("bidding.buyer")}</Label>
+                    <div className="relative">
                       <Input
-                        data-testid="input-new-buyer-name"
-                        value={newBuyerName}
-                        onChange={(e) => setNewBuyerName(e.target.value)}
-                        placeholder={t("bidding.buyerName")}
+                        ref={buyerInputRef}
+                        data-testid="input-buyer-search"
+                        value={buyerSearch}
+                        onChange={(e) => {
+                          setBuyerSearch(e.target.value);
+                          setSelectedBuyerId(null);
+                          setShowBuyerDropdown(true);
+                        }}
+                        onFocus={() => setShowBuyerDropdown(true)}
+                        placeholder={t("bidding.selectBuyer")}
+                        className="mobile-touch-target"
+                        autoComplete="off"
+                      />
+                      {showBuyerDropdown && buyerSearch.trim() && filteredBuyers.length > 0 && (
+                        <div
+                          ref={buyerDropdownRef}
+                          className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-md max-h-48 overflow-y-auto"
+                        >
+                          {filteredBuyers.map((b) => (
+                            <button
+                              key={b.id}
+                              type="button"
+                              data-testid={`option-buyer-${b.id}`}
+                              className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer flex items-center gap-2"
+                              onClick={() => selectBuyer(b)}
+                            >
+                              <span className="font-medium">{b.name}</span>
+                              {b.phone && <span className="text-muted-foreground text-xs">({b.phone})</span>}
+                              {b.redFlag && <AlertTriangle className="w-3 h-3 text-orange-500 ml-auto" />}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      {showBuyerDropdown && buyerSearch.trim() && filteredBuyers.length === 0 && (
+                        <div className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-md px-3 py-2 text-sm text-muted-foreground">
+                          New buyer "{buyerSearch.trim()}" will be created
+                        </div>
+                      )}
+                    </div>
+                    {selectedBuyerId && buyers.find(b => b.id === selectedBuyerId)?.redFlag && (
+                      <div className="flex items-center gap-2 p-3 rounded-md bg-orange-50 border border-orange-300 text-orange-800 text-sm" data-testid="warning-red-flag-buyer">
+                        <AlertTriangle className="w-4 h-4 flex-shrink-0 text-orange-600" />
+                        <span className="font-medium">{t("bidding.redFlagWarningBuyer")}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label>{t("bidding.pricePerKg")}</Label>
+                      <Input
+                        data-testid="input-price-per-kg"
+                        type="number"
+                        inputMode="decimal"
+                        step="0.01"
+                        value={pricePerKg}
+                        onChange={(e) => setPricePerKg(e.target.value)}
+                        onFocus={(e) => e.target.select()}
+                        placeholder="0.00"
                         className="mobile-touch-target"
                       />
-                      <div className="flex gap-2">
-                        <Button size="sm" data-testid="button-save-buyer" onClick={addNewBuyer} className="mobile-touch-target">{t("common.save")}</Button>
-                        <Button size="sm" variant="secondary" onClick={() => setShowNewBuyer(false)} className="mobile-touch-target">{t("common.cancel")}</Button>
-                      </div>
                     </div>
-                  )}
-                  {selectedBuyerId && buyers.find(b => b.id === selectedBuyerId)?.redFlag && (
-                    <div className="flex items-center gap-2 p-3 rounded-md bg-orange-50 border border-orange-300 text-orange-800 text-sm" data-testid="warning-red-flag-buyer">
-                      <AlertTriangle className="w-4 h-4 flex-shrink-0 text-orange-600" />
-                      <span className="font-medium">{t("bidding.redFlagWarningBuyer")}</span>
+                    <div className="space-y-1">
+                      <Label>{t("bidding.numberOfBags")}</Label>
+                      <Input
+                        data-testid="input-bid-bags"
+                        type="number"
+                        inputMode="numeric"
+                        value={bidBags}
+                        onChange={(e) => setBidBags(e.target.value)}
+                        onFocus={(e) => e.target.select()}
+                        placeholder="0"
+                        className="mobile-touch-target"
+                        max={selectedLot.remainingBags}
+                      />
                     </div>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label>{t("bidding.pricePerKg")}</Label>
-                    <Input
-                      data-testid="input-price-per-kg"
-                      type="number"
-                      inputMode="decimal"
-                      step="0.01"
-                      value={pricePerKg}
-                      onChange={(e) => setPricePerKg(e.target.value)}
-                      onFocus={(e) => e.target.select()}
-                      placeholder="0.00"
-                      className="mobile-touch-target"
-                    />
                   </div>
-                  <div className="space-y-1">
-                    <Label>{t("bidding.numberOfBags")}</Label>
-                    <Input
-                      data-testid="input-bid-bags"
-                      type="number"
-                      inputMode="numeric"
-                      value={bidBags}
-                      onChange={(e) => setBidBags(e.target.value)}
-                      onFocus={(e) => e.target.select()}
-                      placeholder="0"
-                      className="mobile-touch-target"
-                      max={selectedLot.remainingBags}
-                    />
-                  </div>
+                  <Button
+                    data-testid="button-submit-bid"
+                    className="w-full mobile-touch-target"
+                    onClick={submitBid}
+                    disabled={createBidMutation.isPending || createBuyerMutation.isPending}
+                  >
+                    {(createBidMutation.isPending || createBuyerMutation.isPending) ? t("common.saving") : t("bidding.addBid")}
+                  </Button>
                 </div>
-                <Button
-                  data-testid="button-submit-bid"
-                  className="w-full mobile-touch-target"
-                  onClick={submitBid}
-                  disabled={createBidMutation.isPending}
-                >
-                  {createBidMutation.isPending ? t("common.saving") : t("bidding.addBid")}
-                </Button>
-              </div>
+              )}
             </div>
           )}
         </DialogContent>
