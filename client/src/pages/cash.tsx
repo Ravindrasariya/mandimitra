@@ -884,7 +884,7 @@ export default function CashPage() {
                       return (
                         <div className="absolute z-50 w-full mt-1 max-h-48 overflow-y-auto bg-popover border rounded-md shadow-lg">
                           {filtered.map(pt => {
-                            const dueDays = pt.bidCreatedAt ? Math.floor((Date.now() - new Date(pt.bidCreatedAt).getTime()) / 86400000) : 0;
+                            const dueDays = pt.date ? Math.max(0, Math.floor((Date.now() - new Date(pt.date + "T00:00:00").getTime()) / 86400000)) : 0;
                             return (
                               <div
                                 key={pt.id}
@@ -946,7 +946,7 @@ export default function CashPage() {
                               <X className="w-3 h-3" />
                             </Button>
                           </div>
-                          <div className="grid grid-cols-3 gap-2">
+                          <div className="grid grid-cols-3 gap-1.5">
                             <div className="space-y-0.5">
                               <Label className="text-[10px] text-muted-foreground">Amount</Label>
                               <Input
@@ -954,15 +954,15 @@ export default function CashPage() {
                                 value={alloc.amount}
                                 onChange={e => setInwardAllocations(prev => prev.map((a, i) => i === idx ? { ...a, amount: e.target.value } : a))}
                                 onFocus={e => e.target.select()}
-                                className="h-8 text-xs"
+                                className="h-7 text-xs px-1.5"
                                 data-testid={`allocation-amount-${idx}`}
                               />
                             </div>
                             <div className="space-y-0.5">
-                              <div className="flex items-center gap-1">
-                                <Label className="text-[10px] text-muted-foreground">Discount %</Label>
+                              <div className="flex items-center gap-0.5">
+                                <Label className="text-[10px] text-muted-foreground">Disc %</Label>
                                 {parseFloat(alloc.discountPercent || "0") > 0 && (
-                                  <span className="text-[10px] font-medium text-orange-600">
+                                  <span className="text-[9px] font-medium text-orange-600">
                                     ₹{((parseFloat(alloc.discountPercent || "0") / 100) * alloc.due).toLocaleString("en-IN", { maximumFractionDigits: 2 })}
                                   </span>
                                 )}
@@ -970,9 +970,18 @@ export default function CashPage() {
                               <Input
                                 type="number" inputMode="decimal"
                                 value={alloc.discountPercent}
-                                onChange={e => setInwardAllocations(prev => prev.map((a, i) => i === idx ? { ...a, discountPercent: e.target.value } : a))}
+                                onChange={e => {
+                                  const newDiscPct = e.target.value;
+                                  setInwardAllocations(prev => prev.map((a, i) => {
+                                    if (i !== idx) return a;
+                                    const discAmt = (parseFloat(newDiscPct || "0") / 100) * a.due;
+                                    const petty = parseFloat(a.pettyAdj || "0");
+                                    const newAmount = Math.max(0, Math.min(a.due, a.due - discAmt - petty));
+                                    return { ...a, discountPercent: newDiscPct, amount: newAmount.toFixed(2) };
+                                  }));
+                                }}
                                 onFocus={e => e.target.select()}
-                                className="h-8 text-xs"
+                                className="h-7 text-xs px-1.5"
                                 placeholder="%"
                                 data-testid={`allocation-discount-${idx}`}
                               />
@@ -982,9 +991,18 @@ export default function CashPage() {
                               <Input
                                 type="number" inputMode="decimal"
                                 value={alloc.pettyAdj}
-                                onChange={e => setInwardAllocations(prev => prev.map((a, i) => i === idx ? { ...a, pettyAdj: e.target.value } : a))}
+                                onChange={e => {
+                                  const newPetty = e.target.value;
+                                  setInwardAllocations(prev => prev.map((a, i) => {
+                                    if (i !== idx) return a;
+                                    const discAmt = (parseFloat(a.discountPercent || "0") / 100) * a.due;
+                                    const petty = parseFloat(newPetty || "0");
+                                    const newAmount = Math.max(0, Math.min(a.due, a.due - discAmt - petty));
+                                    return { ...a, pettyAdj: newPetty, amount: newAmount.toFixed(2) };
+                                  }));
+                                }}
                                 onFocus={e => e.target.select()}
-                                className="h-8 text-xs"
+                                className="h-7 text-xs px-1.5"
                                 data-testid={`allocation-petty-${idx}`}
                               />
                             </div>
