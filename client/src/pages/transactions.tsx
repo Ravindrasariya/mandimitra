@@ -645,9 +645,8 @@ export default function TransactionsPage() {
   const mandiBuyerPct = parseFloat(cs.mandiCommissionBuyerPercent) || 0;
 
   const vehicleBhadaRate = parseFloat(selectedBid?.lot.vehicleBhadaRate || "0");
-  const originalBags = selectedBid?.lot.numberOfBags || 1;
-  const actualBags = selectedBid?.lot.actualNumberOfBags ?? originalBags;
-  const freightFarmerTotal = actualBags > 0 ? (vehicleBhadaRate * bags) / actualBags : 0;
+  const totalBagsInVehicle = selectedBid?.lot.totalBagsInVehicle || selectedBid?.lot.actualNumberOfBags || selectedBid?.lot.numberOfBags || 1;
+  const freightFarmerTotal = totalBagsInVehicle > 0 ? (vehicleBhadaRate * bags) / totalBagsInVehicle : 0;
 
   const hammaliFarmerTotal = hammaliFarmerRate * bags;
   const hammaliBuyerTotal = hammaliBuyerRate * bags;
@@ -1295,7 +1294,7 @@ export default function TransactionsPage() {
                   )}
                   {freightFarmerTotal > 0 && (
                     <div className="flex justify-between text-muted-foreground">
-                      <span>Freight (₹{vehicleBhadaRate} × {bags}/{actualBags}):</span>
+                      <span>Freight (₹{vehicleBhadaRate} × {bags}/{totalBagsInVehicle}):</span>
                       <span>-Rs.{freightFarmerTotal.toFixed(2)}</span>
                     </div>
                   )}
