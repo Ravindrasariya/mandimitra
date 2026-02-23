@@ -115,10 +115,12 @@ export default function BiddingPage() {
     return lots.filter(l => {
       if (l.isReturned) return false;
       if (activeGrade !== ALL_VALUE && l.size !== activeGrade) return false;
-      const d = new Date(l.date);
-      if (d.getFullYear() !== parseInt(yearFilter)) return false;
-      if (selectedMonths.length > 0 && !selectedMonths.includes(String(d.getMonth() + 1))) return false;
-      if (selectedDays.length > 0 && !selectedDays.includes(String(d.getDate()))) return false;
+      if (yearFilter !== ALL_VALUE) {
+        const d = new Date(l.date);
+        if (d.getFullYear() !== parseInt(yearFilter)) return false;
+        if (selectedMonths.length > 0 && !selectedMonths.includes(String(d.getMonth() + 1))) return false;
+        if (selectedDays.length > 0 && !selectedDays.includes(String(d.getDate()))) return false;
+      }
       return true;
     });
   }, [lots, activeGrade, yearFilter, selectedMonths, selectedDays]);
@@ -131,13 +133,17 @@ export default function BiddingPage() {
       if (!groups.has(key)) groups.set(key, { serialNumber: sr, date: lot.date, lots: [] });
       groups.get(key)!.lots.push(lot);
     }
-    const sorted = Array.from(groups.values()).sort((a, b) => {
+    let result = Array.from(groups.values());
+    if (saleStatusFilter !== ALL_VALUE) {
+      result = result.filter(g => g.lots.some(lot => getLotStatus(lot) === saleStatusFilter));
+    }
+    result.sort((a, b) => {
       const dateCompare = b.date.localeCompare(a.date);
       if (dateCompare !== 0) return dateCompare;
       return a.serialNumber - b.serialNumber;
     });
-    return sorted;
-  }, [filteredLots]);
+    return result;
+  }, [filteredLots, saleStatusFilter]);
 
   const { data: buyers = [] } = useQuery<Buyer[]>({
     queryKey: ["/api/buyers", buyerSearch ? `?search=${buyerSearch}` : ""],
@@ -277,10 +283,89 @@ export default function BiddingPage() {
 
   return (
     <div className="p-3 md:p-6 max-w-4xl mx-auto space-y-4">
-      <h1 className="text-base md:text-lg font-bold flex items-center gap-2">
-        <Gavel className="w-5 h-5 text-primary" />
-        {t("bidding.title")}
-      </h1>
+      <div className="flex items-center gap-2 flex-wrap">
+        <h1 className="text-base md:text-lg font-bold flex items-center gap-2 mr-2">
+          <Gavel className="w-5 h-5 text-primary" />
+          {t("bidding.title")}
+        </h1>
+
+        <Select value={yearFilter} onValueChange={(v) => { setYearFilter(v); setSelectedMonths([]); setSelectedDays([]); }}>
+          <SelectTrigger data-testid="select-year" className="w-auto text-xs">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL_VALUE} data-testid="option-year-all">{t("common.all")}</SelectItem>
+            {Array.from({ length: 5 }, (_, i) => String(now.getFullYear() - i)).map(y => (
+              <SelectItem key={y} value={y} data-testid={`option-year-${y}`}>{y}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Popover open={monthPopoverOpen} onOpenChange={setMonthPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="text-xs gap-1" data-testid="button-month-filter">
+              {monthLabel}
+              <ChevronDown className="w-3 h-3" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-2" align="start">
+            <div
+              className="flex items-center gap-2 w-full px-2 py-1 text-xs hover:bg-accent rounded cursor-pointer"
+              onClick={selectAllMonths}
+              data-testid="button-all-months"
+            >
+              <Checkbox checked={selectedMonths.length === 0} />
+              <span>{t("stockRegister.allMonths")}</span>
+            </div>
+            <div className="grid grid-cols-4 gap-1 mt-1">
+              {MONTH_LABELS.map((m, i) => {
+                const val = String(i + 1);
+                return (
+                  <div
+                    key={val}
+                    className={`flex items-center justify-center rounded text-xs p-1.5 cursor-pointer ${selectedMonths.includes(val) ? "bg-primary text-primary-foreground" : ""}`}
+                    data-testid={`toggle-month-${val}`}
+                    onClick={() => toggleMonth(val)}
+                  >
+                    {m}
+                  </div>
+                );
+              })}
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        <Popover open={dayPopoverOpen} onOpenChange={setDayPopoverOpen}>
+          <PopoverTrigger asChild>
+            <Button variant="outline" size="sm" className="text-xs gap-1" data-testid="button-day-filter">
+              {dayLabel}
+              <ChevronDown className="w-3 h-3" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-2" align="start">
+            <div
+              className="flex items-center gap-2 w-full px-2 py-1 text-xs hover:bg-accent rounded cursor-pointer"
+              onClick={selectAllDays}
+              data-testid="button-all-days"
+            >
+              <Checkbox checked={selectedDays.length === 0} />
+              <span>{t("stockRegister.allDays")}</span>
+            </div>
+            <div className="grid grid-cols-7 gap-1 mt-1">
+              {Array.from({ length: daysInMonths }, (_, i) => String(i + 1)).map(d => (
+                <div
+                  key={d}
+                  className={`flex items-center justify-center rounded text-xs p-1.5 cursor-pointer ${selectedDays.includes(d) ? "bg-primary text-primary-foreground" : ""}`}
+                  data-testid={`toggle-day-${d}`}
+                  onClick={() => toggleDay(d)}
+                >
+                  {d}
+                </div>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+      </div>
 
       <div className="flex items-center gap-2 flex-wrap">
         <Select value={activeCrop} onValueChange={setActiveCrop}>
@@ -319,84 +404,20 @@ export default function BiddingPage() {
             ))}
           </SelectContent>
         </Select>
-      </div>
-
-      <div className="flex items-center gap-2 flex-wrap">
-        <Select value={yearFilter} onValueChange={(v) => { setYearFilter(v); setSelectedDays([]); }}>
-          <SelectTrigger data-testid="select-year" className="w-auto text-xs">
+        <Select value={saleStatusFilter} onValueChange={setSaleStatusFilter}>
+          <SelectTrigger
+            data-testid="select-sale-status"
+            className="w-auto font-medium border-violet-500/50 bg-violet-500/10 text-violet-600 dark:text-violet-400"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {Array.from({ length: 5 }, (_, i) => String(now.getFullYear() - i)).map(y => (
-              <SelectItem key={y} value={y} data-testid={`option-year-${y}`}>{y}</SelectItem>
-            ))}
+            <SelectItem value={ALL_VALUE} data-testid="toggle-status-all">{t("common.all")}</SelectItem>
+            <SelectItem value="sold" data-testid="toggle-status-sold">Sold</SelectItem>
+            <SelectItem value="unsold" data-testid="toggle-status-unsold">Unsold</SelectItem>
+            <SelectItem value="partial" data-testid="toggle-status-partial">Partially Sold</SelectItem>
           </SelectContent>
         </Select>
-
-        <Popover open={monthPopoverOpen} onOpenChange={setMonthPopoverOpen}>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="text-xs gap-1" data-testid="button-month-filter">
-              {monthLabel}
-              <ChevronDown className="w-3 h-3" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-2" align="start">
-            <button
-              className="flex items-center gap-2 w-full px-2 py-1 text-xs hover:bg-accent rounded"
-              onClick={selectAllMonths}
-              data-testid="button-all-months"
-            >
-              <Checkbox checked={selectedMonths.length === 0} />
-              <span>{t("stockRegister.allMonths")}</span>
-            </button>
-            <div className="grid grid-cols-4 gap-1 mt-1">
-              {MONTH_LABELS.map((m, i) => {
-                const val = String(i + 1);
-                return (
-                  <button
-                    key={val}
-                    className={`flex items-center justify-center rounded text-xs p-1.5 ${selectedMonths.includes(val) ? "bg-primary text-primary-foreground" : ""}`}
-                    data-testid={`toggle-month-${val}`}
-                    onClick={() => toggleMonth(val)}
-                  >
-                    {m}
-                  </button>
-                );
-              })}
-            </div>
-          </PopoverContent>
-        </Popover>
-
-        <Popover open={dayPopoverOpen} onOpenChange={setDayPopoverOpen}>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="text-xs gap-1" data-testid="button-day-filter">
-              {dayLabel}
-              <ChevronDown className="w-3 h-3" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-2" align="start">
-            <button
-              className="flex items-center gap-2 w-full px-2 py-1 text-xs hover:bg-accent rounded"
-              onClick={selectAllDays}
-              data-testid="button-all-days"
-            >
-              <Checkbox checked={selectedDays.length === 0} />
-              <span>{t("stockRegister.allDays")}</span>
-            </button>
-            <div className="grid grid-cols-7 gap-1 mt-1">
-              {Array.from({ length: daysInMonths }, (_, i) => String(i + 1)).map(d => (
-                <button
-                  key={d}
-                  className={`flex items-center justify-center rounded text-xs p-1.5 ${selectedDays.includes(d) ? "bg-primary text-primary-foreground" : ""}`}
-                  data-testid={`toggle-day-${d}`}
-                  onClick={() => toggleDay(d)}
-                >
-                  {d}
-                </button>
-              ))}
-            </div>
-          </PopoverContent>
-        </Popover>
       </div>
 
       {isLoading ? (
