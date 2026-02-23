@@ -39,6 +39,16 @@ type UnifiedLotGroup = {
   completedTxns: TransactionWithDetails[];
 };
 
+type UnifiedSerialGroup = {
+  serialNumber: number;
+  date: string;
+  farmer: Farmer;
+  lotGroups: UnifiedLotGroup[];
+  allPendingBids: BidWithDetails[];
+  allCompletedTxns: TransactionWithDetails[];
+  totalBags: number;
+};
+
 function buildUnifiedLotGroups(
   pendingBids: BidWithDetails[],
   completedTxns: TransactionWithDetails[]
@@ -59,6 +69,32 @@ function buildUnifiedLotGroups(
       map.set(key, { lotId: tx.lot.lotId, lot: tx.lot, farmer: tx.farmer, pendingBids: [], completedTxns: [] });
     }
     map.get(key)!.completedTxns.push(tx);
+  }
+
+  return Array.from(map.values());
+}
+
+function buildSerialGroups(lotGroups: UnifiedLotGroup[]): UnifiedSerialGroup[] {
+  const map = new Map<string, UnifiedSerialGroup>();
+
+  for (const lg of lotGroups) {
+    const key = `${lg.lot.date}-${lg.lot.serialNumber}`;
+    if (!map.has(key)) {
+      map.set(key, {
+        serialNumber: lg.lot.serialNumber,
+        date: lg.lot.date,
+        farmer: lg.farmer,
+        lotGroups: [],
+        allPendingBids: [],
+        allCompletedTxns: [],
+        totalBags: 0,
+      });
+    }
+    const sg = map.get(key)!;
+    sg.lotGroups.push(lg);
+    sg.allPendingBids.push(...lg.pendingBids);
+    sg.allCompletedTxns.push(...lg.completedTxns);
+    sg.totalBags += lg.lot.actualNumberOfBags ?? lg.lot.numberOfBags;
   }
 
   return Array.from(map.values());
@@ -398,6 +434,11 @@ export default function TransactionsPage() {
   const unifiedGroups = useMemo(
     () => buildUnifiedLotGroups(pendingBids, txns),
     [pendingBids, txns]
+  );
+
+  const serialGroups = useMemo(
+    () => buildSerialGroups(unifiedGroups),
+    [unifiedGroups]
   );
 
   const MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
