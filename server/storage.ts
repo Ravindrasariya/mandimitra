@@ -532,7 +532,8 @@ export class DatabaseStorage implements IStorage {
     const cropPrefix = crop === "Potato" ? "POT" : crop === "Onion" ? "ONI" : "GAR";
     const dateFormatted = date.replace(/-/g, "");
     const pattern = `${cropPrefix}${dateFormatted}%`;
-    const [result] = await db.select({ max: sql<string>`coalesce(max(cast(substring(${lots.lotId} from ${cropPrefix.length + dateFormatted.length + 1}) as integer)), 0)` })
+    const startPos = cropPrefix.length + dateFormatted.length + 1;
+    const [result] = await db.select({ max: sql<string>`coalesce(max(cast(substr(${lots.lotId}, ${startPos}) as integer)), 0)` })
       .from(lots)
       .where(and(eq(lots.businessId, businessId), sql`${lots.lotId} like ${pattern}`));
     return parseInt(result?.max || "0", 10) + 1;
