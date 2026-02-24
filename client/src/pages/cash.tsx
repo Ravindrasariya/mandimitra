@@ -916,7 +916,13 @@ export default function CashPage() {
               {inwardPartyType === "Buyer" && inwardBuyerId && (
                 <div className="space-y-1">
                   <Label className="text-xs">{t("cash.amount")}</Label>
-                  <Input type="number" inputMode="decimal" value={inwardAmount} onChange={e => setInwardAmount(e.target.value)} onFocus={e => e.target.select()} placeholder="0" className="h-9 text-sm" data-testid="inward-amount" />
+                  <Input type="number" inputMode="decimal" value={inwardAmount} onChange={e => {
+                    const newVal = e.target.value;
+                    setInwardAmount(newVal);
+                    if (inwardAllocations.length === 1) {
+                      setInwardAllocations(prev => prev.map(a => ({ ...a, amount: newVal })));
+                    }
+                  }} onFocus={e => e.target.select()} placeholder="0" className="h-9 text-sm" data-testid="inward-amount" />
                 </div>
               )}
               {inwardPartyType === "Buyer" && inwardBuyerId && (
@@ -952,19 +958,23 @@ export default function CashPage() {
                                 key={pt.id}
                                 className="px-3 py-2 hover:bg-accent cursor-pointer text-xs border-b last:border-b-0"
                                 onClick={() => {
-                                  setInwardAllocations(prev => [...prev, {
-                                    txnId: pt.id === 0 ? null : pt.id,
-                                    txnLabel: pt.transactionId === "PY_OPENING" ? "PY Opening Balance" : `SR #${pt.serialNumber}`,
-                                    serialNumber: pt.serialNumber,
-                                    date: pt.date,
-                                    numberOfBags: pt.numberOfBags,
-                                    crop: pt.crop,
-                                    due: parseFloat(pt.due),
-                                    dueDays,
-                                    amount: pt.due,
-                                    discountPercent: "0",
-                                    pettyAdj: "0",
-                                  }]);
+                                  setInwardAllocations(prev => {
+                                    const willBeSingle = prev.length === 0;
+                                    const autoAmount = willBeSingle && inwardAmount && parseFloat(inwardAmount) > 0 ? inwardAmount : pt.due;
+                                    return [...prev, {
+                                      txnId: pt.id === 0 ? null : pt.id,
+                                      txnLabel: pt.transactionId === "PY_OPENING" ? "PY Opening Balance" : `SR #${pt.serialNumber}`,
+                                      serialNumber: pt.serialNumber,
+                                      date: pt.date,
+                                      numberOfBags: pt.numberOfBags,
+                                      crop: pt.crop,
+                                      due: parseFloat(pt.due),
+                                      dueDays,
+                                      amount: autoAmount,
+                                      discountPercent: "0",
+                                      pettyAdj: "0",
+                                    }];
+                                  });
                                   setAllocationSearch("");
                                   setAllocationDropdownOpen(false);
                                 }}
@@ -1069,6 +1079,19 @@ export default function CashPage() {
                               />
                             </div>
                           </div>
+                          {(() => {
+                            const discAmt = (parseFloat(alloc.discountPercent || "0") / 100) * alloc.due;
+                            const totalSettled = parseFloat(alloc.amount || "0") + discAmt + parseFloat(alloc.pettyAdj || "0");
+                            const isFullyClosed = Math.abs(totalSettled - alloc.due) < 0.02;
+                            return (
+                              <div className="flex justify-between items-center text-[10px] px-0.5">
+                                <span className="text-muted-foreground">Settled (Amt+Disc+Petty)</span>
+                                <span className={isFullyClosed ? "text-green-600 font-medium" : "text-muted-foreground"}>
+                                  ₹{totalSettled.toLocaleString("en-IN", { maximumFractionDigits: 2 })} / ₹{alloc.due.toLocaleString("en-IN")}
+                                </span>
+                              </div>
+                            );
+                          })()}
                         </div>
                       ))}
                       {(() => {
