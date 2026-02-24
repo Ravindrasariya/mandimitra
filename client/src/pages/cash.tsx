@@ -1043,14 +1043,7 @@ export default function CashPage() {
                                 type="number" inputMode="decimal"
                                 value={alloc.discountPercent}
                                 onChange={e => {
-                                  const newDiscPct = e.target.value;
-                                  setInwardAllocations(prev => prev.map((a, i) => {
-                                    if (i !== idx) return a;
-                                    const discAmt = (parseFloat(newDiscPct || "0") / 100) * a.due;
-                                    const petty = parseFloat(a.pettyAdj || "0");
-                                    const newAmount = Math.max(0, Math.min(a.due, a.due - discAmt - petty));
-                                    return { ...a, discountPercent: newDiscPct, amount: newAmount.toFixed(2) };
-                                  }));
+                                  setInwardAllocations(prev => prev.map((a, i) => i === idx ? { ...a, discountPercent: e.target.value } : a));
                                 }}
                                 onFocus={e => e.target.select()}
                                 className="h-7 text-xs px-1.5"
@@ -1064,14 +1057,7 @@ export default function CashPage() {
                                 type="number" inputMode="decimal"
                                 value={alloc.pettyAdj}
                                 onChange={e => {
-                                  const newPetty = e.target.value;
-                                  setInwardAllocations(prev => prev.map((a, i) => {
-                                    if (i !== idx) return a;
-                                    const discAmt = (parseFloat(a.discountPercent || "0") / 100) * a.due;
-                                    const petty = parseFloat(newPetty || "0");
-                                    const newAmount = Math.max(0, Math.min(a.due, a.due - discAmt - petty));
-                                    return { ...a, pettyAdj: newPetty, amount: newAmount.toFixed(2) };
-                                  }));
+                                  setInwardAllocations(prev => prev.map((a, i) => i === idx ? { ...a, pettyAdj: e.target.value } : a));
                                 }}
                                 onFocus={e => e.target.select()}
                                 className="h-7 text-xs px-1.5"
