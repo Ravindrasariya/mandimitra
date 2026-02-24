@@ -453,20 +453,31 @@ export class DatabaseStorage implements IStorage {
 
     const results: (Buyer & { receivableDue: string; overallDue: string; bidDates: string[] })[] = [];
     for (const buyer of buyerList) {
-      const [txSum] = await db.select({
-        total: sql<string>`coalesce(sum(cast(${transactions.totalReceivableFromBuyer} as numeric)), 0)`
+      const txnRows = await db.select({
+        receivable: sql<string>`cast(${transactions.totalReceivableFromBuyer} as numeric)`,
+        paid: sql<string>`cast(${transactions.paidAmount} as numeric)`,
       }).from(transactions).where(and(eq(transactions.businessId, businessId), eq(transactions.buyerId, buyer.id), eq(transactions.isReversed, false)));
 
-      const [cashSum] = await db.select({
-        total: sql<string>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`
-      }).from(cashEntries).where(and(eq(cashEntries.businessId, businessId), eq(cashEntries.buyerId, buyer.id), eq(cashEntries.category, "inward"), eq(cashEntries.isReversed, false)));
+      const totalReceivable = txnRows.reduce((s, r) => s + parseFloat(r.receivable || "0"), 0);
+      const totalTxnPaid = txnRows.reduce((s, r) => s + parseFloat(r.paid || "0"), 0);
+      const receivableDue = Math.max(0, totalReceivable - totalTxnPaid).toFixed(2);
 
-      const totalReceivable = parseFloat(txSum?.total || "0");
-      const totalPaid = parseFloat(cashSum?.total || "0");
       const openingBal = parseFloat(buyer.openingBalance || "0");
-      const paidAfterOpening = Math.max(0, totalPaid - Math.max(0, openingBal));
-      const receivableDue = Math.max(0, totalReceivable - paidAfterOpening).toFixed(2);
-      const overallDue = (openingBal + totalReceivable - totalPaid).toFixed(2);
+      let openingDue = 0;
+      if (openingBal > 0) {
+        const openingPaidSum = await db.select({
+          total: sql<string>`coalesce(sum(cast(${cashEntries.amount} as numeric) + cast(${cashEntries.discount} as numeric) + cast(${cashEntries.pettyAdj} as numeric)), 0)`
+        }).from(cashEntries).where(and(
+          eq(cashEntries.businessId, businessId),
+          eq(cashEntries.buyerId, buyer.id),
+          eq(cashEntries.category, "inward"),
+          eq(cashEntries.isReversed, false),
+          sql`${cashEntries.transactionId} IS NULL`,
+        ));
+        openingDue = Math.max(0, openingBal - parseFloat(openingPaidSum[0]?.total || "0"));
+      }
+
+      const overallDue = (parseFloat(receivableDue) + openingDue).toFixed(2);
 
       const buyerBidDates = bidDateMap.get(buyer.id);
       results.push({ ...buyer, receivableDue, overallDue, bidDates: buyerBidDates ? Array.from(buyerBidDates) : [] });
