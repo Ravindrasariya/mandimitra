@@ -132,7 +132,7 @@ const translations: Record<string, Record<Language, string>> = {
   "stockRegister.size": { en: "Size", hi: "साइज़" },
   "stockRegister.bagMarka": { en: "Bag Marka", hi: "बैग मार्का" },
   "stockRegister.vehicleNumber": { en: "Vehicle Number", hi: "वाहन नंबर" },
-  "stockRegister.vehicleBhadaRate": { en: "Vehicle Bhada Rate (per bag)", hi: "वाहन भाड़ा दर (प्रति थैला)" },
+  "stockRegister.vehicleBhadaRate": { en: "Total Bhada/Freight", hi: "कुल भाड़ा/ढुलाई" },
   "stockRegister.initialWeight": { en: "Initial Total Weight (kg)", hi: "प्रारंभिक कुल वजन (किलो)" },
   "stockRegister.returnToFarmer": { en: "Return to Farmer", hi: "किसान को वापसी" },
   "stockRegister.returnConfirmTitle": { en: "Return Lot to Farmer?", hi: "लॉट किसान को वापस करें?" },

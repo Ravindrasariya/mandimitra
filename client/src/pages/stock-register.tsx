@@ -71,6 +71,8 @@ export default function StockRegisterPage() {
   const [editFreightType, setEditFreightType] = useState("");
   const [editTotalBagsInVehicle, setEditTotalBagsInVehicle] = useState("");
   const [editLotFields, setEditLotFields] = useState<Record<number, LotEditState>>({});
+  const [origVehicle, setOrigVehicle] = useState({ vehicleNumber: "", driverName: "", driverContact: "", vehicleBhadaRate: "", freightType: "", totalBagsInVehicle: "" });
+  const [origLotFields, setOrigLotFields] = useState<Record<number, LotEditState>>({});
   const [returnConfirmOpen, setReturnConfirmOpen] = useState(false);
   const [returningLot, setReturningLot] = useState<LotWithFarmer | null>(null);
 
@@ -252,30 +254,35 @@ export default function StockRegisterPage() {
     mutationFn: async () => {
       if (!editingGroup) throw new Error("No group");
 
+      const vn = editVehicleNumber || origVehicle.vehicleNumber;
+      const totalBagsStr = editTotalBagsInVehicle || origVehicle.totalBagsInVehicle;
+      const totalBagsParsed = totalBagsStr ? parseInt(totalBagsStr, 10) : NaN;
       const sharedData: Record<string, any> = {
-        vehicleNumber: editVehicleNumber ? editVehicleNumber.toUpperCase() : null,
-        driverName: editDriverName || null,
-        driverContact: editDriverContact || null,
-        vehicleBhadaRate: editVehicleBhadaRate || null,
-        freightType: editFreightType || null,
-        totalBagsInVehicle: editTotalBagsInVehicle ? parseInt(editTotalBagsInVehicle) : null,
+        vehicleNumber: vn ? vn.toUpperCase() : null,
+        driverName: editDriverName || origVehicle.driverName || null,
+        driverContact: editDriverContact || origVehicle.driverContact || null,
+        vehicleBhadaRate: editVehicleBhadaRate || origVehicle.vehicleBhadaRate || null,
+        freightType: editFreightType || origVehicle.freightType || null,
+        totalBagsInVehicle: Number.isFinite(totalBagsParsed) ? totalBagsParsed : null,
       };
 
       const updates = editingGroup
         .filter(lot => !lot.isReturned)
         .map(lot => {
           const lotState = editLotFields[lot.id];
-          if (!lotState) return null;
+          const orig = origLotFields[lot.id];
+          if (!lotState || !orig) return null;
 
-          const origBags = lotState.numberOfBags ? parseInt(lotState.numberOfBags) : lot.numberOfBags;
-          const actualBags = lotState.actualNumberOfBags ? parseInt(lotState.actualNumberOfBags) : origBags;
+          const origBags = lot.numberOfBags;
+          const actualStr = lotState.actualNumberOfBags || orig.actualNumberOfBags;
+          const actualBags = actualStr ? parseInt(actualStr, 10) : origBags;
 
           return apiRequest("PATCH", `/api/lots/${lot.id}`, {
             ...sharedData,
-            variety: lotState.variety || null,
-            size: lotState.size || null,
-            bagMarka: lotState.bagMarka || null,
-            initialTotalWeight: lotState.initialTotalWeight || null,
+            variety: lotState.variety || orig.variety || null,
+            size: lotState.size || orig.size || null,
+            bagMarka: lotState.bagMarka || orig.bagMarka || null,
+            initialTotalWeight: lotState.initialTotalWeight || orig.initialTotalWeight || null,
             numberOfBags: origBags,
             actualNumberOfBags: Math.min(actualBags, origBags),
           });
@@ -333,16 +340,25 @@ export default function StockRegisterPage() {
     const lots = group.lots;
     setEditingGroup(lots);
     const first = lots[0];
-    setEditVehicleNumber(first.vehicleNumber || "");
-    setEditDriverName(first.driverName || "");
-    setEditDriverContact(first.driverContact || "");
-    setEditVehicleBhadaRate(first.vehicleBhadaRate || "");
-    setEditFreightType(first.freightType || "");
-    setEditTotalBagsInVehicle(first.totalBagsInVehicle != null ? String(first.totalBagsInVehicle) : "");
+    setOrigVehicle({
+      vehicleNumber: first.vehicleNumber || "",
+      driverName: first.driverName || "",
+      driverContact: first.driverContact || "",
+      vehicleBhadaRate: first.vehicleBhadaRate || "",
+      freightType: first.freightType || "",
+      totalBagsInVehicle: first.totalBagsInVehicle != null ? String(first.totalBagsInVehicle) : "",
+    });
+    setEditVehicleNumber("");
+    setEditDriverName("");
+    setEditDriverContact("");
+    setEditVehicleBhadaRate("");
+    setEditFreightType("");
+    setEditTotalBagsInVehicle("");
 
     const fields: Record<number, LotEditState> = {};
+    const origFields: Record<number, LotEditState> = {};
     for (const lot of lots) {
-      fields[lot.id] = {
+      origFields[lot.id] = {
         variety: lot.variety || "",
         size: lot.size || "",
         bagMarka: lot.bagMarka || "",
@@ -350,7 +366,16 @@ export default function StockRegisterPage() {
         actualNumberOfBags: String(lot.actualNumberOfBags ?? lot.numberOfBags),
         numberOfBags: String(lot.numberOfBags),
       };
+      fields[lot.id] = {
+        variety: "",
+        size: "",
+        bagMarka: "",
+        initialTotalWeight: "",
+        actualNumberOfBags: "",
+        numberOfBags: String(lot.numberOfBags),
+      };
     }
+    setOrigLotFields(origFields);
     setEditLotFields(fields);
   };
 
@@ -782,6 +807,7 @@ export default function StockRegisterPage() {
                     data-testid="input-edit-vehicle-number"
                     value={editVehicleNumber}
                     onChange={(e) => setEditVehicleNumber(e.target.value.toUpperCase())}
+                    placeholder={origVehicle.vehicleNumber || "Vehicle #"}
                     className="mobile-touch-target"
                     style={{ textTransform: 'uppercase' }}
                   />
@@ -792,6 +818,7 @@ export default function StockRegisterPage() {
                     data-testid="input-edit-driver-name"
                     value={editDriverName}
                     onChange={(e) => setEditDriverName(e.target.value)}
+                    placeholder={origVehicle.driverName || "Driver Name"}
                     className="mobile-touch-target"
                   />
                 </div>
@@ -803,6 +830,7 @@ export default function StockRegisterPage() {
                     data-testid="input-edit-driver-contact"
                     value={editDriverContact}
                     onChange={(e) => setEditDriverContact(e.target.value)}
+                    placeholder={origVehicle.driverContact || "Contact"}
                     className="mobile-touch-target"
                   />
                 </div>
@@ -814,8 +842,7 @@ export default function StockRegisterPage() {
                     inputMode="decimal"
                     value={editVehicleBhadaRate}
                     onChange={(e) => setEditVehicleBhadaRate(e.target.value)}
-                    onFocus={(e) => e.target.select()}
-                    placeholder="0.00"
+                    placeholder={origVehicle.vehicleBhadaRate || "0.00"}
                     className="mobile-touch-target"
                   />
                 </div>
@@ -823,7 +850,7 @@ export default function StockRegisterPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label>Freight Type</Label>
-                  <Select value={editFreightType || "none"} onValueChange={(v) => setEditFreightType(v === "none" ? "" : v)}>
+                  <Select value={editFreightType || origVehicle.freightType || "none"} onValueChange={(v) => setEditFreightType(v === "none" ? "" : v)}>
                     <SelectTrigger data-testid="select-edit-freight-type" className="mobile-touch-target">
                       <SelectValue placeholder="Select" />
                     </SelectTrigger>
@@ -842,7 +869,7 @@ export default function StockRegisterPage() {
                     inputMode="numeric"
                     value={editTotalBagsInVehicle}
                     onChange={(e) => setEditTotalBagsInVehicle(e.target.value.replace(/\D/g, ''))}
-                    onFocus={(e) => e.target.select()}
+                    placeholder={origVehicle.totalBagsInVehicle || "0"}
                     className="mobile-touch-target"
                   />
                 </div>
@@ -886,13 +913,8 @@ export default function StockRegisterPage() {
                               type="text"
                               inputMode="numeric"
                               value={lotState.numberOfBags}
-                              onChange={(e) => {
-                                const val = e.target.value.replace(/\D/g, '');
-                                updateLotField(lot.id, "numberOfBags", val);
-                                if (val) updateLotField(lot.id, "actualNumberOfBags", val);
-                              }}
-                              onFocus={(e) => e.target.select()}
-                              className="h-8 text-sm"
+                              disabled
+                              className="h-8 text-sm bg-muted"
                             />
                           </div>
                           <div className="space-y-1">
@@ -904,12 +926,12 @@ export default function StockRegisterPage() {
                               value={lotState.actualNumberOfBags}
                               onChange={(e) => {
                                 const val = e.target.value.replace(/\D/g, '');
-                                const maxBags = lotState.numberOfBags ? parseInt(lotState.numberOfBags) : lot.numberOfBags;
+                                const maxBags = parseInt(origLotFields[lot.id]?.numberOfBags || String(lot.numberOfBags));
                                 if (val === '' || parseInt(val) <= maxBags) {
                                   updateLotField(lot.id, "actualNumberOfBags", val);
                                 }
                               }}
-                              onFocus={(e) => e.target.select()}
+                              placeholder={origLotFields[lot.id]?.actualNumberOfBags || "0"}
                               className="h-8 text-sm"
                             />
                           </div>
@@ -921,12 +943,13 @@ export default function StockRegisterPage() {
                               data-testid={`input-edit-variety-${lot.id}`}
                               value={lotState.variety}
                               onChange={(e) => updateLotField(lot.id, "variety", e.target.value)}
+                              placeholder={origLotFields[lot.id]?.variety || t("common.optional")}
                               className="h-8 text-sm"
                             />
                           </div>
                           <div className="space-y-1">
                             <Label className="text-xs">{t("stockRegister.size")}</Label>
-                            <Select value={lotState.size || "none"} onValueChange={(v) => updateLotField(lot.id, "size", v === "none" ? "" : v)}>
+                            <Select value={lotState.size || origLotFields[lot.id]?.size || "none"} onValueChange={(v) => updateLotField(lot.id, "size", v === "none" ? "" : v)}>
                               <SelectTrigger data-testid={`select-edit-size-${lot.id}`} className="h-8 text-sm">
                                 <SelectValue placeholder={t("stockEntry.selectSize")} />
                               </SelectTrigger>
@@ -946,6 +969,7 @@ export default function StockRegisterPage() {
                               data-testid={`input-edit-bag-marka-${lot.id}`}
                               value={lotState.bagMarka}
                               onChange={(e) => updateLotField(lot.id, "bagMarka", e.target.value)}
+                              placeholder={origLotFields[lot.id]?.bagMarka || t("common.optional")}
                               className="h-8 text-sm"
                             />
                           </div>
@@ -957,8 +981,7 @@ export default function StockRegisterPage() {
                               inputMode="decimal"
                               value={lotState.initialTotalWeight}
                               onChange={(e) => updateLotField(lot.id, "initialTotalWeight", e.target.value)}
-                              onFocus={(e) => e.target.select()}
-                              placeholder="0.00"
+                              placeholder={origLotFields[lot.id]?.initialTotalWeight || "0.00"}
                               className="h-8 text-sm"
                             />
                           </div>
