@@ -115,7 +115,7 @@ const translations: Record<string, Record<Language, string>> = {
   "stockEntry.bagMarka": { en: "Bag Marka", hi: "बैग मार्का" },
   "stockEntry.vehicleNumber": { en: "Vehicle #", hi: "वाहन नं." },
   "stockEntry.bhadaRate": { en: "Bhada Rate/Bag", hi: "भाड़ा दर/थैला" },
-  "stockEntry.initialWeight": { en: "Initial Total Weight (kg)", hi: "प्रारंभिक कुल वजन (किलो)" },
+  "stockEntry.initialWeight": { en: "Total Weight (kg)", hi: "कुल वजन (किलो)" },
   "stockEntry.addLot": { en: "Add New Lot", hi: "नया लॉट जोड़ें" },
   "stockEntry.saveToRegister": { en: "Save to Stock Register", hi: "स्टॉक रजिस्टर में सहेजें" },
   "stockEntry.lot": { en: "Lot", hi: "लॉट" },
