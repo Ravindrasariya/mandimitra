@@ -255,7 +255,6 @@ ${businessAddress ? `<p style="font-size:0.85em;color:#555;margin:2px 0">${busin
 <th style="padding:8px;border:1px solid #ccc;text-align:right">Amount</th>
 </tr>
 <tr><td style="padding:6px;border:1px solid #ccc">Bags</td><td style="padding:6px;border:1px solid #ccc;text-align:right">${bags}</td></tr>
-<tr><td style="padding:6px;border:1px solid #ccc">Total Weight</td><td style="padding:6px;border:1px solid #ccc;text-align:right">${parseFloat(tx.totalWeight || "0").toFixed(2)} kg</td></tr>
 <tr><td style="padding:6px;border:1px solid #ccc">Net Weight</td><td style="padding:6px;border:1px solid #ccc;text-align:right">${parseFloat(tx.netWeight || "0").toFixed(2)} kg</td></tr>
 <tr><td style="padding:6px;border:1px solid #ccc">Rate</td><td style="padding:6px;border:1px solid #ccc;text-align:right">Rs.${parseFloat(tx.pricePerKg || "0").toFixed(2)}/kg</td></tr>
 <tr style="background:#f9f9f9"><td style="padding:6px;border:1px solid #ccc"><strong>Gross Amount</strong></td><td style="padding:6px;border:1px solid #ccc;text-align:right"><strong>Rs.${grossAmount.toFixed(2)}</strong></td></tr>
@@ -297,7 +296,7 @@ export default function TransactionsPage() {
   const [monthPopoverOpen, setMonthPopoverOpen] = useState(false);
   const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
 
-  const [totalWeight, setTotalWeight] = useState("");
+  const [netWeightInput, setNetWeightInput] = useState("");
   const [extraChargesFarmer, setExtraChargesFarmer] = useState("0");
   const [extraChargesBuyer, setExtraChargesBuyer] = useState("0");
 
@@ -599,12 +598,12 @@ export default function TransactionsPage() {
   };
 
   const prefillFromTxn = (tx: TransactionWithDetails) => {
-    setTotalWeight(tx.totalWeight || "");
+    setNetWeightInput(tx.netWeight || "");
     setExtraChargesFarmer(tx.extraChargesFarmer || "0");
     setExtraChargesBuyer(tx.extraChargesBuyer || "0");
   };
 
-  const calcProportionateWeight = (bid: BidWithDetails): string => {
+  const calcProportionateNetWeight = (bid: BidWithDetails): string => {
     const lotWeight = parseFloat(bid.lot.initialTotalWeight || "0");
     const lotBags = bid.lot.numberOfBags || 1;
     const bidBags = bid.numberOfBags || 0;
@@ -613,7 +612,7 @@ export default function TransactionsPage() {
   };
 
   const resetFormDefaults = (bid?: BidWithDetails) => {
-    setTotalWeight(bid ? calcProportionateWeight(bid) : "");
+    setNetWeightInput(bid ? calcProportionateNetWeight(bid) : "");
     setExtraChargesFarmer("0");
     setExtraChargesBuyer("0");
   };
@@ -640,10 +639,8 @@ export default function TransactionsPage() {
     hammaliFarmerPerBag: "0", hammaliBuyerPerBag: "0",
   };
 
-  const tw = parseFloat(totalWeight) || 0;
   const bags = selectedBid?.numberOfBags || 0;
-  const netWeight = tw > 0 ? (tw - bags).toFixed(2) : "0.00";
-  const nw = parseFloat(netWeight);
+  const nw = parseFloat(netWeightInput) || 0;
   const price = parseFloat(selectedBid?.pricePerKg || "0");
   const grossAmount = nw * price;
 
@@ -674,8 +671,8 @@ export default function TransactionsPage() {
   const buyerReceivable = grossAmount + buyerAdditions;
 
   const submitTransaction = () => {
-    if (!selectedBid || !totalWeight) {
-      toast({ title: "Error", description: "Total weight is required", variant: "destructive" });
+    if (!selectedBid || !netWeightInput) {
+      toast({ title: "Error", description: "Net weight is required", variant: "destructive" });
       return;
     }
 
@@ -684,11 +681,11 @@ export default function TransactionsPage() {
       bidId: selectedBid.id,
       buyerId: selectedBid.buyerId,
       farmerId: selectedBid.lot.farmerId,
-      totalWeight,
+      totalWeight: netWeightInput,
       numberOfBags: bags,
       hammaliCharges: hammaliFarmerTotal.toString(),
       freightCharges: freightFarmerTotal.toFixed(2),
-      netWeight,
+      netWeight: netWeightInput,
       pricePerKg: selectedBid.pricePerKg,
       aadhatCharges: aadhatBuyer.toFixed(2),
       mandiCharges: mandiBuyer.toFixed(2),
@@ -748,7 +745,7 @@ export default function TransactionsPage() {
       "Buyer Name", "Buyer Phone",
       "Vehicle #", "Driver Name", "Driver Contact", "Freight Type",
       "Grade", "No. of Bags", "Rate/Kg",
-      "Total Weight", "Net Weight",
+      "Net Weight",
       "Hammali Farmer/Bag", "Hammali Buyer/Bag", "Extra Charges Farmer", "Extra Charges Buyer",
       "Aadhat Farmer %", "Aadhat Buyer %", "Mandi Farmer %", "Mandi Buyer %",
       "Freight Charges",
@@ -773,7 +770,7 @@ export default function TransactionsPage() {
         tx.buyer.name, tx.buyer.phone || "",
         tx.lot.vehicleNumber || "", tx.lot.driverName || "", tx.lot.driverContact || "", tx.lot.freightType || "",
         bid.grade || "", tx.numberOfBags, tx.pricePerKg,
-        tx.totalWeight, tx.netWeight,
+        tx.netWeight,
         tx.hammaliFarmerPerBag || "0", tx.hammaliBuyerPerBag || "0",
         tx.extraChargesFarmer || "0", tx.extraChargesBuyer || "0",
         tx.aadhatFarmerPercent || "0", tx.aadhatBuyerPercent || "0",
@@ -1224,25 +1221,19 @@ export default function TransactionsPage() {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label>{t("transactions.totalWeight")}</Label>
-                  <Input
-                    data-testid="input-total-weight"
-                    type="text"
-                    inputMode="decimal"
-                    value={totalWeight}
-                    onChange={(e) => setTotalWeight(e.target.value)}
-                    onFocus={(e) => e.target.select()}
-                    placeholder="0.00"
-                    className="mobile-touch-target"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>{t("transactions.netWeight")}</Label>
-                  <Input value={netWeight} disabled className="mobile-touch-target bg-muted" />
-                  <p className="text-xs text-muted-foreground">Total - {bags} bags</p>
-                </div>
+              <div className="space-y-1">
+                <Label>{t("transactions.netWeight")}</Label>
+                <Input
+                  data-testid="input-net-weight"
+                  type="text"
+                  inputMode="decimal"
+                  value={netWeightInput}
+                  onChange={(e) => setNetWeightInput(e.target.value)}
+                  onFocus={(e) => e.target.select()}
+                  placeholder="0.00"
+                  className="mobile-touch-target"
+                />
+                <p className="text-xs text-muted-foreground">Total - {bags} bags</p>
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-xs" data-testid="charge-rates-display">
@@ -1398,7 +1389,7 @@ export default function TransactionsPage() {
                         const fieldLabels: Record<string, string> = {
                           created: "Created",
                           reversed: "Reversed",
-                          totalWeight: "Total Weight",
+                          totalWeight: "Weight",
                           numberOfBags: "Bags",
                           extraChargesFarmer: "Extra (Farmer)",
                           extraChargesBuyer: "Extra (Buyer)",

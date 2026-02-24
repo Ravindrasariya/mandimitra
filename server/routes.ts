@@ -681,7 +681,7 @@ export async function registerRoutes(
     const oldTx = await storage.getTransaction(txId, businessId);
     if (!oldTx) return res.status(404).json({ message: "Transaction not found" });
 
-    const txTrackFields = ["totalWeight", "numberOfBags", "extraChargesFarmer", "extraChargesBuyer", "netWeight", "pricePerKg", "totalPayableToFarmer", "totalReceivableFromBuyer", "hammaliCharges", "freightCharges", "aadhatCharges", "mandiCharges"];
+    const txTrackFields = ["numberOfBags", "extraChargesFarmer", "extraChargesBuyer", "netWeight", "pricePerKg", "totalPayableToFarmer", "totalReceivableFromBuyer", "hammaliCharges", "freightCharges", "aadhatCharges", "mandiCharges"];
     const changedBy = req.user!.username;
     const updated = await storage.updateTransaction(txId, businessId, req.body);
     if (!updated) return res.status(404).json({ message: "Transaction not found" });
