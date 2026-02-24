@@ -39,6 +39,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onSuccess: (data) => {
       queryClient.clear();
       queryClient.setQueryData(["/api/auth/me"], data);
+      const keysToRemove = Object.keys(localStorage).filter(k => k.startsWith("mandi-mitra-se-"));
+      keysToRemove.forEach(k => localStorage.removeItem(k));
     },
   });
 
