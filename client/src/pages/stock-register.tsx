@@ -702,7 +702,6 @@ export default function StockRegisterPage() {
             const first = group.lots[0];
             const farmer = first.farmer;
             const allReturned = group.lots.every(l => l.isReturned);
-            const totalBags = group.lots.reduce((sum, l) => sum + (l.actualNumberOfBags ?? l.numberOfBags), 0);
             const hasVehicleInfo = first.vehicleNumber || first.driverName || first.vehicleBhadaRate || first.freightType || first.driverContact;
 
             return (
@@ -721,12 +720,11 @@ export default function StockRegisterPage() {
                           {farmer.name} - {farmer.phone}
                           {farmer.village && <span className="text-muted-foreground text-xs ml-1">({farmer.village})</span>}
                         </p>
-                        <span className="text-xs text-muted-foreground">
-                          Total: <strong>{totalBags}</strong> {t("common.bags")}
-                          {first.totalBagsInVehicle != null && first.totalBagsInVehicle !== totalBags && (
-                            <span className="ml-1">(Vehicle: {first.totalBagsInVehicle})</span>
-                          )}
-                        </span>
+                        {first.totalBagsInVehicle != null && (
+                          <span className="text-xs text-muted-foreground">
+                            Total: <strong>{first.totalBagsInVehicle}</strong> {t("common.bags")}
+                          </span>
+                        )}
                       </div>
 
                       <div className="border-t pt-1.5 mt-1.5">

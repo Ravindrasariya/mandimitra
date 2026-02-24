@@ -160,8 +160,8 @@ export default function StockEntryPage() {
       return;
     }
 
-    if (totalLotBags > totalBagsLimit) {
-      toast({ title: "Error", description: `Sum of lot bags (${totalLotBags}) exceeds total bags (${totalBagsLimit})`, variant: "destructive" });
+    if (totalLotBags !== totalBagsLimit) {
+      toast({ title: "Error", description: `Sum of lot bags (${totalLotBags}) must equal total bags (${totalBagsLimit})`, variant: "destructive" });
       return;
     }
 
@@ -534,9 +534,9 @@ export default function StockEntryPage() {
                 className="mobile-touch-target text-sm"
               />
               {totalBagsLimit > 0 && (
-                <p className="text-xs text-muted-foreground">
+                <p className={`text-xs ${totalLotBags === totalBagsLimit ? "text-green-600" : "text-muted-foreground"}`}>
                   Allocated: {totalLotBags} / {totalBagsLimit}
-                  {totalLotBags > totalBagsLimit && <span className="text-red-500 ml-1">(exceeds limit)</span>}
+                  {totalLotBags !== totalBagsLimit && totalLotBags > 0 && <span className="text-red-500 ml-1">(must equal {totalBagsLimit})</span>}
                 </p>
               )}
             </div>
