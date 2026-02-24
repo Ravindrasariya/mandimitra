@@ -402,6 +402,15 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/farmers/:id/pending-transactions", requireAuth, async (req, res) => {
+    try {
+      const result = await storage.getFarmerPendingTransactions(req.user!.businessId, paramId(req.params.id));
+      res.json(result);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
   app.get("/api/lots", requireAuth, async (req, res) => {
     const filters = {
       crop: req.query.crop as string | undefined,
@@ -851,7 +860,10 @@ export async function registerRoutes(
       const { allocations, ...rest } = req.body;
       const data = { ...rest, businessId: req.user!.businessId };
 
-      if (allocations && Array.isArray(allocations) && allocations.length > 0 && data.category === "inward" && data.buyerId) {
+      const isBuyerInward = allocations && Array.isArray(allocations) && allocations.length > 0 && data.category === "inward" && data.buyerId;
+      const isFarmerOutward = allocations && Array.isArray(allocations) && allocations.length > 0 && data.category === "outward" && data.farmerId;
+
+      if (isBuyerInward || isFarmerOutward) {
         const entries = await storage.createCashEntryBatch(data, allocations.map((a: any) => ({
           transactionId: a.transactionId || null,
           amount: String(a.amount || "0"),

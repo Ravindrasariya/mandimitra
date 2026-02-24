@@ -74,6 +74,7 @@ export interface IStorage {
   deleteBid(id: number, businessId: number): Promise<void>;
 
   getBuyerPendingTransactions(businessId: number, buyerId: number): Promise<any[]>;
+  getFarmerPendingTransactions(businessId: number, farmerId: number): Promise<any[]>;
   getTransactions(businessId: number, filters?: { farmerId?: number; buyerId?: number; dateFrom?: string; dateTo?: string }): Promise<(Transaction & { farmer: Farmer; buyer: Buyer; lot: Lot; bid: Bid })[]>;
   getTransaction(id: number, businessId: number): Promise<(Transaction & { farmer: Farmer; buyer: Buyer; lot: Lot; bid: Bid }) | undefined>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
@@ -277,20 +278,32 @@ export class DatabaseStorage implements IStorage {
 
     const results: (Farmer & { totalPayable: string; totalDue: string; salesCount: number; bidDates: string[] })[] = [];
     for (const farmer of farmerList) {
-      const [txSum] = await db.select({
-        total: sql<string>`coalesce(sum(cast(${transactions.totalPayableToFarmer} as numeric)), 0)`,
-        count: sql<number>`count(*)`,
+      const txnRows = await db.select({
+        payable: sql<string>`cast(${transactions.totalPayableToFarmer} as numeric)`,
+        paid: sql<string>`cast(${transactions.farmerPaidAmount} as numeric)`,
       }).from(transactions).where(and(eq(transactions.businessId, businessId), eq(transactions.farmerId, farmer.id), eq(transactions.isReversed, false)));
 
-      const [cashSum] = await db.select({
-        total: sql<string>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`
-      }).from(cashEntries).where(and(eq(cashEntries.businessId, businessId), eq(cashEntries.farmerId, farmer.id), eq(cashEntries.category, "outward"), eq(cashEntries.isReversed, false)));
+      const totalPayable = txnRows.reduce((s, r) => s + parseFloat(r.payable || "0"), 0);
+      const totalTxnPaid = txnRows.reduce((s, r) => s + parseFloat(r.paid || "0"), 0);
+      const txnDue = Math.max(0, totalPayable - totalTxnPaid);
+      const salesCount = txnRows.length;
 
-      const totalPayable = parseFloat(txSum?.total || "0");
-      const totalPaid = parseFloat(cashSum?.total || "0");
       const openingBal = parseFloat(farmer.openingBalance || "0");
-      const totalDue = openingBal + totalPayable - totalPaid;
-      const salesCount = Number(txSum?.count || 0);
+      let openingDue = 0;
+      if (openingBal > 0) {
+        const openingPaidSum = await db.select({
+          total: sql<string>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`
+        }).from(cashEntries).where(and(
+          eq(cashEntries.businessId, businessId),
+          eq(cashEntries.farmerId, farmer.id),
+          eq(cashEntries.category, "outward"),
+          eq(cashEntries.isReversed, false),
+          sql`${cashEntries.transactionId} IS NULL`,
+        ));
+        openingDue = Math.max(0, openingBal - parseFloat(openingPaidSum[0]?.total || "0"));
+      }
+
+      const totalDue = txnDue + openingDue;
 
       const farmerBidDates = bidDateMap.get(farmer.id);
       results.push({
@@ -706,6 +719,74 @@ export class DatabaseStorage implements IStorage {
     return pendingTxns;
   }
 
+  async getFarmerPendingTransactions(businessId: number, farmerId: number): Promise<any[]> {
+    const results = await db.select({
+      transaction: transactions,
+      lot: lots,
+      bid: bids,
+    }).from(transactions)
+      .innerJoin(lots, eq(transactions.lotId, lots.id))
+      .innerJoin(bids, eq(transactions.bidId, bids.id))
+      .where(and(
+        eq(transactions.businessId, businessId),
+        eq(transactions.farmerId, farmerId),
+        eq(transactions.isReversed, false),
+      ))
+      .orderBy(transactions.date, transactions.id);
+
+    const pendingTxns = results
+      .map(r => {
+        const payable = parseFloat(r.transaction.totalPayableToFarmer || "0");
+        const paid = parseFloat(r.transaction.farmerPaidAmount || "0");
+        const due = payable - paid;
+        return {
+          id: r.transaction.id,
+          transactionId: r.transaction.transactionId,
+          serialNumber: r.lot.serialNumber,
+          date: r.transaction.date,
+          numberOfBags: r.transaction.numberOfBags,
+          crop: r.lot.crop,
+          totalPayableToFarmer: r.transaction.totalPayableToFarmer,
+          farmerPaidAmount: r.transaction.farmerPaidAmount,
+          due: due.toFixed(2),
+          bidCreatedAt: r.bid.createdAt,
+        };
+      })
+      .filter(t => parseFloat(t.due) > 0);
+
+    const farmer = await this.getFarmer(farmerId, businessId);
+    const openingBal = parseFloat(farmer?.openingBalance || "0");
+    if (openingBal > 0) {
+      const totalCashEntries = await db.select({
+        total: sql<string>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`
+      }).from(cashEntries).where(and(
+        eq(cashEntries.businessId, businessId),
+        eq(cashEntries.farmerId, farmerId),
+        eq(cashEntries.category, "outward"),
+        eq(cashEntries.isReversed, false),
+        sql`${cashEntries.transactionId} IS NULL`,
+      ));
+      const paidTowardsOpening = parseFloat(totalCashEntries[0]?.total || "0");
+      const openingDue = Math.max(0, openingBal - paidTowardsOpening);
+      if (openingDue > 0) {
+        pendingTxns.unshift({
+          id: 0,
+          transactionId: "PY_OPENING",
+          serialNumber: 0,
+          date: "Previous Year",
+          numberOfBags: 0,
+          crop: "",
+          totalPayableToFarmer: openingBal.toFixed(2),
+          farmerPaidAmount: paidTowardsOpening.toFixed(2),
+          due: openingDue.toFixed(2),
+          bidCreatedAt: new Date(0),
+        });
+      }
+    }
+
+    return pendingTxns;
+  }
+
   async getTransaction(id: number, businessId: number): Promise<(Transaction & { farmer: Farmer; buyer: Buyer; lot: Lot; bid: Bid }) | undefined> {
     const [result] = await db.select({
       transaction: transactions,
@@ -910,6 +991,9 @@ export class DatabaseStorage implements IStorage {
     if (baseEntry.buyerId) {
       await this.recalculateBuyerPaymentStatus(baseEntry.businessId, baseEntry.buyerId);
     }
+    if (baseEntry.farmerId) {
+      await this.recalculateFarmerPaymentStatus(baseEntry.businessId, baseEntry.farmerId);
+    }
 
     return created;
   }
@@ -986,34 +1070,20 @@ export class DatabaseStorage implements IStorage {
       ))
       .orderBy(transactions.date, transactions.id);
 
-    const [cashSum] = await db.select({
-      total: sql<string>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`
-    }).from(cashEntries).where(and(
-      eq(cashEntries.businessId, businessId),
-      eq(cashEntries.farmerId, farmerId),
-      eq(cashEntries.category, "outward"),
-      eq(cashEntries.isReversed, false)
-    ));
-
-    let remaining = parseFloat(cashSum?.total || "0");
-
-    const openingBal = parseFloat(farmer.openingBalance || "0");
-    if (openingBal > 0) {
-      remaining = Math.max(0, remaining - openingBal);
-    }
-
     for (const txn of farmerTxns) {
       const payable = parseFloat(txn.totalPayableToFarmer || "0");
-      let paidForThis = 0;
 
-      if (remaining >= payable) {
-        paidForThis = payable;
-        remaining -= payable;
-      } else if (remaining > 0) {
-        paidForThis = remaining;
-        remaining = 0;
-      }
+      const [entrySum] = await db.select({
+        total: sql<string>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`
+      }).from(cashEntries).where(and(
+        eq(cashEntries.businessId, businessId),
+        eq(cashEntries.farmerId, farmerId),
+        eq(cashEntries.transactionId, txn.id),
+        eq(cashEntries.category, "outward"),
+        eq(cashEntries.isReversed, false)
+      ));
 
+      const paidForThis = parseFloat(entrySum?.total || "0");
       const status = paidForThis >= payable ? "paid" : paidForThis > 0 ? "partial" : "due";
 
       await db.update(transactions)

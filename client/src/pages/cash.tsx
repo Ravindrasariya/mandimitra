@@ -81,6 +81,19 @@ export default function CashPage() {
   const [outwardPaymentMode, setOutwardPaymentMode] = useState("Cash");
   const [outwardBankAccountId, setOutwardBankAccountId] = useState("");
   const [outwardNotes, setOutwardNotes] = useState("");
+  const [farmerAllocations, setFarmerAllocations] = useState<{ txnId: number | null; txnLabel: string; serialNumber: number; date: string; numberOfBags: number; crop: string; due: number; amount: string }[]>([]);
+  const [farmerAllocationSearch, setFarmerAllocationSearch] = useState("");
+  const [farmerAllocationDropdownOpen, setFarmerAllocationDropdownOpen] = useState(false);
+  const farmerAllocationDropdownRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (farmerAllocationDropdownRef.current && !farmerAllocationDropdownRef.current.contains(e.target as Node)) {
+        setFarmerAllocationDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   const [transferFromType, setTransferFromType] = useState("cash");
   const [transferFromAccountId, setTransferFromAccountId] = useState("");
@@ -129,6 +142,13 @@ export default function CashPage() {
     queryKey: ["/api/buyers", inwardBuyerId, "pending-transactions"],
     queryFn: () => inwardBuyerId ? fetch(`/api/buyers/${inwardBuyerId}/pending-transactions`, { credentials: "include" }).then(r => r.json()) : Promise.resolve([]),
     enabled: inwardPartyType === "Buyer" && !!inwardBuyerId,
+  });
+
+  type FarmerPendingTxn = { id: number; transactionId: string; serialNumber: number; date: string; numberOfBags: number; crop: string; totalPayableToFarmer: string; farmerPaidAmount: string; due: string; bidCreatedAt: string };
+  const { data: farmerPendingTransactions = [] } = useQuery<FarmerPendingTxn[]>({
+    queryKey: ["/api/farmers", outwardFarmerId, "pending-transactions"],
+    queryFn: () => outwardFarmerId ? fetch(`/api/farmers/${outwardFarmerId}/pending-transactions`, { credentials: "include" }).then(r => r.json()) : Promise.resolve([]),
+    enabled: outwardOutflowType === "Farmer-Harvest Sale" && !!outwardFarmerId,
   });
 
   const hasBankAccounts = bankAccountsList.length > 0;
@@ -252,7 +272,10 @@ export default function CashPage() {
     }});
     queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
     queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
+    queryClient.invalidateQueries({ predicate: (query) => {
+      const key = query.queryKey[0];
+      return typeof key === "string" && key.startsWith("/api/farmers");
+    }});
     queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"] });
     queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
     queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
@@ -407,22 +430,10 @@ export default function CashPage() {
   };
 
   const submitOutward = () => {
-    if (!outwardAmount || parseFloat(outwardAmount) <= 0) {
-      toast({ title: t("common.error"), description: "Enter valid amount", variant: "destructive" });
-      return;
-    }
     const needsFarmer = outwardOutflowType === "Farmer-Advance" || outwardOutflowType === "Farmer-Harvest Sale";
     if (needsFarmer && !outwardFarmerId) {
       toast({ title: t("common.error"), description: "Select a farmer", variant: "destructive" });
       return;
-    }
-    if (outwardOutflowType === "Farmer-Harvest Sale" && outwardFarmerId) {
-      const farmer = farmersWithDues.find(f => f.id === parseInt(outwardFarmerId));
-      const maxDue = farmer ? parseFloat(farmer.totalDue) : 0;
-      if (parseFloat(outwardAmount) > maxDue) {
-        toast({ title: t("common.error"), description: `Amount cannot exceed farmer's due of ₹${maxDue.toLocaleString("en-IN")}`, variant: "destructive" });
-        return;
-      }
     }
     if (outwardOutflowType === "Salary" && !outwardReceiverName.trim()) {
       toast({ title: t("common.error"), description: "Enter receiver name", variant: "destructive" });
@@ -432,22 +443,72 @@ export default function CashPage() {
       toast({ title: t("common.error"), description: "Select bank account", variant: "destructive" });
       return;
     }
-    createMutation.mutate({
-      category: "outward",
-      type: "cash_out",
-      outflowType: outwardOutflowType,
-      farmerId: needsFarmer ? parseInt(outwardFarmerId) : null,
-      partyName: outwardOutflowType === "Salary" ? outwardReceiverName.trim() : null,
-      amount: outwardAmount,
-      date: outwardDate,
-      paymentMode: outwardPaymentMode,
-      bankAccountId: outwardPaymentMode !== "Cash" ? parseInt(outwardBankAccountId) : null,
-      notes: outwardNotes || null,
-    });
+
+    if (outwardOutflowType === "Farmer-Harvest Sale" && outwardFarmerId && farmerAllocations.length > 0) {
+      if (!outwardAmount || parseFloat(outwardAmount) <= 0) {
+        toast({ title: t("common.error"), description: "Enter the total amount paid", variant: "destructive" });
+        return;
+      }
+      const hasInvalidAmount = farmerAllocations.some(a => !a.amount || parseFloat(a.amount) < 0);
+      if (hasInvalidAmount) {
+        toast({ title: t("common.error"), description: "Enter valid amounts for all allocations", variant: "destructive" });
+        return;
+      }
+      const overAllocated = farmerAllocations.some(a => parseFloat(a.amount || "0") > a.due + 0.01);
+      if (overAllocated) {
+        toast({ title: t("common.error"), description: "Amount cannot exceed due for any transaction", variant: "destructive" });
+        return;
+      }
+      const totalAllocated = farmerAllocations.reduce((sum, a) => sum + parseFloat(a.amount || "0"), 0);
+      const totalPaid = parseFloat(outwardAmount);
+      if (Math.abs(totalAllocated - totalPaid) > 0.01) {
+        toast({ title: t("common.error"), description: `Allocated amount (₹${totalAllocated.toLocaleString("en-IN")}) must equal paid amount (₹${totalPaid.toLocaleString("en-IN")})`, variant: "destructive" });
+        return;
+      }
+      createMutation.mutate({
+        category: "outward",
+        type: "cash_out",
+        outflowType: outwardOutflowType,
+        farmerId: parseInt(outwardFarmerId),
+        amount: outwardAmount,
+        date: outwardDate,
+        paymentMode: outwardPaymentMode,
+        bankAccountId: outwardPaymentMode !== "Cash" ? parseInt(outwardBankAccountId) : null,
+        notes: outwardNotes || null,
+        allocations: farmerAllocations.map(a => ({
+          transactionId: a.txnId,
+          amount: a.amount || "0",
+          discount: "0",
+          pettyAdj: "0",
+        })),
+      });
+    } else if (outwardOutflowType === "Farmer-Harvest Sale" && outwardFarmerId) {
+      toast({ title: t("common.error"), description: "Select at least one transaction to allocate payment", variant: "destructive" });
+      return;
+    } else {
+      if (!outwardAmount || parseFloat(outwardAmount) <= 0) {
+        toast({ title: t("common.error"), description: "Enter valid amount", variant: "destructive" });
+        return;
+      }
+      createMutation.mutate({
+        category: "outward",
+        type: "cash_out",
+        outflowType: outwardOutflowType,
+        farmerId: needsFarmer ? parseInt(outwardFarmerId) : null,
+        partyName: outwardOutflowType === "Salary" ? outwardReceiverName.trim() : null,
+        amount: outwardAmount,
+        date: outwardDate,
+        paymentMode: outwardPaymentMode,
+        bankAccountId: outwardPaymentMode !== "Cash" ? parseInt(outwardBankAccountId) : null,
+        notes: outwardNotes || null,
+      });
+    }
     setOutwardAmount("");
     setOutwardNotes("");
     setOutwardFarmerId("");
     setOutwardReceiverName("");
+    setFarmerAllocations([]);
+    setFarmerAllocationSearch("");
   };
 
   const submitTransfer = () => {
@@ -1092,7 +1153,7 @@ export default function CashPage() {
               )}
               <div className="space-y-1">
                 <Label className="text-xs">{t("cash.outflowType")}</Label>
-                <Select value={outwardOutflowType} onValueChange={setOutwardOutflowType}>
+                <Select value={outwardOutflowType} onValueChange={(v) => { setOutwardOutflowType(v); setFarmerAllocations([]); setFarmerAllocationSearch(""); }}>
                   <SelectTrigger className="h-9 text-sm" data-testid="outward-outflow-type"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     {OUTFLOW_TYPES.map(type => {
@@ -1121,7 +1182,7 @@ export default function CashPage() {
                         <span className="truncate flex-1" data-testid="text-outward-farmer-selected">
                           {(() => { const f = farmersWithDues.find(f => f.id === parseInt(outwardFarmerId)); return f ? (parseFloat(f.totalDue) > 0 ? `${f.name} - Due: ₹${parseFloat(f.totalDue).toLocaleString("en-IN")}` : f.name) : ""; })()}
                         </span>
-                        <button onClick={() => { setOutwardFarmerId(""); setOutwardFarmerSearch(""); if (outwardOutflowType === "Farmer-Harvest Sale") setOutwardAmount(""); }} className="shrink-0" data-testid="button-clear-outward-farmer"><X className="w-3.5 h-3.5" /></button>
+                        <button onClick={() => { setOutwardFarmerId(""); setOutwardFarmerSearch(""); setFarmerAllocations([]); setFarmerAllocationSearch(""); if (outwardOutflowType === "Farmer-Harvest Sale") setOutwardAmount(""); }} className="shrink-0" data-testid="button-clear-outward-farmer"><X className="w-3.5 h-3.5" /></button>
                       </div>
                     ) : (
                       <>
@@ -1150,7 +1211,7 @@ export default function CashPage() {
                                 : farmerList.slice(0, 20);
                               return list.length > 0 ? list.map(f => (
                                 <button key={f.id} className="flex items-center gap-1.5 px-3 py-2 text-sm w-full text-left hover:bg-accent" data-testid={`outward-farmer-opt-${f.id}`}
-                                  onMouseDown={(e) => { e.preventDefault(); setOutwardFarmerId(f.id.toString()); setOutwardFarmerSearch(""); setOutwardFarmerOpen(false); if (outwardOutflowType === "Farmer-Harvest Sale" && parseFloat(f.totalDue) > 0) { setOutwardAmount(parseFloat(f.totalDue).toString()); } }}>
+                                  onMouseDown={(e) => { e.preventDefault(); setOutwardFarmerId(f.id.toString()); setOutwardFarmerSearch(""); setOutwardFarmerOpen(false); setFarmerAllocations([]); setFarmerAllocationSearch(""); setOutwardAmount(""); }}>
                                   <span className="font-medium">{f.name}</span>
                                   <span className="text-muted-foreground text-xs">{f.phone}</span>
                                   {f.village && <span className="text-muted-foreground text-xs">({f.village})</span>}
@@ -1167,6 +1228,136 @@ export default function CashPage() {
                   </div>
                 </div>
               )}
+              {outwardOutflowType === "Farmer-Harvest Sale" && outwardFarmerId && (
+                <>
+                  <div className="space-y-1">
+                    <Label className="text-xs">{t("cash.amount")}</Label>
+                    <Input type="number" inputMode="decimal" value={outwardAmount} onChange={e => setOutwardAmount(e.target.value)} onFocus={e => e.target.select()} placeholder="0" className="h-9 text-sm" data-testid="outward-amount" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs">Allocate to Transactions</Label>
+                    <div className="relative" ref={farmerAllocationDropdownRef}>
+                      <div className="flex items-center border rounded-md bg-background">
+                        <Search className="w-3.5 h-3.5 ml-2 text-muted-foreground" />
+                        <Input
+                          value={farmerAllocationSearch}
+                          onChange={e => { setFarmerAllocationSearch(e.target.value); setFarmerAllocationDropdownOpen(true); }}
+                          onFocus={() => setFarmerAllocationDropdownOpen(true)}
+                          placeholder="Search SR#, date, crop..."
+                          className="h-9 text-sm border-0 focus-visible:ring-0"
+                          data-testid="farmer-allocation-search"
+                        />
+                      </div>
+                      {farmerAllocationDropdownOpen && (() => {
+                        const selectedIds = new Set(farmerAllocations.map(a => a.txnId));
+                        const available = farmerPendingTransactions.filter(pt => !selectedIds.has(pt.id));
+                        const filtered = available.filter(pt => {
+                          if (!farmerAllocationSearch) return true;
+                          const s = farmerAllocationSearch.toLowerCase();
+                          return String(pt.serialNumber).includes(s) || pt.date.toLowerCase().includes(s) || (pt.crop || "").toLowerCase().includes(s);
+                        });
+                        if (filtered.length === 0) return null;
+                        return (
+                          <div className="absolute z-50 w-full mt-1 max-h-48 overflow-y-auto bg-popover border rounded-md shadow-lg">
+                            {filtered.map(pt => (
+                              <div
+                                key={pt.id}
+                                className="px-3 py-2 hover:bg-accent cursor-pointer text-xs border-b last:border-b-0"
+                                onClick={() => {
+                                  setFarmerAllocations(prev => [...prev, {
+                                    txnId: pt.id === 0 ? null : pt.id,
+                                    txnLabel: pt.transactionId === "PY_OPENING" ? "PY Opening Balance" : `SR #${pt.serialNumber}`,
+                                    serialNumber: pt.serialNumber,
+                                    date: pt.date,
+                                    numberOfBags: pt.numberOfBags,
+                                    crop: pt.crop,
+                                    due: parseFloat(pt.due),
+                                    amount: pt.due,
+                                  }]);
+                                  setFarmerAllocationSearch("");
+                                  setFarmerAllocationDropdownOpen(false);
+                                }}
+                                data-testid={`farmer-allocation-option-${pt.id}`}
+                              >
+                                <div className="flex justify-between">
+                                  <span className="font-medium">
+                                    {pt.transactionId === "PY_OPENING" ? "PY Opening Balance" : `SR #${pt.serialNumber} | ${pt.crop}`}
+                                  </span>
+                                  <span className="text-orange-600 font-semibold">₹{parseFloat(pt.due).toLocaleString("en-IN")}</span>
+                                </div>
+                                <div className="text-muted-foreground mt-0.5">
+                                  {pt.date} {pt.numberOfBags > 0 && `| ${pt.numberOfBags} bags`}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()}
+                    </div>
+
+                    {farmerAllocations.length > 0 && (
+                      <div className="space-y-2">
+                        {farmerAllocations.map((alloc, idx) => (
+                          <div key={`${alloc.txnId}-${idx}`} className="bg-muted/60 rounded-lg p-2.5 space-y-2" data-testid={`farmer-allocation-row-${idx}`}>
+                            <div className="flex items-center justify-between">
+                              <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                                <Badge variant="secondary" className="text-[10px]">{alloc.txnLabel}</Badge>
+                                <span className="text-muted-foreground">{alloc.date}</span>
+                                {alloc.numberOfBags > 0 && <span>{alloc.numberOfBags} bags</span>}
+                                {alloc.crop && <span className="text-muted-foreground">{alloc.crop}</span>}
+                              </div>
+                              <Button
+                                variant="ghost" size="icon" className="h-5 w-5 shrink-0"
+                                onClick={() => setFarmerAllocations(prev => prev.filter((_, i) => i !== idx))}
+                                data-testid={`farmer-remove-allocation-${idx}`}
+                              >
+                                <X className="w-3 h-3" />
+                              </Button>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 items-end">
+                              <div className="space-y-0.5">
+                                <Label className="text-[10px] text-muted-foreground">Due</Label>
+                                <Input
+                                  value={`₹${alloc.due.toLocaleString("en-IN")}`}
+                                  readOnly
+                                  className="h-7 text-xs px-1.5 bg-muted"
+                                  data-testid={`farmer-allocation-due-${idx}`}
+                                />
+                              </div>
+                              <div className="space-y-0.5">
+                                <Label className="text-[10px] text-muted-foreground">Amount</Label>
+                                <Input
+                                  type="number" inputMode="decimal"
+                                  value={alloc.amount}
+                                  onChange={e => setFarmerAllocations(prev => prev.map((a, i) => i === idx ? { ...a, amount: e.target.value } : a))}
+                                  onFocus={e => e.target.select()}
+                                  className="h-7 text-xs px-1.5"
+                                  data-testid={`farmer-allocation-amount-${idx}`}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                        {(() => {
+                          const totalAllocated = farmerAllocations.reduce((s, a) => s + parseFloat(a.amount || "0"), 0);
+                          const totalPaid = parseFloat(outwardAmount || "0");
+                          const matched = totalPaid > 0 && Math.abs(totalAllocated - totalPaid) < 0.02;
+                          return (
+                            <div className="text-xs px-1 pt-1 border-t">
+                              <div className="flex justify-between items-center">
+                                <span className="font-medium text-muted-foreground">Allocated</span>
+                                <span className={`font-bold ${matched ? "text-green-600" : totalPaid > 0 ? "text-red-600" : ""}`}>
+                                  ₹{totalAllocated.toLocaleString("en-IN")} / ₹{totalPaid.toLocaleString("en-IN")}
+                                </span>
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
               {outwardOutflowType === "Hammali" && dueHammali > 0 && (
                 <div className="p-2 bg-amber-50 dark:bg-amber-950 rounded text-xs text-amber-700 dark:text-amber-300">
                   Total Hammali from Transactions: ₹{(txAggregates?.totalHammali || 0).toLocaleString("en-IN")} | Paid: ₹{(txAggregates?.paidHammali || 0).toLocaleString("en-IN")} | <span className="font-bold">Due: ₹{dueHammali.toLocaleString("en-IN")}</span>
@@ -1182,26 +1373,12 @@ export default function CashPage() {
                   Total Mandi Commission: ₹{(txAggregates?.totalMandiCommission || 0).toLocaleString("en-IN")} | Paid: ₹{(txAggregates?.paidMandiCommission || 0).toLocaleString("en-IN")} | <span className="font-bold">Due: ₹{dueMandi.toLocaleString("en-IN")}</span>
                 </div>
               )}
-              <div className="space-y-1">
-                <Label className="text-xs">{t("cash.amount")}</Label>
-                <Input type="number" inputMode="decimal" value={outwardAmount} onChange={e => {
-                  const val = e.target.value;
-                  if (outwardOutflowType === "Farmer-Harvest Sale" && outwardFarmerId) {
-                    const farmer = farmersWithDues.find(f => f.id === parseInt(outwardFarmerId));
-                    const maxDue = farmer ? parseFloat(farmer.totalDue) : 0;
-                    if (val && parseFloat(val) > maxDue) {
-                      setOutwardAmount(maxDue.toString());
-                      return;
-                    }
-                  }
-                  setOutwardAmount(val);
-                }} onFocus={e => e.target.select()} placeholder="0" className="h-9 text-sm" data-testid="outward-amount" />
-                {outwardOutflowType === "Farmer-Harvest Sale" && outwardFarmerId && (() => {
-                  const farmer = farmersWithDues.find(f => f.id === parseInt(outwardFarmerId));
-                  const maxDue = farmer ? parseFloat(farmer.totalDue) : 0;
-                  return maxDue > 0 ? <p className="text-[11px] text-muted-foreground">Max: ₹{maxDue.toLocaleString("en-IN")}</p> : null;
-                })()}
-              </div>
+              {outwardOutflowType !== "Farmer-Harvest Sale" && (
+                <div className="space-y-1">
+                  <Label className="text-xs">{t("cash.amount")}</Label>
+                  <Input type="number" inputMode="decimal" value={outwardAmount} onChange={e => setOutwardAmount(e.target.value)} onFocus={e => e.target.select()} placeholder="0" className="h-9 text-sm" data-testid="outward-amount" />
+                </div>
+              )}
               <div className="space-y-1">
                 <Label className="text-xs">{t("cash.paidOn")}</Label>
                 <Input type="date" value={outwardDate} onChange={e => setOutwardDate(e.target.value)} className="h-9 text-sm" data-testid="outward-date" />
