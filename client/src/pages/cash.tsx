@@ -946,7 +946,7 @@ export default function CashPage() {
                               <X className="w-3 h-3" />
                             </Button>
                           </div>
-                          <div className="grid grid-cols-[1.2fr_0.5fr_0.5fr] gap-1 max-w-[280px]">
+                          <div className="grid grid-cols-3 gap-1.5 items-end">
                             <div className="space-y-0.5">
                               <Label className="text-[10px] text-muted-foreground">Amount</Label>
                               <Input
@@ -959,10 +959,10 @@ export default function CashPage() {
                               />
                             </div>
                             <div className="space-y-0.5">
-                              <div className="flex items-center gap-0.5">
-                                <Label className="text-[10px] text-muted-foreground">Disc %</Label>
+                              <div className="flex items-center gap-0.5 truncate">
+                                <Label className="text-[10px] text-muted-foreground shrink-0">Disc %</Label>
                                 {parseFloat(alloc.discountPercent || "0") > 0 && (
-                                  <span className="text-[9px] font-medium text-orange-600">
+                                  <span className="text-[9px] font-medium text-orange-600 truncate">
                                     ₹{((parseFloat(alloc.discountPercent || "0") / 100) * alloc.due).toLocaleString("en-IN", { maximumFractionDigits: 2 })}
                                   </span>
                                 )}
