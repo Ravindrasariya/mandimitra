@@ -771,29 +771,29 @@ export default function CashPage() {
           <div className="flex gap-1 border-b pb-2">
             <Button
               variant={activeTab === "inward" ? "default" : "ghost"}
-              size="sm" className="text-xs h-8 flex-1"
+              size="sm" className="text-[11px] flex-1"
               onClick={() => setActiveTab("inward")}
               data-testid="tab-inward"
             >
-              <ArrowDownLeft className="w-3.5 h-3.5 mr-1" />
+              <ArrowDownLeft className="w-3 h-3 mr-0.5" />
               {t("cash.inwardCash")}
             </Button>
             <Button
               variant={activeTab === "outward" ? "default" : "ghost"}
-              size="sm" className="text-xs h-8 flex-1"
+              size="sm" className="text-[11px] flex-1"
               onClick={() => setActiveTab("outward")}
               data-testid="tab-outward"
             >
-              <ArrowUpRight className="w-3.5 h-3.5 mr-1" />
+              <ArrowUpRight className="w-3 h-3 mr-0.5" />
               {t("cash.outwardCash")}
             </Button>
             <Button
               variant={activeTab === "transfer" ? "default" : "ghost"}
-              size="sm" className="text-xs h-8 flex-1"
+              size="sm" className="text-[11px] flex-1"
               onClick={() => setActiveTab("transfer")}
               data-testid="tab-transfer"
             >
-              <ArrowLeftRight className="w-3.5 h-3.5 mr-1" />
+              <ArrowLeftRight className="w-3 h-3 mr-0.5" />
               {t("cash.transfer")}
             </Button>
           </div>
@@ -946,7 +946,7 @@ export default function CashPage() {
                               <X className="w-3 h-3" />
                             </Button>
                           </div>
-                          <div className="grid grid-cols-3 gap-1.5">
+                          <div className="grid grid-cols-[1fr_0.7fr_0.7fr] gap-1.5">
                             <div className="space-y-0.5">
                               <Label className="text-[10px] text-muted-foreground">Amount</Label>
                               <Input
