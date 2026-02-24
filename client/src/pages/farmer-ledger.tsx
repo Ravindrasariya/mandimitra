@@ -208,7 +208,7 @@ export default function FarmerLedgerPage() {
       if (searchName && !f.name.toLowerCase().includes(searchName.toLowerCase())) return false;
       if (searchVillage && !(f.village || "").toLowerCase().includes(searchVillage.toLowerCase())) return false;
       const dates = f.bidDates || [];
-      if (yearFilter !== "all" || selectedMonths.length > 0 || selectedDays.length > 0) {
+      if (dates.length > 0 && (yearFilter !== "all" || selectedMonths.length > 0 || selectedDays.length > 0)) {
         const hasMatchingDate = dates.some(d => {
           const [y, m, day] = d.split("-");
           if (yearFilter !== "all" && y !== yearFilter) return false;

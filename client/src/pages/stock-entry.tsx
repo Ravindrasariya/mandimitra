@@ -83,6 +83,7 @@ export default function StockEntryPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/farmers/locations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
     },
   });
 
