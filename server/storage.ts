@@ -268,17 +268,16 @@ export class DatabaseStorage implements IStorage {
       farmerList = await db.select().from(farmers).where(eq(farmers.businessId, businessId)).orderBy(asc(farmers.id));
     }
 
-    const allBidDates = await db.select({
+    const allLotDates = await db.select({
       farmerId: lots.farmerId,
-      bidDate: sql<string>`to_char(${bids.createdAt}, 'YYYY-MM-DD')`
-    }).from(bids)
-      .innerJoin(lots, eq(bids.lotId, lots.id))
-      .where(eq(bids.businessId, businessId));
+      lotDate: lots.date,
+    }).from(lots)
+      .where(eq(lots.businessId, businessId));
 
-    const bidDateMap = new Map<number, Set<string>>();
-    for (const row of allBidDates) {
-      if (!bidDateMap.has(row.farmerId)) bidDateMap.set(row.farmerId, new Set());
-      bidDateMap.get(row.farmerId)!.add(row.bidDate);
+    const lotDateMap = new Map<number, Set<string>>();
+    for (const row of allLotDates) {
+      if (!lotDateMap.has(row.farmerId)) lotDateMap.set(row.farmerId, new Set());
+      lotDateMap.get(row.farmerId)!.add(row.lotDate);
     }
 
     const results: (Farmer & { totalPayable: string; totalDue: string; salesCount: number; bidDates: string[] })[] = [];
@@ -310,13 +309,13 @@ export class DatabaseStorage implements IStorage {
 
       const totalDue = txnDue + openingDue;
 
-      const farmerBidDates = bidDateMap.get(farmer.id);
+      const farmerLotDates = lotDateMap.get(farmer.id);
       results.push({
         ...farmer,
         totalPayable: totalPayable.toFixed(2),
         totalDue: totalDue.toFixed(2),
         salesCount,
-        bidDates: farmerBidDates ? Array.from(farmerBidDates) : [],
+        bidDates: farmerLotDates ? Array.from(farmerLotDates) : [],
       });
     }
     return results;
