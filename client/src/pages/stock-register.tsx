@@ -479,14 +479,6 @@ export default function StockRegisterPage() {
     URL.revokeObjectURL(url);
   };
 
-  const getCommonValue = (lots: LotWithFarmer[], field: keyof LotWithFarmer): string | null => {
-    const values = lots.map(l => l[field]).filter(v => v != null && v !== "");
-    if (values.length === 0) return null;
-    const unique = Array.from(new Set(values.map(String)));
-    if (unique.length === 1) return unique[0];
-    return null;
-  };
-
   return (
     <div className="p-3 md:p-6 max-w-4xl mx-auto space-y-3">
       <h1 className="text-base md:text-lg font-bold flex items-center gap-2">
