@@ -458,7 +458,7 @@ export default function StockEntryPage() {
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label>Vehicle #</Label>
               <Input
@@ -481,7 +481,7 @@ export default function StockEntryPage() {
               />
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label>Driver Contact</Label>
               <Input
@@ -508,7 +508,7 @@ export default function StockEntryPage() {
               />
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label>Advance / Credit <span className="text-red-500">*</span></Label>
               <Select value={freightType} onValueChange={setFreightType}>
@@ -603,8 +603,6 @@ export default function StockEntryPage() {
                     </SelectContent>
                   </Select>
                 </div>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                 <div className="space-y-1">
                   <Label>{t("stockEntry.variety")}</Label>
                   <Input
