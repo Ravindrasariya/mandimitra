@@ -946,7 +946,7 @@ export default function CashPage() {
                               <X className="w-3 h-3" />
                             </Button>
                           </div>
-                          <div className="grid grid-cols-[1.2fr_0.5fr_0.5fr] gap-1.5 max-w-sm">
+                          <div className="grid grid-cols-[1.2fr_0.5fr_0.5fr] gap-1 max-w-[280px]">
                             <div className="space-y-0.5">
                               <Label className="text-[10px] text-muted-foreground">Amount</Label>
                               <Input
