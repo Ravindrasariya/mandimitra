@@ -175,13 +175,18 @@ export class DatabaseStorage implements IStorage {
 
   async resetBusinessData(businessId: number): Promise<void> {
     await db.delete(cashEntries).where(eq(cashEntries.businessId, businessId));
+    await db.delete(transactionEditHistory).where(eq(transactionEditHistory.businessId, businessId));
     await db.delete(transactions).where(eq(transactions.businessId, businessId));
     await db.delete(bids).where(eq(bids.businessId, businessId));
+    await db.delete(lotEditHistory).where(eq(lotEditHistory.businessId, businessId));
     await db.delete(lots).where(eq(lots.businessId, businessId));
     await db.delete(farmerEditHistory).where(eq(farmerEditHistory.businessId, businessId));
     await db.delete(farmers).where(eq(farmers.businessId, businessId));
     await db.delete(buyerEditHistory).where(eq(buyerEditHistory.businessId, businessId));
     await db.delete(buyers).where(eq(buyers.businessId, businessId));
+    await db.delete(bankAccounts).where(eq(bankAccounts.businessId, businessId));
+    await db.delete(cashSettings).where(eq(cashSettings.businessId, businessId));
+    await db.delete(businessChargeSettings).where(eq(businessChargeSettings.businessId, businessId));
   }
 
   async getFarmers(businessId: number, search?: string): Promise<Farmer[]> {
