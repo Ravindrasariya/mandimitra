@@ -81,7 +81,7 @@ export default function CashPage() {
   const [outwardPaymentMode, setOutwardPaymentMode] = useState("Cash");
   const [outwardBankAccountId, setOutwardBankAccountId] = useState("");
   const [outwardNotes, setOutwardNotes] = useState("");
-  const [farmerAllocations, setFarmerAllocations] = useState<{ txnId: number | null; txnLabel: string; serialNumber: number; date: string; numberOfBags: number; crop: string; due: number; amount: string }[]>([]);
+  const [farmerAllocations, setFarmerAllocations] = useState<{ groupKey: string; txnLabel: string; serialNumber: number; date: string; numberOfBags: number; crops: string; due: number; amount: string; transactionIds: { id: number; due: number }[] }[]>([]);
   const [farmerAllocationSearch, setFarmerAllocationSearch] = useState("");
   const [farmerAllocationDropdownOpen, setFarmerAllocationDropdownOpen] = useState(false);
   const farmerAllocationDropdownRef = useRef<HTMLDivElement>(null);
@@ -144,7 +144,7 @@ export default function CashPage() {
     enabled: inwardPartyType === "Buyer" && !!inwardBuyerId,
   });
 
-  type FarmerPendingTxn = { id: number; transactionId: string; serialNumber: number; date: string; numberOfBags: number; crop: string; totalPayableToFarmer: string; farmerPaidAmount: string; due: string; bidCreatedAt: string };
+  type FarmerPendingTxn = { groupKey: string; serialNumber: number; date: string; numberOfBags: number; crops: string; totalPayableToFarmer: string; farmerPaidAmount: string; due: string; transactionIds: { id: number; due: number }[] };
   const { data: farmerPendingTransactions = [] } = useQuery<FarmerPendingTxn[]>({
     queryKey: ["/api/farmers", outwardFarmerId, "pending-transactions"],
     queryFn: () => outwardFarmerId ? fetch(`/api/farmers/${outwardFarmerId}/pending-transactions`, { credentials: "include" }).then(r => r.json()) : Promise.resolve([]),
@@ -476,7 +476,8 @@ export default function CashPage() {
         bankAccountId: outwardPaymentMode !== "Cash" ? parseInt(outwardBankAccountId) : null,
         notes: outwardNotes || null,
         allocations: farmerAllocations.map(a => ({
-          transactionId: a.txnId,
+          transactionIds: a.transactionIds.length > 0 ? a.transactionIds : undefined,
+          transactionId: a.transactionIds.length === 0 ? null : undefined,
           amount: a.amount || "0",
           discount: "0",
           pettyAdj: "0",
@@ -1249,39 +1250,40 @@ export default function CashPage() {
                         />
                       </div>
                       {farmerAllocationDropdownOpen && (() => {
-                        const selectedIds = new Set(farmerAllocations.map(a => a.txnId));
-                        const available = farmerPendingTransactions.filter(pt => !selectedIds.has(pt.id));
+                        const selectedKeys = new Set(farmerAllocations.map(a => a.groupKey));
+                        const available = farmerPendingTransactions.filter(pt => !selectedKeys.has(pt.groupKey));
                         const filtered = available.filter(pt => {
                           if (!farmerAllocationSearch) return true;
                           const s = farmerAllocationSearch.toLowerCase();
-                          return String(pt.serialNumber).includes(s) || pt.date.toLowerCase().includes(s) || (pt.crop || "").toLowerCase().includes(s);
+                          return String(pt.serialNumber).includes(s) || pt.date.toLowerCase().includes(s) || (pt.crops || "").toLowerCase().includes(s);
                         });
                         if (filtered.length === 0) return null;
                         return (
                           <div className="absolute z-50 w-full mt-1 max-h-48 overflow-y-auto bg-popover border rounded-md shadow-lg">
                             {filtered.map(pt => (
                               <div
-                                key={pt.id}
+                                key={pt.groupKey}
                                 className="px-3 py-2 hover:bg-accent cursor-pointer text-xs border-b last:border-b-0"
                                 onClick={() => {
                                   setFarmerAllocations(prev => [...prev, {
-                                    txnId: pt.id === 0 ? null : pt.id,
-                                    txnLabel: pt.transactionId === "PY_OPENING" ? "PY Opening Balance" : `SR #${pt.serialNumber}`,
+                                    groupKey: pt.groupKey,
+                                    txnLabel: pt.groupKey === "PY_OPENING" ? "PY Opening Balance" : `SR #${pt.serialNumber}`,
                                     serialNumber: pt.serialNumber,
                                     date: pt.date,
                                     numberOfBags: pt.numberOfBags,
-                                    crop: pt.crop,
+                                    crops: pt.crops,
                                     due: parseFloat(pt.due),
                                     amount: pt.due,
+                                    transactionIds: pt.transactionIds,
                                   }]);
                                   setFarmerAllocationSearch("");
                                   setFarmerAllocationDropdownOpen(false);
                                 }}
-                                data-testid={`farmer-allocation-option-${pt.id}`}
+                                data-testid={`farmer-allocation-option-${pt.groupKey}`}
                               >
                                 <div className="flex justify-between">
                                   <span className="font-medium">
-                                    {pt.transactionId === "PY_OPENING" ? "PY Opening Balance" : `SR #${pt.serialNumber} | ${pt.crop}`}
+                                    {pt.groupKey === "PY_OPENING" ? "PY Opening Balance" : `SR #${pt.serialNumber}${pt.crops ? ` | ${pt.crops}` : ""}`}
                                   </span>
                                   <span className="text-orange-600 font-semibold">₹{parseFloat(pt.due).toLocaleString("en-IN")}</span>
                                 </div>
@@ -1298,13 +1300,13 @@ export default function CashPage() {
                     {farmerAllocations.length > 0 && (
                       <div className="space-y-2">
                         {farmerAllocations.map((alloc, idx) => (
-                          <div key={`${alloc.txnId}-${idx}`} className="bg-muted/60 rounded-lg p-2.5 space-y-2" data-testid={`farmer-allocation-row-${idx}`}>
+                          <div key={`${alloc.groupKey}-${idx}`} className="bg-muted/60 rounded-lg p-2.5 space-y-2" data-testid={`farmer-allocation-row-${idx}`}>
                             <div className="flex items-center justify-between">
                               <div className="flex flex-wrap items-center gap-1.5 text-xs">
                                 <Badge variant="secondary" className="text-[10px]">{alloc.txnLabel}</Badge>
                                 <span className="text-muted-foreground">{alloc.date}</span>
                                 {alloc.numberOfBags > 0 && <span>{alloc.numberOfBags} bags</span>}
-                                {alloc.crop && <span className="text-muted-foreground">{alloc.crop}</span>}
+                                {alloc.crops && <span className="text-muted-foreground">{alloc.crops}</span>}
                               </div>
                               <Button
                                 variant="ghost" size="icon" className="h-5 w-5 shrink-0"

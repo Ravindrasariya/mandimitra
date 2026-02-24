@@ -864,12 +864,37 @@ export async function registerRoutes(
       const isFarmerOutward = allocations && Array.isArray(allocations) && allocations.length > 0 && data.category === "outward" && data.farmerId;
 
       if (isBuyerInward || isFarmerOutward) {
-        const entries = await storage.createCashEntryBatch(data, allocations.map((a: any) => ({
-          transactionId: a.transactionId || null,
-          amount: String(a.amount || "0"),
-          discount: String(a.discount || "0"),
-          pettyAdj: String(a.pettyAdj || "0"),
-        })));
+        const expandedAllocations: { transactionId: number | null; amount: string; discount: string; pettyAdj: string }[] = [];
+        for (const a of allocations) {
+          if (a.transactionIds && Array.isArray(a.transactionIds) && a.transactionIds.length > 0) {
+            const groupAmount = parseFloat(a.amount || "0");
+            const txnDues = a.transactionIds as { id: number; due: number }[];
+            const totalDue = txnDues.reduce((s: number, t: { due: number }) => s + t.due, 0);
+            if (totalDue <= 0 || groupAmount <= 0) continue;
+            let remaining = groupAmount;
+            for (let i = 0; i < txnDues.length; i++) {
+              const isLast = i === txnDues.length - 1;
+              const share = isLast ? remaining : Math.round((txnDues[i].due / totalDue) * groupAmount * 100) / 100;
+              if (share > 0) {
+                expandedAllocations.push({
+                  transactionId: txnDues[i].id,
+                  amount: share.toFixed(2),
+                  discount: "0",
+                  pettyAdj: "0",
+                });
+                remaining = Math.round((remaining - share) * 100) / 100;
+              }
+            }
+          } else {
+            expandedAllocations.push({
+              transactionId: a.transactionId || null,
+              amount: String(a.amount || "0"),
+              discount: String(a.discount || "0"),
+              pettyAdj: String(a.pettyAdj || "0"),
+            });
+          }
+        }
+        const entries = await storage.createCashEntryBatch(data, expandedAllocations);
         res.status(201).json(entries);
       } else {
         const entry = await storage.createCashEntry(data);

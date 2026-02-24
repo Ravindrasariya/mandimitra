@@ -734,25 +734,73 @@ export class DatabaseStorage implements IStorage {
       ))
       .orderBy(transactions.date, transactions.id);
 
-    const pendingTxns = results
+    const txnItems = results
       .map(r => {
         const payable = parseFloat(r.transaction.totalPayableToFarmer || "0");
         const paid = parseFloat(r.transaction.farmerPaidAmount || "0");
         const due = payable - paid;
         return {
           id: r.transaction.id,
-          transactionId: r.transaction.transactionId,
           serialNumber: r.lot.serialNumber,
           date: r.transaction.date,
           numberOfBags: r.transaction.numberOfBags,
           crop: r.lot.crop,
-          totalPayableToFarmer: r.transaction.totalPayableToFarmer,
-          farmerPaidAmount: r.transaction.farmerPaidAmount,
-          due: due.toFixed(2),
-          bidCreatedAt: r.bid.createdAt,
+          totalPayableToFarmer: payable,
+          farmerPaidAmount: paid,
+          due,
         };
       })
-      .filter(t => parseFloat(t.due) > 0);
+      .filter(t => t.due > 0.005);
+
+    const grouped: Record<string, {
+      serialNumber: number;
+      date: string;
+      crops: string[];
+      totalBags: number;
+      totalPayable: number;
+      totalPaid: number;
+      totalDue: number;
+      transactionIds: { id: number; due: number }[];
+    }> = {};
+
+    for (const t of txnItems) {
+      const key = `${t.serialNumber}_${t.date || ""}`;
+      if (!grouped[key]) {
+        grouped[key] = {
+          serialNumber: t.serialNumber,
+          date: t.date || "",
+          crops: [],
+          totalBags: 0,
+          totalPayable: 0,
+          totalPaid: 0,
+          totalDue: 0,
+          transactionIds: [],
+        };
+      }
+      const g = grouped[key];
+      if (t.crop && !g.crops.includes(t.crop)) g.crops.push(t.crop);
+      g.totalBags += t.numberOfBags || 0;
+      g.totalPayable += t.totalPayableToFarmer;
+      g.totalPaid += t.farmerPaidAmount;
+      g.totalDue += t.due;
+      g.transactionIds.push({ id: t.id, due: t.due });
+    }
+
+    const pendingGroups = Object.values(grouped)
+      .filter(g => g.totalDue > 0.005)
+      .map(g => ({
+        groupKey: `${g.serialNumber}_${g.date}`,
+        serialNumber: g.serialNumber,
+        date: g.date,
+        crops: g.crops.join(", "),
+        numberOfBags: g.totalBags,
+        totalPayableToFarmer: g.totalPayable.toFixed(2),
+        farmerPaidAmount: g.totalPaid.toFixed(2),
+        due: g.totalDue.toFixed(2),
+        transactionIds: g.transactionIds,
+      }));
+
+    pendingGroups.sort((a, b) => a.date.localeCompare(b.date) || a.serialNumber - b.serialNumber);
 
     const farmer = await this.getFarmer(farmerId, businessId);
     const openingBal = parseFloat(farmer?.openingBalance || "0");
@@ -769,22 +817,21 @@ export class DatabaseStorage implements IStorage {
       const paidTowardsOpening = parseFloat(totalCashEntries[0]?.total || "0");
       const openingDue = Math.max(0, openingBal - paidTowardsOpening);
       if (openingDue > 0) {
-        pendingTxns.unshift({
-          id: 0,
-          transactionId: "PY_OPENING",
+        pendingGroups.unshift({
+          groupKey: "PY_OPENING",
           serialNumber: 0,
           date: "Previous Year",
+          crops: "",
           numberOfBags: 0,
-          crop: "",
           totalPayableToFarmer: openingBal.toFixed(2),
           farmerPaidAmount: paidTowardsOpening.toFixed(2),
           due: openingDue.toFixed(2),
-          bidCreatedAt: new Date(0),
+          transactionIds: [],
         });
       }
     }
 
-    return pendingTxns;
+    return pendingGroups;
   }
 
   async getTransaction(id: number, businessId: number): Promise<(Transaction & { farmer: Farmer; buyer: Buyer; lot: Lot; bid: Bid }) | undefined> {
