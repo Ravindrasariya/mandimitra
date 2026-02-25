@@ -18,8 +18,9 @@ import TransactionsPage from "@/pages/transactions";
 import CashPage from "@/pages/cash";
 import FarmerLedgerPage from "@/pages/farmer-ledger";
 import BuyerLedgerPage from "@/pages/buyer-ledger";
+import DemoVideosPage from "@/pages/demo-videos";
 import {
-  LayoutDashboard, Package, ClipboardList, Gavel, Receipt, Wallet, Users, ShoppingBag, LogOut, Wheat, Menu, ChevronLeft, ChevronRight, Globe, Phone, UserCircle,
+  LayoutDashboard, Package, ClipboardList, Gavel, Receipt, Wallet, Users, ShoppingBag, LogOut, Wheat, Menu, ChevronLeft, ChevronRight, Globe, Phone, UserCircle, PlayCircle,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -36,6 +37,7 @@ const navItems = [
   { path: "/cash", labelKey: "nav.cash", icon: Wallet, shortLabelKey: "nav.cash", testId: "cash" },
   { path: "/farmer-ledger", labelKey: "nav.farmerLedger", icon: Users, shortLabelKey: "nav.farmers", testId: "farmers" },
   { path: "/buyer-ledger", labelKey: "nav.buyerLedger", icon: ShoppingBag, shortLabelKey: "nav.buyers", testId: "buyers" },
+  { path: "/demo-videos", labelKey: "nav.demoVideos", icon: PlayCircle, shortLabelKey: "nav.demos", testId: "demos" },
 ];
 
 function LanguageToggle({ compact }: { compact?: boolean }) {
@@ -290,6 +292,7 @@ function AppLayout() {
             <Route path="/cash" component={CashPage} />
             <Route path="/farmer-ledger" component={FarmerLedgerPage} />
             <Route path="/buyer-ledger" component={BuyerLedgerPage} />
+            <Route path="/demo-videos" component={DemoVideosPage} />
             <Route component={NotFound} />
           </Switch>
         </main>

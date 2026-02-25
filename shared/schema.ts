@@ -289,6 +289,20 @@ export type InsertCashSettings = z.infer<typeof insertCashSettingsSchema>;
 export type CashEntry = typeof cashEntries.$inferSelect;
 export type InsertCashEntry = z.infer<typeof insertCashEntrySchema>;
 
+export const demoVideos = pgTable("demo_videos", {
+  id: serial("id").primaryKey(),
+  filename: text("filename").notNull(),
+  originalName: text("original_name").notNull(),
+  caption: text("caption").notNull(),
+  mimeType: text("mime_type").notNull(),
+  fileSize: integer("file_size").notNull(),
+  uploadedAt: timestamp("uploaded_at").defaultNow().notNull(),
+});
+
+export const insertDemoVideoSchema = createInsertSchema(demoVideos).omit({ id: true, uploadedAt: true });
+export type DemoVideo = typeof demoVideos.$inferSelect;
+export type InsertDemoVideo = z.infer<typeof insertDemoVideoSchema>;
+
 export const DISTRICTS = [
   "Agar Malwa", "Dewas", "Dhar", "Indore", "Jhabua", "Khargoan",
   "Mandsaur", "Neemuch", "Rajgarh", "Ratlam", "Sagar", "Shajapur", "Ujjain"

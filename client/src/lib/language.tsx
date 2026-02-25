@@ -58,6 +58,8 @@ const translations: Record<string, Record<Language, string>> = {
   "nav.txns": { en: "Txns", hi: "लेनदेन" },
   "nav.farmers": { en: "Farmers", hi: "किसान" },
   "nav.buyers": { en: "Buyers", hi: "खरीदार" },
+  "nav.demoVideos": { en: "Demo Videos", hi: "डेमो वीडियो" },
+  "nav.demos": { en: "Demos", hi: "डेमो" },
   "nav.more": { en: "More", hi: "और" },
   "nav.logout": { en: "Logout", hi: "लॉगआउट" },
   "nav.profile": { en: "Profile", hi: "प्रोफ़ाइल" },
@@ -372,6 +374,16 @@ const translations: Record<string, Record<Language, string>> = {
 
   "language.english": { en: "English", hi: "English" },
   "language.hindi": { en: "हिंदी", hi: "हिंदी" },
+
+  "demoVideos.title": { en: "Demo Videos", hi: "डेमो वीडियो" },
+  "demoVideos.subtitle": { en: "Watch demo videos to learn how to use the app", hi: "ऐप का उपयोग सीखने के लिए डेमो वीडियो देखें" },
+  "demoVideos.noVideos": { en: "No demo videos available yet", hi: "अभी कोई डेमो वीडियो उपलब्ध नहीं है" },
+  "demoVideos.upload": { en: "Upload Video", hi: "वीडियो अपलोड करें" },
+  "demoVideos.caption": { en: "Caption", hi: "शीर्षक" },
+  "demoVideos.captionPlaceholder": { en: "Enter video caption", hi: "वीडियो शीर्षक दर्ज करें" },
+  "demoVideos.uploading": { en: "Uploading...", hi: "अपलोड हो रहा है..." },
+  "demoVideos.deleteConfirm": { en: "Delete this video?", hi: "यह वीडियो हटाएं?" },
+  "demoVideos.manageVideos": { en: "Upload and manage demo videos for users", hi: "उपयोगकर्ताओं के लिए डेमो वीडियो अपलोड और प्रबंधित करें" },
 };
 
 type LanguageContextType = {

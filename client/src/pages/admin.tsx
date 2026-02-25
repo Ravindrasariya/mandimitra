@@ -17,9 +17,9 @@ import {
 } from "@/components/ui/select";
 import {
   Building2, Users as UsersIcon, Plus, Search, Pencil, Power, Archive, RotateCcw,
-  Trash2, KeyRound, LogOut, AlertTriangle,
+  Trash2, KeyRound, LogOut, AlertTriangle, PlayCircle, Upload, X,
 } from "lucide-react";
-import type { Business, User } from "@shared/schema";
+import type { Business, User, DemoVideo } from "@shared/schema";
 
 type SafeUser = Omit<User, "password"> & { business: Business };
 
@@ -33,7 +33,7 @@ function StatusBadge({ status }: { status: string }) {
 export default function AdminPage() {
   const { logout } = useAuth();
   const { t } = useLanguage();
-  const [tab, setTab] = useState<"merchants" | "users">("merchants");
+  const [tab, setTab] = useState<"merchants" | "users" | "videos">("merchants");
 
   return (
     <div className="min-h-screen bg-background">
@@ -65,9 +65,17 @@ export default function AdminPage() {
           >
             <UsersIcon className="w-4 h-4 mr-1" /> {t("admin.users")}
           </Button>
+          <Button
+            variant={tab === "videos" ? "default" : "outline"}
+            size="sm"
+            data-testid="tab-videos"
+            onClick={() => setTab("videos")}
+          >
+            <PlayCircle className="w-4 h-4 mr-1" /> {t("demoVideos.title")}
+          </Button>
         </div>
 
-        {tab === "merchants" ? <MerchantsTab /> : <UsersTab />}
+        {tab === "merchants" ? <MerchantsTab /> : tab === "users" ? <UsersTab /> : <DemoVideosTab />}
       </div>
     </div>
   );
@@ -818,6 +826,176 @@ function EditUserDialog({ user, businesses, onClose, onSubmit, isPending }: {
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function DemoVideosTab() {
+  const { toast } = useToast();
+  const { t } = useLanguage();
+  const [caption, setCaption] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+  const [editingVideo, setEditingVideo] = useState<DemoVideo | null>(null);
+  const [editCaption, setEditCaption] = useState("");
+  const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null);
+
+  const { data: videos = [], isLoading } = useQuery<DemoVideo[]>({
+    queryKey: ["/api/demo-videos"],
+  });
+
+  const handleUpload = async (file: File) => {
+    if (!caption.trim()) {
+      toast({ title: "Caption is required", variant: "destructive" });
+      return;
+    }
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("video", file);
+      formData.append("caption", caption.trim());
+      const res = await fetch("/api/admin/demo-videos", { method: "POST", body: formData, credentials: "include" });
+      if (!res.ok) { const e = await res.json(); throw new Error(e.message); }
+      queryClient.invalidateQueries({ queryKey: ["/api/demo-videos"] });
+      setCaption("");
+      toast({ title: "Video uploaded successfully" });
+    } catch (e: any) {
+      toast({ title: e.message || "Upload failed", variant: "destructive" });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    try {
+      const res = await fetch(`/api/admin/demo-videos/${id}`, { method: "DELETE", credentials: "include" });
+      if (!res.ok) throw new Error("Delete failed");
+      queryClient.invalidateQueries({ queryKey: ["/api/demo-videos"] });
+      setDeleteConfirmId(null);
+      toast({ title: "Video deleted" });
+    } catch (e: any) {
+      toast({ title: e.message, variant: "destructive" });
+    }
+  };
+
+  const handleEditCaption = async () => {
+    if (!editingVideo || !editCaption.trim()) return;
+    try {
+      await apiRequest("PATCH", `/api/admin/demo-videos/${editingVideo.id}`, { caption: editCaption.trim() });
+      queryClient.invalidateQueries({ queryKey: ["/api/demo-videos"] });
+      setEditingVideo(null);
+      toast({ title: "Caption updated" });
+    } catch (e: any) {
+      toast({ title: e.message, variant: "destructive" });
+    }
+  };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  return (
+    <div>
+      <p className="text-sm text-muted-foreground mb-4">{t("demoVideos.manageVideos")}</p>
+
+      <Card className="mb-6">
+        <CardContent className="p-4 space-y-3">
+          <div className="space-y-2">
+            <Label>{t("demoVideos.caption")} *</Label>
+            <Input
+              data-testid="input-video-caption"
+              value={caption}
+              onChange={(e) => setCaption(e.target.value)}
+              placeholder={t("demoVideos.captionPlaceholder")}
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="file"
+              accept="video/*"
+              id="video-upload-input"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (file) handleUpload(file);
+                e.target.value = "";
+              }}
+              data-testid="input-video-file"
+            />
+            <Button
+              disabled={isUploading || !caption.trim()}
+              onClick={() => document.getElementById("video-upload-input")?.click()}
+              data-testid="button-upload-video"
+            >
+              <Upload className="w-4 h-4 mr-1" />
+              {isUploading ? t("demoVideos.uploading") : t("demoVideos.upload")}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {isLoading ? (
+        <div className="text-center py-8 text-muted-foreground">{t("app.loading")}</div>
+      ) : videos.length === 0 ? (
+        <div className="text-center py-8 text-muted-foreground">{t("demoVideos.noVideos")}</div>
+      ) : (
+        <div className="space-y-3">
+          {videos.map((video) => (
+            <Card key={video.id} data-testid={`admin-video-${video.id}`}>
+              <CardContent className="p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm">{video.caption}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {video.originalName} &middot; {formatFileSize(video.fileSize)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setEditingVideo(video); setEditCaption(video.caption); }} data-testid={`button-edit-video-${video.id}`}>
+                      <Pencil className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => setDeleteConfirmId(video.id)} data-testid={`button-delete-video-${video.id}`}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      <Dialog open={!!editingVideo} onOpenChange={() => setEditingVideo(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Edit Caption</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <Input
+              data-testid="input-edit-video-caption"
+              value={editCaption}
+              onChange={(e) => setEditCaption(e.target.value)}
+              placeholder={t("demoVideos.captionPlaceholder")}
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setEditingVideo(null)}>{t("common.cancel")}</Button>
+              <Button onClick={handleEditCaption} disabled={!editCaption.trim()} data-testid="button-save-video-caption">{t("common.save")}</Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!deleteConfirmId} onOpenChange={() => setDeleteConfirmId(null)}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{t("demoVideos.deleteConfirm")}</DialogTitle>
+          </DialogHeader>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setDeleteConfirmId(null)}>{t("common.cancel")}</Button>
+            <Button variant="destructive" onClick={() => deleteConfirmId && handleDelete(deleteConfirmId)} data-testid="button-confirm-delete-video">{t("common.delete")}</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }
 

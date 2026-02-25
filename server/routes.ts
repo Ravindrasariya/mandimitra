@@ -4,6 +4,27 @@ import { z } from "zod";
 import { storage } from "./storage";
 import { setupAuth, requireAuth, requireAdmin, hashPassword, comparePasswords } from "./auth";
 import { format } from "date-fns";
+import multer from "multer";
+import path from "path";
+import fs from "fs";
+
+const uploadsDir = path.join(process.cwd(), "uploads");
+if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+const videoUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadsDir),
+    filename: (_req, file, cb) => {
+      const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1e9)}${path.extname(file.originalname)}`;
+      cb(null, uniqueName);
+    },
+  }),
+  fileFilter: (_req, file, cb) => {
+    if (file.mimetype.startsWith("video/")) cb(null, true);
+    else cb(new Error("Only video files are allowed"));
+  },
+  limits: { fileSize: 200 * 1024 * 1024 },
+});
 
 function paramId(val: string | string[]): number {
   return parseInt(Array.isArray(val) ? val[0] : val);
@@ -1028,6 +1049,119 @@ export async function registerRoutes(
         })),
         txAggregates,
       });
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  // Demo Videos
+  app.post("/api/admin/demo-videos", requireAdmin, videoUpload.single("video"), async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ message: "No video file uploaded" });
+      const caption = req.body.caption || "Demo Video";
+      const { db } = await import("./db");
+      const { demoVideos } = await import("@shared/schema");
+      const [video] = await db.insert(demoVideos).values({
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        caption,
+        mimeType: req.file.mimetype,
+        fileSize: req.file.size,
+      }).returning();
+      res.json(video);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  app.get("/api/demo-videos", requireAuth, async (_req, res) => {
+    try {
+      const { db } = await import("./db");
+      const { demoVideos } = await import("@shared/schema");
+      const { desc } = await import("drizzle-orm");
+      const videos = await db.select({
+        id: demoVideos.id,
+        caption: demoVideos.caption,
+        originalName: demoVideos.originalName,
+        mimeType: demoVideos.mimeType,
+        fileSize: demoVideos.fileSize,
+        uploadedAt: demoVideos.uploadedAt,
+      }).from(demoVideos).orderBy(desc(demoVideos.uploadedAt));
+      res.json(videos);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  app.get("/api/demo-videos/:id/stream", requireAuth, async (req, res) => {
+    try {
+      const { db } = await import("./db");
+      const { demoVideos } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      const [video] = await db.select().from(demoVideos).where(eq(demoVideos.id, paramId(req.params.id)));
+      if (!video) return res.status(404).json({ message: "Video not found" });
+
+      const filePath = path.join(uploadsDir, video.filename);
+      if (!fs.existsSync(filePath)) return res.status(404).json({ message: "Video file not found" });
+
+      const stat = fs.statSync(filePath);
+      const fileSize = stat.size;
+      const range = req.headers.range;
+
+      if (range) {
+        const parts = range.replace(/bytes=/, "").split("-");
+        const start = parseInt(parts[0], 10);
+        const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+        const chunkSize = end - start + 1;
+        const stream = fs.createReadStream(filePath, { start, end });
+        res.writeHead(206, {
+          "Content-Range": `bytes ${start}-${end}/${fileSize}`,
+          "Accept-Ranges": "bytes",
+          "Content-Length": chunkSize,
+          "Content-Type": video.mimeType,
+        });
+        stream.pipe(res);
+      } else {
+        res.writeHead(200, {
+          "Content-Length": fileSize,
+          "Content-Type": video.mimeType,
+          "Accept-Ranges": "bytes",
+        });
+        fs.createReadStream(filePath).pipe(res);
+      }
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  app.patch("/api/admin/demo-videos/:id", requireAdmin, async (req, res) => {
+    try {
+      const { caption } = req.body;
+      if (!caption) return res.status(400).json({ message: "Caption is required" });
+      const { db } = await import("./db");
+      const { demoVideos } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      const [updated] = await db.update(demoVideos).set({ caption }).where(eq(demoVideos.id, paramId(req.params.id))).returning();
+      if (!updated) return res.status(404).json({ message: "Video not found" });
+      res.json(updated);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  app.delete("/api/admin/demo-videos/:id", requireAdmin, async (req, res) => {
+    try {
+      const { db } = await import("./db");
+      const { demoVideos } = await import("@shared/schema");
+      const { eq } = await import("drizzle-orm");
+      const [video] = await db.select().from(demoVideos).where(eq(demoVideos.id, paramId(req.params.id)));
+      if (!video) return res.status(404).json({ message: "Video not found" });
+
+      const filePath = path.join(uploadsDir, video.filename);
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+
+      await db.delete(demoVideos).where(eq(demoVideos.id, video.id));
+      res.json({ success: true });
     } catch (e: any) {
       res.status(400).json({ message: e.message });
     }

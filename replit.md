@@ -18,6 +18,7 @@ Mandi Mitra is a multi-tenant agricultural commodity trading management system t
 2. **Admin Panel** - System admin manages merchants (businesses) and users
    - Merchants: Add, edit, activate/deactivate, archive, reset (wipe user data)
    - Users: Add, edit, reset password, delete
+   - Demo Videos: Upload multiple videos with captions, edit captions, delete videos
    - Business status controls: inactive/archived prevents user login
    - Merchant ID format: BU + YYYYMMDD + sequence (e.g., BU202602131)
    - Default user password: password123
@@ -67,6 +68,7 @@ client/src/
     cash.tsx           - Cash management
     farmer-ledger.tsx  - Farmer ledger (tabular view with summary cards, filters, edit/merge/archive)
     buyer-ledger.tsx   - Buyer ledger view
+    demo-videos.tsx    - Demo videos gallery for users
 ```
 
 ## Authentication
@@ -86,7 +88,7 @@ client/src/
 ## Database
 - PostgreSQL with Drizzle ORM
 - Schema push: `npm run db:push`
-- Tables: businesses, users, farmers, farmer_edit_history, buyers, buyer_edit_history, lot_edit_history, transaction_edit_history, lots, bids, transactions, bank_accounts, cash_settings, cash_entries, business_charge_settings
+- Tables: businesses, users, farmers, farmer_edit_history, buyers, buyer_edit_history, lot_edit_history, transaction_edit_history, lots, bids, transactions, bank_accounts, cash_settings, cash_entries, business_charge_settings, demo_videos
 - LotEditHistory: tracks lot field changes (numberOfBags, actualNumberOfBags, crop, variety, size, bagMarka, vehicleNumber, vehicleBhadaRate, initialTotalWeight) with old/new values, changedBy, timestamp
 - TransactionEditHistory: tracks transaction lifecycle (created, reversed) and field changes (totalWeight, extraCharges, etc.) with old/new values, changedBy username, timestamp
 - Farmer fields: farmerId (auto-generated FM+YYYYMMDD+seq, unique per business), name, phone, village, tehsil, district, state, openingBalance, redFlag (business-level red flag warning — indicates caution, not related to credit/debit), isArchived
