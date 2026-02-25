@@ -1055,23 +1055,31 @@ export async function registerRoutes(
   });
 
   // Demo Videos
-  app.post("/api/admin/demo-videos", requireAdmin, videoUpload.single("video"), async (req, res) => {
-    try {
-      if (!req.file) return res.status(400).json({ message: "No video file uploaded" });
-      const caption = req.body.caption || "Demo Video";
-      const { db } = await import("./db");
-      const { demoVideos } = await import("@shared/schema");
-      const [video] = await db.insert(demoVideos).values({
-        filename: req.file.filename,
-        originalName: req.file.originalname,
-        caption,
-        mimeType: req.file.mimetype,
-        fileSize: req.file.size,
-      }).returning();
-      res.json(video);
-    } catch (e: any) {
-      res.status(400).json({ message: e.message });
-    }
+  app.post("/api/admin/demo-videos", requireAdmin, (req, res) => {
+    videoUpload.single("video")(req, res, async (err) => {
+      if (err) {
+        console.error("Multer upload error:", err);
+        return res.status(400).json({ message: err.message || "Upload failed" });
+      }
+      try {
+        if (!req.file) return res.status(400).json({ message: "No video file uploaded" });
+        console.log(`Video upload received: ${req.file.originalname} (${(req.file.size / 1024 / 1024).toFixed(1)} MB)`);
+        const caption = req.body.caption || "Demo Video";
+        const { db } = await import("./db");
+        const { demoVideos } = await import("@shared/schema");
+        const [video] = await db.insert(demoVideos).values({
+          filename: req.file.filename,
+          originalName: req.file.originalname,
+          caption,
+          mimeType: req.file.mimetype,
+          fileSize: req.file.size,
+        }).returning();
+        res.json(video);
+      } catch (e: any) {
+        console.error("Video save error:", e);
+        res.status(400).json({ message: e.message });
+      }
+    });
   });
 
   app.get("/api/demo-videos", requireAuth, async (_req, res) => {
