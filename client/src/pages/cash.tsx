@@ -594,7 +594,7 @@ export default function CashPage() {
   const downloadCSV = () => {
     const rows = filteredEntries.map(e => ({
       "Cash Flow ID": e.cashFlowId || "",
-      "Date": e.date,
+      "Date": format(new Date(e.createdAt), "dd/MM/yyyy HH:mm:ss"),
       "Category": e.category,
       "Outflow Type": e.outflowType || "",
       "Receiver/Party": e.partyName || (e.buyerId ? getBuyerName(e.buyerId) : e.farmerId ? getFarmerName(e.farmerId) : ""),
@@ -1508,7 +1508,7 @@ export default function CashPage() {
                           {entry.isReversed && <Badge variant="destructive" className="text-[10px]">Reversed</Badge>}
                         </div>
                         <div className="flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
-                          <span>{entry.date}</span>
+                          <span>{format(new Date(entry.createdAt), "dd/MM/yyyy HH:mm:ss")}</span>
                           <Badge variant="outline" className="text-[10px] h-4">{entry.paymentMode}</Badge>
                           {entry.outflowType && entry.category === "outward" && (
                             <span className="text-muted-foreground">{entry.outflowType}</span>
@@ -1554,7 +1554,7 @@ export default function CashPage() {
           {detailEntry && (
             <div className="space-y-2 text-sm">
               <div className="flex justify-between"><span className="text-muted-foreground">Cash Flow ID</span><span className="font-medium">{detailEntry.cashFlowId || "N/A"}</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">{t("common.date")}</span><span>{detailEntry.date}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">{t("common.date")}</span><span>{format(new Date(detailEntry.createdAt), "dd/MM/yyyy HH:mm:ss")}</span></div>
               <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.category")}</span>{getCategoryBadge(detailEntry)}</div>
               {detailEntry.outflowType && <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.outflowType")}</span><span>{detailEntry.outflowType}</span></div>}
               {detailEntry.partyName && <div className="flex justify-between"><span className="text-muted-foreground">Receiver</span><span>{detailEntry.partyName}</span></div>}
