@@ -41,7 +41,7 @@ export default function DemoVideosPage() {
       ) : (
         <div className="space-y-5">
           {videos.map((video) => (
-            <Card key={video.id} data-testid={`card-demo-video-${video.id}`}>
+            <Card key={video.id} className="max-w-lg" data-testid={`card-demo-video-${video.id}`}>
               <CardContent className="p-0">
                 <div className="px-3 py-2 border-b">
                   <span className="text-sm font-medium" data-testid={`text-video-caption-${video.id}`}>{video.caption}</span>
@@ -49,7 +49,7 @@ export default function DemoVideosPage() {
                 <video
                   controls
                   preload="metadata"
-                  className="w-full"
+                  className="w-full max-h-[50vh]"
                   data-testid={`video-player-${video.id}`}
                 >
                   <source src={`/api/demo-videos/${video.id}/stream`} type={video.mimeType} />
