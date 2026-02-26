@@ -41,8 +41,9 @@ Mandi Mitra is a multi-tenant agricultural commodity trading management system t
 4. **Bidding** - Lots grouped by serial number, "All" default for Crop and Size filters, bids target individual lots
 5. **Transactions** - Calculate net weight, commissions (aadhat + mandi), payable/receivable amounts
 6. **Cash Management** - Track Cash In (from buyers) and Cash Out (to farmers) with payment modes
-7. **Farmer Ledger** - Opening balance, transactions, payments, current dues
-8. **Buyer Ledger** - Same structure for buyer tracking
+7. **Farmer Ledger** - Opening balance, transactions, payments, current dues, edit/merge/archive
+8. **Buyer Ledger** - Same structure for buyer tracking, edit/merge/archive
+   - Buyer merge: On edit, if name+phone matches another buyer, prompts to merge (keeps lower ID, transfers all bids/transactions/cash entries/edit history, combines opening balances, deletes duplicate)
 
 ## Project Structure
 ```

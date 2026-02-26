@@ -333,6 +333,27 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/buyers/check-duplicate", requireAuth, async (req, res) => {
+    const { name, phone, excludeId } = req.body;
+    const allBuyers = await storage.getBuyers(req.user!.businessId);
+    const duplicate = allBuyers.find(b =>
+      b.id !== excludeId &&
+      b.name.toLowerCase() === name?.toLowerCase() &&
+      (b.phone || "") === (phone || "")
+    );
+    res.json({ duplicate: duplicate || null });
+  });
+
+  app.post("/api/buyers/merge", requireAuth, async (req, res) => {
+    try {
+      const { keepId, mergeId } = req.body;
+      const result = await storage.mergeBuyers(req.user!.businessId, keepId, mergeId, req.user!.username);
+      res.json(result);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
   app.get("/api/buyers", requireAuth, async (req, res) => {
     const search = req.query.search as string | undefined;
     const withDues = req.query.withDues === "true";

@@ -165,6 +165,8 @@ export default function BuyerLedgerPage() {
   const [sortDir, setSortDir] = usePersistedState<SortDir>("bl-sortDir", "desc");
   const [editingBuyer, setEditingBuyer] = useState<BuyerWithDues | null>(null);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [mergeConfirmOpen, setMergeConfirmOpen] = useState(false);
+  const [duplicateBuyer, setDuplicateBuyer] = useState<BuyerWithDues | null>(null);
 
   const [editName, setEditName] = useState("");
   const [editAddress, setEditAddress] = useState("");
@@ -262,6 +264,32 @@ export default function BuyerLedgerPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/cash-entries"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"] });
+    },
+  });
+
+  const mergeBuyersMutation = useMutation({
+    mutationFn: async (data: { keepId: number; mergeId: number }) => {
+      const res = await apiRequest("POST", "/api/buyers/merge", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === "string" && key.startsWith("/api/buyers");
+      }});
+      queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bids"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"] });
+      setMergeConfirmOpen(false);
+      setDuplicateBuyer(null);
+      setEditingBuyer(null);
+      toast({ title: "Buyers Merged", variant: "success" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
     },
   });
 
@@ -435,7 +463,7 @@ export default function BuyerLedgerPage() {
     }
   };
 
-  const saveEdit = () => {
+  const saveEditDirect = () => {
     if (!editingBuyer) return;
     updateBuyerMutation.mutate({
       id: editingBuyer.id,
@@ -448,6 +476,31 @@ export default function BuyerLedgerPage() {
         openingBalance: editOpeningBalance || "0",
       },
     });
+  };
+
+  const saveEdit = async () => {
+    if (!editingBuyer) return;
+    try {
+      const checkRes = await apiRequest("POST", "/api/buyers/check-duplicate", {
+        name: editName,
+        phone: editPhone || "",
+        excludeId: editingBuyer.id,
+      });
+      const { duplicate } = await checkRes.json();
+      if (duplicate) {
+        setDuplicateBuyer(duplicate);
+        setMergeConfirmOpen(true);
+        return;
+      }
+    } catch {}
+    saveEditDirect();
+  };
+
+  const handleMergeConfirm = () => {
+    if (!editingBuyer || !duplicateBuyer) return;
+    const keepId = Math.min(editingBuyer.id, duplicateBuyer.id);
+    const mergeId = Math.max(editingBuyer.id, duplicateBuyer.id);
+    mergeBuyersMutation.mutate({ keepId, mergeId });
   };
 
   const addBuyer = () => {
@@ -968,6 +1021,52 @@ export default function BuyerLedgerPage() {
               {createBuyerMutation.isPending ? t("buyerLedger.adding") : t("buyerLedger.addBuyer")}
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={mergeConfirmOpen} onOpenChange={setMergeConfirmOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Duplicate Buyer Found</DialogTitle>
+          </DialogHeader>
+          {duplicateBuyer && editingBuyer && (
+            <div className="space-y-4">
+              <p className="text-sm">
+                <strong>{duplicateBuyer.name}</strong> ({duplicateBuyer.phone || "no phone"}) already exists as {duplicateBuyer.buyerId}.
+                Do you want to merge? All dues and records will be moved to the older buyer ID.
+              </p>
+              <div className="flex flex-col gap-2">
+                <Button
+                  onClick={handleMergeConfirm}
+                  disabled={mergeBuyersMutation.isPending}
+                  data-testid="button-confirm-buyer-merge"
+                >
+                  {mergeBuyersMutation.isPending ? "Merging..." : "Yes, Merge Records"}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setMergeConfirmOpen(false);
+                    setDuplicateBuyer(null);
+                    saveEditDirect();
+                  }}
+                  data-testid="button-save-without-merge"
+                >
+                  Save Without Merging
+                </Button>
+                <Button
+                  variant="ghost"
+                  onClick={() => {
+                    setMergeConfirmOpen(false);
+                    setDuplicateBuyer(null);
+                  }}
+                  data-testid="button-cancel-merge"
+                >
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

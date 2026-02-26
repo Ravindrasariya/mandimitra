@@ -54,6 +54,7 @@ export interface IStorage {
   getNextBuyerId(businessId: number): Promise<string>;
   getBuyerEditHistory(buyerId: number, businessId: number): Promise<BuyerEditHistory[]>;
   createBuyerEditHistory(entry: InsertBuyerEditHistory): Promise<BuyerEditHistory>;
+  mergeBuyers(businessId: number, keepId: number, mergeId: number, changedBy: string): Promise<Buyer>;
   getBuyersWithDues(businessId: number, search?: string): Promise<(Buyer & { receivableDue: string; overallDue: string; bidDates: string[] })[]>;
 
   getLotEditHistory(lotId: number, businessId: number): Promise<LotEditHistory[]>;
@@ -416,6 +417,38 @@ export class DatabaseStorage implements IStorage {
   async createBuyerEditHistory(entry: InsertBuyerEditHistory): Promise<BuyerEditHistory> {
     const [created] = await db.insert(buyerEditHistory).values(entry).returning();
     return created;
+  }
+
+  async mergeBuyers(businessId: number, keepId: number, mergeId: number, changedBy: string): Promise<Buyer> {
+    const keepBuyer = await this.getBuyer(keepId, businessId);
+    const mergeBuyer = await this.getBuyer(mergeId, businessId);
+    if (!keepBuyer || !mergeBuyer) throw new Error("Buyer not found");
+
+    await db.update(bids).set({ buyerId: keepId }).where(and(eq(bids.buyerId, mergeId), eq(bids.businessId, businessId)));
+    await db.update(transactions).set({ buyerId: keepId }).where(and(eq(transactions.buyerId, mergeId), eq(transactions.businessId, businessId)));
+    await db.update(cashEntries).set({ buyerId: keepId }).where(and(eq(cashEntries.buyerId, mergeId), eq(cashEntries.businessId, businessId)));
+
+    const mergeOpeningBal = parseFloat(mergeBuyer.openingBalance || "0");
+    const keepOpeningBal = parseFloat(keepBuyer.openingBalance || "0");
+    const newOpeningBal = (keepOpeningBal + mergeOpeningBal).toFixed(2);
+
+    await db.update(buyers).set({ openingBalance: newOpeningBal }).where(and(eq(buyers.id, keepId), eq(buyers.businessId, businessId)));
+
+    await this.createBuyerEditHistory({
+      buyerId: keepId,
+      businessId,
+      fieldChanged: "merge",
+      oldValue: `Buyer ID ${mergeId} (${mergeBuyer.name})`,
+      newValue: `Merged with opening balance ₹${mergeOpeningBal}`,
+      changedBy,
+    });
+
+    await db.update(buyerEditHistory).set({ buyerId: keepId }).where(and(eq(buyerEditHistory.buyerId, mergeId), eq(buyerEditHistory.businessId, businessId)));
+
+    await db.delete(buyers).where(and(eq(buyers.id, mergeId), eq(buyers.businessId, businessId)));
+
+    const [updated] = await db.select().from(buyers).where(and(eq(buyers.id, keepId), eq(buyers.businessId, businessId)));
+    return updated;
   }
 
   async getLotEditHistory(lotId: number, businessId: number): Promise<LotEditHistory[]> {
