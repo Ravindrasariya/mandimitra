@@ -136,7 +136,7 @@ function generateFarmerReceiptHtml(sg: UnifiedSerialGroup, businessName?: string
     const effectiveRate = ppk + epk;
     const gross = nw * effectiveRate;
     const crop = t.lot?.crop || firstLot?.crop || "";
-    const rateDisplay = epk > 0 ? `₹${ppk.toFixed(2)}+${epk.toFixed(2)}` : `₹${ppk.toFixed(2)}`;
+    const rateDisplay = `₹${effectiveRate.toFixed(2)}`;
     return `<tr>
       <td style="padding:6px;border:1px solid #999;text-align:center">${cropLabel[crop] || crop}</td>
       <td style="padding:6px;border:1px solid #999;text-align:center">${t.numberOfBags || 0}</td>
@@ -239,7 +239,7 @@ function generateBuyerReceiptHtml(lot: Lot, farmer: Farmer, tx: TransactionWithD
   const aadhatBuyer = grossAmount * parseFloat(tx.aadhatBuyerPercent || "0") / 100;
   const mandiBuyer = grossAmount * parseFloat(tx.mandiBuyerPercent || "0") / 100;
 
-  const rateDisplay = epkBuyer > 0 ? `Rs.${ppk.toFixed(2)} + Rs.${epkBuyer.toFixed(2)} = Rs.${effectiveRate.toFixed(2)}/kg` : `Rs.${ppk.toFixed(2)}/kg`;
+  const rateDisplay = `Rs.${effectiveRate.toFixed(2)}/kg`;
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Buyer Receipt</title>
 <style>body{font-family:Arial,sans-serif;margin:20px;color:#333}
