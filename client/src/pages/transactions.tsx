@@ -112,28 +112,36 @@ function generateFarmerReceiptHtml(sg: UnifiedSerialGroup, businessName?: string
   const totalExtraCharges = allTxns.reduce((s, t) => s + parseFloat(t.extraChargesFarmer || "0"), 0);
   const totalFreight = allTxns.reduce((s, t) => s + parseFloat(t.freightCharges || "0"), 0);
   const totalAadhatFarmer = allTxns.reduce((s, t) => {
-    const gross = parseFloat(t.netWeight || "0") * parseFloat(t.pricePerKg || "0");
+    const epk = parseFloat((t as any).extraPerKgFarmer || "0");
+    const gross = parseFloat(t.netWeight || "0") * (parseFloat(t.pricePerKg || "0") + epk);
     return s + gross * parseFloat(t.aadhatFarmerPercent || "0") / 100;
   }, 0);
   const totalMandiFarmer = allTxns.reduce((s, t) => {
-    const gross = parseFloat(t.netWeight || "0") * parseFloat(t.pricePerKg || "0");
+    const epk = parseFloat((t as any).extraPerKgFarmer || "0");
+    const gross = parseFloat(t.netWeight || "0") * (parseFloat(t.pricePerKg || "0") + epk);
     return s + gross * parseFloat(t.mandiFarmerPercent || "0") / 100;
   }, 0);
 
   const totalDeduction = totalHammali + totalExtraCharges + totalFreight + totalAadhatFarmer + totalMandiFarmer;
   const totalPayable = allTxns.reduce((s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0);
-  const totalGross = allTxns.reduce((s, t) => s + (parseFloat(t.netWeight || "0") * parseFloat(t.pricePerKg || "0")), 0);
+  const totalGross = allTxns.reduce((s, t) => {
+    const epk = parseFloat((t as any).extraPerKgFarmer || "0");
+    return s + (parseFloat(t.netWeight || "0") * (parseFloat(t.pricePerKg || "0") + epk));
+  }, 0);
 
   const txnRows = allTxns.map(t => {
     const nw = parseFloat(t.netWeight || "0");
     const ppk = parseFloat(t.pricePerKg || "0");
-    const gross = nw * ppk;
+    const epk = parseFloat((t as any).extraPerKgFarmer || "0");
+    const effectiveRate = ppk + epk;
+    const gross = nw * effectiveRate;
     const crop = t.lot?.crop || firstLot?.crop || "";
+    const rateDisplay = epk > 0 ? `₹${ppk.toFixed(2)}+${epk.toFixed(2)}` : `₹${ppk.toFixed(2)}`;
     return `<tr>
       <td style="padding:6px;border:1px solid #999;text-align:center">${cropLabel[crop] || crop}</td>
       <td style="padding:6px;border:1px solid #999;text-align:center">${t.numberOfBags || 0}</td>
       <td style="padding:6px;border:1px solid #999;text-align:right">${nw.toFixed(2)}</td>
-      <td style="padding:6px;border:1px solid #999;text-align:right">₹${ppk.toFixed(2)}</td>
+      <td style="padding:6px;border:1px solid #999;text-align:right">${rateDisplay}</td>
       <td style="padding:6px;border:1px solid #999;text-align:right">₹${gross.toFixed(2)}</td>
     </tr>`;
   }).join("");
@@ -218,7 +226,11 @@ ${totalDeduction > 0 ? `<div class="ded-row sub-total"><span>कुल कटौ
 }
 
 function generateBuyerReceiptHtml(lot: Lot, farmer: Farmer, tx: TransactionWithDetails, businessName?: string, businessAddress?: string) {
-  const grossAmount = parseFloat(tx.netWeight || "0") * parseFloat(tx.pricePerKg || "0");
+  const nw = parseFloat(tx.netWeight || "0");
+  const ppk = parseFloat(tx.pricePerKg || "0");
+  const epkBuyer = parseFloat((tx as any).extraPerKgBuyer || "0");
+  const effectiveRate = ppk + epkBuyer;
+  const grossAmount = nw * effectiveRate;
   const dateStr = tx.date || format(new Date(), "yyyy-MM-dd");
   const bags = tx.numberOfBags || 0;
 
@@ -226,6 +238,8 @@ function generateBuyerReceiptHtml(lot: Lot, farmer: Farmer, tx: TransactionWithD
   const extraBuyer = parseFloat(tx.extraChargesBuyer || "0");
   const aadhatBuyer = grossAmount * parseFloat(tx.aadhatBuyerPercent || "0") / 100;
   const mandiBuyer = grossAmount * parseFloat(tx.mandiBuyerPercent || "0") / 100;
+
+  const rateDisplay = epkBuyer > 0 ? `Rs.${ppk.toFixed(2)} + Rs.${epkBuyer.toFixed(2)} = Rs.${effectiveRate.toFixed(2)}/kg` : `Rs.${ppk.toFixed(2)}/kg`;
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Buyer Receipt</title>
 <style>body{font-family:Arial,sans-serif;margin:20px;color:#333}
@@ -255,8 +269,8 @@ ${businessAddress ? `<p style="font-size:0.85em;color:#555;margin:2px 0">${busin
 <th style="padding:8px;border:1px solid #ccc;text-align:right">Amount</th>
 </tr>
 <tr><td style="padding:6px;border:1px solid #ccc">Bags</td><td style="padding:6px;border:1px solid #ccc;text-align:right">${bags}</td></tr>
-<tr><td style="padding:6px;border:1px solid #ccc">Net Weight</td><td style="padding:6px;border:1px solid #ccc;text-align:right">${parseFloat(tx.netWeight || "0").toFixed(2)} kg</td></tr>
-<tr><td style="padding:6px;border:1px solid #ccc">Rate</td><td style="padding:6px;border:1px solid #ccc;text-align:right">Rs.${parseFloat(tx.pricePerKg || "0").toFixed(2)}/kg</td></tr>
+<tr><td style="padding:6px;border:1px solid #ccc">Net Weight</td><td style="padding:6px;border:1px solid #ccc;text-align:right">${nw.toFixed(2)} kg</td></tr>
+<tr><td style="padding:6px;border:1px solid #ccc">Rate</td><td style="padding:6px;border:1px solid #ccc;text-align:right">${rateDisplay}</td></tr>
 <tr style="background:#f9f9f9"><td style="padding:6px;border:1px solid #ccc"><strong>Gross Amount</strong></td><td style="padding:6px;border:1px solid #ccc;text-align:right"><strong>Rs.${grossAmount.toFixed(2)}</strong></td></tr>
 </table>
 <div class="summary">
@@ -299,6 +313,8 @@ export default function TransactionsPage() {
   const [netWeightInput, setNetWeightInput] = useState("");
   const [extraChargesFarmer, setExtraChargesFarmer] = useState("0");
   const [extraChargesBuyer, setExtraChargesBuyer] = useState("0");
+  const [extraPerKgFarmer, setExtraPerKgFarmer] = useState("0");
+  const [extraPerKgBuyer, setExtraPerKgBuyer] = useState("0");
 
   type ChargeSettingsData = {
     mandiCommissionFarmerPercent: string;
@@ -601,6 +617,8 @@ export default function TransactionsPage() {
     setNetWeightInput(tx.netWeight || "");
     setExtraChargesFarmer(tx.extraChargesFarmer || "0");
     setExtraChargesBuyer(tx.extraChargesBuyer || "0");
+    setExtraPerKgFarmer((tx as any).extraPerKgFarmer || "0");
+    setExtraPerKgBuyer((tx as any).extraPerKgBuyer || "0");
   };
 
   const calcProportionateNetWeight = (bid: BidWithDetails): string => {
@@ -615,6 +633,8 @@ export default function TransactionsPage() {
     setNetWeightInput(bid ? calcProportionateNetWeight(bid) : "");
     setExtraChargesFarmer("0");
     setExtraChargesBuyer("0");
+    setExtraPerKgFarmer("0");
+    setExtraPerKgBuyer("0");
   };
 
   const handleBuyerChange = (val: string) => {
@@ -642,6 +662,10 @@ export default function TransactionsPage() {
   const bags = selectedBid?.numberOfBags || 0;
   const nw = parseFloat(netWeightInput) || 0;
   const price = parseFloat(selectedBid?.pricePerKg || "0");
+  const extraPerKgFarmerVal = parseFloat(extraPerKgFarmer) || 0;
+  const extraPerKgBuyerVal = parseFloat(extraPerKgBuyer) || 0;
+  const farmerGross = nw * (price + extraPerKgFarmerVal);
+  const buyerGross = nw * (price + extraPerKgBuyerVal);
   const grossAmount = nw * price;
 
   const hammaliFarmerRate = parseFloat(cs.hammaliFarmerPerBag) || 0;
@@ -659,16 +683,16 @@ export default function TransactionsPage() {
 
   const hammaliFarmerTotal = hammaliFarmerRate * bags;
   const hammaliBuyerTotal = hammaliBuyerRate * bags;
-  const aadhatFarmer = (grossAmount * aadhatFarmerPct) / 100;
-  const aadhatBuyer = (grossAmount * aadhatBuyerPct) / 100;
-  const mandiFarmer = (grossAmount * mandiFarmerPct) / 100;
-  const mandiBuyer = (grossAmount * mandiBuyerPct) / 100;
+  const aadhatFarmer = (farmerGross * aadhatFarmerPct) / 100;
+  const aadhatBuyer = (buyerGross * aadhatBuyerPct) / 100;
+  const mandiFarmer = (farmerGross * mandiFarmerPct) / 100;
+  const mandiBuyer = (buyerGross * mandiBuyerPct) / 100;
 
   const farmerDeductions = hammaliFarmerTotal + extraFarmer + aadhatFarmer + mandiFarmer + freightFarmerTotal;
   const buyerAdditions = hammaliBuyerTotal + extraBuyer + aadhatBuyer + mandiBuyer;
 
-  const farmerPayable = grossAmount - farmerDeductions;
-  const buyerReceivable = grossAmount + buyerAdditions;
+  const farmerPayable = farmerGross - farmerDeductions;
+  const buyerReceivable = buyerGross + buyerAdditions;
 
   const submitTransaction = () => {
     if (!selectedBid || !netWeightInput) {
@@ -697,6 +721,8 @@ export default function TransactionsPage() {
       hammaliBuyerPerBag: hammaliBuyerRate.toString(),
       extraChargesFarmer: extraFarmer.toFixed(2),
       extraChargesBuyer: extraBuyer.toFixed(2),
+      extraPerKgFarmer: extraPerKgFarmerVal.toFixed(2),
+      extraPerKgBuyer: extraPerKgBuyerVal.toFixed(2),
       totalPayableToFarmer: farmerPayable.toFixed(2),
       totalReceivableFromBuyer: buyerReceivable.toFixed(2),
       date: format(new Date(), "yyyy-MM-dd"),
@@ -747,6 +773,7 @@ export default function TransactionsPage() {
       "Grade", "No. of Bags", "Rate/Kg",
       "Net Weight",
       "Hammali Farmer/Bag", "Hammali Buyer/Bag", "Extra Charges Farmer", "Extra Charges Buyer",
+      "Extra/Kg Farmer", "Extra/Kg Buyer",
       "Aadhat Farmer %", "Aadhat Buyer %", "Mandi Farmer %", "Mandi Buyer %",
       "Freight Charges",
       "Payable to Farmer", "Receivable from Buyer",
@@ -773,6 +800,7 @@ export default function TransactionsPage() {
         tx.netWeight,
         tx.hammaliFarmerPerBag || "0", tx.hammaliBuyerPerBag || "0",
         tx.extraChargesFarmer || "0", tx.extraChargesBuyer || "0",
+        (tx as any).extraPerKgFarmer || "0", (tx as any).extraPerKgBuyer || "0",
         tx.aadhatFarmerPercent || "0", tx.aadhatBuyerPercent || "0",
         tx.mandiFarmerPercent || "0", tx.mandiBuyerPercent || "0",
         tx.freightCharges || "0",
@@ -1257,6 +1285,18 @@ export default function TransactionsPage() {
                   {vehicleBhadaRate > 0 && (
                     <div className="flex justify-between"><span>Freight/Bhada (Total):</span><span>₹{vehicleBhadaRate}</span></div>
                   )}
+                  <div className="flex items-center justify-between border-t pt-1 mt-1">
+                    <span className="font-semibold">Extra ₹/Kg:</span>
+                    <Input
+                      data-testid="input-extra-per-kg-farmer"
+                      type="text"
+                      inputMode="decimal"
+                      value={extraPerKgFarmer}
+                      onChange={(e) => setExtraPerKgFarmer(e.target.value)}
+                      onFocus={(e) => e.target.select()}
+                      className="w-20 h-6 text-xs text-right p-1"
+                    />
+                  </div>
                 </div>
                 <div className="bg-muted/50 rounded p-2 space-y-1">
                   <p className="font-semibold text-muted-foreground">Buyer Charges</p>
@@ -1275,17 +1315,45 @@ export default function TransactionsPage() {
                       className="w-20 h-6 text-xs text-right p-1"
                     />
                   </div>
+                  <div className="flex items-center justify-between border-t pt-1 mt-1">
+                    <span className="font-semibold">Extra ₹/Kg:</span>
+                    <Input
+                      data-testid="input-extra-per-kg-buyer"
+                      type="text"
+                      inputMode="decimal"
+                      value={extraPerKgBuyer}
+                      onChange={(e) => setExtraPerKgBuyer(e.target.value)}
+                      onFocus={(e) => e.target.select()}
+                      className="w-20 h-6 text-xs text-right p-1"
+                    />
+                  </div>
                 </div>
               </div>
 
               <div className="bg-muted rounded-md p-3 space-y-2 text-sm" data-testid="txn-calculation-summary">
                 <div className="flex justify-between">
-                  <span>{t("transactions.grossAmount")}:</span>
-                  <span className="font-medium">Rs.{grossAmount.toFixed(2)}</span>
+                  <span>Bid Rate:</span>
+                  <span className="font-medium">Rs.{price.toFixed(2)}/kg</span>
                 </div>
+                {extraPerKgFarmerVal > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Farmer Rate: {price.toFixed(2)} + {extraPerKgFarmerVal.toFixed(2)}</span>
+                    <span className="font-medium">Rs.{(price + extraPerKgFarmerVal).toFixed(2)}/kg</span>
+                  </div>
+                )}
+                {extraPerKgBuyerVal > 0 && (
+                  <div className="flex justify-between text-blue-600">
+                    <span>Buyer Rate: {price.toFixed(2)} + {extraPerKgBuyerVal.toFixed(2)}</span>
+                    <span className="font-medium">Rs.{(price + extraPerKgBuyerVal).toFixed(2)}/kg</span>
+                  </div>
+                )}
 
                 <div className="border-t pt-2 mt-2">
-                  <p className="text-xs font-semibold text-muted-foreground mb-1">Farmer Deductions:</p>
+                  <div className="flex justify-between">
+                    <span>Farmer Gross ({nw.toFixed(2)} × Rs.{(price + extraPerKgFarmerVal).toFixed(2)}):</span>
+                    <span className="font-medium">Rs.{farmerGross.toFixed(2)}</span>
+                  </div>
+                  <p className="text-xs font-semibold text-muted-foreground mb-1 mt-1">Farmer Deductions:</p>
                   {hammaliFarmerRate > 0 && (
                     <div className="flex justify-between text-muted-foreground">
                       <span>Hammali ({bags} × ₹{hammaliFarmerRate}):</span>
@@ -1329,7 +1397,11 @@ export default function TransactionsPage() {
                 </div>
 
                 <div className="border-t pt-2 mt-2">
-                  <p className="text-xs font-semibold text-muted-foreground mb-1">Buyer Additions:</p>
+                  <div className="flex justify-between">
+                    <span>Buyer Gross ({nw.toFixed(2)} × Rs.{(price + extraPerKgBuyerVal).toFixed(2)}):</span>
+                    <span className="font-medium">Rs.{buyerGross.toFixed(2)}</span>
+                  </div>
+                  <p className="text-xs font-semibold text-muted-foreground mb-1 mt-1">Buyer Additions:</p>
                   {hammaliBuyerRate > 0 && (
                     <div className="flex justify-between text-muted-foreground">
                       <span>Hammali ({bags} × ₹{hammaliBuyerRate}):</span>
@@ -1393,6 +1465,8 @@ export default function TransactionsPage() {
                           numberOfBags: "Bags",
                           extraChargesFarmer: "Extra (Farmer)",
                           extraChargesBuyer: "Extra (Buyer)",
+                          extraPerKgFarmer: "Extra/Kg (Farmer)",
+                          extraPerKgBuyer: "Extra/Kg (Buyer)",
                           netWeight: "Net Weight",
                           pricePerKg: "Price/Kg",
                           totalPayableToFarmer: "Farmer Payable",

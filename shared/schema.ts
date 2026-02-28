@@ -167,6 +167,8 @@ export const transactions = pgTable("transactions", {
   freightCharges: decimal("freight_charges", { precision: 10, scale: 2 }).default("0"),
   netWeight: decimal("net_weight", { precision: 12, scale: 2 }),
   pricePerKg: decimal("price_per_kg", { precision: 10, scale: 2 }),
+  extraPerKgFarmer: decimal("extra_per_kg_farmer", { precision: 10, scale: 2 }).default("0"),
+  extraPerKgBuyer: decimal("extra_per_kg_buyer", { precision: 10, scale: 2 }).default("0"),
   aadhatCharges: decimal("aadhat_charges", { precision: 10, scale: 2 }).default("0"),
   mandiCharges: decimal("mandi_charges", { precision: 10, scale: 2 }).default("0"),
   aadhatFarmerPercent: decimal("aadhat_farmer_percent", { precision: 5, scale: 2 }).default("0"),
