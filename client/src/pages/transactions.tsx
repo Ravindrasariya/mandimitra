@@ -1366,9 +1366,6 @@ export default function TransactionsPage() {
                       >
                         <Plus className="h-3 w-3 mr-1" /> Add Sample
                       </Button>
-                      {hasWarning && (
-                        <p className="text-xs text-orange-500 font-medium flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> One or more bags weigh over 100kg</p>
-                      )}
                       <div className="border-t pt-1 flex justify-between text-xs font-medium">
                         <span>Average ({nonZeroWeights.length} samples):</span>
                         <span>{average > 0 ? `${average.toFixed(2)} kg` : "—"}</span>
