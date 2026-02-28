@@ -169,16 +169,52 @@ export default function StockEntryPage() {
     try {
       let farmerId = selectedFarmer?.id;
 
-      if (!farmerId) {
-        const farmer = await createFarmerMutation.mutateAsync({
-          name: capitalize(farmerName),
-          phone: farmerPhone,
-          village: capitalize(village),
-          tehsil: capitalize(tehsil),
-          district,
-          state,
+      if (selectedFarmer) {
+        const nameChanged = farmerName.trim().toLowerCase() !== selectedFarmer.name.trim().toLowerCase();
+        const phoneChanged = farmerPhone.trim() !== selectedFarmer.phone.trim();
+        const villageChanged = (village || "").trim().toLowerCase() !== (selectedFarmer.village || "").trim().toLowerCase();
+
+        if (nameChanged || phoneChanged || villageChanged) {
+          const dupRes = await apiRequest("POST", "/api/farmers/check-duplicate", {
+            name: farmerName.trim(),
+            phone: farmerPhone.trim(),
+            village: village.trim(),
+          });
+          const dupData = await dupRes.json();
+          if (dupData.duplicate) {
+            farmerId = dupData.duplicate.id;
+          } else {
+            const farmer = await createFarmerMutation.mutateAsync({
+              name: capitalize(farmerName.trim()),
+              phone: farmerPhone.trim(),
+              village: capitalize(village.trim()),
+              tehsil: capitalize(tehsil.trim()),
+              district,
+              state,
+            });
+            farmerId = farmer.id;
+          }
+        }
+      } else {
+        const dupRes = await apiRequest("POST", "/api/farmers/check-duplicate", {
+          name: farmerName.trim(),
+          phone: farmerPhone.trim(),
+          village: village.trim(),
         });
-        farmerId = farmer.id;
+        const dupData = await dupRes.json();
+        if (dupData.duplicate) {
+          farmerId = dupData.duplicate.id;
+        } else {
+          const farmer = await createFarmerMutation.mutateAsync({
+            name: capitalize(farmerName.trim()),
+            phone: farmerPhone.trim(),
+            village: capitalize(village.trim()),
+            tehsil: capitalize(tehsil.trim()),
+            district,
+            state,
+          });
+          farmerId = farmer.id;
+        }
       }
 
       await createBatchMutation.mutateAsync({
