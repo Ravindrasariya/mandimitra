@@ -1322,38 +1322,40 @@ export default function TransactionsPage() {
                   return (
                     <div className="bg-muted/50 rounded-md p-2 space-y-2 mt-1" data-testid="weight-calculator">
                       <p className="text-xs font-semibold text-muted-foreground">Sample Bag Weights (kg)</p>
-                      {samples.map((w, idx) => (
-                        <div key={idx} className="space-y-0.5">
-                          <div className="flex items-center gap-1">
-                            <span className="text-xs text-muted-foreground w-5">{idx + 1}.</span>
-                            <Input
-                              data-testid={`input-sample-weight-${idx}`}
-                              type="text"
-                              inputMode="decimal"
-                              value={w}
-                              onChange={(e) => updateSample(idx, e.target.value)}
-                              onFocus={(e) => e.target.select()}
-                              placeholder="0.00"
-                              className="h-7 text-xs flex-1"
-                            />
-                            {samples.length > 1 && (
-                              <Button
-                                data-testid={`button-remove-sample-${idx}`}
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 w-7 p-0"
-                                onClick={() => removeSample(idx)}
-                              >
-                                <X className="h-3 w-3" />
-                              </Button>
+                      <div className="grid grid-cols-2 gap-2">
+                        {samples.map((w, idx) => (
+                          <div key={idx} className="space-y-0.5">
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs text-muted-foreground w-5">{idx + 1}.</span>
+                              <Input
+                                data-testid={`input-sample-weight-${idx}`}
+                                type="text"
+                                inputMode="decimal"
+                                value={w}
+                                onChange={(e) => updateSample(idx, e.target.value)}
+                                onFocus={(e) => e.target.select()}
+                                placeholder="0.00"
+                                className="h-7 text-xs flex-1"
+                              />
+                              {samples.length > 1 && (
+                                <Button
+                                  data-testid={`button-remove-sample-${idx}`}
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-7 w-7 p-0"
+                                  onClick={() => removeSample(idx)}
+                                >
+                                  <X className="h-3 w-3" />
+                                </Button>
+                              )}
+                            </div>
+                            {(parseFloat(w) || 0) > 100 && (
+                              <p className="text-xs text-orange-500 font-medium ml-6 flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> Over 100kg</p>
                             )}
                           </div>
-                          {(parseFloat(w) || 0) > 100 && (
-                            <p className="text-xs text-orange-500 font-medium ml-6 flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> Over 100kg — please double check</p>
-                          )}
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                       <Button
                         data-testid="button-add-sample"
                         type="button"
