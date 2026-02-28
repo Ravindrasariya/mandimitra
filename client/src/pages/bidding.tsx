@@ -75,6 +75,19 @@ export default function BiddingPage() {
   const buyerInputRef = useRef<HTMLInputElement>(null);
   const buyerDropdownRef = useRef<HTMLDivElement>(null);
 
+  const [deleteConfirmBidId, setDeleteConfirmBidId] = useState<number | null>(null);
+  const [editingBidId, setEditingBidId] = useState<number | null>(null);
+  const [editBuyerId, setEditBuyerId] = useState<number | null>(null);
+  const [editBuyerSearch, setEditBuyerSearch] = useState("");
+  const [editPricePerKg, setEditPricePerKg] = useState("");
+  const [editBidBags, setEditBidBags] = useState("");
+  const [editPaymentType, setEditPaymentType] = useState("Credit");
+  const [editAdvanceAmount, setEditAdvanceAmount] = useState("0");
+  const [editGrade, setEditGrade] = useState("");
+  const [showEditBuyerDropdown, setShowEditBuyerDropdown] = useState(false);
+  const editBuyerInputRef = useRef<HTMLInputElement>(null);
+  const editBuyerDropdownRef = useRef<HTMLDivElement>(null);
+
   const cropQueryParam = activeCrop === ALL_VALUE ? "" : `?crop=${activeCrop}`;
   const { data: lots = [], isLoading } = useQuery<LotWithFarmer[]>({
     queryKey: ["/api/lots", cropQueryParam],
@@ -205,6 +218,12 @@ export default function BiddingPage() {
     return buyers.filter(b => b.name.toLowerCase().includes(search) || (b.phone && b.phone.includes(search)));
   }, [buyers, buyerSearch]);
 
+  const editFilteredBuyers = useMemo(() => {
+    if (!editBuyerSearch.trim()) return buyers;
+    const search = editBuyerSearch.toLowerCase();
+    return buyers.filter(b => b.name.toLowerCase().includes(search) || (b.phone && b.phone.includes(search)));
+  }, [buyers, editBuyerSearch]);
+
   const { data: lotBids = [] } = useQuery<BidWithDetails[]>({
     queryKey: ["/api/bids", selectedLot ? `?lotId=${selectedLot.id}` : ""],
     enabled: !!selectedLot,
@@ -254,9 +273,69 @@ export default function BiddingPage() {
     },
     onSuccess: () => {
       invalidateAll();
+      setDeleteConfirmBidId(null);
       toast({ title: "Bid Deleted", variant: "success" });
     },
   });
+
+  const updateBidMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+      const res = await apiRequest("PATCH", `/api/bids/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      invalidateAll();
+      setEditingBidId(null);
+      toast({ title: "Bid Updated", variant: "success" });
+    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    },
+  });
+
+  const startEditBid = (bid: BidWithDetails) => {
+    setEditingBidId(bid.id);
+    setEditBuyerId(bid.buyerId);
+    setEditBuyerSearch(bid.buyer.name);
+    setEditPricePerKg(bid.pricePerKg);
+    setEditBidBags(bid.numberOfBags.toString());
+    setEditPaymentType(bid.paymentType || "Credit");
+    setEditAdvanceAmount(bid.advanceAmount || "0");
+    setEditGrade(bid.grade || "");
+    setDeleteConfirmBidId(null);
+  };
+
+  const saveEditBid = () => {
+    if (!editingBidId || !editBuyerId) return;
+    const bags = parseInt(editBidBags);
+    if (!bags || bags <= 0) {
+      toast({ title: "Error", description: "Number of bags must be greater than 0", variant: "destructive" });
+      return;
+    }
+    if (!editPricePerKg || parseFloat(editPricePerKg) <= 0) {
+      toast({ title: "Error", description: "Price must be greater than 0", variant: "destructive" });
+      return;
+    }
+    const editingBid = lotBids.find(b => b.id === editingBidId);
+    if (editingBid && selectedLot) {
+      const maxBags = selectedLot.remainingBags + editingBid.numberOfBags;
+      if (bags > maxBags) {
+        toast({ title: "Error", description: `Maximum ${maxBags} bags available`, variant: "destructive" });
+        return;
+      }
+    }
+    updateBidMutation.mutate({
+      id: editingBidId,
+      data: {
+        buyerId: editBuyerId,
+        pricePerKg: editPricePerKg,
+        numberOfBags: bags,
+        grade: editGrade || null,
+        paymentType: editPaymentType,
+        advanceAmount: editPaymentType === "Cash" ? editAdvanceAmount : "0",
+      },
+    });
+  };
 
   const createBuyerMutation = useMutation({
     mutationFn: async (data: any) => {
@@ -337,6 +416,12 @@ export default function BiddingPage() {
         farmerInputRef.current && !farmerInputRef.current.contains(e.target as Node)
       ) {
         setShowFarmerDropdown(false);
+      }
+      if (
+        editBuyerDropdownRef.current && !editBuyerDropdownRef.current.contains(e.target as Node) &&
+        editBuyerInputRef.current && !editBuyerInputRef.current.contains(e.target as Node)
+      ) {
+        setShowEditBuyerDropdown(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -659,23 +744,180 @@ export default function BiddingPage() {
                 <div className="space-y-2">
                   <Label className="text-xs text-muted-foreground">{t("bidding.existingBids")}</Label>
                   {lotBids.map((bid) => (
-                    <div key={bid.id} className="flex items-center justify-between gap-2 bg-muted/50 rounded-md p-2 text-sm">
-                      <div>
-                        <span className="font-medium">{bid.buyer.name}</span>
-                        <span className="text-muted-foreground"> - Rs.{bid.pricePerKg}/kg x {bid.numberOfBags} bags</span>
-                        {bid.grade && bid.grade !== "__all__" && <Badge variant="secondary" className="ml-2 text-xs">{bid.grade}</Badge>}
-                        {bid.paymentType === "Cash" && <Badge variant="outline" className="ml-2 text-xs border-blue-400 text-blue-600 bg-blue-50">Cash ₹{bid.advanceAmount || "0"}</Badge>}
-                        {bid.hasTransaction && <Badge variant="outline" className="ml-2 text-xs border-green-400 text-green-600 bg-green-50">Transacted</Badge>}
-                      </div>
-                      {!bid.hasTransaction && (
-                        <Button
-                          variant="destructive"
-                          size="icon"
-                          data-testid={`button-delete-bid-${bid.id}`}
-                          onClick={() => deleteBidMutation.mutate(bid.id)}
-                        >
-                          <Trash2 className="w-3 h-3" />
-                        </Button>
+                    <div key={bid.id} className="bg-muted/50 rounded-md p-2 text-sm">
+                      {editingBidId === bid.id ? (
+                        <div className="space-y-2">
+                          <div className="space-y-1">
+                            <Label className="text-xs">{t("bidding.buyer")}</Label>
+                            <div className="relative">
+                              <Input
+                                ref={editBuyerInputRef}
+                                data-testid={`input-edit-buyer-${bid.id}`}
+                                value={editBuyerSearch}
+                                onChange={(e) => {
+                                  setEditBuyerSearch(e.target.value);
+                                  setEditBuyerId(null);
+                                  setShowEditBuyerDropdown(true);
+                                }}
+                                onFocus={() => setShowEditBuyerDropdown(true)}
+                                placeholder={t("bidding.selectBuyer")}
+                                className="mobile-touch-target"
+                                autoComplete="off"
+                              />
+                              {showEditBuyerDropdown && editBuyerSearch.trim() && editFilteredBuyers.length > 0 && (
+                                <div
+                                  ref={editBuyerDropdownRef}
+                                  className="absolute z-50 w-full mt-1 bg-popover border border-border rounded-md shadow-md max-h-48 overflow-y-auto"
+                                >
+                                  {editFilteredBuyers.map((b) => (
+                                    <button
+                                      key={b.id}
+                                      type="button"
+                                      data-testid={`option-edit-buyer-${b.id}`}
+                                      className="w-full text-left px-3 py-2 text-sm hover:bg-accent hover:text-accent-foreground cursor-pointer"
+                                      onClick={() => {
+                                        setEditBuyerId(b.id);
+                                        setEditBuyerSearch(b.name);
+                                        setShowEditBuyerDropdown(false);
+                                      }}
+                                    >
+                                      <span className="font-medium">{b.name}</span>
+                                      {b.phone && <span className="text-muted-foreground text-xs ml-1">({b.phone})</span>}
+                                    </button>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="space-y-1">
+                              <Label className="text-xs">{t("bidding.pricePerKg")}</Label>
+                              <Input
+                                data-testid={`input-edit-price-${bid.id}`}
+                                type="number"
+                                inputMode="decimal"
+                                step="0.01"
+                                value={editPricePerKg}
+                                onChange={(e) => setEditPricePerKg(e.target.value)}
+                                onFocus={(e) => e.target.select()}
+                                className="mobile-touch-target"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <Label className="text-xs">{t("bidding.numberOfBags")}</Label>
+                              <Input
+                                data-testid={`input-edit-bags-${bid.id}`}
+                                type="number"
+                                inputMode="numeric"
+                                value={editBidBags}
+                                onChange={(e) => setEditBidBags(e.target.value)}
+                                onFocus={(e) => e.target.select()}
+                                className="mobile-touch-target"
+                                max={selectedLot ? selectedLot.remainingBags + bid.numberOfBags : undefined}
+                              />
+                              <span className="text-[10px] text-muted-foreground">Max: {selectedLot ? selectedLot.remainingBags + bid.numberOfBags : "—"}</span>
+                            </div>
+                          </div>
+                          <div className={`grid ${editPaymentType === "Cash" ? "grid-cols-2" : "grid-cols-1"} gap-2`}>
+                            <div className="space-y-1">
+                              <Label className="text-xs">{t("bidding.paymentType")}</Label>
+                              <Select value={editPaymentType} onValueChange={setEditPaymentType}>
+                                <SelectTrigger className="mobile-touch-target" data-testid={`select-edit-payment-${bid.id}`}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Credit">Credit</SelectItem>
+                                  <SelectItem value="Cash">Cash</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            {editPaymentType === "Cash" && (
+                              <div className="space-y-1">
+                                <Label className="text-xs">{t("bidding.advanceAmount")}</Label>
+                                <Input
+                                  data-testid={`input-edit-advance-${bid.id}`}
+                                  type="number"
+                                  inputMode="decimal"
+                                  value={editAdvanceAmount}
+                                  onChange={(e) => setEditAdvanceAmount(e.target.value)}
+                                  onFocus={(e) => e.target.select()}
+                                  className="mobile-touch-target"
+                                />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex gap-2 pt-1">
+                            <Button
+                              size="sm"
+                              onClick={saveEditBid}
+                              disabled={updateBidMutation.isPending || !editBuyerId}
+                              data-testid={`button-save-edit-bid-${bid.id}`}
+                            >
+                              {updateBidMutation.isPending ? "Saving..." : "Save"}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setEditingBidId(null)}
+                              data-testid={`button-cancel-edit-bid-${bid.id}`}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : deleteConfirmBidId === bid.id ? (
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm text-destructive font-medium">Are you sure?</span>
+                          <div className="flex gap-1">
+                            <Button
+                              size="sm"
+                              variant="destructive"
+                              onClick={() => deleteBidMutation.mutate(bid.id)}
+                              disabled={deleteBidMutation.isPending}
+                              data-testid={`button-confirm-delete-bid-${bid.id}`}
+                            >
+                              {deleteBidMutation.isPending ? "Deleting..." : "Yes, Delete"}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setDeleteConfirmBidId(null)}
+                              data-testid={`button-cancel-delete-bid-${bid.id}`}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between gap-2">
+                          <div>
+                            <span className="font-medium">{bid.buyer.name}</span>
+                            <span className="text-muted-foreground"> - Rs.{bid.pricePerKg}/kg x {bid.numberOfBags} bags</span>
+                            {bid.grade && bid.grade !== "__all__" && <Badge variant="secondary" className="ml-2 text-xs">{bid.grade}</Badge>}
+                            {bid.paymentType === "Cash" && <Badge variant="outline" className="ml-2 text-xs border-blue-400 text-blue-600 bg-blue-50">Cash ₹{bid.advanceAmount || "0"}</Badge>}
+                            {bid.hasTransaction && <Badge variant="outline" className="ml-2 text-xs border-green-400 text-green-600 bg-green-50">Transacted</Badge>}
+                          </div>
+                          {!bid.hasTransaction && (
+                            <div className="flex gap-1">
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                data-testid={`button-edit-bid-${bid.id}`}
+                                onClick={() => startEditBid(bid)}
+                              >
+                                <Pencil className="w-3 h-3" />
+                              </Button>
+                              <Button
+                                variant="destructive"
+                                size="icon"
+                                data-testid={`button-delete-bid-${bid.id}`}
+                                onClick={() => setDeleteConfirmBidId(bid.id)}
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          )}
+                        </div>
                       )}
                     </div>
                   ))}

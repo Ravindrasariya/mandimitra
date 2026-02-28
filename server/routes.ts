@@ -7,6 +7,9 @@ import { format } from "date-fns";
 import multer from "multer";
 import path from "path";
 import fs from "fs";
+import { db } from "./db";
+import { transactions } from "@shared/schema";
+import { eq, and } from "drizzle-orm";
 
 const uploadsDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
@@ -673,13 +676,25 @@ export async function registerRoutes(
   });
 
   app.patch("/api/bids/:id", requireAuth, async (req, res) => {
-    const updated = await storage.updateBid(paramId(req.params.id), req.user!.businessId, req.body);
+    const bidId = paramId(req.params.id);
+    const businessId = req.user!.businessId;
+    const existingTx = await db.select({ id: transactions.id }).from(transactions)
+      .where(and(eq(transactions.bidId, bidId), eq(transactions.businessId, businessId), eq(transactions.isReversed, false)))
+      .limit(1);
+    if (existingTx.length > 0) return res.status(400).json({ message: "Cannot edit a bid that has an active transaction" });
+    const updated = await storage.updateBid(bidId, businessId, req.body);
     if (!updated) return res.status(404).json({ message: "Bid not found" });
     res.json(updated);
   });
 
   app.delete("/api/bids/:id", requireAuth, async (req, res) => {
-    await storage.deleteBid(paramId(req.params.id), req.user!.businessId);
+    const bidId = paramId(req.params.id);
+    const businessId = req.user!.businessId;
+    const existingTx = await db.select({ id: transactions.id }).from(transactions)
+      .where(and(eq(transactions.bidId, bidId), eq(transactions.businessId, businessId), eq(transactions.isReversed, false)))
+      .limit(1);
+    if (existingTx.length > 0) return res.status(400).json({ message: "Cannot delete a bid that has an active transaction" });
+    await storage.deleteBid(bidId, businessId);
     res.json({ message: "Deleted" });
   });
 
