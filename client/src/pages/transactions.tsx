@@ -17,7 +17,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Receipt, Pencil, Printer, ChevronDown, ChevronRight, Calendar, Package, Users, Landmark, HandCoins, Download, History, Share2 } from "lucide-react";
+import { Receipt, Pencil, Printer, ChevronDown, ChevronRight, Calendar, Package, Users, Landmark, HandCoins, Download, History, Share2, Calculator, Plus, X, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { useAuth } from "@/lib/auth";
 import { printReceipt, shareReceiptAsPdf } from "@/lib/receiptUtils";
@@ -311,6 +311,8 @@ export default function TransactionsPage() {
   const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
 
   const [netWeightInput, setNetWeightInput] = useState("");
+  const [showWeightCalc, setShowWeightCalc] = useState(false);
+  const [sampleWeightsMap, setSampleWeightsMap] = useState<Record<number, string[]>>({});
   const [extraChargesFarmer, setExtraChargesFarmer] = useState("0");
   const [extraChargesBuyer, setExtraChargesBuyer] = useState("0");
   const [extraPerKgFarmer, setExtraPerKgFarmer] = useState("0");
@@ -1197,7 +1199,7 @@ export default function TransactionsPage() {
         </div>
       )}
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setShowWeightCalc(false); }}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{isEditing ? t("transactions.editTransaction") : t("transactions.createTransaction")}</DialogTitle>
@@ -1251,17 +1253,131 @@ export default function TransactionsPage() {
 
               <div className="space-y-1">
                 <Label>{t("transactions.netWeight")}</Label>
-                <Input
-                  data-testid="input-net-weight"
-                  type="text"
-                  inputMode="decimal"
-                  value={netWeightInput}
-                  onChange={(e) => setNetWeightInput(e.target.value)}
-                  onFocus={(e) => e.target.select()}
-                  placeholder="0.00"
-                  className="mobile-touch-target"
-                />
+                <div className="flex gap-2">
+                  <Input
+                    data-testid="input-net-weight"
+                    type="text"
+                    inputMode="decimal"
+                    value={netWeightInput}
+                    onChange={(e) => setNetWeightInput(e.target.value)}
+                    onFocus={(e) => e.target.select()}
+                    placeholder="0.00"
+                    className="mobile-touch-target flex-1"
+                  />
+                  <Button
+                    data-testid="button-calculate-weight"
+                    type="button"
+                    variant={showWeightCalc ? "default" : "outline"}
+                    size="sm"
+                    className="whitespace-nowrap mobile-touch-target"
+                    onClick={() => {
+                      if (!showWeightCalc && selectedBid) {
+                        const bidId = selectedBid.id;
+                        if (!sampleWeightsMap[bidId]) {
+                          setSampleWeightsMap(prev => ({ ...prev, [bidId]: ["", "", ""] }));
+                        }
+                      }
+                      setShowWeightCalc(!showWeightCalc);
+                    }}
+                  >
+                    <Calculator className="h-4 w-4 mr-1" />
+                    Calc Wt
+                  </Button>
+                </div>
                 <p className="text-xs text-muted-foreground">Total - {bags} bags</p>
+
+                {showWeightCalc && selectedBid && (() => {
+                  const bidId = selectedBid.id;
+                  const samples = sampleWeightsMap[bidId] || ["", "", ""];
+                  const nonZeroWeights = samples.map(s => parseFloat(s) || 0).filter(w => w > 0);
+                  const average = nonZeroWeights.length > 0 ? nonZeroWeights.reduce((a, b) => a + b, 0) / nonZeroWeights.length : 0;
+                  const hasWarning = samples.some(s => (parseFloat(s) || 0) > 100);
+
+                  const updateSample = (idx: number, val: string) => {
+                    const updated = [...samples];
+                    updated[idx] = val;
+                    setSampleWeightsMap(prev => ({ ...prev, [bidId]: updated }));
+                    const nzw = updated.map(s => parseFloat(s) || 0).filter(w => w > 0);
+                    if (nzw.length > 0) {
+                      const avg = nzw.reduce((a, b) => a + b, 0) / nzw.length;
+                      setNetWeightInput((avg * bags).toFixed(2));
+                    }
+                  };
+
+                  const addSample = () => {
+                    setSampleWeightsMap(prev => ({ ...prev, [bidId]: [...samples, ""] }));
+                  };
+
+                  const removeSample = (idx: number) => {
+                    if (samples.length <= 1) return;
+                    const updated = samples.filter((_, i) => i !== idx);
+                    setSampleWeightsMap(prev => ({ ...prev, [bidId]: updated }));
+                    const nzw = updated.map(s => parseFloat(s) || 0).filter(w => w > 0);
+                    if (nzw.length > 0) {
+                      const avg = nzw.reduce((a, b) => a + b, 0) / nzw.length;
+                      setNetWeightInput((avg * bags).toFixed(2));
+                    }
+                  };
+
+                  return (
+                    <div className="bg-muted/50 rounded-md p-2 space-y-2 mt-1" data-testid="weight-calculator">
+                      <p className="text-xs font-semibold text-muted-foreground">Sample Bag Weights (kg)</p>
+                      {samples.map((w, idx) => (
+                        <div key={idx} className="space-y-0.5">
+                          <div className="flex items-center gap-1">
+                            <span className="text-xs text-muted-foreground w-5">{idx + 1}.</span>
+                            <Input
+                              data-testid={`input-sample-weight-${idx}`}
+                              type="text"
+                              inputMode="decimal"
+                              value={w}
+                              onChange={(e) => updateSample(idx, e.target.value)}
+                              onFocus={(e) => e.target.select()}
+                              placeholder="0.00"
+                              className="h-7 text-xs flex-1"
+                            />
+                            {samples.length > 1 && (
+                              <Button
+                                data-testid={`button-remove-sample-${idx}`}
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 w-7 p-0"
+                                onClick={() => removeSample(idx)}
+                              >
+                                <X className="h-3 w-3" />
+                              </Button>
+                            )}
+                          </div>
+                          {(parseFloat(w) || 0) > 100 && (
+                            <p className="text-xs text-orange-500 font-medium ml-6 flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> Over 100kg — please double check</p>
+                          )}
+                        </div>
+                      ))}
+                      <Button
+                        data-testid="button-add-sample"
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-7 text-xs w-full"
+                        onClick={addSample}
+                      >
+                        <Plus className="h-3 w-3 mr-1" /> Add Sample
+                      </Button>
+                      {hasWarning && (
+                        <p className="text-xs text-orange-500 font-medium flex items-center gap-1"><AlertTriangle className="h-3 w-3" /> One or more bags weigh over 100kg</p>
+                      )}
+                      <div className="border-t pt-1 flex justify-between text-xs font-medium">
+                        <span>Average ({nonZeroWeights.length} samples):</span>
+                        <span>{average > 0 ? `${average.toFixed(2)} kg` : "—"}</span>
+                      </div>
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>Net Weight ({average.toFixed(2)} × {bags} bags):</span>
+                        <span>{average > 0 ? `${(average * bags).toFixed(2)} kg` : "—"}</span>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
 
               <div className="grid grid-cols-2 gap-2 text-xs" data-testid="charge-rates-display">
