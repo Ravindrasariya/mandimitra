@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -49,6 +49,10 @@ export default function StockEntryPage() {
   const [district, setDistrict, clearDistrict] = usePersistedState("se-district", "");
   const [state] = useState("Madhya Pradesh");
   const [entryDate, setEntryDate, clearEntryDate] = usePersistedState("se-entryDate", format(new Date(), "yyyy-MM-dd"));
+
+  useEffect(() => {
+    setEntryDate(format(new Date(), "yyyy-MM-dd"));
+  }, []);
 
   const [vehicleNumber, setVehicleNumber, clearVehicleNumber] = usePersistedState("se-vehicleNumber", "");
   const [driverName, setDriverName, clearDriverName] = usePersistedState("se-driverName", "");
