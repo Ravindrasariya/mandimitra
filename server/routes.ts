@@ -638,6 +638,12 @@ export async function registerRoutes(
       if (!lot) return res.status(404).json({ message: "Lot not found" });
       if (lot.isReturned) return res.status(400).json({ message: "Lot is already returned" });
 
+      const lotBids = await storage.getBids(businessId, lotId);
+      const pendingBids = lotBids.filter(b => !b.hasTransaction);
+      if (pendingBids.length > 0) {
+        return res.status(400).json({ message: "This lot has active bids. Please return bids to stock register first before returning to farmer." });
+      }
+
       const actual = lot.actualNumberOfBags ?? lot.numberOfBags;
       const soldBags = actual - lot.remainingBags;
 

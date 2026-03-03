@@ -881,15 +881,21 @@ export default function StockRegisterPage() {
                         {getStatusBadge(lot)}
                       </div>
                       {!isReturned && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-7 text-xs text-destructive border-destructive/30"
-                          data-testid={`button-return-lot-${lot.id}`}
-                          onClick={() => { setReturningLot(lot); setReturnConfirmOpen(true); }}
-                        >
-                          {t("stockRegister.returnToFarmer")}
-                        </Button>
+                        (lot as any).hasPendingBids ? (
+                          <span className="text-xs text-muted-foreground italic" data-testid={`text-pending-bids-${lot.id}`}>
+                            Return bids to stock first
+                          </span>
+                        ) : (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="h-7 text-xs text-destructive border-destructive/30"
+                            data-testid={`button-return-lot-${lot.id}`}
+                            onClick={() => { setReturningLot(lot); setReturnConfirmOpen(true); }}
+                          >
+                            {t("stockRegister.returnToFarmer")}
+                          </Button>
+                        )
                       )}
                     </div>
 

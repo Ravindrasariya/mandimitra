@@ -62,7 +62,7 @@ export interface IStorage {
   getTransactionEditHistory(transactionId: number, businessId: number): Promise<TransactionEditHistory[]>;
   createTransactionEditHistory(entry: InsertTransactionEditHistory): Promise<TransactionEditHistory>;
 
-  getLots(businessId: number, filters?: { crop?: string; date?: string; search?: string }): Promise<(Lot & { farmer: Farmer })[]>;
+  getLots(businessId: number, filters?: { crop?: string; date?: string; search?: string }): Promise<(Lot & { farmer: Farmer; hasPendingBids?: boolean })[]>;
   getLot(id: number, businessId: number): Promise<(Lot & { farmer: Farmer }) | undefined>;
   createLot(lot: InsertLot): Promise<Lot>;
   updateLot(id: number, businessId: number, data: Partial<InsertLot>): Promise<Lot | undefined>;
@@ -535,7 +535,7 @@ export class DatabaseStorage implements IStorage {
     return results;
   }
 
-  async getLots(businessId: number, filters?: { crop?: string; date?: string; search?: string }): Promise<(Lot & { farmer: Farmer })[]> {
+  async getLots(businessId: number, filters?: { crop?: string; date?: string; search?: string }): Promise<(Lot & { farmer: Farmer; hasPendingBids?: boolean })[]> {
     let conditions = [eq(lots.businessId, businessId)];
     if (filters?.crop) conditions.push(eq(lots.crop, filters.crop));
     if (filters?.date) conditions.push(eq(lots.date, filters.date));
@@ -548,7 +548,26 @@ export class DatabaseStorage implements IStorage {
       .where(and(...conditions))
       .orderBy(desc(lots.createdAt));
 
-    let mapped = results.map(r => ({ ...r.lot, farmer: r.farmer }));
+    const lotIds = results.map(r => r.lot.id);
+    let pendingBidLotIds = new Set<number>();
+    if (lotIds.length > 0) {
+      const allBidsForLots = await db.select({ lotId: bids.lotId, bidId: bids.id }).from(bids)
+        .where(and(eq(bids.businessId, businessId), sql`${bids.lotId} IN (${sql.join(lotIds.map(id => sql`${id}`), sql`, `)})`));
+      const bidIds = allBidsForLots.map(b => b.bidId);
+      let transactedBidIds = new Set<number>();
+      if (bidIds.length > 0) {
+        const activeTransactions = await db.select({ bidId: transactions.bidId }).from(transactions)
+          .where(and(eq(transactions.businessId, businessId), eq(transactions.isReversed, false), sql`${transactions.bidId} IN (${sql.join(bidIds.map(id => sql`${id}`), sql`, `)})`));
+        transactedBidIds = new Set(activeTransactions.map(t => t.bidId));
+      }
+      for (const b of allBidsForLots) {
+        if (!transactedBidIds.has(b.bidId)) {
+          pendingBidLotIds.add(b.lotId);
+        }
+      }
+    }
+
+    let mapped = results.map(r => ({ ...r.lot, farmer: r.farmer, hasPendingBids: pendingBidLotIds.has(r.lot.id) }));
 
     if (filters?.search) {
       const s = filters.search.toLowerCase();
