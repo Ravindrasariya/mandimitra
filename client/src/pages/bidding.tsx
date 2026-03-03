@@ -658,6 +658,9 @@ export default function BiddingPage() {
                       </span>
                     )}
                   </div>
+                  <div className="text-xs text-muted-foreground" data-testid={`text-total-bags-${serialNumber}`}>
+                    Total: {groupLots.reduce((sum, l) => sum + (l.actualNumberOfBags ?? l.numberOfBags), 0)} bags
+                  </div>
 
                   <div className="space-y-2">
                     {groupLots.map((lot) => {
