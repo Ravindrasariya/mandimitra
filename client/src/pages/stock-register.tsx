@@ -880,7 +880,7 @@ export default function StockRegisterPage() {
                         <Badge variant="outline" className="text-xs">{lot.crop}</Badge>
                         {getStatusBadge(lot)}
                       </div>
-                      {!isReturned && (
+                      {!isReturned && lot.remainingBags > 0 && (
                         (lot as any).hasPendingBids ? (
                           <span className="text-xs text-muted-foreground italic" data-testid={`text-pending-bids-${lot.id}`}>
                             Return bids to stock first
