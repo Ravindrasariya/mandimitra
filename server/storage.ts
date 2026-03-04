@@ -293,6 +293,21 @@ export class DatabaseStorage implements IStorage {
       const txnDue = Math.max(0, totalPayable - totalTxnPaid);
       const salesCount = txnRows.length;
 
+      const advanceRows = await db.select({
+        advance: sql<string>`coalesce(${lots.farmerAdvanceAmount}, '0')`,
+        sn: lots.serialNumber,
+        dt: lots.date,
+      }).from(lots).where(and(eq(lots.businessId, businessId), eq(lots.farmerId, farmer.id)));
+      const seenSr = new Set<string>();
+      let totalAdvance = 0;
+      for (const r of advanceRows) {
+        const key = `${r.dt}-${r.sn}`;
+        if (!seenSr.has(key)) {
+          seenSr.add(key);
+          totalAdvance += parseFloat(r.advance || "0");
+        }
+      }
+
       const openingBal = parseFloat(farmer.openingBalance || "0");
       let openingDue = 0;
       if (openingBal > 0) {
@@ -308,7 +323,7 @@ export class DatabaseStorage implements IStorage {
         openingDue = Math.max(0, openingBal - parseFloat(openingPaidSum[0]?.total || "0"));
       }
 
-      const totalDue = txnDue + openingDue;
+      const totalDue = Math.max(0, txnDue + openingDue - totalAdvance);
 
       const farmerLotDates = lotDateMap.get(farmer.id);
       results.push({

@@ -1035,9 +1035,10 @@ export default function TransactionsPage() {
           {filteredSerialGroups.map((sg) => {
             const activeTxns = sg.allCompletedTxns.filter(t => !t.isReversed);
             const hasCompleted = activeTxns.length > 0;
+            const sgAdvance = parseFloat(sg.lotGroups[0]?.lot?.farmerAdvanceAmount || "0");
             const totalFarmerPayable = activeTxns.reduce(
               (s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0
-            );
+            ) - sgAdvance;
             const isBilled = sg.lotGroups.every(lg => lg.lot.remainingBags === 0) && sg.allPendingBids.length === 0;
 
             return (
@@ -1125,7 +1126,7 @@ export default function TransactionsPage() {
                   </div>
 
                   {hasCompleted && (() => {
-                    const farmerTotalPayable = activeTxns.reduce((s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0);
+                    const farmerTotalPayable = activeTxns.reduce((s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0) - sgAdvance;
                     const farmerTotalPaid = activeTxns.reduce((s, t) => s + parseFloat(t.farmerPaidAmount || "0"), 0);
                     const fStatus = farmerTotalPaid >= farmerTotalPayable ? "paid" : farmerTotalPaid > 0 ? "partial" : "due";
                     return (
