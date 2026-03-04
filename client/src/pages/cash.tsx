@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import type { Farmer, Buyer, CashEntry, BankAccount } from "@shared/schema";
-import { Wallet, Settings, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Download, RotateCcw, Trash2, Plus, Filter, X, Search, ChevronsUpDown } from "lucide-react";
+import { Wallet, Settings, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Download, RotateCcw, Trash2, Plus, Filter, X, Search, ChevronsUpDown, Pencil, Check } from "lucide-react";
 import { format } from "date-fns";
 
 type BuyerWithDues = Buyer & { receivableDue: string; overallDue: string };
@@ -43,6 +43,8 @@ export default function CashPage() {
   const [reverseConfirmEntry, setReverseConfirmEntry] = useState<CashEntry | null>(null);
   const [chequeBounceEntry, setChequeBounceEntry] = useState<CashEntry | null>(null);
   const [deleteAccountId, setDeleteAccountId] = useState<number | null>(null);
+  const [editingAccountId, setEditingAccountId] = useState<number | null>(null);
+  const [editAccountData, setEditAccountData] = useState({ name: "", accountType: "Current", openingBalance: "0" });
 
   const [filterCategory, setFilterCategory] = usePersistedState("cash-filterCategory", "all");
   const [filterPaymentMode, setFilterPaymentMode] = usePersistedState("cash-filterPayMode", "all");
@@ -344,6 +346,19 @@ export default function CashPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
       setDeleteAccountId(null);
       toast({ title: "Account Deleted", variant: "success" });
+    },
+  });
+
+  const updateBankMutation = useMutation({
+    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+      const res = await apiRequest("PATCH", `/api/bank-accounts/${id}`, data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash-entries"] });
+      setEditingAccountId(null);
+      toast({ title: t("common.saved"), variant: "success" });
     },
   });
 
@@ -1645,15 +1660,59 @@ export default function CashPage() {
             <div className="border-t pt-3 space-y-3">
               <Label className="text-sm font-medium">{t("cash.bankAccounts")}</Label>
               {bankAccountsList.map(account => (
-                <div key={account.id} className="flex items-center gap-2 p-2 bg-muted/30 rounded text-sm">
-                  <div className="flex-1 min-w-0">
-                    <p className="font-medium truncate">{account.name}</p>
-                    <p className="text-xs text-muted-foreground">{account.accountType} • Opening: ₹{parseFloat(account.openingBalance || "0").toLocaleString("en-IN")}</p>
+                editingAccountId === account.id ? (
+                  <div key={account.id} className="space-y-2 p-2.5 bg-muted/30 rounded border border-primary/30 text-sm" data-testid={`edit-bank-row-${account.id}`}>
+                    <Input
+                      value={editAccountData.name}
+                      onChange={e => setEditAccountData(d => ({ ...d, name: e.target.value }))}
+                      className="h-8 text-sm"
+                      data-testid={`input-edit-bank-name-${account.id}`}
+                    />
+                    <Select value={editAccountData.accountType} onValueChange={v => setEditAccountData(d => ({ ...d, accountType: v }))}>
+                      <SelectTrigger className="h-8 text-sm" data-testid={`select-edit-bank-type-${account.id}`}><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Limit">Limit</SelectItem>
+                        <SelectItem value="Current">Current</SelectItem>
+                        <SelectItem value="Saving">Saving</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      type="number" inputMode="decimal"
+                      value={editAccountData.openingBalance}
+                      onChange={e => setEditAccountData(d => ({ ...d, openingBalance: e.target.value }))}
+                      onFocus={e => e.target.select()}
+                      className="h-8 text-sm"
+                      data-testid={`input-edit-bank-balance-${account.id}`}
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm" className="flex-1 h-8"
+                        disabled={!editAccountData.name || updateBankMutation.isPending}
+                        onClick={() => updateBankMutation.mutate({ id: account.id, data: editAccountData })}
+                        data-testid={`button-save-edit-bank-${account.id}`}
+                      >
+                        <Check className="w-3.5 h-3.5 mr-1" />
+                        {updateBankMutation.isPending ? t("common.saving") : t("common.save")}
+                      </Button>
+                      <Button variant="outline" size="sm" className="h-8" onClick={() => setEditingAccountId(null)} data-testid={`button-cancel-edit-bank-${account.id}`}>
+                        {t("common.cancel")}
+                      </Button>
+                    </div>
                   </div>
-                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive shrink-0" onClick={() => setDeleteAccountId(account.id)} data-testid={`delete-bank-${account.id}`}>
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
+                ) : (
+                  <div key={account.id} className="flex items-center gap-2 p-2 bg-muted/30 rounded text-sm">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium truncate">{account.name}</p>
+                      <p className="text-xs text-muted-foreground">{account.accountType} • Opening: ₹{parseFloat(account.openingBalance || "0").toLocaleString("en-IN")}</p>
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 shrink-0" onClick={() => { setEditingAccountId(account.id); setEditAccountData({ name: account.name, accountType: account.accountType, openingBalance: account.openingBalance || "0" }); }} data-testid={`edit-bank-${account.id}`}>
+                      <Pencil className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive shrink-0" onClick={() => setDeleteAccountId(account.id)} data-testid={`delete-bank-${account.id}`}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                )
               ))}
 
               <div className="space-y-2 border rounded-lg p-3">
