@@ -225,11 +225,18 @@ export default function DashboardPage() {
   const buyerDuesDistribution = useMemo(() => {
     const filtered = filteredBuyersWithDues.filter(b => parseFloat(b.overallDue) > 0);
     const total = filtered.reduce((s, b) => s + parseFloat(b.overallDue), 0);
-    return filtered.map(b => ({
+    const sorted = filtered.map(b => ({
       name: b.name,
       value: Math.round(parseFloat(b.overallDue)),
       pct: total > 0 ? ((parseFloat(b.overallDue) / total) * 100).toFixed(1) : "0",
     })).sort((a, b) => b.value - a.value);
+    if (sorted.length <= 7) return sorted;
+    const top7 = sorted.slice(0, 7);
+    const othersValue = sorted.slice(7).reduce((s, b) => s + b.value, 0);
+    if (othersValue > 0) {
+      top7.push({ name: "Others", value: othersValue, pct: total > 0 ? ((othersValue / total) * 100).toFixed(1) : "0" });
+    }
+    return top7;
   }, [filteredBuyersWithDues]);
 
   const timeSeriesData = useMemo(() => {
