@@ -230,13 +230,13 @@ export default function DashboardPage() {
       value: Math.round(parseFloat(b.overallDue)),
       pct: total > 0 ? ((parseFloat(b.overallDue) / total) * 100).toFixed(1) : "0",
     })).sort((a, b) => b.value - a.value);
-    if (sorted.length <= 7) return sorted;
-    const top7 = sorted.slice(0, 7);
-    const othersValue = sorted.slice(7).reduce((s, b) => s + b.value, 0);
+    if (sorted.length <= 5) return sorted;
+    const top5 = sorted.slice(0, 5);
+    const othersValue = sorted.slice(5).reduce((s, b) => s + b.value, 0);
     if (othersValue > 0) {
-      top7.push({ name: "Others", value: othersValue, pct: total > 0 ? ((othersValue / total) * 100).toFixed(1) : "0" });
+      top5.push({ name: "Others", value: othersValue, pct: total > 0 ? ((othersValue / total) * 100).toFixed(1) : "0" });
     }
-    return top7;
+    return top5;
   }, [filteredBuyersWithDues]);
 
   const timeSeriesData = useMemo(() => {
