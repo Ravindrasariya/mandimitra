@@ -14,7 +14,13 @@ import {
   type CashSettings, type InsertCashSettings,
   type CashEntry, type InsertCashEntry,
   type BusinessChargeSettings, type InsertBusinessChargeSettings,
+  type Asset, type InsertAsset,
+  type AssetDepreciationLog, type InsertAssetDepreciationLog,
+  type Liability, type InsertLiability,
+  type LiabilityPayment, type InsertLiabilityPayment,
   users, businesses, farmers, farmerEditHistory, buyers, buyerEditHistory, lotEditHistory, transactionEditHistory, lots, bids, transactions, bankAccounts, cashSettings, cashEntries, businessChargeSettings,
+  assets, assetDepreciationLog, liabilities, liabilityPayments,
+  ASSET_DEPRECIATION_RATES,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, ilike, or, sql, desc, asc, gte, lte, ne, isNotNull } from "drizzle-orm";
@@ -101,6 +107,27 @@ export interface IStorage {
 
   getFarmerLedger(businessId: number, farmerId: number, dateFrom?: string, dateTo?: string): Promise<{ transactions: Transaction[]; cashEntries: CashEntry[]; farmer: Farmer }>;
   getBuyerLedger(businessId: number, buyerId: number, dateFrom?: string, dateTo?: string): Promise<{ transactions: Transaction[]; cashEntries: CashEntry[]; buyer: Buyer }>;
+
+  getAssets(businessId: number): Promise<Asset[]>;
+  getAsset(id: number, businessId: number): Promise<Asset | undefined>;
+  createAsset(asset: InsertAsset): Promise<Asset>;
+  updateAsset(id: number, businessId: number, data: Partial<InsertAsset>): Promise<Asset | undefined>;
+  deleteAsset(id: number, businessId: number): Promise<void>;
+  getAssetDepreciationLog(assetId: number, businessId: number): Promise<AssetDepreciationLog[]>;
+  runDepreciation(businessId: number, fy: string): Promise<AssetDepreciationLog[]>;
+
+  getLiabilities(businessId: number): Promise<Liability[]>;
+  getLiability(id: number, businessId: number): Promise<Liability | undefined>;
+  createLiability(liability: InsertLiability): Promise<Liability>;
+  updateLiability(id: number, businessId: number, data: Partial<InsertLiability>): Promise<Liability | undefined>;
+  deleteLiability(id: number, businessId: number): Promise<void>;
+  getLiabilityPayments(liabilityId: number, businessId: number): Promise<LiabilityPayment[]>;
+  createLiabilityPayment(payment: InsertLiabilityPayment): Promise<LiabilityPayment>;
+  reverseLiabilityPayment(id: number, businessId: number): Promise<LiabilityPayment | undefined>;
+  settleLiability(id: number, businessId: number): Promise<Liability | undefined>;
+
+  getBalanceSheet(businessId: number, fy: string): Promise<any>;
+  getProfitAndLoss(businessId: number, fy: string): Promise<any>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1303,6 +1330,311 @@ export class DatabaseStorage implements IStorage {
     const cash = await db.select().from(cashEntries).where(and(...cashConditions)).orderBy(asc(cashEntries.date));
 
     return { transactions: txns, cashEntries: cash, buyer };
+  }
+
+  async getAssets(businessId: number): Promise<Asset[]> {
+    return db.select().from(assets).where(eq(assets.businessId, businessId)).orderBy(desc(assets.createdAt));
+  }
+
+  async getAsset(id: number, businessId: number): Promise<Asset | undefined> {
+    const [asset] = await db.select().from(assets).where(and(eq(assets.id, id), eq(assets.businessId, businessId)));
+    return asset;
+  }
+
+  async createAsset(asset: InsertAsset): Promise<Asset> {
+    const [created] = await db.insert(assets).values(asset).returning();
+    return created;
+  }
+
+  async updateAsset(id: number, businessId: number, data: Partial<InsertAsset>): Promise<Asset | undefined> {
+    const [updated] = await db.update(assets).set(data).where(and(eq(assets.id, id), eq(assets.businessId, businessId))).returning();
+    return updated;
+  }
+
+  async deleteAsset(id: number, businessId: number): Promise<void> {
+    await db.delete(assetDepreciationLog).where(and(eq(assetDepreciationLog.assetId, id), eq(assetDepreciationLog.businessId, businessId)));
+    await db.delete(assets).where(and(eq(assets.id, id), eq(assets.businessId, businessId)));
+  }
+
+  async getAssetDepreciationLog(assetId: number, businessId: number): Promise<AssetDepreciationLog[]> {
+    return db.select().from(assetDepreciationLog).where(and(eq(assetDepreciationLog.assetId, assetId), eq(assetDepreciationLog.businessId, businessId))).orderBy(asc(assetDepreciationLog.financialYear));
+  }
+
+  async runDepreciation(businessId: number, fy: string): Promise<AssetDepreciationLog[]> {
+    const parts = fy.split("-");
+    const fyStartYear = parseInt(parts[0]);
+    const fyStart = new Date(fyStartYear, 3, 1);
+    const fyEnd = new Date(fyStartYear + 1, 2, 31);
+
+    const allAssets = await db.select().from(assets).where(and(eq(assets.businessId, businessId), eq(assets.isDisposed, false)));
+
+    const results: AssetDepreciationLog[] = [];
+    for (const asset of allAssets) {
+      const purchaseDate = new Date(asset.purchaseDate);
+      if (purchaseDate > fyEnd) continue;
+
+      const existingLog = await db.select().from(assetDepreciationLog)
+        .where(and(eq(assetDepreciationLog.assetId, asset.id), eq(assetDepreciationLog.financialYear, fy)));
+
+      const prevLogs = await db.select().from(assetDepreciationLog)
+        .where(and(eq(assetDepreciationLog.assetId, asset.id), eq(assetDepreciationLog.businessId, businessId)))
+        .orderBy(desc(assetDepreciationLog.financialYear));
+
+      let openingValue = parseFloat(asset.originalCost || "0");
+      if (prevLogs.length > 0) {
+        const latestBefore = prevLogs.find(l => l.financialYear < fy);
+        if (latestBefore) openingValue = parseFloat(latestBefore.closingValue || "0");
+      }
+
+      if (openingValue <= 0) continue;
+
+      let monthsUsed = 12;
+      if (purchaseDate >= fyStart && purchaseDate <= fyEnd) {
+        const purchaseMonth = purchaseDate.getMonth();
+        const fyMonthIndex = purchaseMonth >= 3 ? purchaseMonth - 3 : purchaseMonth + 9;
+        monthsUsed = 12 - fyMonthIndex;
+        monthsUsed = Math.max(1, Math.min(12, monthsUsed));
+      }
+
+      const rate = parseFloat(asset.depreciationRate || "10");
+      const depAmount = Math.round((openingValue * rate / 100 * monthsUsed / 12) * 100) / 100;
+      const closingValue = Math.round((openingValue - depAmount) * 100) / 100;
+
+      if (existingLog.length > 0) {
+        const [updated] = await db.update(assetDepreciationLog).set({
+          openingValue: openingValue.toFixed(2),
+          depreciationAmount: depAmount.toFixed(2),
+          closingValue: closingValue.toFixed(2),
+          monthsUsed,
+        }).where(eq(assetDepreciationLog.id, existingLog[0].id)).returning();
+        results.push(updated);
+      } else {
+        const [created] = await db.insert(assetDepreciationLog).values({
+          assetId: asset.id,
+          businessId,
+          financialYear: fy,
+          openingValue: openingValue.toFixed(2),
+          depreciationAmount: depAmount.toFixed(2),
+          closingValue: closingValue.toFixed(2),
+          monthsUsed,
+        }).returning();
+        results.push(created);
+      }
+
+      await db.update(assets).set({ currentBookValue: closingValue.toFixed(2) }).where(eq(assets.id, asset.id));
+    }
+
+    return results;
+  }
+
+  async getLiabilities(businessId: number): Promise<Liability[]> {
+    return db.select().from(liabilities).where(eq(liabilities.businessId, businessId)).orderBy(desc(liabilities.createdAt));
+  }
+
+  async getLiability(id: number, businessId: number): Promise<Liability | undefined> {
+    const [liability] = await db.select().from(liabilities).where(and(eq(liabilities.id, id), eq(liabilities.businessId, businessId)));
+    return liability;
+  }
+
+  async createLiability(liability: InsertLiability): Promise<Liability> {
+    const [created] = await db.insert(liabilities).values(liability).returning();
+    return created;
+  }
+
+  async updateLiability(id: number, businessId: number, data: Partial<InsertLiability>): Promise<Liability | undefined> {
+    const [updated] = await db.update(liabilities).set(data).where(and(eq(liabilities.id, id), eq(liabilities.businessId, businessId))).returning();
+    return updated;
+  }
+
+  async deleteLiability(id: number, businessId: number): Promise<void> {
+    await db.delete(liabilityPayments).where(and(eq(liabilityPayments.liabilityId, id), eq(liabilityPayments.businessId, businessId)));
+    await db.delete(liabilities).where(and(eq(liabilities.id, id), eq(liabilities.businessId, businessId)));
+  }
+
+  async getLiabilityPayments(liabilityId: number, businessId: number): Promise<LiabilityPayment[]> {
+    return db.select().from(liabilityPayments).where(and(eq(liabilityPayments.liabilityId, liabilityId), eq(liabilityPayments.businessId, businessId))).orderBy(desc(liabilityPayments.paymentDate));
+  }
+
+  async createLiabilityPayment(payment: InsertLiabilityPayment): Promise<LiabilityPayment> {
+    const [created] = await db.insert(liabilityPayments).values(payment).returning();
+    const amount = parseFloat(payment.principalAmount?.toString() || "0");
+    if (amount > 0) {
+      const liability = await this.getLiability(payment.liabilityId, payment.businessId);
+      if (liability) {
+        const newOutstanding = Math.max(0, parseFloat(liability.outstandingAmount || "0") - amount);
+        await db.update(liabilities).set({ outstandingAmount: newOutstanding.toFixed(2) }).where(eq(liabilities.id, payment.liabilityId));
+      }
+    }
+    return created;
+  }
+
+  async reverseLiabilityPayment(id: number, businessId: number): Promise<LiabilityPayment | undefined> {
+    const [payment] = await db.select().from(liabilityPayments).where(and(eq(liabilityPayments.id, id), eq(liabilityPayments.businessId, businessId)));
+    if (!payment || payment.isReversed) return payment;
+
+    const [updated] = await db.update(liabilityPayments).set({ isReversed: true }).where(eq(liabilityPayments.id, id)).returning();
+    const principalAmount = parseFloat(payment.principalAmount || "0");
+    if (principalAmount > 0) {
+      const liability = await this.getLiability(payment.liabilityId, businessId);
+      if (liability) {
+        const newOutstanding = parseFloat(liability.outstandingAmount || "0") + principalAmount;
+        await db.update(liabilities).set({ outstandingAmount: newOutstanding.toFixed(2) }).where(eq(liabilities.id, payment.liabilityId));
+      }
+    }
+    return updated;
+  }
+
+  async settleLiability(id: number, businessId: number): Promise<Liability | undefined> {
+    const today = new Date().toISOString().split("T")[0];
+    const [updated] = await db.update(liabilities).set({ isSettled: true, settledDate: today, outstandingAmount: "0" }).where(and(eq(liabilities.id, id), eq(liabilities.businessId, businessId))).returning();
+    return updated;
+  }
+
+  async getBalanceSheet(businessId: number, fy: string): Promise<any> {
+    const parts = fy.split("-");
+    const fyEndYear = parseInt(parts[0]) + 1;
+
+    const allAssets = await db.select().from(assets).where(and(eq(assets.businessId, businessId), eq(assets.isDisposed, false)));
+    const fixedAssetsByCategory: Record<string, number> = {};
+    for (const a of allAssets) {
+      const cat = a.category;
+      fixedAssetsByCategory[cat] = (fixedAssetsByCategory[cat] || 0) + parseFloat(a.currentBookValue || "0");
+    }
+    const totalFixedAssets = Object.values(fixedAssetsByCategory).reduce((s, v) => s + v, 0);
+
+    const cashSetting = await this.getCashSettings(businessId);
+    const cashInHand = parseFloat(cashSetting?.cashInHandOpening || "0");
+
+    const bankAccts = await this.getBankAccounts(businessId);
+    let totalBankBalance = 0;
+    const bankDetails: { name: string; balance: number }[] = [];
+    for (const ba of bankAccts) {
+      const opening = parseFloat(ba.openingBalance || "0");
+      const inwardResult = await db.select({
+        total: sql<string>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`
+      }).from(cashEntries).where(and(eq(cashEntries.businessId, businessId), eq(cashEntries.bankAccountId, ba.id), eq(cashEntries.category, "inward"), eq(cashEntries.isReversed, false)));
+      const outwardResult = await db.select({
+        total: sql<string>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`
+      }).from(cashEntries).where(and(eq(cashEntries.businessId, businessId), eq(cashEntries.bankAccountId, ba.id), or(eq(cashEntries.category, "outward"), eq(cashEntries.category, "expense")), eq(cashEntries.isReversed, false)));
+      const balance = opening + parseFloat(inwardResult[0]?.total || "0") - parseFloat(outwardResult[0]?.total || "0");
+      if (ba.accountType === "Limit" && balance < 0) {
+        bankDetails.push({ name: ba.name, balance: 0 });
+      } else {
+        bankDetails.push({ name: ba.name, balance });
+        totalBankBalance += Math.max(0, balance);
+      }
+    }
+
+    const farmersWithDues = await this.getFarmersWithDues(businessId);
+    const farmerReceivable = farmersWithDues.reduce((s, f) => s + parseFloat(f.totalDue || "0"), 0);
+
+    const buyersWithDues = await this.getBuyersWithDues(businessId);
+    const buyerReceivable = buyersWithDues.reduce((s, b) => s + parseFloat(b.receivableDue || "0"), 0);
+
+    const totalCurrentAssets = cashInHand + totalBankBalance + farmerReceivable + buyerReceivable;
+    const totalAssets = totalFixedAssets + totalCurrentAssets;
+
+    const allLiabilities = await this.getLiabilities(businessId);
+    const longTermLiabilities = allLiabilities.filter(l => !l.isSettled);
+    const totalLongTerm = longTermLiabilities.reduce((s, l) => s + parseFloat(l.outstandingAmount || "0"), 0);
+
+    let limitOutstanding = 0;
+    for (const ba of bankAccts) {
+      if (ba.accountType === "Limit") {
+        const opening = parseFloat(ba.openingBalance || "0");
+        const inwardResult = await db.select({
+          total: sql<string>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`
+        }).from(cashEntries).where(and(eq(cashEntries.businessId, businessId), eq(cashEntries.bankAccountId, ba.id), eq(cashEntries.category, "inward"), eq(cashEntries.isReversed, false)));
+        const outwardResult = await db.select({
+          total: sql<string>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`
+        }).from(cashEntries).where(and(eq(cashEntries.businessId, businessId), eq(cashEntries.bankAccountId, ba.id), or(eq(cashEntries.category, "outward"), eq(cashEntries.category, "expense")), eq(cashEntries.isReversed, false)));
+        const balance = opening + parseFloat(inwardResult[0]?.total || "0") - parseFloat(outwardResult[0]?.total || "0");
+        if (balance < 0) limitOutstanding += Math.abs(balance);
+      }
+    }
+
+    const totalLiabilities = totalLongTerm + limitOutstanding;
+    const ownersEquity = totalAssets - totalLiabilities;
+
+    return {
+      fy,
+      fixedAssets: { byCategory: fixedAssetsByCategory, total: totalFixedAssets },
+      currentAssets: {
+        cashInHand,
+        bankBalances: bankDetails,
+        totalBankBalance,
+        farmerReceivable,
+        buyerReceivable,
+        total: totalCurrentAssets,
+      },
+      totalAssets,
+      longTermLiabilities: longTermLiabilities.map(l => ({ name: l.name, type: l.type, outstanding: parseFloat(l.outstandingAmount || "0") })),
+      totalLongTermLiabilities: totalLongTerm,
+      currentLiabilities: { limitOutstanding },
+      totalLiabilities,
+      ownersEquity,
+    };
+  }
+
+  async getProfitAndLoss(businessId: number, fy: string): Promise<any> {
+    const parts = fy.split("-");
+    const fyStartYear = parseInt(parts[0]);
+    const fyStartDate = `${fyStartYear}-04-01`;
+    const fyEndDate = `${fyStartYear + 1}-03-31`;
+
+    const txnRows = await db.select({
+      aadhat: sql<string>`coalesce(sum(cast(${transactions.aadhatCharges} as numeric)), 0)`,
+      mandi: sql<string>`coalesce(sum(cast(${transactions.mandiCharges} as numeric)), 0)`,
+      hammali: sql<string>`coalesce(sum(cast(${transactions.hammaliCharges} as numeric)), 0)`,
+      extraFarmer: sql<string>`coalesce(sum(cast(${transactions.extraChargesFarmer} as numeric)), 0)`,
+      extraBuyer: sql<string>`coalesce(sum(cast(${transactions.extraChargesBuyer} as numeric)), 0)`,
+    }).from(transactions).where(and(
+      eq(transactions.businessId, businessId),
+      eq(transactions.isReversed, false),
+      gte(transactions.date, fyStartDate),
+      lte(transactions.date, fyEndDate),
+    ));
+
+    const aadhatIncome = parseFloat(txnRows[0]?.aadhat || "0");
+    const mandiIncome = parseFloat(txnRows[0]?.mandi || "0");
+    const hammaliIncome = parseFloat(txnRows[0]?.hammali || "0");
+    const extraCharges = parseFloat(txnRows[0]?.extraFarmer || "0") + parseFloat(txnRows[0]?.extraBuyer || "0");
+    const totalIncome = aadhatIncome + mandiIncome + hammaliIncome + extraCharges;
+
+    const depLogs = await db.select({
+      total: sql<string>`coalesce(sum(cast(${assetDepreciationLog.depreciationAmount} as numeric)), 0)`
+    }).from(assetDepreciationLog).where(and(eq(assetDepreciationLog.businessId, businessId), eq(assetDepreciationLog.financialYear, fy)));
+    const depreciation = parseFloat(depLogs[0]?.total || "0");
+
+    const interestResult = await db.select({
+      total: sql<string>`coalesce(sum(cast(${liabilityPayments.interestAmount} as numeric)), 0)`
+    }).from(liabilityPayments).where(and(
+      eq(liabilityPayments.businessId, businessId),
+      eq(liabilityPayments.isReversed, false),
+      gte(liabilityPayments.paymentDate, fyStartDate),
+      lte(liabilityPayments.paymentDate, fyEndDate),
+    ));
+    const interestOnLiabilities = parseFloat(interestResult[0]?.total || "0");
+
+    const totalExpenses = depreciation + interestOnLiabilities;
+    const netProfitLoss = totalIncome - totalExpenses;
+
+    return {
+      fy,
+      income: {
+        aadhatCommission: aadhatIncome,
+        mandiCommission: mandiIncome,
+        hammaliIncome,
+        extraCharges,
+        total: totalIncome,
+      },
+      expenses: {
+        depreciation,
+        interestOnLiabilities,
+        total: totalExpenses,
+      },
+      netProfitLoss,
+    };
   }
 }
 

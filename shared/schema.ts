@@ -307,6 +307,91 @@ export const insertDemoVideoSchema = createInsertSchema(demoVideos).omit({ id: t
 export type DemoVideo = typeof demoVideos.$inferSelect;
 export type InsertDemoVideo = z.infer<typeof insertDemoVideoSchema>;
 
+export const ASSET_CATEGORIES = ["Building", "Plant & Machinery", "Furniture & Fixtures", "Vehicles", "Computers", "Electrical Fittings", "Other"] as const;
+export const ASSET_DEPRECIATION_RATES: Record<string, number> = {
+  "Building": 10,
+  "Plant & Machinery": 15,
+  "Furniture & Fixtures": 10,
+  "Vehicles": 15,
+  "Computers": 40,
+  "Electrical Fittings": 10,
+  "Other": 10,
+};
+
+export const LIABILITY_TYPES = ["Bank Loan", "Equipment Loan", "Credit Line", "Outstanding Payable", "Other"] as const;
+
+export const assets = pgTable("assets", {
+  id: serial("id").primaryKey(),
+  businessId: integer("business_id").notNull().references(() => businesses.id),
+  name: text("name").notNull(),
+  category: text("category").notNull(),
+  purchaseDate: date("purchase_date").notNull(),
+  originalCost: decimal("original_cost", { precision: 12, scale: 2 }).notNull().default("0"),
+  currentBookValue: decimal("current_book_value", { precision: 12, scale: 2 }).notNull().default("0"),
+  depreciationRate: decimal("depreciation_rate", { precision: 5, scale: 2 }).notNull().default("10"),
+  assetType: text("asset_type").notNull().default("opening"),
+  isDisposed: boolean("is_disposed").notNull().default(false),
+  disposalDate: date("disposal_date"),
+  disposalAmount: decimal("disposal_amount", { precision: 12, scale: 2 }),
+  disposalReason: text("disposal_reason"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertAssetSchema = createInsertSchema(assets).omit({ id: true, createdAt: true });
+export type Asset = typeof assets.$inferSelect;
+export type InsertAsset = z.infer<typeof insertAssetSchema>;
+
+export const assetDepreciationLog = pgTable("asset_depreciation_log", {
+  id: serial("id").primaryKey(),
+  assetId: integer("asset_id").notNull().references(() => assets.id),
+  businessId: integer("business_id").notNull().references(() => businesses.id),
+  financialYear: text("financial_year").notNull(),
+  openingValue: decimal("opening_value", { precision: 12, scale: 2 }).notNull(),
+  depreciationAmount: decimal("depreciation_amount", { precision: 12, scale: 2 }).notNull(),
+  closingValue: decimal("closing_value", { precision: 12, scale: 2 }).notNull(),
+  monthsUsed: integer("months_used").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertAssetDepreciationLogSchema = createInsertSchema(assetDepreciationLog).omit({ id: true, createdAt: true });
+export type AssetDepreciationLog = typeof assetDepreciationLog.$inferSelect;
+export type InsertAssetDepreciationLog = z.infer<typeof insertAssetDepreciationLogSchema>;
+
+export const liabilities = pgTable("liabilities", {
+  id: serial("id").primaryKey(),
+  businessId: integer("business_id").notNull().references(() => businesses.id),
+  name: text("name").notNull(),
+  type: text("type").notNull(),
+  originalAmount: decimal("original_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  outstandingAmount: decimal("outstanding_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  interestRate: decimal("interest_rate", { precision: 5, scale: 2 }).notNull().default("0"),
+  emiAmount: decimal("emi_amount", { precision: 12, scale: 2 }),
+  startDate: date("start_date").notNull(),
+  isSettled: boolean("is_settled").notNull().default(false),
+  settledDate: date("settled_date"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertLiabilitySchema = createInsertSchema(liabilities).omit({ id: true, createdAt: true });
+export type Liability = typeof liabilities.$inferSelect;
+export type InsertLiability = z.infer<typeof insertLiabilitySchema>;
+
+export const liabilityPayments = pgTable("liability_payments", {
+  id: serial("id").primaryKey(),
+  liabilityId: integer("liability_id").notNull().references(() => liabilities.id),
+  businessId: integer("business_id").notNull().references(() => businesses.id),
+  paymentDate: date("payment_date").notNull(),
+  amount: decimal("amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  principalAmount: decimal("principal_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  interestAmount: decimal("interest_amount", { precision: 12, scale: 2 }).notNull().default("0"),
+  isReversed: boolean("is_reversed").notNull().default(false),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const insertLiabilityPaymentSchema = createInsertSchema(liabilityPayments).omit({ id: true, createdAt: true });
+export type LiabilityPayment = typeof liabilityPayments.$inferSelect;
+export type InsertLiabilityPayment = z.infer<typeof insertLiabilityPaymentSchema>;
+
 export const DISTRICTS = [
   "Agar Malwa", "Dewas", "Dhar", "Indore", "Jhabua", "Khargoan",
   "Mandsaur", "Neemuch", "Rajgarh", "Ratlam", "Sagar", "Shajapur", "Ujjain"

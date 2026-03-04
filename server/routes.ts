@@ -8,7 +8,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { db } from "./db";
-import { transactions } from "@shared/schema";
+import { transactions, insertAssetSchema, insertLiabilitySchema } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 
 const uploadsDir = path.join(process.cwd(), "uploads");
@@ -1219,5 +1219,136 @@ export async function registerRoutes(
     }
   });
 
+  // ============ Books: Assets ============
+  app.get("/api/assets", requireAuth, async (req, res) => {
+    try {
+      const assetList = await storage.getAssets(req.user!.businessId);
+      res.json(assetList);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.post("/api/assets", requireAuth, async (req, res) => {
+    try {
+      const parsed = insertAssetSchema.parse({ ...req.body, businessId: req.user!.businessId });
+      const asset = await storage.createAsset(parsed);
+      res.json(asset);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.put("/api/assets/:id", requireAuth, async (req, res) => {
+    try {
+      const updated = await storage.updateAsset(paramId(req.params.id), req.user!.businessId, req.body);
+      if (!updated) return res.status(404).json({ message: "Asset not found" });
+      res.json(updated);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.delete("/api/assets/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteAsset(paramId(req.params.id), req.user!.businessId);
+      res.json({ success: true });
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.get("/api/assets/:id/depreciation", requireAuth, async (req, res) => {
+    try {
+      const logs = await storage.getAssetDepreciationLog(paramId(req.params.id), req.user!.businessId);
+      res.json(logs);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.post("/api/assets/depreciation", requireAuth, async (req, res) => {
+    try {
+      const { fy } = req.body;
+      if (!fy) return res.status(400).json({ message: "Financial year is required" });
+      const results = await storage.runDepreciation(req.user!.businessId, fy);
+      res.json(results);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  // ============ Books: Liabilities ============
+  app.get("/api/liabilities", requireAuth, async (req, res) => {
+    try {
+      const list = await storage.getLiabilities(req.user!.businessId);
+      res.json(list);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.post("/api/liabilities", requireAuth, async (req, res) => {
+    try {
+      const parsed = insertLiabilitySchema.parse({ ...req.body, businessId: req.user!.businessId });
+      const created = await storage.createLiability(parsed);
+      res.json(created);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.put("/api/liabilities/:id", requireAuth, async (req, res) => {
+    try {
+      const updated = await storage.updateLiability(paramId(req.params.id), req.user!.businessId, req.body);
+      if (!updated) return res.status(404).json({ message: "Liability not found" });
+      res.json(updated);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.delete("/api/liabilities/:id", requireAuth, async (req, res) => {
+    try {
+      await storage.deleteLiability(paramId(req.params.id), req.user!.businessId);
+      res.json({ success: true });
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.get("/api/liabilities/:id/payments", requireAuth, async (req, res) => {
+    try {
+      const payments = await storage.getLiabilityPayments(paramId(req.params.id), req.user!.businessId);
+      res.json(payments);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.post("/api/liabilities/:id/payments", requireAuth, async (req, res) => {
+    try {
+      const payment = await storage.createLiabilityPayment({ ...req.body, liabilityId: paramId(req.params.id), businessId: req.user!.businessId });
+      res.json(payment);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.post("/api/liabilities/:id/payments/:paymentId/reverse", requireAuth, async (req, res) => {
+    try {
+      const reversed = await storage.reverseLiabilityPayment(paramId(req.params.paymentId), req.user!.businessId);
+      if (!reversed) return res.status(404).json({ message: "Payment not found" });
+      res.json(reversed);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.post("/api/liabilities/:id/settle", requireAuth, async (req, res) => {
+    try {
+      const settled = await storage.settleLiability(paramId(req.params.id), req.user!.businessId);
+      if (!settled) return res.status(404).json({ message: "Liability not found" });
+      res.json(settled);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  // ============ Books: Balance Sheet & P&L ============
+  app.get("/api/books/balance-sheet", requireAuth, async (req, res) => {
+    try {
+      const fy = (req.query.fy as string) || getCurrentFY();
+      const data = await storage.getBalanceSheet(req.user!.businessId, fy);
+      res.json(data);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
+  app.get("/api/books/profit-and-loss", requireAuth, async (req, res) => {
+    try {
+      const fy = (req.query.fy as string) || getCurrentFY();
+      const data = await storage.getProfitAndLoss(req.user!.businessId, fy);
+      res.json(data);
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
   return httpServer;
+}
+
+function getCurrentFY(): string {
+  const now = new Date();
+  const year = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+  return `${year}-${(year + 1).toString().slice(2)}`;
 }

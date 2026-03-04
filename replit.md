@@ -44,6 +44,11 @@ Mandi Mitra is a multi-tenant agricultural commodity trading management system t
 7. **Farmer Ledger** - Opening balance, transactions, payments, current dues, edit/merge/archive
 8. **Buyer Ledger** - Same structure for buyer tracking, edit/merge/archive
    - Buyer merge: On edit, if name+phone matches another buyer, prompts to merge (keeps lower ID, transfers all bids/transactions/cash entries/edit history, combines opening balances, deletes duplicate)
+9. **Books** (Beta) - Expandable nav section with 4 accounting registers:
+   - **Asset Register** (/books/assets): CRUD for fixed assets with categories (Building/Plant & Machinery/Furniture & Fixtures/Vehicles/Computers/Electrical Fittings/Other), WDV depreciation engine (Indian FY April-March, month-based proration, idempotent), disposal tracking
+   - **Liability Register** (/books/liabilities): CRUD for liabilities (Bank Loan/Equipment Loan/Credit Line/Outstanding Payable/Other), payment recording with principal/interest split, reversals, settlement
+   - **Balance Sheet** (/books/balance-sheet): FY-based financial position — Fixed Assets (by category after depreciation), Current Assets (cash in hand, bank balances, farmer/buyer receivables), Long-term Liabilities, Current Liabilities (limit account outstanding), Owner's Equity. CSV export.
+   - **Profit & Loss** (/books/pnl): FY-based income/expense report — Income (aadhat/mandi/hammali commissions, extra charges), Expenses (depreciation, interest on liabilities), Net Profit/Loss. CSV export.
 
 ## Project Structure
 ```
@@ -70,6 +75,10 @@ client/src/
     farmer-ledger.tsx  - Farmer ledger (tabular view with summary cards, filters, edit/merge/archive)
     buyer-ledger.tsx   - Buyer ledger view
     demo-videos.tsx    - Demo videos gallery for users
+    asset-register.tsx - Asset register (Books)
+    liability-register.tsx - Liability register (Books)
+    balance-sheet.tsx  - Balance sheet (Books)
+    profit-loss.tsx    - Profit & Loss (Books)
 ```
 
 ## Authentication
@@ -89,7 +98,7 @@ client/src/
 ## Database
 - PostgreSQL with Drizzle ORM
 - Schema push: `npm run db:push`
-- Tables: businesses, users, farmers, farmer_edit_history, buyers, buyer_edit_history, lot_edit_history, transaction_edit_history, lots, bids, transactions, bank_accounts, cash_settings, cash_entries, business_charge_settings, demo_videos
+- Tables: businesses, users, farmers, farmer_edit_history, buyers, buyer_edit_history, lot_edit_history, transaction_edit_history, lots, bids, transactions, bank_accounts, cash_settings, cash_entries, business_charge_settings, demo_videos, assets, asset_depreciation_log, liabilities, liability_payments
 - LotEditHistory: tracks lot field changes (numberOfBags, actualNumberOfBags, crop, variety, size, bagMarka, vehicleNumber, vehicleBhadaRate, initialTotalWeight, farmerAdvanceAmount, farmerAdvanceMode) with old/new values, changedBy, timestamp
 - TransactionEditHistory: tracks transaction lifecycle (created, reversed) and field changes (totalWeight, extraCharges, etc.) with old/new values, changedBy username, timestamp
 - Farmer fields: farmerId (auto-generated FM+YYYYMMDD+seq, unique per business), name, phone, village, tehsil, district, state, openingBalance, redFlag (business-level red flag warning — indicates caution, not related to credit/debit), isArchived

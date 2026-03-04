@@ -19,8 +19,12 @@ import CashPage from "@/pages/cash";
 import FarmerLedgerPage from "@/pages/farmer-ledger";
 import BuyerLedgerPage from "@/pages/buyer-ledger";
 import DemoVideosPage from "@/pages/demo-videos";
+import AssetRegisterPage from "@/pages/asset-register";
+import LiabilityRegisterPage from "@/pages/liability-register";
+import BalanceSheetPage from "@/pages/balance-sheet";
+import ProfitLossPage from "@/pages/profit-loss";
 import {
-  LayoutDashboard, Package, ClipboardList, Gavel, Receipt, Wallet, Users, ShoppingBag, LogOut, Wheat, Menu, ChevronLeft, ChevronRight, Globe, Phone, UserCircle, PlayCircle,
+  LayoutDashboard, Package, ClipboardList, Gavel, Receipt, Wallet, Users, ShoppingBag, LogOut, Wheat, Menu, ChevronLeft, ChevronRight, Globe, Phone, UserCircle, PlayCircle, BookOpen, ChevronDown, ChevronUp, Landmark, Scale, PieChart, TrendingUp,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -37,8 +41,16 @@ const navItems = [
   { path: "/cash", labelKey: "nav.cash", icon: Wallet, shortLabelKey: "nav.cash", testId: "cash" },
   { path: "/farmer-ledger", labelKey: "nav.farmerLedger", icon: Users, shortLabelKey: "nav.farmers", testId: "farmers" },
   { path: "/buyer-ledger", labelKey: "nav.buyerLedger", icon: ShoppingBag, shortLabelKey: "nav.buyers", testId: "buyers" },
-  { path: "/demo-videos", labelKey: "nav.demoVideos", icon: PlayCircle, shortLabelKey: "nav.demos", testId: "demos" },
 ];
+
+const booksSubItems = [
+  { path: "/books/assets", labelKey: "nav.assetRegister", icon: Landmark, testId: "assets" },
+  { path: "/books/liabilities", labelKey: "nav.liabilityRegister", icon: Scale, testId: "liabilities" },
+  { path: "/books/balance-sheet", labelKey: "nav.balanceSheet", icon: PieChart, testId: "balance-sheet" },
+  { path: "/books/pnl", labelKey: "nav.profitLoss", icon: TrendingUp, testId: "pnl" },
+];
+
+const demoVideosItem = { path: "/demo-videos", labelKey: "nav.demoVideos", icon: PlayCircle, shortLabelKey: "nav.demos", testId: "demos" };
 
 function LanguageToggle({ compact }: { compact?: boolean }) {
   const { language, setLanguage } = useLanguage();
@@ -105,6 +117,7 @@ function MobileBottomNav() {
   const [location] = useLocation();
   const [showMore, setShowMore] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [mobileBooksExpanded, setMobileBooksExpanded] = useState(false);
   const { logout } = useAuth();
   const { t } = useLanguage();
 
@@ -115,7 +128,7 @@ function MobileBottomNav() {
     <>
       {showMore && (
         <div className="fixed inset-0 z-40 bg-black/30" onClick={() => setShowMore(false)}>
-          <div className="absolute bottom-16 left-0 right-0 bg-card border-t rounded-t-xl p-3 space-y-1" onClick={(e) => e.stopPropagation()}>
+          <div className="absolute bottom-16 left-0 right-0 bg-card border-t rounded-t-xl p-3 space-y-1 max-h-[70vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             {moreNav.map((item) => (
               <Link key={item.path} href={item.path}>
                 <button
@@ -128,6 +141,44 @@ function MobileBottomNav() {
                 </button>
               </Link>
             ))}
+            <div className="border-t my-1 pt-1">
+              <button
+                data-testid="nav-more-books-toggle"
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-md text-sm ${location.startsWith("/books") ? "bg-primary text-primary-foreground" : "hover-elevate"}`}
+                onClick={() => setMobileBooksExpanded(!mobileBooksExpanded)}
+              >
+                <BookOpen className="w-5 h-5" />
+                <span className="flex-1 text-left">{t("nav.books")}</span>
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 bg-amber-100 text-amber-700 border-amber-300">Beta</Badge>
+                {mobileBooksExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+              {mobileBooksExpanded && (
+                <div className="ml-6 space-y-0.5">
+                  {booksSubItems.map((item) => (
+                    <Link key={item.path} href={item.path}>
+                      <button
+                        data-testid={`nav-more-books-${item.testId}`}
+                        className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-md text-sm ${location === item.path ? "bg-primary text-primary-foreground" : "hover-elevate"}`}
+                        onClick={() => setShowMore(false)}
+                      >
+                        <item.icon className="w-4 h-4" />
+                        {t(item.labelKey)}
+                      </button>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+            <Link href={demoVideosItem.path}>
+              <button
+                data-testid={`nav-more-${demoVideosItem.testId}`}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-md text-sm ${location === demoVideosItem.path ? "bg-primary text-primary-foreground" : "hover-elevate"}`}
+                onClick={() => setShowMore(false)}
+              >
+                <demoVideosItem.icon className="w-5 h-5" />
+                {t(demoVideosItem.labelKey)}
+              </button>
+            </Link>
             <div className="border-t my-1 pt-1">
               <button
                 data-testid="nav-more-profile"
@@ -185,6 +236,8 @@ function DesktopSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
   const { logout } = useAuth();
   const { t } = useLanguage();
   const [profileOpen, setProfileOpen] = useState(false);
+  const [booksExpanded, setBooksExpanded] = useState(() => location.startsWith("/books"));
+  const isBooksActive = location.startsWith("/books");
 
   return (
     <div className={`hidden md:flex flex-col border-r bg-sidebar h-screen sticky top-0 transition-all duration-200 ${collapsed ? "w-16" : "w-56"}`}>
@@ -225,6 +278,58 @@ function DesktopSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
               </Link>
             );
           })}
+          {collapsed ? (
+            <Link href="/books/assets">
+              <button
+                data-testid="sidebar-books"
+                className={`w-full flex items-center justify-center px-2 py-2.5 rounded-md text-sm transition-colors ${isBooksActive ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : "text-sidebar-foreground hover-elevate"}`}
+                title={t("nav.books")}
+              >
+                <BookOpen className="w-4 h-4 flex-shrink-0" />
+              </button>
+            </Link>
+          ) : (
+            <>
+              <button
+                data-testid="sidebar-books-toggle"
+                className={`w-full flex items-center gap-3 rounded-md text-sm transition-colors px-3 py-2.5 ${isBooksActive ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : "text-sidebar-foreground hover-elevate"}`}
+                onClick={() => setBooksExpanded(!booksExpanded)}
+              >
+                <BookOpen className="w-4 h-4 flex-shrink-0" />
+                <span className="truncate flex-1 text-left">{t("nav.books")}</span>
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 bg-amber-100 text-amber-700 border-amber-300">Beta</Badge>
+                {booksExpanded ? <ChevronUp className="w-3 h-3 flex-shrink-0" /> : <ChevronDown className="w-3 h-3 flex-shrink-0" />}
+              </button>
+              {booksExpanded && (
+                <div className="ml-4 space-y-0.5 border-l pl-2">
+                  {booksSubItems.map((item) => {
+                    const isActive = location === item.path;
+                    return (
+                      <Link key={item.path} href={item.path}>
+                        <button
+                          data-testid={`sidebar-books-${item.testId}`}
+                          className={`w-full flex items-center gap-2.5 rounded-md text-sm transition-colors px-2.5 py-2 ${isActive ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : "text-sidebar-foreground hover-elevate"}`}
+                        >
+                          <item.icon className="w-3.5 h-3.5 flex-shrink-0" />
+                          <span className="truncate">{t(item.labelKey)}</span>
+                        </button>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+          <Link href={demoVideosItem.path}>
+            <button
+              data-testid={`sidebar-${demoVideosItem.testId}`}
+              className={`w-full flex items-center gap-3 rounded-md text-sm transition-colors ${collapsed ? "justify-center px-2 py-2.5" : "px-3 py-2.5"} ${location === demoVideosItem.path ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : "text-sidebar-foreground hover-elevate"}`}
+              title={collapsed ? t(demoVideosItem.labelKey) : undefined}
+            >
+              <demoVideosItem.icon className="w-4 h-4 flex-shrink-0" />
+              {!collapsed && <span className="truncate">{t(demoVideosItem.labelKey)}</span>}
+            </button>
+          </Link>
         </div>
       </ScrollArea>
       <div className="border-t p-2 space-y-0.5">
@@ -292,6 +397,10 @@ function AppLayout() {
             <Route path="/cash" component={CashPage} />
             <Route path="/farmer-ledger" component={FarmerLedgerPage} />
             <Route path="/buyer-ledger" component={BuyerLedgerPage} />
+            <Route path="/books/assets" component={AssetRegisterPage} />
+            <Route path="/books/liabilities" component={LiabilityRegisterPage} />
+            <Route path="/books/balance-sheet" component={BalanceSheetPage} />
+            <Route path="/books/pnl" component={ProfitLossPage} />
             <Route path="/demo-videos" component={DemoVideosPage} />
             <Route component={NotFound} />
           </Switch>
