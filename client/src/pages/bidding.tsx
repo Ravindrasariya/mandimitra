@@ -943,7 +943,8 @@ export default function BiddingPage() {
                         data-testid="input-buyer-search"
                         value={buyerSearch}
                         onChange={(e) => {
-                          setBuyerSearch(e.target.value);
+                          const val = e.target.value.replace(/\b\w/g, c => c.toUpperCase());
+                          setBuyerSearch(val);
                           setSelectedBuyerId(null);
                           setShowBuyerDropdown(true);
                         }}
