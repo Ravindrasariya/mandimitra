@@ -13,7 +13,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import type { Farmer, Buyer, CashEntry, BankAccount } from "@shared/schema";
-import { Wallet, Settings, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Download, RotateCcw, Trash2, Plus, Filter, X, Search, ChevronsUpDown, Pencil, Check } from "lucide-react";
+import { ASSET_CATEGORIES, ASSET_DEPRECIATION_RATES } from "@shared/schema";
+import { Wallet, Settings, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Download, RotateCcw, Trash2, Plus, Filter, X, Search, ChevronsUpDown, Pencil, Check, Save } from "lucide-react";
 import { format } from "date-fns";
 
 type BuyerWithDues = Buyer & { receivableDue: string; overallDue: string };
@@ -31,6 +32,7 @@ const OUTFLOW_TYPES = [
   "Hammali",
   "Mandi Commission",
   "Salary",
+  "Interest Payment on Loan/LOC",
 ] as const;
 
 export default function CashPage() {
@@ -112,6 +114,14 @@ export default function CashPage() {
   const [outwardReceiverName, setOutwardReceiverName] = useState("");
   const [outwardFarmerSearch, setOutwardFarmerSearch] = useState("");
   const [outwardFarmerOpen, setOutwardFarmerOpen] = useState(false);
+
+  const [expenseCategory, setExpenseCategory] = useState<"revenue" | "capital">("revenue");
+  const [capitalAssetName, setCapitalAssetName] = useState("");
+  const [capitalCategory, setCapitalCategory] = useState("");
+  const [capitalDepRate, setCapitalDepRate] = useState("");
+  const [capitalAmount, setCapitalAmount] = useState("");
+  const [capitalDate, setCapitalDate] = useState(format(now, "yyyy-MM-dd"));
+  const [capitalRemarks, setCapitalRemarks] = useState("");
 
   const [cashInHandOpening, setCashInHandOpening] = useState("");
   const [newBankName, setNewBankName] = useState("");
@@ -362,6 +372,55 @@ export default function CashPage() {
     },
   });
 
+  const capitalExpenseMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/capital-expense", data);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey[0] as string;
+        return key?.startsWith("/api/cash-entries") || key === "/api/assets" || key?.startsWith("/api/books/");
+      }});
+      setCapitalAssetName("");
+      setCapitalCategory("");
+      setCapitalDepRate("");
+      setCapitalAmount("");
+      setCapitalDate(format(new Date(), "yyyy-MM-dd"));
+      setCapitalRemarks("");
+      toast({ title: t("common.saved"), variant: "success" });
+    },
+  });
+
+  const submitCapitalExpense = () => {
+    if (!capitalAssetName.trim()) {
+      toast({ title: t("common.error"), description: "Enter asset name", variant: "destructive" });
+      return;
+    }
+    if (!capitalCategory) {
+      toast({ title: t("common.error"), description: "Select a category", variant: "destructive" });
+      return;
+    }
+    if (!capitalAmount || parseFloat(capitalAmount) <= 0) {
+      toast({ title: t("common.error"), description: "Enter valid amount", variant: "destructive" });
+      return;
+    }
+    if (outwardPaymentMode !== "Cash" && !outwardBankAccountId) {
+      toast({ title: t("common.error"), description: "Select bank account", variant: "destructive" });
+      return;
+    }
+    capitalExpenseMutation.mutate({
+      assetName: capitalAssetName.trim(),
+      category: capitalCategory,
+      depreciationRate: capitalDepRate || "10",
+      amount: capitalAmount,
+      date: capitalDate,
+      paymentMode: outwardPaymentMode,
+      bankAccountId: outwardPaymentMode !== "Cash" ? parseInt(outwardBankAccountId) : null,
+      remarks: capitalRemarks || null,
+    });
+  };
+
   const submitInward = () => {
     if (inwardPartyType === "Buyer" && !inwardBuyerId) {
       toast({ title: t("common.error"), description: "Select a buyer", variant: "destructive" });
@@ -596,6 +655,7 @@ export default function CashPage() {
     if (e.outflowType === "Buyer" && e.buyerId) return getBuyerName(e.buyerId);
     if (e.farmerId) return getFarmerName(e.farmerId);
     if (e.outflowType === "Salary" && e.partyName) return `Salary - ${e.partyName}`;
+    if (e.outflowType === "Capital Expense" && e.partyName) return `Capital - ${e.partyName}`;
     if (e.outflowType === "Others") return "General";
     return e.outflowType || "Entry";
   };
@@ -743,6 +803,7 @@ export default function CashPage() {
           <select value={filterOutflowType} onChange={(e) => setFilterOutflowType(e.target.value)} className="h-8 w-[150px] text-xs rounded-md border border-input bg-background px-2" data-testid="filter-outflow-type">
             <option value="all">Outflow: All</option>
             {OUTFLOW_TYPES.map(type => <option key={type} value={type}>{type}</option>)}
+            <option value="Capital Expense">Capital Expense</option>
           </select>
           <select value={filterBuyer} onChange={(e) => setFilterBuyer(e.target.value)} className="h-8 w-[150px] text-xs rounded-md border border-input bg-background px-2" data-testid="filter-buyer">
             <option value="all">Buyer: All</option>
@@ -1177,245 +1238,337 @@ export default function CashPage() {
                 </div>
               )}
               <div className="space-y-1">
-                <Label className="text-xs">{t("cash.outflowType")}</Label>
-                <Select value={outwardOutflowType} onValueChange={(v) => { setOutwardOutflowType(v); setFarmerAllocations([]); setFarmerAllocationSearch(""); }}>
-                  <SelectTrigger className="h-9 text-sm" data-testid="outward-outflow-type"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {OUTFLOW_TYPES.map(type => {
-                      const hint = getOutflowHint(type);
-                      return (
-                        <SelectItem key={type} value={type}>
-                          {type}{hint ? ` (${hint})` : ""}
-                        </SelectItem>
-                      );
-                    })}
-                  </SelectContent>
-                </Select>
-              </div>
-              {outwardOutflowType === "Salary" && (
-                <div className="space-y-1">
-                  <Label className="text-xs">Receiver Name</Label>
-                  <Input value={outwardReceiverName} onChange={e => setOutwardReceiverName(e.target.value)} placeholder="Enter receiver name" className="h-9 text-sm" data-testid="outward-receiver-name" />
+                <Label className="text-xs font-medium">Expense Category</Label>
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant={expenseCategory === "revenue" ? "default" : "outline"}
+                    size="sm"
+                    className="flex-1 h-9"
+                    onClick={() => setExpenseCategory("revenue")}
+                    data-testid="expense-category-revenue"
+                  >
+                    Revenue Expense
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={expenseCategory === "capital" ? "default" : "outline"}
+                    size="sm"
+                    className="flex-1 h-9"
+                    onClick={() => setExpenseCategory("capital")}
+                    data-testid="expense-category-capital"
+                  >
+                    Capital Expense
+                  </Button>
                 </div>
-              )}
-              {(outwardOutflowType === "Farmer-Advance" || outwardOutflowType === "Farmer-Harvest Sale") && (
-                <div className="space-y-1">
-                  <Label className="text-xs">{outwardOutflowType === "Farmer-Advance" ? t("cash.farmer") : t("cash.farmerWithDues")}</Label>
-                  <div className="relative">
-                    {outwardFarmerId ? (
-                      <div className="h-9 text-sm rounded-md border border-input bg-background px-3 flex items-center gap-2">
-                        <span className="truncate flex-1" data-testid="text-outward-farmer-selected">
-                          {(() => { const f = farmersWithDues.find(f => f.id === parseInt(outwardFarmerId)); return f ? (parseFloat(f.totalDue) > 0 ? `${f.name} - Due: ₹${parseFloat(f.totalDue).toLocaleString("en-IN")}` : f.name) : ""; })()}
-                        </span>
-                        <button onClick={() => { setOutwardFarmerId(""); setOutwardFarmerSearch(""); setFarmerAllocations([]); setFarmerAllocationSearch(""); if (outwardOutflowType === "Farmer-Harvest Sale") setOutwardAmount(""); }} className="shrink-0" data-testid="button-clear-outward-farmer"><X className="w-3.5 h-3.5" /></button>
+              </div>
+
+              {expenseCategory === "revenue" && (
+                <>
+                  <div className="space-y-1">
+                    <Label className="text-xs">{t("cash.outflowType")}</Label>
+                    <Select value={outwardOutflowType} onValueChange={(v) => { setOutwardOutflowType(v); setFarmerAllocations([]); setFarmerAllocationSearch(""); }}>
+                      <SelectTrigger className="h-9 text-sm" data-testid="outward-outflow-type"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {OUTFLOW_TYPES.map(type => {
+                          const hint = getOutflowHint(type);
+                          return (
+                            <SelectItem key={type} value={type}>
+                              {type}{hint ? ` (${hint})` : ""}
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {outwardOutflowType === "Salary" && (
+                    <div className="space-y-1">
+                      <Label className="text-xs">Receiver Name</Label>
+                      <Input value={outwardReceiverName} onChange={e => setOutwardReceiverName(e.target.value)} placeholder="Enter receiver name" className="h-9 text-sm" data-testid="outward-receiver-name" />
+                    </div>
+                  )}
+                  {(outwardOutflowType === "Farmer-Advance" || outwardOutflowType === "Farmer-Harvest Sale") && (
+                    <div className="space-y-1">
+                      <Label className="text-xs">{outwardOutflowType === "Farmer-Advance" ? t("cash.farmer") : t("cash.farmerWithDues")}</Label>
+                      <div className="relative">
+                        {outwardFarmerId ? (
+                          <div className="h-9 text-sm rounded-md border border-input bg-background px-3 flex items-center gap-2">
+                            <span className="truncate flex-1" data-testid="text-outward-farmer-selected">
+                              {(() => { const f = farmersWithDues.find(f => f.id === parseInt(outwardFarmerId)); return f ? (parseFloat(f.totalDue) > 0 ? `${f.name} - Due: ₹${parseFloat(f.totalDue).toLocaleString("en-IN")}` : f.name) : ""; })()}
+                            </span>
+                            <button onClick={() => { setOutwardFarmerId(""); setOutwardFarmerSearch(""); setFarmerAllocations([]); setFarmerAllocationSearch(""); if (outwardOutflowType === "Farmer-Harvest Sale") setOutwardAmount(""); }} className="shrink-0" data-testid="button-clear-outward-farmer"><X className="w-3.5 h-3.5" /></button>
+                          </div>
+                        ) : (
+                          <>
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                            <Input
+                              value={outwardFarmerSearch}
+                              onChange={(e) => { setOutwardFarmerSearch(e.target.value); setOutwardFarmerOpen(true); }}
+                              onFocus={() => setOutwardFarmerOpen(true)}
+                              onBlur={() => setTimeout(() => setOutwardFarmerOpen(false), 200)}
+                              placeholder={t("cash.selectFarmer")}
+                              className="h-9 text-sm pl-8"
+                              data-testid="outward-farmer"
+                            />
+                            {outwardFarmerOpen && (
+                              <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-[200px] overflow-y-auto">
+                                {(() => {
+                                  const isAdvance = outwardOutflowType === "Farmer-Advance";
+                                  const farmerList = isAdvance
+                                    ? farmersWithDues.filter(f => !f.isArchived).sort((a, b) => a.name.localeCompare(b.name))
+                                    : farmersWithDues.filter(f => !f.isArchived && parseFloat(f.totalDue) > 0).sort((a, b) => a.name.localeCompare(b.name));
+                                  const list = outwardFarmerSearch
+                                    ? farmerList.filter(f => {
+                                        const q = outwardFarmerSearch.toLowerCase();
+                                        return f.name.toLowerCase().includes(q) || f.phone.includes(q) || (f.village || "").toLowerCase().includes(q);
+                                      }).slice(0, 20)
+                                    : farmerList.slice(0, 20);
+                                  return list.length > 0 ? list.map(f => (
+                                    <button key={f.id} className="flex items-center gap-1.5 px-3 py-2 text-sm w-full text-left hover:bg-accent" data-testid={`outward-farmer-opt-${f.id}`}
+                                      onMouseDown={(e) => { e.preventDefault(); setOutwardFarmerId(f.id.toString()); setOutwardFarmerSearch(""); setOutwardFarmerOpen(false); setFarmerAllocations([]); setFarmerAllocationSearch(""); setOutwardAmount(""); }}>
+                                      <span className="font-medium">{f.name}</span>
+                                      <span className="text-muted-foreground text-xs">{f.phone}</span>
+                                      {f.village && <span className="text-muted-foreground text-xs">({f.village})</span>}
+                                      {parseFloat(f.totalDue) > 0 && <span className="ml-auto text-xs text-orange-600">Due: ₹{parseFloat(f.totalDue).toLocaleString("en-IN")}</span>}
+                                    </button>
+                                  )) : (
+                                    <div className="px-3 py-2 text-xs text-muted-foreground" data-testid="status-outward-farmer-empty">{outwardFarmerSearch ? "No farmers found" : isAdvance ? "No farmers found" : "No farmers with dues"}</div>
+                                  );
+                                })()}
+                              </div>
+                            )}
+                          </>
+                        )}
                       </div>
-                    ) : (
-                      <>
-                        <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-                        <Input
-                          value={outwardFarmerSearch}
-                          onChange={(e) => { setOutwardFarmerSearch(e.target.value); setOutwardFarmerOpen(true); }}
-                          onFocus={() => setOutwardFarmerOpen(true)}
-                          onBlur={() => setTimeout(() => setOutwardFarmerOpen(false), 200)}
-                          placeholder={t("cash.selectFarmer")}
-                          className="h-9 text-sm pl-8"
-                          data-testid="outward-farmer"
-                        />
-                        {outwardFarmerOpen && (
-                          <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-[200px] overflow-y-auto">
+                    </div>
+                  )}
+                  {outwardOutflowType === "Farmer-Harvest Sale" && outwardFarmerId && (
+                    <>
+                      <div className="space-y-1">
+                        <Label className="text-xs">{t("cash.amount")}</Label>
+                        <Input type="number" inputMode="decimal" value={outwardAmount} onChange={e => setOutwardAmount(e.target.value)} onFocus={e => e.target.select()} placeholder="0" className="h-9 text-sm" data-testid="outward-amount" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs">Allocate to Transactions</Label>
+                        <div className="relative" ref={farmerAllocationDropdownRef}>
+                          <div className="flex items-center border rounded-md bg-background">
+                            <Search className="w-3.5 h-3.5 ml-2 text-muted-foreground" />
+                            <Input
+                              value={farmerAllocationSearch}
+                              onChange={e => { setFarmerAllocationSearch(e.target.value); setFarmerAllocationDropdownOpen(true); }}
+                              onFocus={() => setFarmerAllocationDropdownOpen(true)}
+                              placeholder="Search SR#, date, crop..."
+                              className="h-9 text-sm border-0 focus-visible:ring-0"
+                              data-testid="farmer-allocation-search"
+                            />
+                          </div>
+                          {farmerAllocationDropdownOpen && (() => {
+                            const selectedKeys = new Set(farmerAllocations.map(a => a.groupKey));
+                            const available = farmerPendingTransactions.filter(pt => !selectedKeys.has(pt.groupKey));
+                            const filtered = available.filter(pt => {
+                              if (!farmerAllocationSearch) return true;
+                              const s = farmerAllocationSearch.toLowerCase();
+                              return String(pt.serialNumber).includes(s) || pt.date.toLowerCase().includes(s) || (pt.crops || "").toLowerCase().includes(s);
+                            });
+                            if (filtered.length === 0) return null;
+                            return (
+                              <div className="absolute z-50 w-full mt-1 max-h-48 overflow-y-auto bg-popover border rounded-md shadow-lg">
+                                {filtered.map(pt => (
+                                  <div
+                                    key={pt.groupKey}
+                                    className="px-3 py-2 hover:bg-accent cursor-pointer text-xs border-b last:border-b-0"
+                                    onClick={() => {
+                                      setFarmerAllocations(prev => [...prev, {
+                                        groupKey: pt.groupKey,
+                                        txnLabel: pt.groupKey === "PY_OPENING" ? "PY Opening Balance" : `SR #${pt.serialNumber}`,
+                                        serialNumber: pt.serialNumber,
+                                        date: pt.date,
+                                        numberOfBags: pt.numberOfBags,
+                                        crops: pt.crops,
+                                        due: parseFloat(pt.due),
+                                        amount: pt.due,
+                                        transactionIds: pt.transactionIds,
+                                      }]);
+                                      setFarmerAllocationSearch("");
+                                      setFarmerAllocationDropdownOpen(false);
+                                    }}
+                                    data-testid={`farmer-allocation-option-${pt.groupKey}`}
+                                  >
+                                    <div className="flex justify-between">
+                                      <span className="font-medium">
+                                        {pt.groupKey === "PY_OPENING" ? "PY Opening Balance" : `SR #${pt.serialNumber}${pt.crops ? ` | ${pt.crops}` : ""}`}
+                                      </span>
+                                      <span className="text-orange-600 font-semibold">₹{parseFloat(pt.due).toLocaleString("en-IN")}</span>
+                                    </div>
+                                    <div className="text-muted-foreground mt-0.5">
+                                      {pt.date} {pt.numberOfBags > 0 && `| ${pt.numberOfBags} bags`}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            );
+                          })()}
+                        </div>
+
+                        {farmerAllocations.length > 0 && (
+                          <div className="space-y-2">
+                            {farmerAllocations.map((alloc, idx) => (
+                              <div key={`${alloc.groupKey}-${idx}`} className="bg-muted/60 rounded-lg p-2.5 space-y-2" data-testid={`farmer-allocation-row-${idx}`}>
+                                <div className="flex items-center justify-between">
+                                  <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                                    <Badge variant="secondary" className="text-[10px]">{alloc.txnLabel}</Badge>
+                                    <span className="text-muted-foreground">{alloc.date}</span>
+                                    {alloc.numberOfBags > 0 && <span>{alloc.numberOfBags} bags</span>}
+                                    {alloc.crops && <span className="text-muted-foreground">{alloc.crops}</span>}
+                                  </div>
+                                  <Button
+                                    variant="ghost" size="icon" className="h-5 w-5 shrink-0"
+                                    onClick={() => setFarmerAllocations(prev => prev.filter((_, i) => i !== idx))}
+                                    data-testid={`farmer-remove-allocation-${idx}`}
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </Button>
+                                </div>
+                                <div className="grid grid-cols-2 gap-2 items-end">
+                                  <div className="space-y-0.5">
+                                    <Label className="text-[10px] text-muted-foreground">Due</Label>
+                                    <Input
+                                      value={`₹${alloc.due.toLocaleString("en-IN")}`}
+                                      readOnly
+                                      className="h-7 text-xs px-1.5 bg-muted"
+                                      data-testid={`farmer-allocation-due-${idx}`}
+                                    />
+                                  </div>
+                                  <div className="space-y-0.5">
+                                    <Label className="text-[10px] text-muted-foreground">Amount</Label>
+                                    <Input
+                                      type="number" inputMode="decimal"
+                                      value={alloc.amount}
+                                      onChange={e => setFarmerAllocations(prev => prev.map((a, i) => i === idx ? { ...a, amount: e.target.value } : a))}
+                                      onFocus={e => e.target.select()}
+                                      className="h-7 text-xs px-1.5"
+                                      data-testid={`farmer-allocation-amount-${idx}`}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
                             {(() => {
-                              const isAdvance = outwardOutflowType === "Farmer-Advance";
-                              const farmerList = isAdvance
-                                ? farmersWithDues.filter(f => !f.isArchived).sort((a, b) => a.name.localeCompare(b.name))
-                                : farmersWithDues.filter(f => !f.isArchived && parseFloat(f.totalDue) > 0).sort((a, b) => a.name.localeCompare(b.name));
-                              const list = outwardFarmerSearch
-                                ? farmerList.filter(f => {
-                                    const q = outwardFarmerSearch.toLowerCase();
-                                    return f.name.toLowerCase().includes(q) || f.phone.includes(q) || (f.village || "").toLowerCase().includes(q);
-                                  }).slice(0, 20)
-                                : farmerList.slice(0, 20);
-                              return list.length > 0 ? list.map(f => (
-                                <button key={f.id} className="flex items-center gap-1.5 px-3 py-2 text-sm w-full text-left hover:bg-accent" data-testid={`outward-farmer-opt-${f.id}`}
-                                  onMouseDown={(e) => { e.preventDefault(); setOutwardFarmerId(f.id.toString()); setOutwardFarmerSearch(""); setOutwardFarmerOpen(false); setFarmerAllocations([]); setFarmerAllocationSearch(""); setOutwardAmount(""); }}>
-                                  <span className="font-medium">{f.name}</span>
-                                  <span className="text-muted-foreground text-xs">{f.phone}</span>
-                                  {f.village && <span className="text-muted-foreground text-xs">({f.village})</span>}
-                                  {parseFloat(f.totalDue) > 0 && <span className="ml-auto text-xs text-orange-600">Due: ₹{parseFloat(f.totalDue).toLocaleString("en-IN")}</span>}
-                                </button>
-                              )) : (
-                                <div className="px-3 py-2 text-xs text-muted-foreground" data-testid="status-outward-farmer-empty">{outwardFarmerSearch ? "No farmers found" : isAdvance ? "No farmers found" : "No farmers with dues"}</div>
+                              const totalAllocated = farmerAllocations.reduce((s, a) => s + parseFloat(a.amount || "0"), 0);
+                              const totalPaid = parseFloat(outwardAmount || "0");
+                              const matched = totalPaid > 0 && Math.abs(totalAllocated - totalPaid) < 0.02;
+                              return (
+                                <div className="text-xs px-1 pt-1 border-t">
+                                  <div className="flex justify-between items-center">
+                                    <span className="font-medium text-muted-foreground">Allocated</span>
+                                    <span className={`font-bold ${matched ? "text-green-600" : totalPaid > 0 ? "text-red-600" : ""}`}>
+                                      ₹{totalAllocated.toLocaleString("en-IN")} / ₹{totalPaid.toLocaleString("en-IN")}
+                                    </span>
+                                  </div>
+                                </div>
                               );
                             })()}
                           </div>
                         )}
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
-              {outwardOutflowType === "Farmer-Harvest Sale" && outwardFarmerId && (
-                <>
-                  <div className="space-y-1">
-                    <Label className="text-xs">{t("cash.amount")}</Label>
-                    <Input type="number" inputMode="decimal" value={outwardAmount} onChange={e => setOutwardAmount(e.target.value)} onFocus={e => e.target.select()} placeholder="0" className="h-9 text-sm" data-testid="outward-amount" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label className="text-xs">Allocate to Transactions</Label>
-                    <div className="relative" ref={farmerAllocationDropdownRef}>
-                      <div className="flex items-center border rounded-md bg-background">
-                        <Search className="w-3.5 h-3.5 ml-2 text-muted-foreground" />
-                        <Input
-                          value={farmerAllocationSearch}
-                          onChange={e => { setFarmerAllocationSearch(e.target.value); setFarmerAllocationDropdownOpen(true); }}
-                          onFocus={() => setFarmerAllocationDropdownOpen(true)}
-                          placeholder="Search SR#, date, crop..."
-                          className="h-9 text-sm border-0 focus-visible:ring-0"
-                          data-testid="farmer-allocation-search"
-                        />
                       </div>
-                      {farmerAllocationDropdownOpen && (() => {
-                        const selectedKeys = new Set(farmerAllocations.map(a => a.groupKey));
-                        const available = farmerPendingTransactions.filter(pt => !selectedKeys.has(pt.groupKey));
-                        const filtered = available.filter(pt => {
-                          if (!farmerAllocationSearch) return true;
-                          const s = farmerAllocationSearch.toLowerCase();
-                          return String(pt.serialNumber).includes(s) || pt.date.toLowerCase().includes(s) || (pt.crops || "").toLowerCase().includes(s);
-                        });
-                        if (filtered.length === 0) return null;
-                        return (
-                          <div className="absolute z-50 w-full mt-1 max-h-48 overflow-y-auto bg-popover border rounded-md shadow-lg">
-                            {filtered.map(pt => (
-                              <div
-                                key={pt.groupKey}
-                                className="px-3 py-2 hover:bg-accent cursor-pointer text-xs border-b last:border-b-0"
-                                onClick={() => {
-                                  setFarmerAllocations(prev => [...prev, {
-                                    groupKey: pt.groupKey,
-                                    txnLabel: pt.groupKey === "PY_OPENING" ? "PY Opening Balance" : `SR #${pt.serialNumber}`,
-                                    serialNumber: pt.serialNumber,
-                                    date: pt.date,
-                                    numberOfBags: pt.numberOfBags,
-                                    crops: pt.crops,
-                                    due: parseFloat(pt.due),
-                                    amount: pt.due,
-                                    transactionIds: pt.transactionIds,
-                                  }]);
-                                  setFarmerAllocationSearch("");
-                                  setFarmerAllocationDropdownOpen(false);
-                                }}
-                                data-testid={`farmer-allocation-option-${pt.groupKey}`}
-                              >
-                                <div className="flex justify-between">
-                                  <span className="font-medium">
-                                    {pt.groupKey === "PY_OPENING" ? "PY Opening Balance" : `SR #${pt.serialNumber}${pt.crops ? ` | ${pt.crops}` : ""}`}
-                                  </span>
-                                  <span className="text-orange-600 font-semibold">₹{parseFloat(pt.due).toLocaleString("en-IN")}</span>
-                                </div>
-                                <div className="text-muted-foreground mt-0.5">
-                                  {pt.date} {pt.numberOfBags > 0 && `| ${pt.numberOfBags} bags`}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        );
-                      })()}
+                    </>
+                  )}
+                  {outwardOutflowType === "Hammali" && dueHammali > 0 && (
+                    <div className="p-2 bg-amber-50 dark:bg-amber-950 rounded text-xs text-amber-700 dark:text-amber-300">
+                      Total Hammali from Transactions: ₹{(txAggregates?.totalHammali || 0).toLocaleString("en-IN")} | Paid: ₹{(txAggregates?.paidHammali || 0).toLocaleString("en-IN")} | <span className="font-bold">Due: ₹{dueHammali.toLocaleString("en-IN")}</span>
                     </div>
-
-                    {farmerAllocations.length > 0 && (
-                      <div className="space-y-2">
-                        {farmerAllocations.map((alloc, idx) => (
-                          <div key={`${alloc.groupKey}-${idx}`} className="bg-muted/60 rounded-lg p-2.5 space-y-2" data-testid={`farmer-allocation-row-${idx}`}>
-                            <div className="flex items-center justify-between">
-                              <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                                <Badge variant="secondary" className="text-[10px]">{alloc.txnLabel}</Badge>
-                                <span className="text-muted-foreground">{alloc.date}</span>
-                                {alloc.numberOfBags > 0 && <span>{alloc.numberOfBags} bags</span>}
-                                {alloc.crops && <span className="text-muted-foreground">{alloc.crops}</span>}
-                              </div>
-                              <Button
-                                variant="ghost" size="icon" className="h-5 w-5 shrink-0"
-                                onClick={() => setFarmerAllocations(prev => prev.filter((_, i) => i !== idx))}
-                                data-testid={`farmer-remove-allocation-${idx}`}
-                              >
-                                <X className="w-3 h-3" />
-                              </Button>
-                            </div>
-                            <div className="grid grid-cols-2 gap-2 items-end">
-                              <div className="space-y-0.5">
-                                <Label className="text-[10px] text-muted-foreground">Due</Label>
-                                <Input
-                                  value={`₹${alloc.due.toLocaleString("en-IN")}`}
-                                  readOnly
-                                  className="h-7 text-xs px-1.5 bg-muted"
-                                  data-testid={`farmer-allocation-due-${idx}`}
-                                />
-                              </div>
-                              <div className="space-y-0.5">
-                                <Label className="text-[10px] text-muted-foreground">Amount</Label>
-                                <Input
-                                  type="number" inputMode="decimal"
-                                  value={alloc.amount}
-                                  onChange={e => setFarmerAllocations(prev => prev.map((a, i) => i === idx ? { ...a, amount: e.target.value } : a))}
-                                  onFocus={e => e.target.select()}
-                                  className="h-7 text-xs px-1.5"
-                                  data-testid={`farmer-allocation-amount-${idx}`}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                        {(() => {
-                          const totalAllocated = farmerAllocations.reduce((s, a) => s + parseFloat(a.amount || "0"), 0);
-                          const totalPaid = parseFloat(outwardAmount || "0");
-                          const matched = totalPaid > 0 && Math.abs(totalAllocated - totalPaid) < 0.02;
-                          return (
-                            <div className="text-xs px-1 pt-1 border-t">
-                              <div className="flex justify-between items-center">
-                                <span className="font-medium text-muted-foreground">Allocated</span>
-                                <span className={`font-bold ${matched ? "text-green-600" : totalPaid > 0 ? "text-red-600" : ""}`}>
-                                  ₹{totalAllocated.toLocaleString("en-IN")} / ₹{totalPaid.toLocaleString("en-IN")}
-                                </span>
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    )}
+                  )}
+                  {outwardOutflowType === "Extra Charges" && dueExtraCharges > 0 && (
+                    <div className="p-2 bg-purple-50 dark:bg-purple-950 rounded text-xs text-purple-700 dark:text-purple-300">
+                      Total Extra Charges from Transactions: ₹{(txAggregates?.totalExtraCharges || 0).toLocaleString("en-IN")} | Paid: ₹{(txAggregates?.paidExtraCharges || 0).toLocaleString("en-IN")} | <span className="font-bold">Due: ₹{dueExtraCharges.toLocaleString("en-IN")}</span>
+                    </div>
+                  )}
+                  {outwardOutflowType === "Mandi Commission" && dueMandi > 0 && (
+                    <div className="p-2 bg-amber-50 dark:bg-amber-950 rounded text-xs text-amber-700 dark:text-amber-300">
+                      Total Mandi Commission: ₹{(txAggregates?.totalMandiCommission || 0).toLocaleString("en-IN")} | Paid: ₹{(txAggregates?.paidMandiCommission || 0).toLocaleString("en-IN")} | <span className="font-bold">Due: ₹{dueMandi.toLocaleString("en-IN")}</span>
+                    </div>
+                  )}
+                  {outwardOutflowType !== "Farmer-Harvest Sale" && (
+                    <div className="space-y-1">
+                      <Label className="text-xs">{t("cash.amount")}</Label>
+                      <Input type="number" inputMode="decimal" value={outwardAmount} onChange={e => setOutwardAmount(e.target.value)} onFocus={e => e.target.select()} placeholder="0" className="h-9 text-sm" data-testid="outward-amount" />
+                    </div>
+                  )}
+                  <div className="space-y-1">
+                    <Label className="text-xs">{t("cash.paidOn")}</Label>
+                    <Input type="date" value={outwardDate} onChange={e => setOutwardDate(e.target.value)} className="h-9 text-sm" data-testid="outward-date" />
                   </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">{t("cash.remarks")}</Label>
+                    <Input value={outwardNotes} onChange={e => setOutwardNotes(e.target.value)} placeholder={t("cash.remarksPlaceholder")} className="h-9 text-sm" data-testid="outward-notes" />
+                  </div>
+                  <Button className="w-full h-9 text-sm" onClick={submitOutward} disabled={createMutation.isPending} data-testid="button-submit-outward">
+                    {createMutation.isPending ? t("common.saving") : t("cash.submit")}
+                  </Button>
                 </>
               )}
-              {outwardOutflowType === "Hammali" && dueHammali > 0 && (
-                <div className="p-2 bg-amber-50 dark:bg-amber-950 rounded text-xs text-amber-700 dark:text-amber-300">
-                  Total Hammali from Transactions: ₹{(txAggregates?.totalHammali || 0).toLocaleString("en-IN")} | Paid: ₹{(txAggregates?.paidHammali || 0).toLocaleString("en-IN")} | <span className="font-bold">Due: ₹{dueHammali.toLocaleString("en-IN")}</span>
-                </div>
+
+              {expenseCategory === "capital" && (
+                <>
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium">Asset Name *</Label>
+                    <Input
+                      value={capitalAssetName}
+                      onChange={e => setCapitalAssetName(e.target.value)}
+                      placeholder="Enter asset name"
+                      className="h-9 text-sm"
+                      data-testid="capital-asset-name"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium">Category *</Label>
+                    <Select value={capitalCategory} onValueChange={(v) => { setCapitalCategory(v); setCapitalDepRate(String(ASSET_DEPRECIATION_RATES[v] || 10)); }}>
+                      <SelectTrigger className="h-9 text-sm" data-testid="capital-category"><SelectValue placeholder="Select category" /></SelectTrigger>
+                      <SelectContent>
+                        {ASSET_CATEGORIES.map(cat => (
+                          <SelectItem key={cat} value={cat}>{cat}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Depreciation Rate</Label>
+                    <Input
+                      type="number" inputMode="decimal"
+                      value={capitalDepRate}
+                      onChange={e => setCapitalDepRate(e.target.value)}
+                      onFocus={e => e.target.select()}
+                      placeholder="10"
+                      className="h-9 text-sm"
+                      data-testid="capital-dep-rate"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs font-medium">Amount ({"\u20B9"}) *</Label>
+                    <Input
+                      type="number" inputMode="decimal"
+                      value={capitalAmount}
+                      onChange={e => setCapitalAmount(e.target.value)}
+                      onFocus={e => e.target.select()}
+                      placeholder="0"
+                      className="h-9 text-sm"
+                      data-testid="capital-amount"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">Paid on</Label>
+                    <Input type="date" value={capitalDate} onChange={e => setCapitalDate(e.target.value)} className="h-9 text-sm" data-testid="capital-date" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs">{t("cash.remarks")}</Label>
+                    <Input value={capitalRemarks} onChange={e => setCapitalRemarks(e.target.value)} placeholder={t("cash.remarksPlaceholder")} className="h-9 text-sm" data-testid="capital-remarks" />
+                  </div>
+                  <Button className="w-full h-9 text-sm" onClick={submitCapitalExpense} disabled={capitalExpenseMutation.isPending} data-testid="button-submit-capital">
+                    <Save className="w-3.5 h-3.5 mr-1" />
+                    {capitalExpenseMutation.isPending ? t("common.saving") : "Record Expense"}
+                  </Button>
+                </>
               )}
-              {outwardOutflowType === "Extra Charges" && dueExtraCharges > 0 && (
-                <div className="p-2 bg-purple-50 dark:bg-purple-950 rounded text-xs text-purple-700 dark:text-purple-300">
-                  Total Extra Charges from Transactions: ₹{(txAggregates?.totalExtraCharges || 0).toLocaleString("en-IN")} | Paid: ₹{(txAggregates?.paidExtraCharges || 0).toLocaleString("en-IN")} | <span className="font-bold">Due: ₹{dueExtraCharges.toLocaleString("en-IN")}</span>
-                </div>
-              )}
-              {outwardOutflowType === "Mandi Commission" && dueMandi > 0 && (
-                <div className="p-2 bg-amber-50 dark:bg-amber-950 rounded text-xs text-amber-700 dark:text-amber-300">
-                  Total Mandi Commission: ₹{(txAggregates?.totalMandiCommission || 0).toLocaleString("en-IN")} | Paid: ₹{(txAggregates?.paidMandiCommission || 0).toLocaleString("en-IN")} | <span className="font-bold">Due: ₹{dueMandi.toLocaleString("en-IN")}</span>
-                </div>
-              )}
-              {outwardOutflowType !== "Farmer-Harvest Sale" && (
-                <div className="space-y-1">
-                  <Label className="text-xs">{t("cash.amount")}</Label>
-                  <Input type="number" inputMode="decimal" value={outwardAmount} onChange={e => setOutwardAmount(e.target.value)} onFocus={e => e.target.select()} placeholder="0" className="h-9 text-sm" data-testid="outward-amount" />
-                </div>
-              )}
-              <div className="space-y-1">
-                <Label className="text-xs">{t("cash.paidOn")}</Label>
-                <Input type="date" value={outwardDate} onChange={e => setOutwardDate(e.target.value)} className="h-9 text-sm" data-testid="outward-date" />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">{t("cash.remarks")}</Label>
-                <Input value={outwardNotes} onChange={e => setOutwardNotes(e.target.value)} placeholder={t("cash.remarksPlaceholder")} className="h-9 text-sm" data-testid="outward-notes" />
-              </div>
-              <Button className="w-full h-9 text-sm" onClick={submitOutward} disabled={createMutation.isPending} data-testid="button-submit-outward">
-                {createMutation.isPending ? t("common.saving") : t("cash.submit")}
-              </Button>
             </div>
           )}
 

@@ -1219,6 +1219,51 @@ export async function registerRoutes(
     }
   });
 
+  // ============ Capital Expense (Cash + Asset) ============
+  app.post("/api/capital-expense", requireAuth, async (req, res) => {
+    try {
+      const { assetName, category, depreciationRate, amount, date, paymentMode, bankAccountId, remarks } = req.body;
+      const businessId = req.user!.businessId;
+
+      if (!assetName || !category || !amount || parseFloat(amount) <= 0) {
+        return res.status(400).json({ message: "Asset name, category, and valid amount are required" });
+      }
+
+      const entryDate = date || new Date().toISOString().slice(0, 10);
+
+      const cashEntry = await storage.createCashEntry({
+        businessId,
+        category: "outward",
+        type: "cash_out",
+        outflowType: "Capital Expense",
+        amount: String(amount),
+        date: entryDate,
+        paymentMode: paymentMode || "Cash",
+        bankAccountId: bankAccountId || null,
+        notes: remarks || null,
+        farmerId: null,
+        buyerId: null,
+        transactionId: null,
+        partyName: assetName,
+        discount: "0",
+        pettyAdj: "0",
+      });
+
+      const asset = await storage.createAsset({
+        businessId,
+        name: assetName,
+        category,
+        purchaseDate: entryDate,
+        originalCost: String(amount),
+        currentBookValue: String(amount),
+        depreciationRate: String(depreciationRate || "10"),
+        assetType: "purchased",
+      });
+
+      res.json({ cashEntry, asset });
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
   // ============ Books: Assets ============
   app.get("/api/assets", requireAuth, async (req, res) => {
     try {
