@@ -1,0 +1,131 @@
+Books Section Overview
+
+The Books section is accessible via a "Books" navigation item and contains four modules:
+1. Asset Register (/assets)
+
+Purpose: Track all fixed assets owned by the business.
+
+Asset Categories:
+
+    Building (10% depreciation)
+    Plant & Machinery (15% depreciation)
+    Furniture & Fixtures (10% depreciation)
+    Vehicles (15% depreciation)
+    Computers (40% depreciation)
+    Electrical Fittings (10% depreciation)
+    Other (10% depreciation)
+
+Features:
+
+    Full CRUD (create, read, update, delete) for assets
+    Two types of assets: "Opening" (pre-existing assets entered manually) and assets created automatically via capital expenses
+    Each asset tracks: name, category, purchase date, original cost, current book value, depreciation rate, and disposal info
+    Disposal tracking: disposal date, disposal amount, and reason
+    Assets created from capital expenses are linked back to the expense record via expenseId
+
+Depreciation Engine:
+
+    Written Down Value (WDV) method per Indian Income Tax Act rates
+    Financial Year (April 1 – March 31) based calculation
+    Month-based proration: e.g., asset purchased in November gets 5 months of depreciation in that FY
+    Idempotent: if run again for the same FY, it recalculates rather than doubling
+    Depreciation log stored in assetDepreciationLog table with: asset ID, FY, opening value, depreciation amount, closing value, months used
+
+2. Liability Register (/liabilities)
+
+Purpose: Track all liabilities/loans owed by the business.
+
+Liability Types:
+
+    Bank Loan
+    Equipment Loan
+    Credit Line
+    Outstanding Payable
+    Other
+
+Features:
+
+    Full CRUD for liabilities
+    Each liability tracks: name, type, original amount, outstanding amount, interest rate, EMI amount, start date, settlement status
+    Payment recording with principal/interest split
+    Payment reversals
+    Settlement tracking (mark as settled)
+
+3. Balance Sheet (/balance-sheet)
+
+Purpose: FY-based financial position report as of March 31.
+
+Structure:
+
+Fixed Assets (by category):
+
+    Shows each asset category's total after depreciation for the selected FY
+    Uses the depreciation engine to compute book values
+
+Current Assets:
+
+    Farmer PY Receivables — outstanding opening receivable balances from farmers
+    Buyer PY Receivables — outstanding opening receivable balances from buyers/merchants
+    Farmer Advance — outstanding advance amounts given to farmers (from farmer_advance_freight table, type = 'advance')
+    Farmer Freight — outstanding freight amounts for farmers (from farmer_advance_freight table, type = 'freight')
+    Merchant Advance — outstanding advance amounts given to merchants/buyers (from merchant_advance table)
+    Cash in Hand — from opening balance settings
+    Bank Account Balances — computed from transactions (opening balance + receipts - expenses + transfers in - transfers out)
+
+Long-term Liabilities:
+
+    From the liability register (bank loans, equipment loans, etc.)
+
+Current Liabilities:
+
+    Includes auto-calculated limit account outstanding: if a bank account of type "limit" has a negative balance (computed as openingBalance + receipts - expenses + transfersIn - transfersOut), the absolute value is shown as a current liability
+
+Owner's Equity:
+
+    Equity = Total Assets (Fixed + Current) − Total Liabilities (Long-term + Current)
+
+Export: CSV download via ?format=csv
+4. Profit & Loss (/profit-and-loss)
+
+Purpose: FY-based income and expense report.
+
+Income:
+
+    Cold Storage Charges = sum of coldStorageCharge from sales − sum of adjReceivableSelfDueAmount (adjustments for self-sale dues)
+    Receivable Adjustments (PY receivable adjustments, advance adjustments, freight adjustments) — shown as deductions
+    Merchant Extras (extraDueToMerchant) — additional charges billed to merchants
+    Other Income — any income categorized as "other_income"
+    Total Income = Cold Storage Charges − Receivable Adjustments + Merchant Extras + Other Income
+
+Expenses:
+
+    Revenue expenses only (expenseClass = 'revenue'), grouped by type:
+        Salary, Hammali, Grading Charges, General Expenses, Interest on Loan, Electricity Charges, Chemical Spray Charges
+    Depreciation — total depreciation for the FY from the depreciation engine
+    Interest on Liabilities — interest portion of liability payments during the FY
+    Capital expenses (expenseClass = 'capital') and Advance expenses (expenseClass = 'advance') are excluded from P&L
+
+Net Profit/Loss: Total Income − Total Expenses
+
+Export: CSV download via ?format=csv
+Year Convention
+
+    All four modules use Indian Financial Year (April 1 – March 31)
+    FY labels follow "YYYY-YY" format (e.g., "2025-26")
+    Balance Sheet date is always March 31 of the FY end year
+    Depreciation proration is based on months within the FY
+
+Data Tables Involved
+
+    assets — fixed asset records
+    assetDepreciationLog — yearly depreciation entries per asset
+    liabilities — liability/loan records
+    liabilityPayments — payment records against liabilities (with principal/interest split)
+    openingReceivables — PY receivable balances (farmer and buyer)
+    farmerAdvanceFreight — farmer advance and freight records
+    merchantAdvance — merchant/buyer advance records
+    expenses — all expense records (with expenseClass distinguishing revenue/capital/advance)
+    cashReceipts — income records
+    salesHistory — sales records (source of cold storage charges)
+    bankAccounts — bank account definitions and opening balances
+    cashTransfers — inter-account transfers
