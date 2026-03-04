@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DISTRICTS, CROPS, SIZES } from "@shared/schema";
 import type { Farmer } from "@shared/schema";
-import { Plus, Trash2, Search, Wheat, AlertTriangle, Truck } from "lucide-react";
+import { Plus, Trash2, Search, Wheat, AlertTriangle, Truck, Banknote } from "lucide-react";
 import { format } from "date-fns";
 
 type LotEntry = {
@@ -53,6 +53,9 @@ export default function StockEntryPage() {
   useEffect(() => {
     setEntryDate(format(new Date(), "yyyy-MM-dd"));
   }, []);
+
+  const [farmerAdvanceAmount, setFarmerAdvanceAmount, clearFarmerAdvanceAmount] = usePersistedState("se-farmerAdvanceAmount", "");
+  const [farmerAdvanceMode, setFarmerAdvanceMode, clearFarmerAdvanceMode] = usePersistedState("se-farmerAdvanceMode", "");
 
   const [vehicleNumber, setVehicleNumber, clearVehicleNumber] = usePersistedState("se-vehicleNumber", "");
   const [driverName, setDriverName, clearDriverName] = usePersistedState("se-driverName", "");
@@ -230,6 +233,8 @@ export default function StockEntryPage() {
         vehicleBhadaRate: vehicleBhadaRate || null,
         freightType,
         totalBagsInVehicle: parseInt(totalBagsInVehicle),
+        farmerAdvanceAmount: farmerAdvanceAmount || null,
+        farmerAdvanceMode: farmerAdvanceMode || null,
         lots: lots.map(lot => ({
           crop: lot.crop,
           variety: lot.variety || null,
@@ -254,6 +259,8 @@ export default function StockEntryPage() {
       clearVehicleNumber();
       clearDriverName();
       clearDriverContact();
+      clearFarmerAdvanceAmount();
+      clearFarmerAdvanceMode();
       clearVehicleBhadaRate();
       clearFreightType();
       clearTotalBagsInVehicle();
@@ -488,6 +495,42 @@ export default function StockEntryPage() {
               </Button>
             </div>
           )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Banknote className="w-4 h-4" />
+            Advance Payment
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <Label>Advance Amount (₹)</Label>
+              <Input
+                data-testid="input-farmer-advance-amount"
+                type="text"
+                inputMode="decimal"
+                placeholder="0.00"
+                value={farmerAdvanceAmount}
+                onChange={(e) => setFarmerAdvanceAmount(e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Cash or Account</Label>
+              <Select value={farmerAdvanceMode} onValueChange={setFarmerAdvanceMode}>
+                <SelectTrigger data-testid="select-farmer-advance-mode">
+                  <SelectValue placeholder="Select mode" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Cash">Cash</SelectItem>
+                  <SelectItem value="Account">Account</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </CardContent>
       </Card>
 

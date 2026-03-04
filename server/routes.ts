@@ -517,7 +517,7 @@ export async function registerRoutes(
   app.post("/api/lots/batch", requireAuth, async (req, res) => {
     try {
       const businessId = req.user!.businessId;
-      const { farmerId, date, vehicleNumber, driverName, driverContact, vehicleBhadaRate, freightType, totalBagsInVehicle, lots: lotItems } = req.body;
+      const { farmerId, date, vehicleNumber, driverName, driverContact, vehicleBhadaRate, freightType, totalBagsInVehicle, farmerAdvanceAmount, farmerAdvanceMode, lots: lotItems } = req.body;
       const dateStr = date || format(new Date(), "yyyy-MM-dd");
 
       if (!lotItems || !Array.isArray(lotItems) || lotItems.length === 0) {
@@ -560,6 +560,8 @@ export async function registerRoutes(
           freightType: freightType || null,
           totalBagsInVehicle: totalBagsInVehicle ? parseInt(totalBagsInVehicle) : null,
           initialTotalWeight: item.initialTotalWeight || null,
+          farmerAdvanceAmount: farmerAdvanceAmount || null,
+          farmerAdvanceMode: farmerAdvanceMode || null,
         };
 
         const lot = await storage.createLot(data);
@@ -606,7 +608,7 @@ export async function registerRoutes(
       data.remainingBags = data.actualNumberOfBags - soldBags;
     }
 
-    const trackFields = ["numberOfBags", "actualNumberOfBags", "crop", "variety", "size", "bagMarka", "vehicleNumber", "vehicleBhadaRate", "initialTotalWeight"];
+    const trackFields = ["numberOfBags", "actualNumberOfBags", "crop", "variety", "size", "bagMarka", "vehicleNumber", "vehicleBhadaRate", "initialTotalWeight", "farmerAdvanceAmount", "farmerAdvanceMode"];
     const changedBy = req.user!.username;
     for (const field of trackFields) {
       if (data[field] !== undefined) {

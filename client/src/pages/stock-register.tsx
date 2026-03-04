@@ -70,8 +70,10 @@ export default function StockRegisterPage() {
   const [editVehicleBhadaRate, setEditVehicleBhadaRate] = useState("");
   const [editFreightType, setEditFreightType] = useState("");
   const [editTotalBagsInVehicle, setEditTotalBagsInVehicle] = useState("");
+  const [editFarmerAdvanceAmount, setEditFarmerAdvanceAmount] = useState("");
+  const [editFarmerAdvanceMode, setEditFarmerAdvanceMode] = useState("");
   const [editLotFields, setEditLotFields] = useState<Record<number, LotEditState>>({});
-  const [origVehicle, setOrigVehicle] = useState({ vehicleNumber: "", driverName: "", driverContact: "", vehicleBhadaRate: "", freightType: "", totalBagsInVehicle: "" });
+  const [origVehicle, setOrigVehicle] = useState({ vehicleNumber: "", driverName: "", driverContact: "", vehicleBhadaRate: "", freightType: "", totalBagsInVehicle: "", farmerAdvanceAmount: "", farmerAdvanceMode: "" });
   const [origLotFields, setOrigLotFields] = useState<Record<number, LotEditState>>({});
   const [returnConfirmOpen, setReturnConfirmOpen] = useState(false);
   const [returningLot, setReturningLot] = useState<LotWithFarmer | null>(null);
@@ -264,6 +266,8 @@ export default function StockRegisterPage() {
         vehicleBhadaRate: editVehicleBhadaRate || origVehicle.vehicleBhadaRate || null,
         freightType: editFreightType || origVehicle.freightType || null,
         totalBagsInVehicle: Number.isFinite(totalBagsParsed) ? totalBagsParsed : null,
+        farmerAdvanceAmount: editFarmerAdvanceAmount || origVehicle.farmerAdvanceAmount || null,
+        farmerAdvanceMode: editFarmerAdvanceMode || origVehicle.farmerAdvanceMode || null,
       };
 
       const updates = editingGroup
@@ -347,6 +351,8 @@ export default function StockRegisterPage() {
       vehicleBhadaRate: first.vehicleBhadaRate || "",
       freightType: first.freightType || "",
       totalBagsInVehicle: first.totalBagsInVehicle != null ? String(first.totalBagsInVehicle) : "",
+      farmerAdvanceAmount: first.farmerAdvanceAmount || "",
+      farmerAdvanceMode: first.farmerAdvanceMode || "",
     });
     setEditVehicleNumber("");
     setEditDriverName("");
@@ -354,6 +360,8 @@ export default function StockRegisterPage() {
     setEditVehicleBhadaRate("");
     setEditFreightType("");
     setEditTotalBagsInVehicle("");
+    setEditFarmerAdvanceAmount("");
+    setEditFarmerAdvanceMode("");
 
     const fields: Record<number, LotEditState> = {};
     const origFields: Record<number, LotEditState> = {};
@@ -452,6 +460,7 @@ export default function StockRegisterPage() {
       "Farmer ID", "Farmer Name", "Farmer Phone", "Farmer Village", "Farmer Tehsil", "Farmer District",
       "No. of Bags", "Remaining Bags", "Bag Marka", "Initial Total Weight",
       "Vehicle Number", "Vehicle Bhada Rate", "Driver Name", "Driver Contact", "Freight Type", "Total Bags In Vehicle",
+      "Farmer Advance Amount", "Farmer Advance Mode",
       "Status"
     ];
 
@@ -465,6 +474,7 @@ export default function StockRegisterPage() {
       lot.farmer.farmerId, lot.farmer.name, lot.farmer.phone, lot.farmer.village || "", lot.farmer.tehsil || "", lot.farmer.district || "",
       lot.numberOfBags, lot.remainingBags, lot.bagMarka || "", lot.initialTotalWeight || "",
       lot.vehicleNumber || "", lot.vehicleBhadaRate || "", lot.driverName || "", lot.driverContact || "", lot.freightType || "", lot.totalBagsInVehicle ?? "",
+      lot.farmerAdvanceAmount || "", lot.farmerAdvanceMode || "",
       getLotStatus(lot)
     ].map(escCSV).join(","));
 
@@ -862,6 +872,33 @@ export default function StockRegisterPage() {
                     placeholder={origVehicle.totalBagsInVehicle || "0"}
                     className="mobile-touch-target"
                   />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label>Advance Amount (₹)</Label>
+                  <Input
+                    data-testid="input-edit-farmer-advance-amount"
+                    type="text"
+                    inputMode="decimal"
+                    value={editFarmerAdvanceAmount || origVehicle.farmerAdvanceAmount}
+                    onChange={(e) => setEditFarmerAdvanceAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="mobile-touch-target"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label>Advance Mode</Label>
+                  <Select value={editFarmerAdvanceMode || origVehicle.farmerAdvanceMode || "none"} onValueChange={(v) => setEditFarmerAdvanceMode(v === "none" ? "" : v)}>
+                    <SelectTrigger data-testid="select-edit-farmer-advance-mode" className="mobile-touch-target">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">--</SelectItem>
+                      <SelectItem value="Cash">Cash</SelectItem>
+                      <SelectItem value="Account">Account</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
             </div>

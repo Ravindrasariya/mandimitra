@@ -122,8 +122,9 @@ function generateFarmerReceiptHtml(sg: UnifiedSerialGroup, businessName?: string
     return s + gross * parseFloat(t.mandiFarmerPercent || "0") / 100;
   }, 0);
 
+  const farmerAdvance = parseFloat(firstLot?.farmerAdvanceAmount || "0");
   const totalDeduction = totalHammali + totalExtraCharges + totalFreight + totalAadhatFarmer + totalMandiFarmer;
-  const totalPayable = allTxns.reduce((s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0);
+  const totalPayable = allTxns.reduce((s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0) - farmerAdvance;
   const totalGross = allTxns.reduce((s, t) => {
     const epk = parseFloat((t as any).extraPerKgFarmer || "0");
     return s + (parseFloat(t.netWeight || "0") * (parseFloat(t.pricePerKg || "0") + epk));
@@ -218,7 +219,8 @@ ${totalExtraCharges > 0 ? `<div class="ded-row"><span>अतिरिक्त �
 ${totalAadhatFarmer > 0 ? `<div class="ded-row"><span>आढ़त / Aadhat${aadhatDetail}:</span><span>₹${totalAadhatFarmer.toFixed(2)}</span></div>` : ""}
 ${totalMandiFarmer > 0 ? `<div class="ded-row"><span>मण्डी शुल्क / Mandi${mandiDetail}:</span><span>₹${totalMandiFarmer.toFixed(2)}</span></div>` : ""}
 ${totalFreight > 0 ? `<div class="ded-row"><span>भाड़ा / Freight${freightDetail}:</span><span>₹${totalFreight.toFixed(2)}</span></div>` : ""}
-${totalDeduction > 0 ? `<div class="ded-row sub-total"><span>कुल कटौती / Total Deduction:</span><span>₹${totalDeduction.toFixed(2)}</span></div>` : ""}
+${farmerAdvance > 0 ? `<div class="ded-row"><span>अग्रिम / Advance (${firstLot?.farmerAdvanceMode || "Cash"}):</span><span>₹${farmerAdvance.toFixed(2)}</span></div>` : ""}
+${(totalDeduction + farmerAdvance) > 0 ? `<div class="ded-row sub-total"><span>कुल कटौती / Total Deduction:</span><span>₹${(totalDeduction + farmerAdvance).toFixed(2)}</span></div>` : ""}
 <div class="ded-row total-row"><span>किसान को देय राशि / Net Payable:</span><span>₹${totalPayable.toFixed(2)}</span></div>
 </div>
 <div style="text-align:center;margin-top:20px;padding-top:10px;border-top:1px dashed #ccc;font-size:15px;font-weight:bold;color:#555">हमें सेवा का अवसर देने के लिए धन्यवाद!</div>
@@ -1112,7 +1114,15 @@ export default function TransactionsPage() {
                     {sg.farmer.phone && <span className="text-xs text-muted-foreground">{sg.farmer.phone}</span>}
                     {sg.farmer.village && <span className="text-xs text-muted-foreground">{sg.farmer.village}</span>}
                   </div>
-                  <p className="text-xs text-muted-foreground mb-2">{sg.totalBags} {t("transactions.bagsTotal")}</p>
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground mb-2">
+                    <span>{sg.totalBags} {t("transactions.bagsTotal")}</span>
+                    {parseFloat(sg.lotGroups[0]?.lot?.farmerAdvanceAmount || "0") > 0 && (
+                      <span className="text-orange-600 font-medium">
+                        Advance: Rs.{parseFloat(sg.lotGroups[0].lot.farmerAdvanceAmount || "0").toFixed(2)}
+                        {sg.lotGroups[0].lot.farmerAdvanceMode ? ` (${sg.lotGroups[0].lot.farmerAdvanceMode})` : ""}
+                      </span>
+                    )}
+                  </div>
 
                   {hasCompleted && (() => {
                     const farmerTotalPayable = activeTxns.reduce((s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0);
