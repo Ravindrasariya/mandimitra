@@ -54,26 +54,6 @@ export default function StockEntryPage() {
     setEntryDate(format(new Date(), "yyyy-MM-dd"));
   }, []);
 
-  const [lastAutoFilledVehicle, setLastAutoFilledVehicle] = useState("");
-
-  useEffect(() => {
-    const trimmedVehicle = vehicleNumber.trim();
-    if (trimmedVehicle.length < 3) {
-      setShowDriverSuggestions(false);
-      return;
-    }
-    if (driverSuggestions.length === 1 && trimmedVehicle !== lastAutoFilledVehicle) {
-      setDriverName(driverSuggestions[0].driverName);
-      setDriverContact(driverSuggestions[0].driverContact);
-      setLastAutoFilledVehicle(trimmedVehicle);
-      setShowDriverSuggestions(false);
-    } else if (driverSuggestions.length > 1) {
-      setShowDriverSuggestions(true);
-    } else {
-      setShowDriverSuggestions(false);
-    }
-  }, [driverSuggestions, vehicleNumber]);
-
   const [farmerAdvanceAmount, setFarmerAdvanceAmount, clearFarmerAdvanceAmount] = usePersistedState("se-farmerAdvanceAmount", "");
   const [farmerAdvanceMode, setFarmerAdvanceMode, clearFarmerAdvanceMode] = usePersistedState("se-farmerAdvanceMode", "");
 
@@ -103,6 +83,26 @@ export default function StockEntryPage() {
     },
     enabled: vehicleNumber.trim().length >= 3,
   });
+
+  const [lastAutoFilledVehicle, setLastAutoFilledVehicle] = useState("");
+
+  useEffect(() => {
+    const trimmedVehicle = vehicleNumber.trim();
+    if (trimmedVehicle.length < 3) {
+      setShowDriverSuggestions(false);
+      return;
+    }
+    if (driverSuggestions.length === 1 && trimmedVehicle !== lastAutoFilledVehicle) {
+      setDriverName(driverSuggestions[0].driverName);
+      setDriverContact(driverSuggestions[0].driverContact);
+      setLastAutoFilledVehicle(trimmedVehicle);
+      setShowDriverSuggestions(false);
+    } else if (driverSuggestions.length > 1) {
+      setShowDriverSuggestions(true);
+    } else {
+      setShowDriverSuggestions(false);
+    }
+  }, [driverSuggestions, vehicleNumber]);
 
   const { data: locationData } = useQuery<{ villages: string[]; tehsils: string[] }>({
     queryKey: ["/api/farmers/locations"],
