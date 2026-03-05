@@ -68,6 +68,7 @@ export interface IStorage {
   getTransactionEditHistory(transactionId: number, businessId: number): Promise<TransactionEditHistory[]>;
   createTransactionEditHistory(entry: InsertTransactionEditHistory): Promise<TransactionEditHistory>;
 
+  getDriversByVehicleNumber(businessId: number, vehicleNumber: string): Promise<{ driverName: string; driverContact: string }[]>;
   getLots(businessId: number, filters?: { crop?: string; date?: string; search?: string }): Promise<(Lot & { farmer: Farmer; hasPendingBids?: boolean })[]>;
   getLot(id: number, businessId: number): Promise<(Lot & { farmer: Farmer }) | undefined>;
   createLot(lot: InsertLot): Promise<Lot>;
@@ -575,6 +576,27 @@ export class DatabaseStorage implements IStorage {
       results.push({ ...buyer, receivableDue, overallDue, bidDates: buyerBidDates ? Array.from(buyerBidDates) : [] });
     }
     return results;
+  }
+
+  async getDriversByVehicleNumber(businessId: number, vehicleNumber: string): Promise<{ driverName: string; driverContact: string }[]> {
+    const results = await db
+      .selectDistinct({
+        driverName: lots.driverName,
+        driverContact: lots.driverContact,
+      })
+      .from(lots)
+      .where(
+        and(
+          eq(lots.businessId, businessId),
+          sql`UPPER(${lots.vehicleNumber}) = UPPER(${vehicleNumber})`,
+          isNotNull(lots.driverName),
+          sql`${lots.driverName} != ''`
+        )
+      );
+    return results.map(r => ({
+      driverName: r.driverName || "",
+      driverContact: r.driverContact || "",
+    }));
   }
 
   async getLots(businessId: number, filters?: { crop?: string; date?: string; search?: string }): Promise<(Lot & { farmer: Farmer; hasPendingBids?: boolean })[]> {

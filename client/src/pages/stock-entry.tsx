@@ -54,6 +54,26 @@ export default function StockEntryPage() {
     setEntryDate(format(new Date(), "yyyy-MM-dd"));
   }, []);
 
+  const [lastAutoFilledVehicle, setLastAutoFilledVehicle] = useState("");
+
+  useEffect(() => {
+    const trimmedVehicle = vehicleNumber.trim();
+    if (trimmedVehicle.length < 3) {
+      setShowDriverSuggestions(false);
+      return;
+    }
+    if (driverSuggestions.length === 1 && trimmedVehicle !== lastAutoFilledVehicle) {
+      setDriverName(driverSuggestions[0].driverName);
+      setDriverContact(driverSuggestions[0].driverContact);
+      setLastAutoFilledVehicle(trimmedVehicle);
+      setShowDriverSuggestions(false);
+    } else if (driverSuggestions.length > 1) {
+      setShowDriverSuggestions(true);
+    } else {
+      setShowDriverSuggestions(false);
+    }
+  }, [driverSuggestions, vehicleNumber]);
+
   const [farmerAdvanceAmount, setFarmerAdvanceAmount, clearFarmerAdvanceAmount] = usePersistedState("se-farmerAdvanceAmount", "");
   const [farmerAdvanceMode, setFarmerAdvanceMode, clearFarmerAdvanceMode] = usePersistedState("se-farmerAdvanceMode", "");
 
@@ -66,9 +86,22 @@ export default function StockEntryPage() {
 
   const [lots, setLots, clearLots] = usePersistedState<LotEntry[]>("se-lots", [{ ...emptyLot }]);
 
+  const [showDriverSuggestions, setShowDriverSuggestions] = useState(false);
+
   const { data: farmerSuggestions = [] } = useQuery<Farmer[]>({
     queryKey: ["/api/farmers", `?search=${farmerSearch}`],
     enabled: farmerSearch.length >= 1 && !selectedFarmer,
+  });
+
+  const { data: driverSuggestions = [] } = useQuery<{ driverName: string; driverContact: string }[]>({
+    queryKey: ["/api/vehicles", vehicleNumber, "drivers"],
+    queryFn: async () => {
+      if (vehicleNumber.trim().length < 3) return [];
+      const res = await fetch(`/api/vehicles/${encodeURIComponent(vehicleNumber.trim())}/drivers`, { credentials: "include" });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    enabled: vehicleNumber.trim().length >= 3,
   });
 
   const { data: locationData } = useQuery<{ villages: string[]; tehsils: string[] }>({
@@ -548,7 +581,13 @@ export default function StockEntryPage() {
               <Input
                 data-testid="input-vehicle-number"
                 value={vehicleNumber}
-                onChange={(e) => setVehicleNumber(e.target.value.toUpperCase())}
+                onChange={(e) => {
+                  const val = e.target.value.toUpperCase();
+                  setVehicleNumber(val);
+                  if (val.trim().length < 3) {
+                    setShowDriverSuggestions(false);
+                  }
+                }}
                 placeholder="e.g. MP09AB1234"
                 className="mobile-touch-target text-sm"
                 style={{ textTransform: 'uppercase' }}
@@ -565,6 +604,27 @@ export default function StockEntryPage() {
               />
             </div>
           </div>
+          {showDriverSuggestions && driverSuggestions.length > 1 && (
+            <div className="border rounded-md bg-muted/50 p-2 space-y-1" data-testid="driver-suggestions-dropdown">
+              <p className="text-xs text-muted-foreground font-medium">Multiple drivers found — select one:</p>
+              {driverSuggestions.map((d, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  data-testid={`driver-suggestion-${i}`}
+                  className="w-full text-left px-3 py-2 rounded-md text-sm hover:bg-accent transition-colors flex justify-between items-center"
+                  onClick={() => {
+                    setDriverName(d.driverName);
+                    setDriverContact(d.driverContact);
+                    setShowDriverSuggestions(false);
+                  }}
+                >
+                  <span className="font-medium capitalize">{d.driverName}</span>
+                  <span className="text-muted-foreground">{d.driverContact || "No contact"}</span>
+                </button>
+              ))}
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
               <Label>Driver Contact</Label>

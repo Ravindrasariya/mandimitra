@@ -456,6 +456,15 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/vehicles/:vehicleNumber/drivers", requireAuth, async (req, res) => {
+    const vehicleNumber = req.params.vehicleNumber;
+    if (!vehicleNumber || vehicleNumber.trim().length < 3) {
+      return res.json([]);
+    }
+    const drivers = await storage.getDriversByVehicleNumber(req.user!.businessId, vehicleNumber.trim());
+    res.json(drivers);
+  });
+
   app.get("/api/lots", requireAuth, async (req, res) => {
     const filters = {
       crop: req.query.crop as string | undefined,
