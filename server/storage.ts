@@ -1081,31 +1081,97 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(cashEntries).where(and(...conditions)).orderBy(desc(cashEntries.createdAt));
   }
 
+  private async validateAllocationDues(
+    txDb: typeof db,
+    businessId: number,
+    allocationsToCheck: { transactionId: number | null; amount: string; discount: string; pettyAdj: string }[],
+    isBuyerInward: boolean,
+  ): Promise<void> {
+    const txnAllocMap = new Map<number, number>();
+    for (const alloc of allocationsToCheck) {
+      if (alloc.transactionId == null) continue;
+      const allocTotal = Math.round((parseFloat(alloc.amount || "0") + parseFloat(alloc.discount || "0") + parseFloat(alloc.pettyAdj || "0")) * 100) / 100;
+      txnAllocMap.set(alloc.transactionId, Math.round(((txnAllocMap.get(alloc.transactionId) || 0) + allocTotal) * 100) / 100);
+    }
+
+    for (const [txnId, newPayment] of txnAllocMap) {
+      const [lockedTxn] = await txDb.select({
+        id: transactions.id,
+        totalReceivableFromBuyer: transactions.totalReceivableFromBuyer,
+        totalPayableToFarmer: transactions.totalPayableToFarmer,
+        isReversed: transactions.isReversed,
+      }).from(transactions)
+        .where(and(eq(transactions.id, txnId), eq(transactions.businessId, businessId)))
+        .for("update");
+
+      if (!lockedTxn) throw new Error(`Transaction #${txnId} not found`);
+      if (lockedTxn.isReversed) throw new Error(`Transaction #${txnId} has been reversed`);
+
+      const totalOwed = isBuyerInward
+        ? parseFloat(lockedTxn.totalReceivableFromBuyer || "0")
+        : parseFloat(lockedTxn.totalPayableToFarmer || "0");
+
+      const [existingSum] = await txDb.select({
+        total: sql<string>`coalesce(sum(cast(${cashEntries.amount} as numeric) + cast(${cashEntries.discount} as numeric) + cast(${cashEntries.pettyAdj} as numeric)), 0)`
+      }).from(cashEntries).where(and(
+        eq(cashEntries.businessId, businessId),
+        eq(cashEntries.transactionId, txnId),
+        eq(cashEntries.category, isBuyerInward ? "inward" : "outward"),
+        eq(cashEntries.isReversed, false)
+      ));
+
+      const alreadyPaid = parseFloat(existingSum?.total || "0");
+      const remainingDue = Math.round((totalOwed - alreadyPaid) * 100) / 100;
+
+      if (newPayment > remainingDue + 0.01) {
+        if (remainingDue <= 0) {
+          throw new Error(`Transaction has already been fully paid. Please refresh and try again.`);
+        }
+        throw new Error(`Payment exceeds remaining due (₹${remainingDue.toFixed(2)}). Another payment may have been made. Please refresh and try again.`);
+      }
+    }
+  }
+
   async createCashEntry(entry: InsertCashEntry): Promise<CashEntry> {
     const txDate = entry.date ? new Date(entry.date + "T00:00:00") : new Date();
     const dateStr = `${txDate.getFullYear()}${String(txDate.getMonth() + 1).padStart(2, "0")}${String(txDate.getDate()).padStart(2, "0")}`;
     const prefix = `CF${dateStr}`;
 
     for (let attempt = 0; attempt < 5; attempt++) {
-      const existing = await db.select({ cashFlowId: cashEntries.cashFlowId })
-        .from(cashEntries)
-        .where(and(
-          eq(cashEntries.businessId, entry.businessId),
-          sql`${cashEntries.cashFlowId} like ${prefix + "%"}`
-        ));
-
-      let maxSeq = 0;
-      for (const row of existing) {
-        const suffix = (row.cashFlowId || "").substring(prefix.length);
-        const num = parseInt(suffix, 10);
-        if (!isNaN(num) && num > maxSeq) maxSeq = num;
-      }
-
-      const seq = maxSeq + 1;
-      const cashFlowId = `${prefix}${seq}`;
-
       try {
-        const [created] = await db.insert(cashEntries).values({ ...entry, cashFlowId }).returning();
+        const created = await db.transaction(async (tx) => {
+          if (entry.transactionId) {
+            const isBuyerInward = !!(entry.buyerId && entry.category === "inward");
+            const isFarmerOutward = !!(entry.farmerId && entry.category === "outward");
+            if (isBuyerInward || isFarmerOutward) {
+              await this.validateAllocationDues(tx as unknown as typeof db, entry.businessId, [{
+                transactionId: entry.transactionId,
+                amount: entry.amount || "0",
+                discount: entry.discount || "0",
+                pettyAdj: entry.pettyAdj || "0",
+              }], isBuyerInward);
+            }
+          }
+
+          const existing = await tx.select({ cashFlowId: cashEntries.cashFlowId })
+            .from(cashEntries)
+            .where(and(
+              eq(cashEntries.businessId, entry.businessId),
+              sql`${cashEntries.cashFlowId} like ${prefix + "%"}`
+            ));
+
+          let maxSeq = 0;
+          for (const row of existing) {
+            const suffix = (row.cashFlowId || "").substring(prefix.length);
+            const num = parseInt(suffix, 10);
+            if (!isNaN(num) && num > maxSeq) maxSeq = num;
+          }
+
+          const cashFlowId = `${prefix}${maxSeq + 1}`;
+          const [result] = await tx.insert(cashEntries).values({ ...entry, cashFlowId }).returning();
+          return result;
+        });
+
         if (created.buyerId && created.category === "inward") {
           await this.recalculateBuyerPaymentStatus(entry.businessId, created.buyerId);
         }
@@ -1126,43 +1192,52 @@ export class DatabaseStorage implements IStorage {
     const dateStr = `${txDate.getFullYear()}${String(txDate.getMonth() + 1).padStart(2, "0")}${String(txDate.getDate()).padStart(2, "0")}`;
     const prefix = `CF${dateStr}`;
 
-    const existing = await db.select({ cashFlowId: cashEntries.cashFlowId })
-      .from(cashEntries)
-      .where(and(
-        eq(cashEntries.businessId, baseEntry.businessId),
-        sql`${cashEntries.cashFlowId} like ${prefix + "%"}`
-      ));
+    return await db.transaction(async (tx) => {
+      const isBuyerInward = !!(baseEntry.buyerId && baseEntry.category === "inward");
+      const isFarmerOutward = !!(baseEntry.farmerId && baseEntry.category === "outward");
+      if (isBuyerInward || isFarmerOutward) {
+        await this.validateAllocationDues(tx as unknown as typeof db, baseEntry.businessId, allocations, isBuyerInward);
+      }
 
-    let maxSeq = 0;
-    for (const row of existing) {
-      const suffix = (row.cashFlowId || "").substring(prefix.length);
-      const num = parseInt(suffix, 10);
-      if (!isNaN(num) && num > maxSeq) maxSeq = num;
-    }
+      const existing = await tx.select({ cashFlowId: cashEntries.cashFlowId })
+        .from(cashEntries)
+        .where(and(
+          eq(cashEntries.businessId, baseEntry.businessId),
+          sql`${cashEntries.cashFlowId} like ${prefix + "%"}`
+        ));
 
-    const cashFlowId = `${prefix}${maxSeq + 1}`;
-    const created: CashEntry[] = [];
+      let maxSeq = 0;
+      for (const row of existing) {
+        const suffix = (row.cashFlowId || "").substring(prefix.length);
+        const num = parseInt(suffix, 10);
+        if (!isNaN(num) && num > maxSeq) maxSeq = num;
+      }
 
-    for (const alloc of allocations) {
-      const [entry] = await db.insert(cashEntries).values({
-        ...baseEntry,
-        cashFlowId,
-        transactionId: alloc.transactionId,
-        amount: alloc.amount,
-        discount: alloc.discount,
-        pettyAdj: alloc.pettyAdj,
-      }).returning();
-      created.push(entry);
-    }
+      const cashFlowId = `${prefix}${maxSeq + 1}`;
+      const created: CashEntry[] = [];
 
-    if (baseEntry.buyerId) {
-      await this.recalculateBuyerPaymentStatus(baseEntry.businessId, baseEntry.buyerId);
-    }
-    if (baseEntry.farmerId) {
-      await this.recalculateFarmerPaymentStatus(baseEntry.businessId, baseEntry.farmerId);
-    }
+      for (const alloc of allocations) {
+        const [entry] = await tx.insert(cashEntries).values({
+          ...baseEntry,
+          cashFlowId,
+          transactionId: alloc.transactionId,
+          amount: alloc.amount,
+          discount: alloc.discount,
+          pettyAdj: alloc.pettyAdj,
+        }).returning();
+        created.push(entry);
+      }
 
-    return created;
+      return created;
+    }).then(async (created) => {
+      if (baseEntry.buyerId) {
+        await this.recalculateBuyerPaymentStatus(baseEntry.businessId, baseEntry.buyerId);
+      }
+      if (baseEntry.farmerId) {
+        await this.recalculateFarmerPaymentStatus(baseEntry.businessId, baseEntry.farmerId);
+      }
+      return created;
+    });
   }
 
   async reverseCashEntry(id: number, businessId: number, reason?: string | null): Promise<CashEntry | undefined> {
