@@ -15,7 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Farmer, FarmerEditHistory } from "@shared/schema";
-import { Users, Search, Pencil, RefreshCw, Printer, Archive, AlertTriangle, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, Calendar } from "lucide-react";
+import { Users, Search, Pencil, RefreshCw, Printer, Archive, AlertTriangle, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, Calendar, Download } from "lucide-react";
 import { format } from "date-fns";
 import { printReceipt } from "@/lib/receiptUtils";
 
@@ -333,6 +333,33 @@ export default function FarmerLedgerPage() {
     printReceipt(html);
   };
 
+  const handleCsvDownload = () => {
+    const headers = ["Farmer ID", "Name", "Phone", "Village", "Bank Name", "Bank Account #", "IFSC Code", "Total Payable", "Total Due"];
+    const escCsv = (v: string) => {
+      if (v.includes(",") || v.includes('"') || v.includes("\n")) return `"${v.replace(/"/g, '""')}"`;
+      return v;
+    };
+    const rows = sortedFarmers.map(f => [
+      f.farmerId,
+      f.name,
+      f.phone || "",
+      f.village || "",
+      f.bankName || "",
+      f.bankAccountNumber || "",
+      f.ifscCode || "",
+      f.totalPayable || "0",
+      f.totalDue || "0",
+    ].map(escCsv).join(","));
+    const csv = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `farmers_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="p-3 md:p-6 max-w-6xl mx-auto space-y-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -448,6 +475,9 @@ export default function FarmerLedgerPage() {
         </Button>
         <Button variant="outline" size="sm" onClick={handlePrint} data-testid="button-print">
           <Printer className="w-4 h-4" />
+        </Button>
+        <Button variant="outline" size="sm" onClick={handleCsvDownload} data-testid="button-csv-download">
+          <Download className="w-4 h-4" />
         </Button>
       </div>
 
@@ -571,7 +601,7 @@ export default function FarmerLedgerPage() {
       )}
 
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>{t("farmerLedger.editFarmer")}</DialogTitle>
             <DialogDescription>{t("farmerLedger.editDesc")}</DialogDescription>
@@ -579,75 +609,77 @@ export default function FarmerLedgerPage() {
           {editingFarmer && (
             <div className="space-y-3">
               <div className="text-xs text-muted-foreground font-mono">ID: {editingFarmer.farmerId}</div>
-              <div className="space-y-1">
-                <Label className="text-xs">{t("common.name")}</Label>
-                <Input
-                  data-testid="input-edit-farmer-name"
-                  value={editName}
-                  onChange={(e) => setEditName(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">{t("common.contact")}</Label>
-                <Input
-                  data-testid="input-edit-farmer-phone"
-                  value={editPhone}
-                  onChange={(e) => setEditPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                  inputMode="tel"
-                  maxLength={10}
-                />
-                {editPhone && editPhone.length !== 10 && (
-                  <p className="text-xs text-orange-600">Please enter a valid 10-digit mobile number</p>
-                )}
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">{t("common.village")}</Label>
-                <Input
-                  data-testid="input-edit-farmer-village"
-                  value={editVillage}
-                  onChange={(e) => setEditVillage(e.target.value)}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Bank Name</Label>
-                <Input
-                  data-testid="input-edit-farmer-bank-name"
-                  value={editBankName}
-                  onChange={(e) => setEditBankName(e.target.value)}
-                  placeholder="e.g. State Bank of India"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">Bank Account #</Label>
-                <Input
-                  data-testid="input-edit-farmer-bank-account"
-                  value={editBankAccountNumber}
-                  onChange={(e) => setEditBankAccountNumber(e.target.value.replace(/\D/g, ''))}
-                  inputMode="numeric"
-                  placeholder="Account number"
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">IFSC Code</Label>
-                <Input
-                  data-testid="input-edit-farmer-ifsc"
-                  value={editIfscCode}
-                  onChange={(e) => setEditIfscCode(e.target.value.toUpperCase().slice(0, 11))}
-                  placeholder="e.g. SBIN0001234"
-                  maxLength={11}
-                />
-              </div>
-              <div className="space-y-1">
-                <Label className="text-xs">{t("farmerLedger.redFlag")}</Label>
-                <Select value={editRedFlag} onValueChange={setEditRedFlag}>
-                  <SelectTrigger data-testid="select-edit-red-flag">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="false">{t("common.no")}</SelectItem>
-                    <SelectItem value="true">{t("common.yes")}</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs">{t("common.name")}</Label>
+                  <Input
+                    data-testid="input-edit-farmer-name"
+                    value={editName}
+                    onChange={(e) => setEditName(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">{t("common.contact")}</Label>
+                  <Input
+                    data-testid="input-edit-farmer-phone"
+                    value={editPhone}
+                    onChange={(e) => setEditPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    inputMode="tel"
+                    maxLength={10}
+                  />
+                  {editPhone && editPhone.length !== 10 && (
+                    <p className="text-xs text-orange-600">10-digit number required</p>
+                  )}
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">{t("common.village")}</Label>
+                  <Input
+                    data-testid="input-edit-farmer-village"
+                    value={editVillage}
+                    onChange={(e) => setEditVillage(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Bank Name</Label>
+                  <Input
+                    data-testid="input-edit-farmer-bank-name"
+                    value={editBankName}
+                    onChange={(e) => setEditBankName(e.target.value)}
+                    placeholder="e.g. State Bank of India"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Bank Account #</Label>
+                  <Input
+                    data-testid="input-edit-farmer-bank-account"
+                    value={editBankAccountNumber}
+                    onChange={(e) => setEditBankAccountNumber(e.target.value.replace(/\D/g, ''))}
+                    inputMode="numeric"
+                    placeholder="Account number"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">IFSC Code</Label>
+                  <Input
+                    data-testid="input-edit-farmer-ifsc"
+                    value={editIfscCode}
+                    onChange={(e) => setEditIfscCode(e.target.value.toUpperCase().slice(0, 11))}
+                    placeholder="e.g. SBIN0001234"
+                    maxLength={11}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">{t("farmerLedger.redFlag")}</Label>
+                  <Select value={editRedFlag} onValueChange={setEditRedFlag}>
+                    <SelectTrigger data-testid="select-edit-red-flag">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="false">{t("common.no")}</SelectItem>
+                      <SelectItem value="true">{t("common.yes")}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <Button
