@@ -601,7 +601,7 @@ export default function FarmerLedgerPage() {
       )}
 
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{t("farmerLedger.editFarmer")}</DialogTitle>
             <DialogDescription>{t("farmerLedger.editDesc")}</DialogDescription>
