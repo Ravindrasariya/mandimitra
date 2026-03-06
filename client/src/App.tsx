@@ -339,7 +339,7 @@ function DesktopSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
 }
 
 function MobileHeader() {
-  const { t, language, setLanguage } = useLanguage();
+  const { t } = useLanguage();
   const { user, logout } = useAuth();
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -356,15 +356,18 @@ function MobileHeader() {
             <span className="text-[9px] -mt-0.5">by <span className="text-green-500 font-semibold">Krashu</span><span className="text-orange-500 font-semibold">Ved</span></span>
           </div>
         </div>
-        <button
-          data-testid="button-header-profile"
-          className="flex items-center gap-1.5 rounded-md px-2 py-1.5 hover:bg-accent transition-colors"
-          onClick={() => setMenuOpen(!menuOpen)}
-          aria-haspopup="true"
-          aria-expanded={menuOpen}
-        >
-          <UserCircle className="w-5 h-5" />
-        </button>
+        <div className="flex items-center gap-1">
+          <LanguageToggle />
+          <button
+            data-testid="button-header-profile"
+            className="flex items-center gap-1.5 rounded-md px-2 py-1.5 hover:bg-accent transition-colors"
+            onClick={() => setMenuOpen(!menuOpen)}
+            aria-haspopup="true"
+            aria-expanded={menuOpen}
+          >
+            <UserCircle className="w-5 h-5" />
+          </button>
+        </div>
       </header>
       {menuOpen && (
         <>
@@ -383,14 +386,6 @@ function MobileHeader() {
             >
               <UserCircle className="w-4 h-4" />
               {t("nav.profile")}
-            </button>
-            <button
-              data-testid="button-header-language"
-              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-accent transition-colors"
-              onClick={() => setLanguage(language === "en" ? "hi" : "en")}
-            >
-              <Globe className="w-4 h-4" />
-              {language === "en" ? "हिंदी में बदलें" : "Switch to English"}
             </button>
             <div className="border-t my-0.5" />
             <button
