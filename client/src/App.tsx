@@ -116,9 +116,7 @@ function ProfileDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o
 function MobileBottomNav() {
   const [location] = useLocation();
   const [showMore, setShowMore] = useState(false);
-  const [profileOpen, setProfileOpen] = useState(false);
   const [mobileBooksExpanded, setMobileBooksExpanded] = useState(false);
-  const { logout } = useAuth();
   const { t } = useLanguage();
 
   const primaryNav = navItems.slice(0, 4);
@@ -179,28 +177,9 @@ function MobileBottomNav() {
                 {t(demoVideosItem.labelKey)}
               </button>
             </Link>
-            <div className="border-t my-1 pt-1">
-              <button
-                data-testid="nav-more-profile"
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-md text-sm hover-elevate"
-                onClick={() => { setShowMore(false); setProfileOpen(true); }}
-              >
-                <UserCircle className="w-5 h-5" />
-                {t("nav.profile")}
-              </button>
-              <button
-                data-testid="nav-more-logout"
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-md text-sm text-destructive hover-elevate"
-                onClick={() => { setShowMore(false); logout(); }}
-              >
-                <LogOut className="w-5 h-5" />
-                {t("nav.logout")}
-              </button>
-            </div>
           </div>
         </div>
       )}
-      <ProfileDialog open={profileOpen} onOpenChange={setProfileOpen} />
       <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t safe-area-bottom">
         <div className="flex items-stretch">
           {primaryNav.map((item) => {
@@ -360,21 +339,73 @@ function DesktopSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
 }
 
 function MobileHeader() {
-  const { t } = useLanguage();
+  const { t, language, setLanguage } = useLanguage();
+  const { user, logout } = useAuth();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   return (
-    <header className="md:hidden flex items-center justify-between px-3 py-2 border-b bg-card sticky top-0 z-30">
-      <div className="flex items-center gap-2">
-        <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center">
-          <Wheat className="w-4 h-4 text-primary" />
+    <>
+      <header className="md:hidden flex items-center justify-between px-3 py-2 border-b bg-card sticky top-0 z-30">
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-full bg-primary/10 flex items-center justify-center">
+            <Wheat className="w-4 h-4 text-primary" />
+          </div>
+          <div className="flex flex-col leading-tight">
+            <span className="font-bold text-lg">{t("app.name")}</span>
+            <span className="text-[9px] -mt-0.5">by <span className="text-green-500 font-semibold">Krashu</span><span className="text-orange-500 font-semibold">Ved</span></span>
+          </div>
         </div>
-        <div className="flex flex-col leading-tight">
-          <span className="font-bold text-lg">{t("app.name")}</span>
-          <span className="text-[9px] -mt-0.5">by <span className="text-green-500 font-semibold">Krashu</span><span className="text-orange-500 font-semibold">Ved</span></span>
-        </div>
-      </div>
-      <LanguageToggle />
-    </header>
+        <button
+          data-testid="button-header-profile"
+          className="flex items-center gap-1.5 rounded-md px-2 py-1.5 hover:bg-accent transition-colors"
+          onClick={() => setMenuOpen(!menuOpen)}
+          aria-haspopup="true"
+          aria-expanded={menuOpen}
+        >
+          <UserCircle className="w-5 h-5" />
+        </button>
+      </header>
+      {menuOpen && (
+        <>
+          <div className="fixed inset-0 z-[60]" onClick={() => setMenuOpen(false)} />
+          <div className="fixed top-[52px] right-2 z-[70] w-56 bg-card border rounded-lg shadow-lg py-1" role="menu">
+            {user && (
+              <div className="px-4 py-2.5 border-b">
+                <p className="text-sm font-semibold truncate" data-testid="text-header-profile-name">{user.name}</p>
+                <p className="text-xs text-muted-foreground truncate">{user.businessName}</p>
+              </div>
+            )}
+            <button
+              data-testid="button-header-view-profile"
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-accent transition-colors"
+              onClick={() => { setMenuOpen(false); setProfileOpen(true); }}
+            >
+              <UserCircle className="w-4 h-4" />
+              {t("nav.profile")}
+            </button>
+            <button
+              data-testid="button-header-language"
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm hover:bg-accent transition-colors"
+              onClick={() => setLanguage(language === "en" ? "hi" : "en")}
+            >
+              <Globe className="w-4 h-4" />
+              {language === "en" ? "हिंदी में बदलें" : "Switch to English"}
+            </button>
+            <div className="border-t my-0.5" />
+            <button
+              data-testid="button-header-logout"
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-destructive hover:bg-accent transition-colors"
+              onClick={() => { setMenuOpen(false); logout(); }}
+            >
+              <LogOut className="w-4 h-4" />
+              {t("nav.logout")}
+            </button>
+          </div>
+        </>
+      )}
+      <ProfileDialog open={profileOpen} onOpenChange={setProfileOpen} />
+    </>
   );
 }
 
