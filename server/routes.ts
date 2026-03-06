@@ -254,6 +254,9 @@ export async function registerRoutes(
     tehsil: z.string().optional(),
     district: z.string().optional(),
     state: z.string().optional(),
+    bankName: z.string().optional(),
+    bankAccountNumber: z.string().optional(),
+    ifscCode: z.string().optional(),
     openingBalance: z.string().optional(),
     redFlag: z.boolean().optional(),
     isArchived: z.boolean().optional(),
@@ -269,7 +272,7 @@ export async function registerRoutes(
     if (!parsed.success) return res.status(400).json({ message: "Invalid fields", errors: parsed.error.flatten() });
 
     const data = parsed.data;
-    const trackFields = ["name", "phone", "village", "redFlag", "isArchived"] as const;
+    const trackFields = ["name", "phone", "village", "bankName", "bankAccountNumber", "ifscCode", "redFlag", "isArchived"] as const;
     for (const field of trackFields) {
       if (data[field] !== undefined && String(data[field]) !== String(existing[field] ?? "")) {
         await storage.createFarmerEditHistory({

@@ -78,6 +78,9 @@ export default function FarmerLedgerPage() {
   const [editPhone, setEditPhone] = useState("");
   const [editVillage, setEditVillage] = useState("");
   const [editRedFlag, setEditRedFlag] = useState("false");
+  const [editBankName, setEditBankName] = useState("");
+  const [editBankAccountNumber, setEditBankAccountNumber] = useState("");
+  const [editIfscCode, setEditIfscCode] = useState("");
 
   const [mergeConfirmOpen, setMergeConfirmOpen] = useState(false);
   const [duplicateFarmer, setDuplicateFarmer] = useState<Farmer | null>(null);
@@ -266,6 +269,9 @@ export default function FarmerLedgerPage() {
     setEditPhone(farmer.phone);
     setEditVillage(farmer.village || "");
     setEditRedFlag(farmer.redFlag ? "true" : "false");
+    setEditBankName(farmer.bankName || "");
+    setEditBankAccountNumber(farmer.bankAccountNumber || "");
+    setEditIfscCode(farmer.ifscCode || "");
     setHistoryFarmerId(farmer.id);
     setEditDialogOpen(true);
   };
@@ -275,7 +281,7 @@ export default function FarmerLedgerPage() {
     const newRedFlag = editRedFlag === "true";
     updateFarmerMutation.mutate({
       id: editingFarmer.id,
-      data: { name: editName, phone: editPhone, village: editVillage, redFlag: newRedFlag },
+      data: { name: editName, phone: editPhone, village: editVillage, redFlag: newRedFlag, bankName: editBankName, bankAccountNumber: editBankAccountNumber, ifscCode: editIfscCode },
     });
   };
 
@@ -600,6 +606,35 @@ export default function FarmerLedgerPage() {
                   data-testid="input-edit-farmer-village"
                   value={editVillage}
                   onChange={(e) => setEditVillage(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Bank Name</Label>
+                <Input
+                  data-testid="input-edit-farmer-bank-name"
+                  value={editBankName}
+                  onChange={(e) => setEditBankName(e.target.value)}
+                  placeholder="e.g. State Bank of India"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">Bank Account #</Label>
+                <Input
+                  data-testid="input-edit-farmer-bank-account"
+                  value={editBankAccountNumber}
+                  onChange={(e) => setEditBankAccountNumber(e.target.value.replace(/\D/g, ''))}
+                  inputMode="numeric"
+                  placeholder="Account number"
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-xs">IFSC Code</Label>
+                <Input
+                  data-testid="input-edit-farmer-ifsc"
+                  value={editIfscCode}
+                  onChange={(e) => setEditIfscCode(e.target.value.toUpperCase().slice(0, 11))}
+                  placeholder="e.g. SBIN0001234"
+                  maxLength={11}
                 />
               </div>
               <div className="space-y-1">
