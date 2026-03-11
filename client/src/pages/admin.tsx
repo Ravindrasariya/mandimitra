@@ -97,7 +97,7 @@ function MerchantsTab() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: { name: string; phone: string; address: string }) => {
+    mutationFn: async (data: { name: string; phone: string; address: string; licenceNo: string; shopNo: string }) => {
       const res = await apiRequest("POST", "/api/admin/businesses", data);
       return res.json();
     },
@@ -241,19 +241,21 @@ function MerchantsTab() {
   );
 }
 
-function AddMerchantDialog({ open, onClose, onSubmit, isPending }: { open: boolean; onClose: () => void; onSubmit: (data: { name: string; phone: string; address: string }) => void; isPending: boolean }) {
+function AddMerchantDialog({ open, onClose, onSubmit, isPending }: { open: boolean; onClose: () => void; onSubmit: (data: { name: string; phone: string; address: string; licenceNo: string; shopNo: string }) => void; isPending: boolean }) {
   const { t } = useLanguage();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  const [licenceNo, setLicenceNo] = useState("");
+  const [shopNo, setShopNo] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({ name, phone, address });
+    onSubmit({ name, phone, address, licenceNo, shopNo });
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) { onClose(); setName(""); setPhone(""); setAddress(""); } }}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) { onClose(); setName(""); setPhone(""); setAddress(""); setLicenceNo(""); setShopNo(""); } }}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{t("admin.addMerchant")}</DialogTitle>
@@ -272,6 +274,16 @@ function AddMerchantDialog({ open, onClose, onSubmit, isPending }: { open: boole
             <Label>{t("common.address")}</Label>
             <Input data-testid="input-merchant-address" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="Enter address" />
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Licence No</Label>
+              <Input data-testid="input-merchant-licence-no" value={licenceNo} onChange={(e) => setLicenceNo(e.target.value)} placeholder="Enter licence no." />
+            </div>
+            <div className="space-y-2">
+              <Label>Shop No</Label>
+              <Input data-testid="input-merchant-shop-no" value={shopNo} onChange={(e) => setShopNo(e.target.value)} placeholder="Enter shop no." />
+            </div>
+          </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
             <Button type="submit" data-testid="button-save-merchant" disabled={isPending || !name}>{isPending ? t("common.saving") : t("common.save")}</Button>
@@ -287,10 +299,12 @@ function EditMerchantDialog({ biz, onClose, onSubmit, isPending }: { biz: Busine
   const [name, setName] = useState(biz.name);
   const [phone, setPhone] = useState(biz.phone || "");
   const [address, setAddress] = useState(biz.address || "");
+  const [licenceNo, setLicenceNo] = useState(biz.licenceNo || "");
+  const [shopNo, setShopNo] = useState(biz.shopNo || "");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({ name, phone, address });
+    onSubmit({ name, phone, address, licenceNo, shopNo });
   };
 
   return (
@@ -312,6 +326,16 @@ function EditMerchantDialog({ biz, onClose, onSubmit, isPending }: { biz: Busine
           <div className="space-y-2">
             <Label>{t("common.address")}</Label>
             <Input data-testid="input-edit-merchant-address" value={address} onChange={(e) => setAddress(e.target.value)} />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Licence No</Label>
+              <Input data-testid="input-edit-merchant-licence-no" value={licenceNo} onChange={(e) => setLicenceNo(e.target.value)} placeholder="Enter licence no." />
+            </div>
+            <div className="space-y-2">
+              <Label>Shop No</Label>
+              <Input data-testid="input-edit-merchant-shop-no" value={shopNo} onChange={(e) => setShopNo(e.target.value)} placeholder="Enter shop no." />
+            </div>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>{t("common.cancel")}</Button>

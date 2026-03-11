@@ -15,6 +15,8 @@ export const businesses = pgTable("businesses", {
   name: text("name").notNull(),
   address: text("address"),
   phone: text("phone"),
+  licenceNo: text("licence_no"),
+  shopNo: text("shop_no"),
   status: text("status").notNull().default("active"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
