@@ -13,6 +13,7 @@ export const businesses = pgTable("businesses", {
   id: serial("id").primaryKey(),
   merchantId: text("merchant_id").notNull().unique(),
   name: text("name").notNull(),
+  initials: text("initials"),
   address: text("address"),
   phone: text("phone"),
   licenceNo: text("licence_no"),

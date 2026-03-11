@@ -97,7 +97,7 @@ function MerchantsTab() {
   });
 
   const createMutation = useMutation({
-    mutationFn: async (data: { name: string; phone: string; address: string; licenceNo: string; shopNo: string }) => {
+    mutationFn: async (data: { name: string; phone: string; address: string; licenceNo: string; shopNo: string; initials: string }) => {
       const res = await apiRequest("POST", "/api/admin/businesses", data);
       return res.json();
     },
@@ -241,30 +241,37 @@ function MerchantsTab() {
   );
 }
 
-function AddMerchantDialog({ open, onClose, onSubmit, isPending }: { open: boolean; onClose: () => void; onSubmit: (data: { name: string; phone: string; address: string; licenceNo: string; shopNo: string }) => void; isPending: boolean }) {
+function AddMerchantDialog({ open, onClose, onSubmit, isPending }: { open: boolean; onClose: () => void; onSubmit: (data: { name: string; phone: string; address: string; licenceNo: string; shopNo: string; initials: string }) => void; isPending: boolean }) {
   const { t } = useLanguage();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [licenceNo, setLicenceNo] = useState("");
   const [shopNo, setShopNo] = useState("");
+  const [initials, setInitials] = useState("");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({ name, phone, address, licenceNo, shopNo });
+    onSubmit({ name, phone, address, licenceNo, shopNo, initials });
   };
 
   return (
-    <Dialog open={open} onOpenChange={(v) => { if (!v) { onClose(); setName(""); setPhone(""); setAddress(""); setLicenceNo(""); setShopNo(""); } }}>
+    <Dialog open={open} onOpenChange={(v) => { if (!v) { onClose(); setName(""); setPhone(""); setAddress(""); setLicenceNo(""); setShopNo(""); setInitials(""); } }}>
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{t("admin.addMerchant")}</DialogTitle>
           <DialogDescription>{t("admin.createMerchant")}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label>{t("admin.businessName")}</Label>
-            <Input data-testid="input-merchant-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter business name" required />
+          <div className="flex gap-3">
+            <div className="flex-1 space-y-2">
+              <Label>{t("admin.businessName")}</Label>
+              <Input data-testid="input-merchant-name" value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter business name" required />
+            </div>
+            <div className="w-24 space-y-2">
+              <Label>Initials</Label>
+              <Input data-testid="input-merchant-initials" value={initials} onChange={(e) => setInitials(e.target.value)} placeholder="e.g. MM" />
+            </div>
           </div>
           <div className="space-y-2">
             <Label>{t("admin.contactNumber")}</Label>
@@ -301,10 +308,11 @@ function EditMerchantDialog({ biz, onClose, onSubmit, isPending }: { biz: Busine
   const [address, setAddress] = useState(biz.address || "");
   const [licenceNo, setLicenceNo] = useState(biz.licenceNo || "");
   const [shopNo, setShopNo] = useState(biz.shopNo || "");
+  const [initials, setInitials] = useState(biz.initials || "");
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit({ name, phone, address, licenceNo, shopNo });
+    onSubmit({ name, phone, address, licenceNo, shopNo, initials });
   };
 
   return (
@@ -315,9 +323,15 @@ function EditMerchantDialog({ biz, onClose, onSubmit, isPending }: { biz: Busine
           <DialogDescription>{t("admin.updateMerchant")} {biz.merchantId}</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label>{t("admin.businessName")}</Label>
-            <Input data-testid="input-edit-merchant-name" value={name} onChange={(e) => setName(e.target.value)} required />
+          <div className="flex gap-3">
+            <div className="flex-1 space-y-2">
+              <Label>{t("admin.businessName")}</Label>
+              <Input data-testid="input-edit-merchant-name" value={name} onChange={(e) => setName(e.target.value)} required />
+            </div>
+            <div className="w-24 space-y-2">
+              <Label>Initials</Label>
+              <Input data-testid="input-edit-merchant-initials" value={initials} onChange={(e) => setInitials(e.target.value)} placeholder="e.g. MM" />
+            </div>
           </div>
           <div className="space-y-2">
             <Label>{t("admin.contactNumber")}</Label>
