@@ -159,8 +159,12 @@ function generateBuyerListPrintHtml(buyers: BuyerWithDues[], summary: { total: n
 export default function BuyerLedgerPage() {
   const { toast } = useToast();
   const { t } = useLanguage();
+  const _now = new Date();
+  const _defaultYear = String(_now.getFullYear());
+  const _defaultMonth = String(_now.getMonth() + 1);
+  const _defaultDay = String(_now.getDate());
   const [searchTerm, setSearchTerm] = usePersistedState("bl-searchTerm", "");
-  const [statusFilter, setStatusFilter] = usePersistedState("bl-statusFilter", "all");
+  const [cropFilter, setCropFilter] = usePersistedState("bl-cropFilter", "all");
   const [sortField, setSortField] = usePersistedState<SortField>("bl-sortField", "overallDue");
   const [sortDir, setSortDir] = usePersistedState<SortDir>("bl-sortDir", "desc");
   const [editingBuyer, setEditingBuyer] = useState<BuyerWithDues | null>(null);
@@ -180,9 +184,9 @@ export default function BuyerLedgerPage() {
   const [newPhone, setNewPhone] = useState("");
   const [newLicenceNo, setNewLicenceNo] = useState("");
   const [newOpeningBalance, setNewOpeningBalance] = useState("");
-  const [yearFilter, setYearFilter] = usePersistedState("bl-yearFilter", "all");
-  const [selectedMonths, setSelectedMonths] = usePersistedState<string[]>("bl-selectedMonths", []);
-  const [selectedDays, setSelectedDays] = usePersistedState<string[]>("bl-selectedDays", []);
+  const [yearFilter, setYearFilter] = usePersistedState("bl-yearFilter", _defaultYear);
+  const [selectedMonths, setSelectedMonths] = usePersistedState<string[]>("bl-selectedMonths", [_defaultMonth]);
+  const [selectedDays, setSelectedDays] = usePersistedState<string[]>("bl-selectedDays", [_defaultDay]);
   const [monthPopoverOpen, setMonthPopoverOpen] = useState(false);
   const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
 
@@ -191,7 +195,7 @@ export default function BuyerLedgerPage() {
     queryKey: ["/api/buyers" + buyerQueryParams],
   });
 
-  const { data: allTransactions = [] } = useQuery<{ id: number; date: string; buyerId: number; totalReceivableFromBuyer: string; paidAmount: string; paymentStatus: string; isReversed: boolean }[]>({
+  const { data: allTransactions = [] } = useQuery<{ id: number; date: string; crop: string; buyerId: number; totalReceivableFromBuyer: string; paidAmount: string; paymentStatus: string; isReversed: boolean }[]>({
     queryKey: ["/api/transactions"],
   });
 
@@ -215,7 +219,7 @@ export default function BuyerLedgerPage() {
       setNewName("");
       setNewAddress("");
       setNewPhone("");
-      setNewBuyerCode("");
+      setNewLicenceNo("");
       setNewOpeningBalance("");
       toast({ title: "Buyer Created", variant: "success" });
     },
@@ -357,12 +361,21 @@ export default function BuyerLedgerPage() {
         });
         if (!hasMatchingDate) return false;
       }
-      if (statusFilter === "active" && !b.isActive) return false;
-      if (statusFilter === "inactive" && b.isActive) return false;
-      if (statusFilter === "redFlag" && !b.redFlag) return false;
+      if (cropFilter !== "all") {
+        const buyerTxns = allTransactions.filter(t => t.buyerId === b.id && !t.isReversed);
+        const hasCrop = buyerTxns.some(t => {
+          if (t.crop !== cropFilter) return false;
+          const [y, m, day] = t.date.split("-");
+          if (yearFilter !== "all" && y !== yearFilter) return false;
+          if (selectedMonths.length > 0 && !selectedMonths.includes(String(parseInt(m)))) return false;
+          if (selectedDays.length > 0 && !selectedDays.includes(String(parseInt(day)))) return false;
+          return true;
+        });
+        if (!hasCrop) return false;
+      }
       return true;
     });
-  }, [buyers, yearFilter, selectedMonths, selectedDays, statusFilter]);
+  }, [buyers, yearFilter, selectedMonths, selectedDays, cropFilter, allTransactions]);
 
   const sortedBuyers = useMemo(() => {
     const sorted = [...filteredBuyers];
@@ -435,11 +448,21 @@ export default function BuyerLedgerPage() {
   const getPaanaHtml = async (buyer: BuyerWithDues) => {
     const res = await apiRequest("GET", `/api/buyers/${buyer.id}/paana`);
     const data = await res.json();
+    const dateFilterActive = yearFilter !== "all" || selectedMonths.length > 0 || selectedDays.length > 0;
+    const filteredTxns = dateFilterActive
+      ? (data.transactions || []).filter((t: any) => {
+          const [y, m, d] = (t.date || "").split("-");
+          if (yearFilter !== "all" && y !== yearFilter) return false;
+          if (selectedMonths.length > 0 && !selectedMonths.includes(String(parseInt(m)))) return false;
+          if (selectedDays.length > 0 && !selectedDays.includes(String(parseInt(d)))) return false;
+          return true;
+        })
+      : data.transactions;
     return generateBuyerPaanaHtml(
       data.businessName,
       data.businessAddress || "",
       data.buyer,
-      data.transactions,
+      filteredTxns,
       buyer.overallDue
     );
   };
@@ -614,15 +637,15 @@ export default function BuyerLedgerPage() {
             </div>
           </PopoverContent>
         </Popover>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger data-testid="select-status-filter" className="w-[100px]">
+        <Select value={cropFilter} onValueChange={setCropFilter}>
+          <SelectTrigger data-testid="select-crop-filter" className="w-[100px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">{t("common.all")}...</SelectItem>
-            <SelectItem value="active">{t("common.active")}</SelectItem>
-            <SelectItem value="inactive">{t("common.inactive")}</SelectItem>
-            <SelectItem value="redFlag">{t("buyerLedger.redFlag")}</SelectItem>
+            <SelectItem value="all">{t("common.all")}</SelectItem>
+            <SelectItem value="Onion">{t("crop.onion")}</SelectItem>
+            <SelectItem value="Potato">{t("crop.potato")}</SelectItem>
+            <SelectItem value="Garlic">{t("crop.garlic")}</SelectItem>
           </SelectContent>
         </Select>
         <div className="relative">
