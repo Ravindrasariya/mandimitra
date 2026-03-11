@@ -24,7 +24,7 @@ import LiabilityRegisterPage from "@/pages/liability-register";
 import BalanceSheetPage from "@/pages/balance-sheet";
 import ProfitLossPage from "@/pages/profit-loss";
 import {
-  LayoutDashboard, Package, ClipboardList, Gavel, Receipt, Wallet, Users, ShoppingBag, LogOut, Wheat, Menu, ChevronLeft, ChevronRight, Globe, Phone, UserCircle, PlayCircle, BookOpen, ChevronDown, ChevronUp, Landmark, Scale, PieChart, TrendingUp,
+  LayoutDashboard, Package, ClipboardList, Gavel, Receipt, Wallet, Users, ShoppingBag, LogOut, Wheat, Menu, ChevronLeft, ChevronRight, Globe, Phone, UserCircle, PlayCircle, BookOpen, ChevronDown, ChevronUp, Landmark, Scale, PieChart, TrendingUp, Building2, CheckCircle2, Loader2,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -69,9 +69,22 @@ function LanguageToggle({ compact }: { compact?: boolean }) {
 }
 
 function ProfileDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
-  const { user } = useAuth();
+  const { user, switchBusiness } = useAuth();
   const { t } = useLanguage();
+  const [switching, setSwitching] = useState<number | null>(null);
   if (!user) return null;
+
+  const hasMultipleBusinesses = user.allBusinesses && user.allBusinesses.length > 1;
+
+  const handleSwitch = async (businessId: number) => {
+    setSwitching(businessId);
+    try {
+      await switchBusiness(businessId);
+      onOpenChange(false);
+    } finally {
+      setSwitching(null);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -91,22 +104,71 @@ function ProfileDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o
             <span className="text-sm text-muted-foreground">{t("profile.mobile")}</span>
             <span className="text-sm font-medium text-right" data-testid="text-profile-mobile">{user.phone || "—"}</span>
           </div>
-          <div className="flex justify-between items-start gap-2">
-            <span className="text-sm text-muted-foreground">{t("profile.merchant")}</span>
-            <span className="text-sm font-medium text-right" data-testid="text-profile-merchant">{user.businessName}</span>
-          </div>
-          {user.businessAddress && (
-            <div className="flex justify-between items-start gap-2">
-              <span className="text-sm text-muted-foreground">{t("profile.address")}</span>
-              <span className="text-sm font-medium text-right" data-testid="text-profile-address">{user.businessAddress}</span>
-            </div>
+
+          {!hasMultipleBusinesses && (
+            <>
+              <div className="flex justify-between items-start gap-2">
+                <span className="text-sm text-muted-foreground">{t("profile.merchant")}</span>
+                <span className="text-sm font-medium text-right" data-testid="text-profile-merchant">{user.businessName}</span>
+              </div>
+              {user.businessAddress && (
+                <div className="flex justify-between items-start gap-2">
+                  <span className="text-sm text-muted-foreground">{t("profile.address")}</span>
+                  <span className="text-sm font-medium text-right" data-testid="text-profile-address">{user.businessAddress}</span>
+                </div>
+              )}
+            </>
           )}
+
           <div className="flex justify-between items-center gap-2">
             <span className="text-sm text-muted-foreground">{t("profile.accessType")}</span>
             <Badge variant={user.accessLevel === "edit" ? "default" : "secondary"} data-testid="badge-profile-access">
               {user.accessLevel === "edit" ? t("profile.editAccess") : t("profile.viewAccess")}
             </Badge>
           </div>
+
+          {hasMultipleBusinesses && (
+            <div className="pt-1">
+              <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1.5">
+                <Building2 className="w-3.5 h-3.5" />
+                {t("profile.myBusinesses") || "My Businesses"}
+              </p>
+              <div className="space-y-2">
+                {user.allBusinesses.map(biz => {
+                  const isActive = biz.businessId === user.businessId;
+                  const isSwitching = switching === biz.businessId;
+                  return (
+                    <div
+                      key={biz.businessId}
+                      data-testid={`card-business-${biz.businessId}`}
+                      className={`flex items-center justify-between gap-2 rounded-lg border px-3 py-2.5 ${isActive ? "border-primary/50 bg-primary/5" : "border-border"}`}
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium truncate">{biz.businessName}</p>
+                        {biz.businessAddress && (
+                          <p className="text-xs text-muted-foreground truncate">{biz.businessAddress}</p>
+                        )}
+                      </div>
+                      {isActive ? (
+                        <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0" data-testid={`icon-active-business-${biz.businessId}`} />
+                      ) : (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 text-xs flex-shrink-0"
+                          disabled={isSwitching || switching !== null}
+                          onClick={() => handleSwitch(biz.businessId)}
+                          data-testid={`button-switch-business-${biz.businessId}`}
+                        >
+                          {isSwitching ? <Loader2 className="w-3 h-3 animate-spin" /> : (t("profile.switch") || "Switch")}
+                        </Button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

@@ -100,6 +100,19 @@ export async function setupAuth(app: Express): Promise<void> {
     })
   );
 
+  async function buildAllBusinesses(username: string, role: string) {
+    if (role === "system_admin") return [];
+    const all = await storage.getUsersByUsername(username);
+    return all.map(u => ({
+      userId: u.id,
+      businessId: u.businessId,
+      businessName: u.business.name,
+      businessAddress: u.business.address || "",
+      businessInitials: u.business.initials || "",
+      accessLevel: u.accessLevel,
+    }));
+  }
+
   passport.serializeUser((user, done) => {
     done(null, user.id);
   });
@@ -128,10 +141,12 @@ export async function setupAuth(app: Express): Promise<void> {
         }
         const { password, ...safeUser } = user;
         const business = await storage.getBusiness(safeUser.businessId);
+        const allBusinesses = await buildAllBusinesses(safeUser.username, safeUser.role);
         return res.json({
           ...safeUser,
           businessName: business?.name || "",
           businessAddress: business?.address || "",
+          allBusinesses,
         });
       });
     })(req, res);
@@ -148,10 +163,42 @@ export async function setupAuth(app: Express): Promise<void> {
     if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
     const { password, ...safeUser } = req.user!;
     const business = await storage.getBusiness(safeUser.businessId);
+    const allBusinesses = await buildAllBusinesses(safeUser.username, safeUser.role);
     res.json({
       ...safeUser,
       businessName: business?.name || "",
       businessAddress: business?.address || "",
+      allBusinesses,
+    });
+  });
+
+  app.post("/api/auth/switch-business", async (req, res) => {
+    if (!req.isAuthenticated()) return res.status(401).json({ message: "Not authenticated" });
+    const { businessId } = req.body;
+    if (!businessId) return res.status(400).json({ message: "businessId required" });
+
+    const allUsers = await storage.getUsersByUsername(req.user!.username);
+    const targetUserEntry = allUsers.find(u => u.businessId === businessId);
+    if (!targetUserEntry) return res.status(403).json({ message: "You do not have access to this business" });
+
+    const business = await storage.getBusiness(businessId);
+    if (!business) return res.status(404).json({ message: "Business not found" });
+    if (business.status !== "active") return res.status(403).json({ message: "This business account is not active" });
+
+    await new Promise<void>((resolve, reject) => {
+      req.login(targetUserEntry as Express.User, (err) => {
+        if (err) reject(err);
+        else resolve();
+      });
+    });
+
+    const { password, ...safeUser } = targetUserEntry;
+    const allBusinesses = await buildAllBusinesses(safeUser.username, safeUser.role);
+    res.json({
+      ...safeUser,
+      businessName: business.name,
+      businessAddress: business.address || "",
+      allBusinesses,
     });
   });
 

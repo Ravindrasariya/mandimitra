@@ -75,6 +75,8 @@ const translations: Record<string, Record<Language, string>> = {
   "profile.accessType": { en: "Access Type", hi: "एक्सेस प्रकार" },
   "profile.editAccess": { en: "Edit Access", hi: "संपादन एक्सेस" },
   "profile.viewAccess": { en: "View Access", hi: "केवल देखें" },
+  "profile.myBusinesses": { en: "My Businesses", hi: "मेरे व्यापार" },
+  "profile.switch": { en: "Switch", hi: "बदलें" },
 
   "common.save": { en: "Save", hi: "सहेजें" },
   "common.saved": { en: "Saved", hi: "सहेज लिया" },

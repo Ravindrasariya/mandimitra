@@ -2,6 +2,15 @@ import { createContext, useContext, type ReactNode } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient, getQueryFn } from "./queryClient";
 
+export type BusinessEntry = {
+  userId: string;
+  businessId: number;
+  businessName: string;
+  businessAddress: string;
+  businessInitials: string;
+  accessLevel: string;
+};
+
 type AuthUser = {
   id: string;
   username: string;
@@ -13,6 +22,7 @@ type AuthUser = {
   mustChangePassword: boolean;
   businessName: string;
   businessAddress: string;
+  allBusinesses: BusinessEntry[];
 };
 
 type AuthContextType = {
@@ -21,9 +31,12 @@ type AuthContextType = {
   login: (username: string, password: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string, phone?: string) => Promise<void>;
+  switchBusiness: (businessId: number) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextType | null>(null);
+
+const LAST_BUSINESS_KEY = (username: string) => `mandi-mitra-last-business-${username}`;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const { data: user, isLoading } = useQuery<AuthUser | null>({
@@ -34,13 +47,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginMutation = useMutation({
     mutationFn: async ({ username, password }: { username: string; password: string }) => {
       const res = await apiRequest("POST", "/api/auth/login", { username, password });
-      return res.json();
+      return res.json() as Promise<AuthUser>;
     },
-    onSuccess: (data) => {
+    onSuccess: async (data) => {
       queryClient.clear();
-      queryClient.setQueryData(["/api/auth/me"], data);
+
       const keysToRemove = Object.keys(localStorage).filter(k => k.startsWith("mandi-mitra-se-"));
       keysToRemove.forEach(k => localStorage.removeItem(k));
+
+      if (data.allBusinesses && data.allBusinesses.length > 1) {
+        const stored = localStorage.getItem(LAST_BUSINESS_KEY(data.username));
+        if (stored) {
+          const lastId = parseInt(stored, 10);
+          const target = data.allBusinesses.find(b => b.businessId === lastId);
+          if (target && target.businessId !== data.businessId) {
+            try {
+              const res = await apiRequest("POST", "/api/auth/switch-business", { businessId: lastId });
+              const switched = await res.json() as AuthUser;
+              queryClient.setQueryData(["/api/auth/me"], switched);
+              return;
+            } catch {
+            }
+          }
+        }
+      }
+
+      queryClient.setQueryData(["/api/auth/me"], data);
     },
   });
 
@@ -64,6 +96,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
+  const switchBusinessMutation = useMutation({
+    mutationFn: async (businessId: number) => {
+      const res = await apiRequest("POST", "/api/auth/switch-business", { businessId });
+      return res.json() as Promise<AuthUser>;
+    },
+    onSuccess: (data) => {
+      localStorage.setItem(LAST_BUSINESS_KEY(data.username), String(data.businessId));
+      queryClient.setQueryData(["/api/auth/me"], data);
+      queryClient.invalidateQueries();
+    },
+  });
+
   const login = async (username: string, password: string) => {
     return loginMutation.mutateAsync({ username, password });
   };
@@ -76,8 +120,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await changePasswordMutation.mutateAsync({ currentPassword, newPassword, phone });
   };
 
+  const switchBusiness = async (businessId: number) => {
+    await switchBusinessMutation.mutateAsync(businessId);
+  };
+
   return (
-    <AuthContext.Provider value={{ user: user ?? null, isLoading, login, logout, changePassword }}>
+    <AuthContext.Provider value={{ user: user ?? null, isLoading, login, logout, changePassword, switchBusiness }}>
       {children}
     </AuthContext.Provider>
   );

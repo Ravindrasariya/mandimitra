@@ -30,6 +30,7 @@ import { eq, and, ilike, or, sql, desc, asc, gte, lte, ne, isNotNull } from "dri
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
   getUserByUsername(username: string): Promise<User | undefined>;
+  getUsersByUsername(username: string): Promise<(User & { business: Business })[]>;
   createUser(user: InsertUser): Promise<User>;
   updateUserPassword(id: string, password: string): Promise<void>;
   updateUser(id: string, data: Partial<InsertUser>): Promise<User | undefined>;
@@ -147,6 +148,15 @@ export class DatabaseStorage implements IStorage {
   async getUserByUsername(username: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.username, username));
     return user;
+  }
+
+  async getUsersByUsername(username: string): Promise<(User & { business: Business })[]> {
+    const results = await db.select({ user: users, business: businesses })
+      .from(users)
+      .innerJoin(businesses, eq(users.businessId, businesses.id))
+      .where(eq(users.username, username))
+      .orderBy(asc(businesses.name));
+    return results.map(r => ({ ...r.user, business: r.business }));
   }
 
   async createUser(user: InsertUser): Promise<User> {
