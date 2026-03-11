@@ -12,7 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import type { Bid, Buyer, Lot, Farmer, Transaction, BusinessChargeSettings, TransactionEditHistory } from "@shared/schema";
+import type { Bid, Buyer, Lot, Farmer, Transaction, BusinessChargeSettings, TransactionEditHistory, ReceiptTemplate } from "@shared/schema";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -286,6 +286,102 @@ ${mandiBuyer > 0 ? `<div class="summary-row"><span>Mandi (${tx.mandiBuyerPercent
 </body></html>`;
 }
 
+function applyFarmerTemplate(tmpl: string, sg: UnifiedSerialGroup, businessName?: string, businessAddress?: string): string {
+  const farmer = sg.farmer;
+  const allTxns = sg.lotGroups.flatMap(lg => lg.completedTxns.filter(t => !t.isReversed));
+  const firstLot = sg.lotGroups[0]?.lot;
+  const cropLabel: Record<string, string> = { Potato: "आलू / Potato", Onion: "प्याज / Onion", Garlic: "लहसुन / Garlic" };
+
+  const totalHammali = allTxns.reduce((s, t) => s + parseFloat(t.hammaliCharges || "0"), 0);
+  const totalExtraCharges = allTxns.reduce((s, t) => s + parseFloat(t.extraChargesFarmer || "0"), 0);
+  const totalFreight = allTxns.reduce((s, t) => s + parseFloat(t.freightCharges || "0"), 0);
+  const totalAadhat = allTxns.reduce((s, t) => {
+    const gross = parseFloat(t.netWeight || "0") * (parseFloat(t.pricePerKg || "0") + parseFloat((t as any).extraPerKgFarmer || "0"));
+    return s + gross * parseFloat(t.aadhatFarmerPercent || "0") / 100;
+  }, 0);
+  const totalMandi = allTxns.reduce((s, t) => {
+    const gross = parseFloat(t.netWeight || "0") * (parseFloat(t.pricePerKg || "0") + parseFloat((t as any).extraPerKgFarmer || "0"));
+    return s + gross * parseFloat(t.mandiFarmerPercent || "0") / 100;
+  }, 0);
+  const farmerAdvance = parseFloat(firstLot?.farmerAdvanceAmount || "0");
+  const totalDeduction = totalHammali + totalExtraCharges + totalFreight + totalAadhat + totalMandi + farmerAdvance;
+  const totalGross = allTxns.reduce((s, t) => s + parseFloat(t.netWeight || "0") * (parseFloat(t.pricePerKg || "0") + parseFloat((t as any).extraPerKgFarmer || "0")), 0);
+  const totalNetWeight = allTxns.reduce((s, t) => s + parseFloat(t.netWeight || "0"), 0);
+  const netPayable = allTxns.reduce((s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0) - farmerAdvance;
+
+  const txnRowsHtml = allTxns.map(t => {
+    const nw = parseFloat(t.netWeight || "0");
+    const epk = parseFloat((t as any).extraPerKgFarmer || "0");
+    const rate = parseFloat(t.pricePerKg || "0") + epk;
+    const gross = nw * rate;
+    const crop = t.lot?.crop || firstLot?.crop || "";
+    return `<tr><td>${cropLabel[crop] || crop}</td><td>${t.numberOfBags || 0}</td><td>${nw.toFixed(2)}</td><td>₹${rate.toFixed(2)}</td><td>₹${gross.toFixed(2)}</td></tr>`;
+  }).join("");
+
+  const replacements: Record<string, string> = {
+    "{{BUSINESS_NAME}}": businessName || "",
+    "{{BUSINESS_ADDRESS}}": businessAddress || "",
+    "{{SERIAL_NUMBER}}": String(sg.serialNumber),
+    "{{DATE}}": sg.date || format(new Date(), "yyyy-MM-dd"),
+    "{{FARMER_NAME}}": farmer.name,
+    "{{FARMER_PHONE}}": farmer.phone || "",
+    "{{FARMER_VILLAGE}}": farmer.village || "",
+    "{{FARMER_TEHSIL}}": farmer.tehsil || "",
+    "{{FARMER_DISTRICT}}": farmer.district || "",
+    "{{VEHICLE_NUMBER}}": firstLot?.vehicleNumber || "",
+    "{{TOTAL_BAGS}}": String(sg.totalBags),
+    "{{NET_WEIGHT}}": totalNetWeight.toFixed(2),
+    "{{GROSS_AMOUNT}}": totalGross.toFixed(2),
+    "{{HAMMALI}}": totalHammali.toFixed(2),
+    "{{AADHAT}}": totalAadhat.toFixed(2),
+    "{{MANDI_CHARGES}}": totalMandi.toFixed(2),
+    "{{FREIGHT}}": totalFreight.toFixed(2),
+    "{{ADVANCE}}": farmerAdvance.toFixed(2),
+    "{{TOTAL_DEDUCTION}}": totalDeduction.toFixed(2),
+    "{{NET_PAYABLE}}": netPayable.toFixed(2),
+    "{{CROP}}": firstLot?.crop || "",
+    "{{TXN_ROWS_HTML}}": txnRowsHtml,
+  };
+  return Object.entries(replacements).reduce((html, [token, val]) => html.split(token).join(val), tmpl);
+}
+
+function applyBuyerTemplate(tmpl: string, lot: Lot, farmer: Farmer, tx: TransactionWithDetails, businessName?: string, businessAddress?: string): string {
+  const nw = parseFloat(tx.netWeight || "0");
+  const ppk = parseFloat(tx.pricePerKg || "0");
+  const epkBuyer = parseFloat((tx as any).extraPerKgBuyer || "0");
+  const effectiveRate = ppk + epkBuyer;
+  const grossAmount = nw * effectiveRate;
+  const bags = tx.numberOfBags || 0;
+  const hammaliBuyer = parseFloat(tx.hammaliBuyerPerBag || "0") * bags;
+  const extraBuyer = parseFloat(tx.extraChargesBuyer || "0");
+  const aadhatBuyer = grossAmount * parseFloat(tx.aadhatBuyerPercent || "0") / 100;
+  const mandiBuyer = grossAmount * parseFloat(tx.mandiBuyerPercent || "0") / 100;
+
+  const replacements: Record<string, string> = {
+    "{{BUSINESS_NAME}}": businessName || "",
+    "{{BUSINESS_ADDRESS}}": businessAddress || "",
+    "{{LOT_ID}}": lot.lotId,
+    "{{DATE}}": tx.date || format(new Date(), "yyyy-MM-dd"),
+    "{{BUYER_NAME}}": tx.buyer.name,
+    "{{BUYER_CODE}}": tx.buyer.buyerCode || "",
+    "{{FARMER_NAME}}": farmer.name,
+    "{{CROP}}": lot.crop,
+    "{{SIZE}}": lot.size || "",
+    "{{BAGS}}": String(bags),
+    "{{NET_WEIGHT}}": nw.toFixed(2),
+    "{{RATE}}": effectiveRate.toFixed(2),
+    "{{GROSS_AMOUNT}}": grossAmount.toFixed(2),
+    "{{HAMMALI}}": hammaliBuyer.toFixed(2),
+    "{{EXTRA_CHARGES}}": extraBuyer.toFixed(2),
+    "{{AADHAT}}": aadhatBuyer.toFixed(2),
+    "{{AADHAT_PCT}}": tx.aadhatBuyerPercent || "0",
+    "{{MANDI_CHARGES}}": mandiBuyer.toFixed(2),
+    "{{MANDI_PCT}}": tx.mandiBuyerPercent || "0",
+    "{{TOTAL_RECEIVABLE}}": parseFloat(tx.totalReceivableFromBuyer || "0").toFixed(2),
+  };
+  return Object.entries(replacements).reduce((html, [token, val]) => html.split(token).join(val), tmpl);
+}
+
 export default function TransactionsPage() {
   const { toast } = useToast();
   const { t } = useLanguage();
@@ -343,6 +439,10 @@ export default function TransactionsPage() {
 
   const { data: farmersWithDues = [] } = useQuery<(Farmer & { totalPayable: string; totalDue: string; salesCount: number })[]>({
     queryKey: ["/api/farmers-with-dues"],
+  });
+
+  const { data: receiptTemplates = [] } = useQuery<ReceiptTemplate[]>({
+    queryKey: ["/api/receipt-templates"],
   });
 
   const { data: buyersWithDues = [] } = useQuery<(Buyer & { receivableDue: string; overallDue: string })[]>({
@@ -742,27 +842,37 @@ export default function TransactionsPage() {
 
   const isSaving = createTxMutation.isPending || updateTxMutation.isPending;
 
+  const getFarmerReceiptHtml = (sg: UnifiedSerialGroup): string => {
+    const customTmpl = receiptTemplates.find(t => t.templateType === "farmer");
+    if (customTmpl) return applyFarmerTemplate(customTmpl.templateHtml, sg, user?.businessName, user?.businessAddress);
+    return generateFarmerReceiptHtml(sg, user?.businessName, user?.businessAddress);
+  };
+
+  const getBuyerReceiptHtml = (tx: TransactionWithDetails, group: UnifiedLotGroup): string => {
+    const crop = group.lot.crop;
+    const customTmpl = receiptTemplates.find(t => t.templateType === "buyer" && t.crop === crop)
+      || receiptTemplates.find(t => t.templateType === "buyer" && t.crop === "");
+    if (customTmpl) return applyBuyerTemplate(customTmpl.templateHtml, group.lot, group.farmer, tx, user?.businessName, user?.businessAddress);
+    return generateBuyerReceiptHtml(group.lot, group.farmer, tx, user?.businessName, user?.businessAddress);
+  };
+
   const handlePrintFarmerReceipt = (sg: UnifiedSerialGroup) => {
-    const html = generateFarmerReceiptHtml(sg, user?.businessName, user?.businessAddress);
-    printReceipt(html);
+    printReceipt(getFarmerReceiptHtml(sg));
   };
 
   const handleShareFarmerReceipt = (sg: UnifiedSerialGroup) => {
-    const html = generateFarmerReceiptHtml(sg, user?.businessName, user?.businessAddress);
     const farmerShortName = sg.farmer.name.split(/\s+/).slice(0, 2).join("");
     const fileName = `Farmer_Receipt_${farmerShortName}_${sg.date}.pdf`;
-    shareReceiptAsPdf(html, fileName);
+    shareReceiptAsPdf(getFarmerReceiptHtml(sg), fileName);
   };
 
   const handlePrintBuyerReceipt = (tx: TransactionWithDetails, group: UnifiedLotGroup) => {
-    const html = generateBuyerReceiptHtml(group.lot, group.farmer, tx, user?.businessName, user?.businessAddress);
-    printReceipt(html);
+    printReceipt(getBuyerReceiptHtml(tx, group));
   };
 
   const handleShareBuyerReceipt = (tx: TransactionWithDetails, group: UnifiedLotGroup) => {
-    const html = generateBuyerReceiptHtml(group.lot, group.farmer, tx, user?.businessName, user?.businessAddress);
     const fileName = `Buyer_Receipt_${group.lotId}_${tx.buyer.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
-    shareReceiptAsPdf(html, fileName);
+    shareReceiptAsPdf(getBuyerReceiptHtml(tx, group), fileName);
   };
 
   const exportCSV = () => {

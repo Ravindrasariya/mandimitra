@@ -220,6 +220,32 @@ export async function registerRoutes(
     res.json({ message: "Password reset to default" });
   });
 
+  app.get("/api/admin/receipt-templates/:businessId", requireAdmin, async (req, res) => {
+    const businessId = paramId(req.params.businessId);
+    const templates = await storage.listReceiptTemplates(businessId);
+    res.json(templates);
+  });
+
+  app.post("/api/admin/receipt-templates/:businessId", requireAdmin, async (req, res) => {
+    const businessId = paramId(req.params.businessId);
+    const { templateType, crop, templateHtml } = req.body;
+    if (!templateType || !templateHtml) return res.status(400).json({ message: "templateType and templateHtml required" });
+    const tmpl = await storage.upsertReceiptTemplate(businessId, templateType, crop || "", templateHtml);
+    res.json(tmpl);
+  });
+
+  app.delete("/api/admin/receipt-templates/:businessId/:id", requireAdmin, async (req, res) => {
+    const businessId = paramId(req.params.businessId);
+    const id = paramId(req.params.id);
+    await storage.deleteReceiptTemplate(id, businessId);
+    res.json({ message: "Deleted" });
+  });
+
+  app.get("/api/receipt-templates", requireAuth, async (req, res) => {
+    const templates = await storage.listReceiptTemplates(req.user!.businessId);
+    res.json(templates);
+  });
+
   app.get("/api/farmers", requireAuth, async (req, res) => {
     const search = req.query.search as string | undefined;
     const result = await storage.getFarmers(req.user!.businessId, search);

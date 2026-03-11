@@ -27,7 +27,7 @@ The system employs a modern web stack:
         -   **Liability Register**: CRUD for liabilities, payment recording with principal/interest split, and settlement.
         -   **Balance Sheet**: FY-based financial position reporting with CSV export.
         -   **Profit & Loss**: FY-based income/expense reporting with CSV export.
-    -   **Reporting**: Generation and sharing of Farmer Receipts (Hindi), Buyer Receipts (English), and Buyer Paana (outstanding dues) with WhatsApp sharing capability (PDF export).
+    -   **Reporting**: Generation and sharing of Farmer Receipts (Hindi), Buyer Receipts (English), and Buyer Paana (outstanding dues) with WhatsApp sharing capability (PDF export). Supports custom HTML receipt templates per business (uploaded via the Admin Panel), with `{{PLACEHOLDER}}` substitution for both farmer and per-crop buyer receipts.
 
 ## External Dependencies
 -   **PostgreSQL**: Relational database for all persistent data.

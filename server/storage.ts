@@ -18,8 +18,10 @@ import {
   type AssetDepreciationLog, type InsertAssetDepreciationLog,
   type Liability, type InsertLiability,
   type LiabilityPayment, type InsertLiabilityPayment,
+  type ReceiptTemplate,
   users, businesses, farmers, farmerEditHistory, buyers, buyerEditHistory, lotEditHistory, transactionEditHistory, lots, bids, transactions, bankAccounts, cashSettings, cashEntries, businessChargeSettings,
   assets, assetDepreciationLog, liabilities, liabilityPayments,
+  receiptTemplates,
   ASSET_DEPRECIATION_RATES,
 } from "@shared/schema";
 import { db } from "./db";
@@ -129,6 +131,11 @@ export interface IStorage {
 
   getBalanceSheet(businessId: number, fy: string): Promise<any>;
   getProfitAndLoss(businessId: number, fy: string): Promise<any>;
+
+  listReceiptTemplates(businessId: number): Promise<ReceiptTemplate[]>;
+  getReceiptTemplate(businessId: number, templateType: string, crop: string): Promise<ReceiptTemplate | undefined>;
+  upsertReceiptTemplate(businessId: number, templateType: string, crop: string, templateHtml: string): Promise<ReceiptTemplate>;
+  deleteReceiptTemplate(id: number, businessId: number): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1732,6 +1739,42 @@ export class DatabaseStorage implements IStorage {
       },
       netProfitLoss,
     };
+  }
+
+  async listReceiptTemplates(businessId: number): Promise<ReceiptTemplate[]> {
+    return db.select().from(receiptTemplates).where(eq(receiptTemplates.businessId, businessId));
+  }
+
+  async getReceiptTemplate(businessId: number, templateType: string, crop: string): Promise<ReceiptTemplate | undefined> {
+    const [tmpl] = await db.select().from(receiptTemplates).where(
+      and(
+        eq(receiptTemplates.businessId, businessId),
+        eq(receiptTemplates.templateType, templateType),
+        eq(receiptTemplates.crop, crop)
+      )
+    );
+    return tmpl;
+  }
+
+  async upsertReceiptTemplate(businessId: number, templateType: string, crop: string, templateHtml: string): Promise<ReceiptTemplate> {
+    const existing = await this.getReceiptTemplate(businessId, templateType, crop);
+    if (existing) {
+      const [updated] = await db.update(receiptTemplates)
+        .set({ templateHtml, updatedAt: new Date() })
+        .where(eq(receiptTemplates.id, existing.id))
+        .returning();
+      return updated;
+    }
+    const [created] = await db.insert(receiptTemplates)
+      .values({ businessId, templateType, crop, templateHtml })
+      .returning();
+    return created;
+  }
+
+  async deleteReceiptTemplate(id: number, businessId: number): Promise<void> {
+    await db.delete(receiptTemplates).where(
+      and(eq(receiptTemplates.id, id), eq(receiptTemplates.businessId, businessId))
+    );
   }
 }
 

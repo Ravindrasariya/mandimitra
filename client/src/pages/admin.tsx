@@ -17,9 +17,11 @@ import {
 } from "@/components/ui/select";
 import {
   Building2, Users as UsersIcon, Plus, Search, Pencil, Power, Archive, RotateCcw,
-  Trash2, KeyRound, LogOut, AlertTriangle, PlayCircle, Upload, X,
+  Trash2, KeyRound, LogOut, AlertTriangle, PlayCircle, Upload, X, FileText, ChevronDown, ChevronRight,
 } from "lucide-react";
-import type { Business, User, DemoVideo } from "@shared/schema";
+import type { Business, User, DemoVideo, ReceiptTemplate } from "@shared/schema";
+import { CROPS } from "@shared/schema";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 type SafeUser = Omit<User, "password"> & { business: Business };
 
@@ -88,6 +90,7 @@ function MerchantsTab() {
   const [showAdd, setShowAdd] = useState(false);
   const [editBiz, setEditBiz] = useState<Business | null>(null);
   const [confirmAction, setConfirmAction] = useState<{ type: "toggle" | "archive" | "reset"; biz: Business } | null>(null);
+  const [templatesBiz, setTemplatesBiz] = useState<Business | null>(null);
 
   const { data: businesses = [], isLoading } = useQuery<Business[]>({
     queryKey: ["/api/admin/businesses"],
@@ -211,6 +214,14 @@ function MerchantsTab() {
                           >
                             <RotateCcw className="w-4 h-4 text-destructive" />
                           </Button>
+                          <Button
+                            variant="ghost" size="icon"
+                            data-testid={`button-receipt-templates-${biz.id}`}
+                            title="Receipt Templates"
+                            onClick={() => setTemplatesBiz(biz)}
+                          >
+                            <FileText className="w-4 h-4 text-blue-600" />
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -225,6 +236,7 @@ function MerchantsTab() {
       <AddMerchantDialog open={showAdd} onClose={() => setShowAdd(false)} onSubmit={(data) => createMutation.mutate(data)} isPending={createMutation.isPending} />
       {editBiz && <EditMerchantDialog biz={editBiz} onClose={() => setEditBiz(null)} onSubmit={(data) => updateMutation.mutate({ id: editBiz.id, data })} isPending={updateMutation.isPending} />}
       {confirmAction && <ConfirmMerchantAction action={confirmAction} onClose={() => setConfirmAction(null)} />}
+      {templatesBiz && <ReceiptTemplatesDialog biz={templatesBiz} onClose={() => setTemplatesBiz(null)} />}
     </>
   );
 }
@@ -448,6 +460,252 @@ function ConfirmMerchantAction({ action, onClose }: { action: { type: "toggle" |
             </Button>
           </DialogFooter>
         </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+const FARMER_PLACEHOLDERS = [
+  { token: "{{BUSINESS_NAME}}", desc: "Firm / business name" },
+  { token: "{{BUSINESS_ADDRESS}}", desc: "Business address" },
+  { token: "{{SERIAL_NUMBER}}", desc: "Serial number of the lot group" },
+  { token: "{{DATE}}", desc: "Date of transaction" },
+  { token: "{{FARMER_NAME}}", desc: "Farmer full name" },
+  { token: "{{FARMER_PHONE}}", desc: "Farmer phone number" },
+  { token: "{{FARMER_VILLAGE}}", desc: "Farmer village" },
+  { token: "{{FARMER_TEHSIL}}", desc: "Farmer tehsil" },
+  { token: "{{FARMER_DISTRICT}}", desc: "Farmer district" },
+  { token: "{{VEHICLE_NUMBER}}", desc: "Vehicle number" },
+  { token: "{{TOTAL_BAGS}}", desc: "Total number of bags" },
+  { token: "{{NET_WEIGHT}}", desc: "Total net weight (kg)" },
+  { token: "{{GROSS_AMOUNT}}", desc: "Gross sale amount" },
+  { token: "{{HAMMALI}}", desc: "Total hammali deduction" },
+  { token: "{{AADHAT}}", desc: "Aadhat commission" },
+  { token: "{{MANDI_CHARGES}}", desc: "Mandi charges" },
+  { token: "{{FREIGHT}}", desc: "Freight/bhada amount" },
+  { token: "{{ADVANCE}}", desc: "Farmer advance amount" },
+  { token: "{{TOTAL_DEDUCTION}}", desc: "Sum of all deductions" },
+  { token: "{{NET_PAYABLE}}", desc: "Net amount payable to farmer" },
+  { token: "{{TXN_ROWS_HTML}}", desc: "Full HTML table rows of all transactions (crop, bags, weight, rate, amount)" },
+];
+
+const BUYER_PLACEHOLDERS = [
+  { token: "{{BUSINESS_NAME}}", desc: "Firm / business name" },
+  { token: "{{BUSINESS_ADDRESS}}", desc: "Business address" },
+  { token: "{{LOT_ID}}", desc: "Lot ID" },
+  { token: "{{DATE}}", desc: "Date of transaction" },
+  { token: "{{BUYER_NAME}}", desc: "Buyer name" },
+  { token: "{{BUYER_CODE}}", desc: "Buyer code" },
+  { token: "{{FARMER_NAME}}", desc: "Farmer name" },
+  { token: "{{CROP}}", desc: "Crop name" },
+  { token: "{{SIZE}}", desc: "Produce size/grade" },
+  { token: "{{BAGS}}", desc: "Number of bags" },
+  { token: "{{NET_WEIGHT}}", desc: "Net weight in kg" },
+  { token: "{{RATE}}", desc: "Rate per kg" },
+  { token: "{{GROSS_AMOUNT}}", desc: "Gross amount" },
+  { token: "{{HAMMALI}}", desc: "Hammali charge (buyer)" },
+  { token: "{{EXTRA_CHARGES}}", desc: "Extra charges (buyer)" },
+  { token: "{{AADHAT}}", desc: "Aadhat commission" },
+  { token: "{{AADHAT_PCT}}", desc: "Aadhat percentage" },
+  { token: "{{MANDI_CHARGES}}", desc: "Mandi charges" },
+  { token: "{{MANDI_PCT}}", desc: "Mandi percentage" },
+  { token: "{{TOTAL_RECEIVABLE}}", desc: "Total amount receivable from buyer" },
+];
+
+function ReceiptTemplatesDialog({ biz, onClose }: { biz: Business; onClose: () => void }) {
+  const { toast } = useToast();
+  const [buyerCrop, setBuyerCrop] = useState<string>("");
+  const [showPlaceholders, setShowPlaceholders] = useState(false);
+
+  const { data: templates = [], isLoading, refetch } = useQuery<ReceiptTemplate[]>({
+    queryKey: [`/api/admin/receipt-templates/${biz.id}`],
+    queryFn: async () => {
+      const res = await apiRequest("GET", `/api/admin/receipt-templates/${biz.id}`);
+      return res.json();
+    },
+  });
+
+  const uploadMutation = useMutation({
+    mutationFn: async ({ templateType, crop, templateHtml }: { templateType: string; crop: string; templateHtml: string }) => {
+      const res = await apiRequest("POST", `/api/admin/receipt-templates/${biz.id}`, { templateType, crop, templateHtml });
+      return res.json();
+    },
+    onSuccess: () => {
+      refetch();
+      toast({ title: "Template uploaded", variant: "success" });
+    },
+    onError: (e: Error) => toast({ title: "Upload failed", description: e.message, variant: "destructive" }),
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/admin/receipt-templates/${biz.id}/${id}`);
+    },
+    onSuccess: () => {
+      refetch();
+      toast({ title: "Template deleted", variant: "success" });
+    },
+    onError: (e: Error) => toast({ title: "Error", description: e.message, variant: "destructive" }),
+  });
+
+  const handleFileUpload = (templateType: string, crop: string) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".html,text/html";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const templateHtml = await file.text();
+      uploadMutation.mutate({ templateType, crop, templateHtml });
+    };
+    input.click();
+  };
+
+  const farmerTemplate = templates.find(t => t.templateType === "farmer");
+  const buyerTemplates = templates.filter(t => t.templateType === "buyer");
+
+  return (
+    <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <FileText className="w-5 h-5 text-blue-600" />
+            Receipt Templates — {biz.name}
+          </DialogTitle>
+          <DialogDescription>
+            Upload custom HTML receipt formats for this business. If not uploaded, the default format is used.
+          </DialogDescription>
+        </DialogHeader>
+
+        {isLoading ? (
+          <div className="py-6 text-center text-muted-foreground text-sm">Loading...</div>
+        ) : (
+          <div className="space-y-5">
+            <div className="border rounded-lg p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-sm">Farmer Receipt</p>
+                  <p className="text-xs text-muted-foreground">One template per business, applies to all crops</p>
+                </div>
+                {farmerTemplate ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-green-600 font-medium flex items-center gap-1">
+                      <FileText className="w-3 h-3" /> Custom uploaded
+                    </span>
+                    <Button
+                      variant="ghost" size="icon"
+                      data-testid="button-delete-farmer-template"
+                      onClick={() => deleteMutation.mutate(farmerTemplate.id)}
+                      disabled={deleteMutation.isPending}
+                    >
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleFileUpload("farmer", "")} disabled={uploadMutation.isPending}>
+                      <Upload className="w-3 h-3 mr-1" /> Replace
+                    </Button>
+                  </div>
+                ) : (
+                  <Button variant="outline" size="sm" data-testid="button-upload-farmer-template" onClick={() => handleFileUpload("farmer", "")} disabled={uploadMutation.isPending}>
+                    <Upload className="w-3 h-3 mr-1" /> Upload HTML
+                  </Button>
+                )}
+              </div>
+              {farmerTemplate && (
+                <p className="text-xs text-muted-foreground">
+                  Last updated: {new Date(farmerTemplate.updatedAt).toLocaleDateString()}
+                </p>
+              )}
+            </div>
+
+            <div className="border rounded-lg p-4 space-y-3">
+              <div>
+                <p className="font-medium text-sm">Buyer Receipts</p>
+                <p className="text-xs text-muted-foreground">Different template per crop — select a crop, then upload</p>
+              </div>
+
+              <div className="flex gap-2 items-end">
+                <div className="flex-1 space-y-1">
+                  <label className="text-xs text-muted-foreground">Select crop</label>
+                  <Select value={buyerCrop} onValueChange={setBuyerCrop}>
+                    <SelectTrigger data-testid="select-buyer-crop-template" className="h-8">
+                      <SelectValue placeholder="Choose a crop..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CROPS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  variant="outline" size="sm"
+                  data-testid="button-upload-buyer-template"
+                  disabled={!buyerCrop || uploadMutation.isPending}
+                  onClick={() => buyerCrop && handleFileUpload("buyer", buyerCrop)}
+                >
+                  <Upload className="w-3 h-3 mr-1" /> Upload HTML
+                </Button>
+              </div>
+
+              {buyerTemplates.length === 0 ? (
+                <p className="text-xs text-muted-foreground italic">No buyer templates uploaded yet — using default for all crops.</p>
+              ) : (
+                <div className="space-y-2">
+                  {buyerTemplates.map(t => (
+                    <div key={t.id} className="flex items-center justify-between bg-muted/40 rounded px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-3 h-3 text-green-600" />
+                        <span className="text-sm font-medium">{t.crop}</span>
+                        <span className="text-xs text-muted-foreground">Updated {new Date(t.updatedAt).toLocaleDateString()}</span>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => handleFileUpload("buyer", t.crop)} disabled={uploadMutation.isPending} title="Replace">
+                          <Upload className="w-3 h-3" />
+                        </Button>
+                        <Button variant="ghost" size="icon" onClick={() => deleteMutation.mutate(t.id)} disabled={deleteMutation.isPending} title="Delete">
+                          <Trash2 className="w-3 h-3 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <Collapsible open={showPlaceholders} onOpenChange={setShowPlaceholders}>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" className="w-full justify-between text-muted-foreground">
+                  <span className="text-xs">Available template placeholders</span>
+                  {showPlaceholders ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                  <div>
+                    <p className="text-xs font-semibold mb-2 text-muted-foreground uppercase tracking-wide">Farmer Receipt</p>
+                    <div className="space-y-1">
+                      {FARMER_PLACEHOLDERS.map(p => (
+                        <div key={p.token} className="flex gap-2 text-xs">
+                          <code className="font-mono text-blue-700 dark:text-blue-400 whitespace-nowrap">{p.token}</code>
+                          <span className="text-muted-foreground">{p.desc}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold mb-2 text-muted-foreground uppercase tracking-wide">Buyer Receipt</p>
+                    <div className="space-y-1">
+                      {BUYER_PLACEHOLDERS.map(p => (
+                        <div key={p.token} className="flex gap-2 text-xs">
+                          <code className="font-mono text-blue-700 dark:text-blue-400 whitespace-nowrap">{p.token}</code>
+                          <span className="text-muted-foreground">{p.desc}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

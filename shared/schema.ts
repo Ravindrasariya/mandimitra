@@ -403,3 +403,19 @@ export const DISTRICTS = [
 export const CROPS = ["Garlic", "Onion", "Potato"] as const;
 export const SIZES = ["Large", "Medium", "Small", "Chhatan"] as const;
 export const PAYMENT_MODES = ["Cash", "Online", "Cheque"] as const;
+
+export const receiptTemplates = pgTable("receipt_templates", {
+  id: serial("id").primaryKey(),
+  businessId: integer("business_id").notNull().references(() => businesses.id),
+  templateType: text("template_type").notNull(),
+  crop: text("crop").notNull().default(""),
+  templateHtml: text("template_html").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueTemplate: uniqueIndex("receipt_templates_business_type_crop_unique").on(table.businessId, table.templateType, table.crop),
+}));
+
+export const insertReceiptTemplateSchema = createInsertSchema(receiptTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+export type ReceiptTemplate = typeof receiptTemplates.$inferSelect;
+export type InsertReceiptTemplate = z.infer<typeof insertReceiptTemplateSchema>;
