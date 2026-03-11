@@ -533,7 +533,7 @@ const BUYER_PLACEHOLDERS = [
   { token: "{{LOT_ID}}", desc: "Lot ID" },
   { token: "{{DATE}}", desc: "Date of transaction" },
   { token: "{{BUYER_NAME}}", desc: "Buyer name" },
-  { token: "{{BUYER_CODE}}", desc: "Buyer code" },
+  { token: "{{BUYER_CODE}}", desc: "Buyer licence number" },
   { token: "{{FARMER_NAME}}", desc: "Farmer name" },
   { token: "{{CROP}}", desc: "Crop name" },
   { token: "{{SIZE}}", desc: "Produce size/grade" },

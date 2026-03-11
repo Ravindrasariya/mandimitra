@@ -261,7 +261,7 @@ ${businessAddress ? `<p style="font-size:0.85em;color:#555;margin:2px 0">${busin
 </div>
 <table class="detail-table">
 <tr><td><strong>Lot No:</strong> ${lot.lotId}</td><td><strong>Date:</strong> ${dateStr}</td></tr>
-<tr><td><strong>Buyer:</strong> ${tx.buyer.name}</td><td><strong>Buyer Code:</strong> ${tx.buyer.buyerCode || "-"}</td></tr>
+<tr><td><strong>Buyer:</strong> ${tx.buyer.name}</td><td><strong>Licence No:</strong> ${tx.buyer.licenceNo || "-"}</td></tr>
 <tr><td><strong>Farmer:</strong> ${farmer.name}</td><td><strong>Crop:</strong> ${lot.crop}</td></tr>
 <tr><td><strong>Size:</strong> ${lot.size || "-"}</td><td></td></tr>
 </table>
@@ -363,7 +363,7 @@ function applyBuyerTemplate(tmpl: string, lot: Lot, farmer: Farmer, tx: Transact
     "{{LOT_ID}}": lot.lotId,
     "{{DATE}}": tx.date || format(new Date(), "yyyy-MM-dd"),
     "{{BUYER_NAME}}": tx.buyer.name,
-    "{{BUYER_CODE}}": tx.buyer.buyerCode || "",
+    "{{BUYER_CODE}}": tx.buyer.licenceNo || "",
     "{{FARMER_NAME}}": farmer.name,
     "{{CROP}}": lot.crop,
     "{{SIZE}}": lot.size || "",

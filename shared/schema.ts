@@ -64,7 +64,7 @@ export const buyers = pgTable("buyers", {
   name: text("name").notNull(),
   phone: text("phone"),
   address: text("address"),
-  buyerCode: text("buyer_code"),
+  licenceNo: text("licence_no"),
   redFlag: boolean("negative_flag").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
   openingBalance: decimal("opening_balance", { precision: 12, scale: 2 }).default("0"),

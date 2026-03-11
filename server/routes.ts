@@ -430,7 +430,7 @@ export async function registerRoutes(
         name: "Name",
         phone: "Contact",
         address: "Address",
-        buyerCode: "Buyer Code",
+        licenceNo: "Licence No",
         redFlag: "Red Flag",
         isActive: "Active Status",
         openingBalance: "Opening Balance",

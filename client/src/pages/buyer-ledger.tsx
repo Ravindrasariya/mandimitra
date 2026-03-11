@@ -171,14 +171,14 @@ export default function BuyerLedgerPage() {
   const [editName, setEditName] = useState("");
   const [editAddress, setEditAddress] = useState("");
   const [editPhone, setEditPhone] = useState("");
-  const [editBuyerCode, setEditBuyerCode] = useState("");
+  const [editLicenceNo, setEditLicenceNo] = useState("");
   const [editRedFlag, setEditRedFlag] = useState(false);
   const [editOpeningBalance, setEditOpeningBalance] = useState("");
 
   const [newName, setNewName] = useState("");
   const [newAddress, setNewAddress] = useState("");
   const [newPhone, setNewPhone] = useState("");
-  const [newBuyerCode, setNewBuyerCode] = useState("");
+  const [newLicenceNo, setNewLicenceNo] = useState("");
   const [newOpeningBalance, setNewOpeningBalance] = useState("");
   const [yearFilter, setYearFilter] = usePersistedState("bl-yearFilter", "all");
   const [selectedMonths, setSelectedMonths] = usePersistedState<string[]>("bl-selectedMonths", []);
@@ -427,7 +427,7 @@ export default function BuyerLedgerPage() {
     setEditName(buyer.name);
     setEditAddress(buyer.address || "");
     setEditPhone(buyer.phone || "");
-    setEditBuyerCode(buyer.buyerCode || "");
+    setEditLicenceNo(buyer.licenceNo || "");
     setEditRedFlag(buyer.redFlag);
     setEditOpeningBalance(buyer.openingBalance || "0");
   };
@@ -471,7 +471,7 @@ export default function BuyerLedgerPage() {
         name: editName,
         address: editAddress || null,
         phone: editPhone || null,
-        buyerCode: editBuyerCode || null,
+        licenceNo: editLicenceNo || null,
         redFlag: editRedFlag,
         openingBalance: editOpeningBalance || "0",
       },
@@ -512,7 +512,7 @@ export default function BuyerLedgerPage() {
       name: newName.trim(),
       address: newAddress || null,
       phone: newPhone || null,
-      buyerCode: newBuyerCode || null,
+      licenceNo: newLicenceNo || null,
       openingBalance: newOpeningBalance || "0",
     });
   };
@@ -740,7 +740,7 @@ export default function BuyerLedgerPage() {
                         <td className="p-3 font-mono text-xs">{buyer.buyerId}</td>
                         <td className="p-3 font-medium">{buyer.name}</td>
                         <td className="p-3 text-muted-foreground">{buyer.address || "-"}</td>
-                        <td className="p-3 text-muted-foreground">{buyer.buyerCode || "-"}</td>
+                        <td className="p-3 text-muted-foreground">{buyer.licenceNo || "-"}</td>
                         <td className="p-3">{buyer.phone || "-"}</td>
                         <td className="p-3 text-center">
                           {buyer.redFlag && (
@@ -797,7 +797,7 @@ export default function BuyerLedgerPage() {
                           <p className="font-medium">{buyer.name}</p>
                           {buyer.address && <p className="text-xs text-muted-foreground">{buyer.address}</p>}
                           {buyer.phone && <p className="text-xs">{buyer.phone}</p>}
-                          {buyer.buyerCode && <p className="text-xs text-muted-foreground">Code: {buyer.buyerCode}</p>}
+                          {buyer.licenceNo && <p className="text-xs text-muted-foreground">Licence: {buyer.licenceNo}</p>}
                           <div className="flex gap-4 text-xs pt-1">
                             <span>{t("buyerLedger.overall")}: <strong>{formatIndianCurrency(buyer.overallDue)}</strong></span>
                             <span>{t("buyerLedger.receivable")}: <strong className="text-orange-600">{formatIndianCurrency(buyer.receivableDue)}</strong></span>
@@ -882,8 +882,8 @@ export default function BuyerLedgerPage() {
               <Label>{t("buyerLedger.buyerCode")}</Label>
               <Input
                 data-testid="input-edit-buyer-code"
-                value={editBuyerCode}
-                onChange={(e) => setEditBuyerCode(e.target.value)}
+                value={editLicenceNo}
+                onChange={(e) => setEditLicenceNo(e.target.value)}
                 className="mobile-touch-target"
               />
             </div>
@@ -993,8 +993,8 @@ export default function BuyerLedgerPage() {
               <Label>{t("buyerLedger.buyerCode")}</Label>
               <Input
                 data-testid="input-new-buyer-code"
-                value={newBuyerCode}
-                onChange={(e) => setNewBuyerCode(e.target.value)}
+                value={newLicenceNo}
+                onChange={(e) => setNewLicenceNo(e.target.value)}
                 placeholder={t("common.optional")}
                 className="mobile-touch-target"
               />
