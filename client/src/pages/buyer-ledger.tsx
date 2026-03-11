@@ -195,7 +195,7 @@ export default function BuyerLedgerPage() {
     queryKey: ["/api/buyers" + buyerQueryParams],
   });
 
-  const { data: allTransactions = [] } = useQuery<{ id: number; date: string; crop: string; buyerId: number; totalReceivableFromBuyer: string; paidAmount: string; paymentStatus: string; isReversed: boolean }[]>({
+  const { data: allTransactions = [] } = useQuery<{ id: number; date: string; lot?: { crop?: string }; buyerId: number; totalReceivableFromBuyer: string; paidAmount: string; paymentStatus: string; isReversed: boolean }[]>({
     queryKey: ["/api/transactions"],
   });
 
@@ -364,7 +364,7 @@ export default function BuyerLedgerPage() {
       if (cropFilter !== "all") {
         const buyerTxns = allTransactions.filter(t => t.buyerId === b.id && !t.isReversed);
         const hasCrop = buyerTxns.some(t => {
-          if (t.crop !== cropFilter) return false;
+          if (t.lot?.crop !== cropFilter) return false;
           const [y, m, day] = t.date.split("-");
           if (yearFilter !== "all" && y !== yearFilter) return false;
           if (selectedMonths.length > 0 && !selectedMonths.includes(String(parseInt(m)))) return false;
