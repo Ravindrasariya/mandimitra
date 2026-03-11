@@ -226,14 +226,24 @@ export async function setupAuth(app: Express): Promise<void> {
     }
 
     const hashed = await hashPassword(newPassword);
-    await storage.updateUserPassword(user.id, hashed);
+    const siblings = await storage.getUsersByUsername(user.username);
+    await Promise.all(siblings.map(u => storage.updateUserPassword(u.id, hashed)));
+    await Promise.all(siblings.map(u => storage.updateUser(u.id, { mustChangePassword: false })));
 
     if (phone) {
       await storage.updateUser(user.id, { phone });
     }
 
-    const { password, ...safeUser } = user;
-    res.json({ ...safeUser, mustChangePassword: false });
+    const business = await storage.getBusiness(user.businessId);
+    const allBusinesses = await buildAllBusinesses(user.username, user.role);
+    const { password: _pw, ...safeUser } = user;
+    res.json({
+      ...safeUser,
+      mustChangePassword: false,
+      businessName: business?.name || "",
+      businessAddress: business?.address || "",
+      allBusinesses,
+    });
   });
 
   app.post("/api/auth/change-password-public", async (req, res) => {
@@ -267,8 +277,9 @@ export async function setupAuth(app: Express): Promise<void> {
     }
 
     const hashed = await hashPassword(newPassword);
-    await storage.updateUserPassword(user.id, hashed);
-    await storage.updateUser(user.id, { mustChangePassword: false });
+    const siblings = await storage.getUsersByUsername(username);
+    await Promise.all(siblings.map(u => storage.updateUserPassword(u.id, hashed)));
+    await Promise.all(siblings.map(u => storage.updateUser(u.id, { mustChangePassword: false })));
 
     res.json({ message: "Password changed successfully" });
   });
