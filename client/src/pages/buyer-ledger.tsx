@@ -377,6 +377,35 @@ export default function BuyerLedgerPage() {
     });
   }, [buyers, yearFilter, selectedMonths, selectedDays, cropFilter, allTransactions]);
 
+  const anyFilterActive = yearFilter !== "all" || selectedMonths.length > 0 || selectedDays.length > 0 || cropFilter !== "all";
+
+  const filteredDuesByBuyer = useMemo(() => {
+    const map = new Map<number, { receivable: number; overall: number }>();
+    for (const b of filteredBuyers) {
+      if (!anyFilterActive) {
+        map.set(b.id, {
+          receivable: parseFloat(b.receivableDue),
+          overall: parseFloat(b.overallDue),
+        });
+      } else {
+        const txns = allTransactions.filter(t => t.buyerId === b.id && !t.isReversed);
+        let receivable = 0;
+        for (const t of txns) {
+          if (cropFilter !== "all" && t.lot?.crop !== cropFilter) continue;
+          const [y, m, day] = t.date.split("-");
+          if (yearFilter !== "all" && y !== yearFilter) continue;
+          if (selectedMonths.length > 0 && !selectedMonths.includes(String(parseInt(m)))) continue;
+          if (selectedDays.length > 0 && !selectedDays.includes(String(parseInt(day)))) continue;
+          const due = parseFloat(t.totalReceivableFromBuyer || "0") - parseFloat(t.paidAmount || "0");
+          if (due > 0) receivable += due;
+        }
+        const openingBal = parseFloat((b as any).openingBalance || "0");
+        map.set(b.id, { receivable, overall: receivable + openingBal });
+      }
+    }
+    return map;
+  }, [filteredBuyers, allTransactions, yearFilter, selectedMonths, selectedDays, cropFilter, anyFilterActive]);
+
   const sortedBuyers = useMemo(() => {
     const sorted = [...filteredBuyers];
     sorted.sort((a, b) => {
@@ -384,29 +413,39 @@ export default function BuyerLedgerPage() {
       if (sortField === "buyerId") {
         cmp = a.buyerId.localeCompare(b.buyerId);
       } else if (sortField === "overallDue") {
-        cmp = parseFloat(a.overallDue) - parseFloat(b.overallDue);
+        const aVal = filteredDuesByBuyer.get(a.id)?.overall ?? parseFloat(a.overallDue);
+        const bVal = filteredDuesByBuyer.get(b.id)?.overall ?? parseFloat(b.overallDue);
+        cmp = aVal - bVal;
       } else if (sortField === "receivableDue") {
-        cmp = parseFloat(a.receivableDue) - parseFloat(b.receivableDue);
+        const aVal = filteredDuesByBuyer.get(a.id)?.receivable ?? parseFloat(a.receivableDue);
+        const bVal = filteredDuesByBuyer.get(b.id)?.receivable ?? parseFloat(b.receivableDue);
+        cmp = aVal - bVal;
       }
       return sortDir === "asc" ? cmp : -cmp;
     });
     return sorted;
-  }, [filteredBuyers, sortField, sortDir]);
+  }, [filteredBuyers, filteredDuesByBuyer, sortField, sortDir]);
 
   const summary = useMemo(() => {
     const total = filteredBuyers.length;
-    const withDues = filteredBuyers.filter(b => parseFloat(b.overallDue) > 0).length;
-    const totalOverallDue = filteredBuyers.reduce((s, b) => s + parseFloat(b.overallDue), 0);
-    const totalReceivableDue = filteredBuyers.reduce((s, b) => s + parseFloat(b.receivableDue), 0);
-    
+    let withDues = 0;
+    let totalOverallDue = 0;
+    let totalReceivableDue = 0;
+    filteredBuyers.forEach(b => {
+      const dues = filteredDuesByBuyer.get(b.id) || { receivable: 0, overall: 0 };
+      if (dues.overall > 0) withDues++;
+      totalOverallDue += dues.overall;
+      totalReceivableDue += dues.receivable;
+    });
+
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     const filteredBuyerIds = new Set(filteredBuyers.map(b => b.id));
-    const activeTxns = allTransactions.filter(t => 
+    const activeTxns = allTransactions.filter(t =>
       !t.isReversed && filteredBuyerIds.has(t.buyerId)
     );
-    
+
     let duesOver15 = 0;
     let duesOver30 = 0;
     activeTxns.forEach(t => {
@@ -417,9 +456,9 @@ export default function BuyerLedgerPage() {
       if (diffDays > 30) duesOver30 += due;
       if (diffDays > 15) duesOver15 += due;
     });
-    
+
     return { total, withDues, totalOverallDue, totalReceivableDue, duesOver15, duesOver30 };
-  }, [filteredBuyers, allTransactions]);
+  }, [filteredBuyers, filteredDuesByBuyer, allTransactions]);
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
@@ -448,9 +487,9 @@ export default function BuyerLedgerPage() {
   const getPaanaHtml = async (buyer: BuyerWithDues) => {
     const res = await apiRequest("GET", `/api/buyers/${buyer.id}/paana`);
     const data = await res.json();
-    const dateFilterActive = yearFilter !== "all" || selectedMonths.length > 0 || selectedDays.length > 0;
-    const filteredTxns = dateFilterActive
+    const filteredTxns = anyFilterActive
       ? (data.transactions || []).filter((t: any) => {
+          if (cropFilter !== "all" && t.crop !== cropFilter) return false;
           const [y, m, d] = (t.date || "").split("-");
           if (yearFilter !== "all" && y !== yearFilter) return false;
           if (selectedMonths.length > 0 && !selectedMonths.includes(String(parseInt(m)))) return false;
@@ -783,10 +822,10 @@ export default function BuyerLedgerPage() {
                           />
                         </td>
                         <td className="p-3 text-right font-medium">
-                          {formatIndianCurrency(buyer.overallDue)}
+                          {formatIndianCurrency(filteredDuesByBuyer.get(buyer.id)?.overall ?? parseFloat(buyer.overallDue))}
                         </td>
                         <td className="p-3 text-right font-medium text-orange-600">
-                          {formatIndianCurrency(buyer.receivableDue)}
+                          {formatIndianCurrency(filteredDuesByBuyer.get(buyer.id)?.receivable ?? parseFloat(buyer.receivableDue))}
                         </td>
                         <td className="p-3">
                           <div className="flex items-center gap-1">
@@ -822,8 +861,8 @@ export default function BuyerLedgerPage() {
                           {buyer.phone && <p className="text-xs">{buyer.phone}</p>}
                           {buyer.licenceNo && <p className="text-xs text-muted-foreground">Licence: {buyer.licenceNo}</p>}
                           <div className="flex gap-4 text-xs pt-1">
-                            <span>{t("buyerLedger.overall")}: <strong>{formatIndianCurrency(buyer.overallDue)}</strong></span>
-                            <span>{t("buyerLedger.receivable")}: <strong className="text-orange-600">{formatIndianCurrency(buyer.receivableDue)}</strong></span>
+                            <span>{t("buyerLedger.overall")}: <strong>{formatIndianCurrency(filteredDuesByBuyer.get(buyer.id)?.overall ?? parseFloat(buyer.overallDue))}</strong></span>
+                            <span>{t("buyerLedger.receivable")}: <strong className="text-orange-600">{formatIndianCurrency(filteredDuesByBuyer.get(buyer.id)?.receivable ?? parseFloat(buyer.receivableDue))}</strong></span>
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-2">
