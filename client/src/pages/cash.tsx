@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, apiRequestJson, queryClient } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/lib/language";
 import { Button } from "@/components/ui/button";
@@ -42,7 +42,6 @@ export default function CashPage() {
   const [activeTab, setActiveTab] = usePersistedState<"inward" | "outward" | "transfer">("cash-activeTab", "inward");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [detailEntry, setDetailEntry] = useState<CashEntry | null>(null);
-  const [detailEntryGroup, setDetailEntryGroup] = useState<CashEntry[]>([]);
   const [reverseConfirmEntry, setReverseConfirmEntry] = useState<CashEntry | null>(null);
   const [chequeBounceEntry, setChequeBounceEntry] = useState<CashEntry | null>(null);
   const [deleteAccountId, setDeleteAccountId] = useState<number | null>(null);
@@ -153,26 +152,14 @@ export default function CashPage() {
   type PendingTxn = { id: number; transactionId: string; serialNumber: number; date: string; numberOfBags: number; crop: string; totalReceivableFromBuyer: string; paidAmount: string; due: string; bidCreatedAt: string };
   const { data: pendingTransactions = [] } = useQuery<PendingTxn[]>({
     queryKey: ["/api/buyers", inwardBuyerId, "pending-transactions"],
-    queryFn: async () => {
-      if (!inwardBuyerId) return [];
-      const r = await fetch(`/api/buyers/${inwardBuyerId}/pending-transactions`, { credentials: "include" });
-      if (!r.ok) return [];
-      const text = await r.text();
-      try { return JSON.parse(text); } catch { return []; }
-    },
+    queryFn: () => inwardBuyerId ? fetch(`/api/buyers/${inwardBuyerId}/pending-transactions`, { credentials: "include" }).then(r => r.json()) : Promise.resolve([]),
     enabled: inwardPartyType === "Buyer" && !!inwardBuyerId,
   });
 
   type FarmerPendingTxn = { groupKey: string; serialNumber: number; date: string; numberOfBags: number; crops: string; totalPayableToFarmer: string; farmerPaidAmount: string; due: string; transactionIds: { id: number; due: number }[] };
   const { data: farmerPendingTransactions = [] } = useQuery<FarmerPendingTxn[]>({
     queryKey: ["/api/farmers", outwardFarmerId, "pending-transactions"],
-    queryFn: async () => {
-      if (!outwardFarmerId) return [];
-      const r = await fetch(`/api/farmers/${outwardFarmerId}/pending-transactions`, { credentials: "include" });
-      if (!r.ok) return [];
-      const text = await r.text();
-      try { return JSON.parse(text); } catch { return []; }
-    },
+    queryFn: () => outwardFarmerId ? fetch(`/api/farmers/${outwardFarmerId}/pending-transactions`, { credentials: "include" }).then(r => r.json()) : Promise.resolve([]),
     enabled: outwardOutflowType === "Farmer-Harvest Sale" && !!outwardFarmerId,
   });
 
@@ -223,23 +210,6 @@ export default function CashPage() {
     }
     return result;
   }, [allEntries, filterPaymentMode, filterOutflowType, filterBuyer, filterFarmer, filterRemarks]);
-
-  type EntryGroup = { key: string; representative: CashEntry; entries: CashEntry[]; totalAmount: number; isReversed: boolean; };
-  const groupedEntries = useMemo<EntryGroup[]>(() => {
-    const map = new Map<string, CashEntry[]>();
-    for (const e of filteredEntries) {
-      const key = e.cashFlowId || `solo-${e.id}`;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(e);
-    }
-    return Array.from(map.values()).map(entries => ({
-      key: entries[0].cashFlowId || `solo-${entries[0].id}`,
-      representative: entries[0],
-      entries,
-      totalAmount: entries.reduce((s, e) => s + parseFloat(e.amount || "0"), 0),
-      isReversed: entries.every(e => e.isReversed),
-    }));
-  }, [filteredEntries]);
 
   const filteredTotals = useMemo(() => {
     let totalInflow = 0, totalOutflow = 0;
@@ -324,7 +294,10 @@ export default function CashPage() {
   };
 
   const createMutation = useMutation({
-    mutationFn: async (data: any) => apiRequestJson("POST", "/api/cash-entries", data),
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/cash-entries", data);
+      return res.json();
+    },
     onSuccess: () => {
       invalidateCashQueries();
       toast({ title: t("common.saved"), variant: "success" });
@@ -335,8 +308,10 @@ export default function CashPage() {
   });
 
   const reverseMutation = useMutation({
-    mutationFn: async ({ id, reason }: { id: number; reason?: string }) =>
-      apiRequestJson("PATCH", `/api/cash-entries/${id}/reverse`, reason ? { reason } : undefined),
+    mutationFn: async ({ id, reason }: { id: number; reason?: string }) => {
+      const res = await apiRequest("PATCH", `/api/cash-entries/${id}/reverse`, reason ? { reason } : undefined);
+      return res.json();
+    },
     onSuccess: () => {
       invalidateCashQueries();
       setReverseConfirmEntry(null);
@@ -348,22 +323,11 @@ export default function CashPage() {
     },
   });
 
-  const reverseGroupMutation = useMutation({
-    mutationFn: async ({ cashFlowId, reason }: { cashFlowId: string; reason?: string }) =>
-      apiRequestJson("PATCH", `/api/cash-entries/group-reverse`, { cashFlowId, reason }),
-    onSuccess: () => {
-      invalidateCashQueries();
-      setReverseConfirmEntry(null);
-      setDetailEntry(null);
-      toast({ title: t("common.saved"), description: "Payment reversed", variant: "success" });
-    },
-    onError: (err: any) => {
-      toast({ title: t("common.error"), description: err.message, variant: "destructive" });
-    },
-  });
-
   const saveCashSettingsMutation = useMutation({
-    mutationFn: async (val: string) => apiRequestJson("POST", "/api/cash-settings", { cashInHandOpening: val }),
+    mutationFn: async (val: string) => {
+      const res = await apiRequest("POST", "/api/cash-settings", { cashInHandOpening: val });
+      return res.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cash-settings"] });
       toast({ title: t("common.saved"), variant: "success" });
@@ -371,7 +335,10 @@ export default function CashPage() {
   });
 
   const createBankMutation = useMutation({
-    mutationFn: async (data: any) => apiRequestJson("POST", "/api/bank-accounts", data),
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/bank-accounts", data);
+      return res.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
       setNewBankName("");
@@ -393,8 +360,10 @@ export default function CashPage() {
   });
 
   const updateBankMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: any }) =>
-      apiRequestJson("PATCH", `/api/bank-accounts/${id}`, data),
+    mutationFn: async ({ id, data }: { id: number; data: any }) => {
+      const res = await apiRequest("PATCH", `/api/bank-accounts/${id}`, data);
+      return res.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash-entries"] });
@@ -404,7 +373,10 @@ export default function CashPage() {
   });
 
   const capitalExpenseMutation = useMutation({
-    mutationFn: async (data: any) => apiRequestJson("POST", "/api/capital-expense", data),
+    mutationFn: async (data: any) => {
+      const res = await apiRequest("POST", "/api/capital-expense", data);
+      return res.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ predicate: (query) => {
         const key = query.queryKey[0] as string;
@@ -515,19 +487,14 @@ export default function CashPage() {
         return;
       }
       const buildSplitLog = () => {
-        if (inwardAllocations.length <= 1) return null;
-        const getLabel = (a: typeof inwardAllocations[0]) => a.txnId === null ? "PY" : `SR#${a.serialNumber}`;
-        const items = inwardAllocations.map(a => {
-          const discAmt = (parseFloat(a.discountPercent || "0") / 100) * a.due;
-          return {
-            label: getLabel(a),
-            amount: parseFloat(a.amount || "0").toFixed(2),
-            discountPct: a.discountPercent || "0",
-            discountAmt: discAmt.toFixed(2),
-            pettyAdj: parseFloat(a.pettyAdj || "0").toFixed(2),
-          };
-        });
-        return JSON.stringify(items);
+        const label = (a: typeof inwardAllocations[0]) => a.txnId === null ? "PY" : `SR#${a.serialNumber}`;
+        const amtParts = inwardAllocations.map(a => `${label(a)}-${parseFloat(a.amount || "0").toFixed(2)}`);
+        const discParts = inwardAllocations.filter(a => parseFloat(a.discountPercent || "0") > 0).map(a => `${label(a)}-${a.discountPercent}%`);
+        const pettyParts = inwardAllocations.filter(a => parseFloat(a.pettyAdj || "0") > 0).map(a => `${label(a)}-${parseFloat(a.pettyAdj || "0").toFixed(2)}`);
+        let log = `Amt: ${amtParts.join(", ")}`;
+        if (discParts.length > 0) log += ` | Disc%: ${discParts.join(", ")}`;
+        if (pettyParts.length > 0) log += ` | Petty: ${pettyParts.join(", ")}`;
+        return log;
       };
       createMutation.mutate({
         category: "inward",
@@ -604,17 +571,6 @@ export default function CashPage() {
         toast({ title: t("common.error"), description: `Allocated amount (₹${totalAllocated.toLocaleString("en-IN")}) must equal paid amount (₹${totalPaid.toLocaleString("en-IN")})`, variant: "destructive" });
         return;
       }
-      const buildFarmerSplitLog = () => {
-        if (farmerAllocations.length <= 1) return null;
-        const items = farmerAllocations.map(a => ({
-          label: a.txnLabel,
-          amount: parseFloat(a.amount || "0").toFixed(2),
-          discountPct: "0",
-          discountAmt: "0.00",
-          pettyAdj: "0.00",
-        }));
-        return JSON.stringify(items);
-      };
       createMutation.mutate({
         category: "outward",
         type: "cash_out",
@@ -625,7 +581,6 @@ export default function CashPage() {
         paymentMode: outwardPaymentMode,
         bankAccountId: outwardPaymentMode !== "Cash" ? parseInt(outwardBankAccountId) : null,
         notes: outwardNotes || null,
-        splitLog: buildFarmerSplitLog(),
         allocations: farmerAllocations.map(a => ({
           transactionIds: a.transactionIds.length > 0 ? a.transactionIds : undefined,
           transactionId: a.transactionIds.length === 0 ? null : undefined,
@@ -736,37 +691,24 @@ export default function CashPage() {
   };
 
   const downloadCSV = () => {
-    const parseSplitLog = (log: string | null) => {
-      if (!log) return null;
-      try { return JSON.parse(log) as { label: string; amount: string; discountPct: string; discountAmt: string; pettyAdj: string }[]; } catch { return null; }
-    };
-    const rows = groupedEntries.map(group => {
-      const e = group.representative;
-      const splitLog = (e as any).splitLog as string | null;
-      const splits = parseSplitLog(splitLog);
-      const splitAmounts = splits ? splits.map(s => `${s.label}:${parseFloat(s.amount).toLocaleString("en-IN")}`).join(" | ") : "";
-      const splitDisc = splits ? splits.map(s => `${s.label}:${s.discountPct}%`).join(" | ") : "";
-      const splitPetty = splits ? splits.map(s => `${s.label}:${parseFloat(s.pettyAdj).toLocaleString("en-IN")}`).join(" | ") : "";
-      return {
-        "Cash Flow ID": e.cashFlowId || "",
-        "Date": format(new Date(e.createdAt), "dd/MM/yyyy HH:mm:ss"),
-        "Category": e.category,
-        "Outflow Type": e.outflowType || "",
-        "Receiver/Party": e.partyName || (e.buyerId ? getBuyerName(e.buyerId) : e.farmerId ? getFarmerName(e.farmerId) : ""),
-        "Buyer": e.buyerId ? getBuyerName(e.buyerId) : "",
-        "Farmer": e.farmerId ? getFarmerName(e.farmerId) : "",
-        "Total Amount": group.totalAmount.toFixed(2),
-        "Amount Split": splitAmounts,
-        "Disc % Split": splitDisc,
-        "Petty Adj Split": splitPetty,
-        "Payment Mode": e.paymentMode,
-        "Bank Account": e.bankAccountId ? getAccountName(e.bankAccountId) : "",
-        "Notes": e.notes || "",
-        "Status": group.isReversed ? "Reversed" : "Active",
-      };
-    });
+    const rows = filteredEntries.map(e => ({
+      "Cash Flow ID": e.cashFlowId || "",
+      "Date": format(new Date(e.createdAt), "dd/MM/yyyy HH:mm:ss"),
+      "Category": e.category,
+      "Outflow Type": e.outflowType || "",
+      "Receiver/Party": e.partyName || (e.buyerId ? getBuyerName(e.buyerId) : e.farmerId ? getFarmerName(e.farmerId) : ""),
+      "Buyer": e.buyerId ? getBuyerName(e.buyerId) : "",
+      "Farmer": e.farmerId ? getFarmerName(e.farmerId) : "",
+      "Amount": e.amount,
+      "Discount": e.discount || "0",
+      "Petty Adj": e.pettyAdj || "0",
+      "Payment Mode": e.paymentMode,
+      "Bank Account": e.bankAccountId ? getAccountName(e.bankAccountId) : "",
+      "Notes": e.notes || "",
+      "Status": e.isReversed ? "Reversed" : "Active",
+    }));
     const headers = Object.keys(rows[0] || {});
-    const csv = [headers.join(","), ...rows.map(r => headers.map(h => `"${String((r as any)[h]).replace(/"/g, '""')}"`).join(","))].join("\n");
+    const csv = [headers.join(","), ...rows.map(r => headers.map(h => `"${(r as any)[h]}"`).join(","))].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -1753,140 +1695,112 @@ export default function CashPage() {
 
           {isLoading ? (
             <div className="text-center py-8 text-muted-foreground text-sm">{t("app.loading")}</div>
-          ) : groupedEntries.length === 0 ? (
+          ) : filteredEntries.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground text-sm">{t("cash.noEntries")}</div>
           ) : (
             <div className="space-y-2 max-h-[60vh] overflow-y-auto">
-              {groupedEntries.map(group => {
-                const entry = group.representative;
-                return (
-                  <Card
-                    key={group.key}
-                    className={`cursor-pointer transition-opacity ${group.isReversed ? "opacity-40" : ""}`}
-                    onClick={() => { setDetailEntry(entry); setDetailEntryGroup(group.entries); }}
-                    data-testid={`cash-entry-${entry.id}`}
-                  >
-                    <CardContent className="p-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex flex-wrap items-center gap-1.5 mb-1">
-                            <span className="text-sm font-medium">
-                              {entry.category === "inward" ? "↙" : entry.category === "outward" ? "↗" : "⇄"} {getEntryLabel(entry)}
-                            </span>
-                            {getCategoryBadge(entry)}
-                            {group.entries.length > 1 && <Badge variant="secondary" className="text-[10px]">{group.entries.length} txns</Badge>}
-                            {group.isReversed && <Badge variant="destructive" className="text-[10px]">Reversed</Badge>}
-                          </div>
-                          <div className="flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
-                            <span>{format(new Date(entry.createdAt), "dd/MM/yyyy HH:mm:ss")}</span>
-                            <Badge variant="outline" className="text-[10px] h-4">{entry.paymentMode}</Badge>
-                            {entry.outflowType && entry.category === "outward" && (
-                              <span className="text-muted-foreground">{entry.outflowType}</span>
-                            )}
-                            {entry.isReversed && entry.reversedAt && (
-                              <span>Reversed on {format(new Date(entry.reversedAt), "dd/MM/yyyy")}</span>
-                            )}
-                            {entry.notes && <span className="truncate max-w-[150px]">{entry.notes}</span>}
-                          </div>
+              {filteredEntries.map(entry => (
+                <Card
+                  key={entry.id}
+                  className={`cursor-pointer transition-opacity ${entry.isReversed ? "opacity-40" : ""}`}
+                  onClick={() => setDetailEntry(entry)}
+                  data-testid={`cash-entry-${entry.id}`}
+                >
+                  <CardContent className="p-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-wrap items-center gap-1.5 mb-1">
+                          <span className="text-sm font-medium">
+                            {entry.category === "inward" ? "↙" : entry.category === "outward" ? "↗" : "⇄"} {getEntryLabel(entry)}
+                          </span>
+                          {getCategoryBadge(entry)}
+                          {entry.isReversed && <Badge variant="destructive" className="text-[10px]">Reversed</Badge>}
                         </div>
-                        <div className="flex items-center gap-1.5">
-                          <div className="text-right">
-                            <span className={`text-sm font-bold whitespace-nowrap ${entry.category === "outward" || entry.category === "transfer" ? "text-orange-600" : "text-green-600"}`}>
-                              {entry.category === "outward" ? "-" : entry.category === "inward" ? "+" : ""}₹{group.totalAmount.toLocaleString("en-IN")}
-                            </span>
-                          </div>
-                          {!group.isReversed && (
-                            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={(ev) => { ev.stopPropagation(); setReverseConfirmEntry(entry); }} data-testid={`reverse-entry-${entry.id}`}>
-                              <RotateCcw className="w-3 h-3" />
-                            </Button>
+                        <div className="flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground">
+                          <span>{format(new Date(entry.createdAt), "dd/MM/yyyy HH:mm:ss")}</span>
+                          <Badge variant="outline" className="text-[10px] h-4">{entry.paymentMode}</Badge>
+                          {entry.outflowType && entry.category === "outward" && (
+                            <span className="text-muted-foreground">{entry.outflowType}</span>
                           )}
+                          {entry.isReversed && entry.reversedAt && (
+                            <span>Reversed on {format(new Date(entry.reversedAt), "dd/MM/yyyy")}</span>
+                          )}
+                          {entry.notes && <span className="truncate max-w-[150px]">{entry.notes}</span>}
                         </div>
                       </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
+                      <div className="flex items-center gap-1.5">
+                        <div className="text-right">
+                          <span className={`text-sm font-bold whitespace-nowrap ${entry.category === "outward" || entry.category === "transfer" ? "text-orange-600" : "text-green-600"}`}>
+                            {entry.category === "outward" ? "-" : entry.category === "inward" ? "+" : ""}₹{parseFloat(entry.amount).toLocaleString("en-IN")}
+                          </span>
+                          {(parseFloat(entry.discount || "0") > 0 || parseFloat(entry.pettyAdj || "0") > 0) && (
+                            <div className="text-[9px] text-muted-foreground">
+                              {parseFloat(entry.discount || "0") > 0 && <span>Disc: ₹{parseFloat(entry.discount!).toLocaleString("en-IN")} </span>}
+                              {parseFloat(entry.pettyAdj || "0") > 0 && <span>Petty: ₹{parseFloat(entry.pettyAdj!).toLocaleString("en-IN")}</span>}
+                            </div>
+                          )}
+                        </div>
+                        {!entry.isReversed && (
+                          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={(ev) => { ev.stopPropagation(); setReverseConfirmEntry(entry); }} data-testid={`reverse-entry-${entry.id}`}>
+                            <RotateCcw className="w-3 h-3" />
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                    {(entry as any).splitLog && (
+                      <p className="text-[9px] text-muted-foreground mt-1 leading-tight break-all border-t pt-1">{(entry as any).splitLog}</p>
+                    )}
+                  </CardContent>
+                </Card>
+              ))}
             </div>
           )}
         </div>
       </div>
 
       <Dialog open={!!detailEntry} onOpenChange={() => setDetailEntry(null)}>
-        <DialogContent className="max-w-sm flex flex-col max-h-[85vh]">
-          <DialogHeader className="shrink-0">
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
             <DialogTitle>{t("cash.entryDetails")}</DialogTitle>
           </DialogHeader>
-          <div className="overflow-y-auto flex-1 pr-1">
-          {detailEntry && (() => {
-            const totalAmt = detailEntryGroup.reduce((s, e) => s + parseFloat(e.amount || "0"), 0);
-            const splitLog = (detailEntry as any).splitLog as string | null;
-            let splitItems: { label: string; amount: string; discountPct: string; discountAmt: string; pettyAdj: string; }[] | null = null;
-            if (splitLog) { try { splitItems = JSON.parse(splitLog); } catch { splitItems = null; } }
-            const isGroup = detailEntryGroup.length > 1;
-            return (
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between"><span className="text-muted-foreground">Cash Flow ID</span><span className="font-medium">{detailEntry.cashFlowId || "N/A"}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">{t("common.date")}</span><span>{format(new Date(detailEntry.createdAt), "dd/MM/yyyy HH:mm:ss")}</span></div>
-                <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.category")}</span>{getCategoryBadge(detailEntry)}</div>
-                {detailEntry.outflowType && <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.outflowType")}</span><span>{detailEntry.outflowType}</span></div>}
-                {detailEntry.partyName && <div className="flex justify-between"><span className="text-muted-foreground">Receiver</span><span>{detailEntry.partyName}</span></div>}
-                <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.amount")}</span><span className="font-bold">₹{totalAmt.toLocaleString("en-IN")}</span></div>
-                {!isGroup && parseFloat(detailEntry.discount || "0") > 0 && (
-                  <div className="flex justify-between"><span className="text-muted-foreground">Discount</span><span>₹{parseFloat(detailEntry.discount!).toLocaleString("en-IN")}</span></div>
-                )}
-                {!isGroup && parseFloat(detailEntry.pettyAdj || "0") > 0 && (
-                  <div className="flex justify-between"><span className="text-muted-foreground">Petty Adj</span><span>₹{parseFloat(detailEntry.pettyAdj!).toLocaleString("en-IN")}</span></div>
-                )}
-                <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.paymentMode")}</span><span>{detailEntry.paymentMode}</span></div>
-                {detailEntry.bankAccountId && <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.bankAccount")}</span><span>{getAccountName(detailEntry.bankAccountId)}</span></div>}
-                {detailEntry.buyerId && <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.buyer")}</span><span>{getBuyerName(detailEntry.buyerId)}</span></div>}
-                {detailEntry.farmerId && <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.farmer")}</span><span>{getFarmerName(detailEntry.farmerId)}</span></div>}
-                {detailEntry.notes && <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.remarks")}</span><span>{detailEntry.notes}</span></div>}
-
-                {isGroup && (
-                  <div className="pt-2 border-t space-y-3">
-                    <p className="text-xs font-semibold text-muted-foreground">Payment Split</p>
-                    {(splitItems || detailEntryGroup.map((e, i) => ({
-                      label: `Txn #${i + 1}`,
-                      amount: parseFloat(e.amount || "0").toFixed(2),
-                      discountPct: "0",
-                      discountAmt: parseFloat(e.discount || "0").toFixed(2),
-                      pettyAdj: parseFloat(e.pettyAdj || "0").toFixed(2),
-                    }))).map((item, i) => (
-                      <div key={i} className="bg-muted/50 rounded-lg p-3 space-y-1.5">
-                        <p className="text-sm font-semibold">{item.label}</p>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Amount</span>
-                          <span className="font-medium">₹{parseFloat(item.amount).toLocaleString("en-IN")}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Disc %</span>
-                          <span className="font-medium">{item.discountPct}%{parseFloat(item.discountAmt) > 0 ? ` (₹${parseFloat(item.discountAmt).toLocaleString("en-IN")})` : ""}</span>
-                        </div>
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Petty Adj</span>
-                          <span className="font-medium">₹{parseFloat(item.pettyAdj).toLocaleString("en-IN")}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                <div className="flex justify-between"><span className="text-muted-foreground">Status</span><span>{detailEntry.isReversed ? "Reversed" : "Active"}</span></div>
-                {!detailEntry.isReversed && detailEntry.paymentMode === "Cheque" && (
-                  <Button variant="destructive" size="sm" className="w-full mt-2" onClick={() => { setChequeBounceEntry(detailEntry); setDetailEntry(null); }} data-testid="button-cheque-bounced">
-                    Cheque Bounced
-                  </Button>
-                )}
-                {!detailEntry.isReversed && (
-                  <Button variant="outline" size="sm" className="w-full" onClick={() => { setReverseConfirmEntry(detailEntry); setDetailEntry(null); setDetailEntryGroup([]); }} data-testid="button-reverse-from-detail">
-                    {t("cash.reverseEntry")}
-                  </Button>
-                )}
-              </div>
-            );
-          })()}
-          </div>
+          {detailEntry && (
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between"><span className="text-muted-foreground">Cash Flow ID</span><span className="font-medium">{detailEntry.cashFlowId || "N/A"}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">{t("common.date")}</span><span>{format(new Date(detailEntry.createdAt), "dd/MM/yyyy HH:mm:ss")}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.category")}</span>{getCategoryBadge(detailEntry)}</div>
+              {detailEntry.outflowType && <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.outflowType")}</span><span>{detailEntry.outflowType}</span></div>}
+              {detailEntry.partyName && <div className="flex justify-between"><span className="text-muted-foreground">Receiver</span><span>{detailEntry.partyName}</span></div>}
+              <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.amount")}</span><span className="font-bold">₹{parseFloat(detailEntry.amount).toLocaleString("en-IN")}</span></div>
+              {parseFloat(detailEntry.discount || "0") > 0 && (
+                <div className="flex justify-between"><span className="text-muted-foreground">Discount</span><span>₹{parseFloat(detailEntry.discount!).toLocaleString("en-IN")}</span></div>
+              )}
+              {parseFloat(detailEntry.pettyAdj || "0") > 0 && (
+                <div className="flex justify-between"><span className="text-muted-foreground">Petty Adj</span><span>₹{parseFloat(detailEntry.pettyAdj!).toLocaleString("en-IN")}</span></div>
+              )}
+              <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.paymentMode")}</span><span>{detailEntry.paymentMode}</span></div>
+              {detailEntry.bankAccountId && <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.bankAccount")}</span><span>{getAccountName(detailEntry.bankAccountId)}</span></div>}
+              {detailEntry.buyerId && <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.buyer")}</span><span>{getBuyerName(detailEntry.buyerId)}</span></div>}
+              {detailEntry.farmerId && <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.farmer")}</span><span>{getFarmerName(detailEntry.farmerId)}</span></div>}
+              {detailEntry.notes && <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.remarks")}</span><span>{detailEntry.notes}</span></div>}
+              {(detailEntry as any).splitLog && (
+                <div className="pt-1 border-t">
+                  <p className="text-[10px] text-muted-foreground font-medium mb-0.5">Payment Split</p>
+                  <p className="text-[10px] text-muted-foreground leading-relaxed break-all">{(detailEntry as any).splitLog}</p>
+                </div>
+              )}
+              <div className="flex justify-between"><span className="text-muted-foreground">Status</span><span>{detailEntry.isReversed ? "Reversed" : "Active"}</span></div>
+              {!detailEntry.isReversed && detailEntry.paymentMode === "Cheque" && (
+                <Button variant="destructive" size="sm" className="w-full mt-2" onClick={() => { setChequeBounceEntry(detailEntry); setDetailEntry(null); }} data-testid="button-cheque-bounced">
+                  Cheque Bounced
+                </Button>
+              )}
+              {!detailEntry.isReversed && (
+                <Button variant="outline" size="sm" className="w-full" onClick={() => { setReverseConfirmEntry(detailEntry); setDetailEntry(null); }} data-testid="button-reverse-from-detail">
+                  {t("cash.reverseEntry")}
+                </Button>
+              )}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
@@ -1898,11 +1812,8 @@ export default function CashPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => reverseConfirmEntry?.cashFlowId && reverseGroupMutation.mutate({ cashFlowId: reverseConfirmEntry.cashFlowId })}
-              disabled={reverseGroupMutation.isPending}
-            >
-              {reverseGroupMutation.isPending ? t("common.saving") : t("cash.reverse")}
+            <AlertDialogAction onClick={() => reverseConfirmEntry && reverseMutation.mutate({ id: reverseConfirmEntry.id })}>
+              {t("cash.reverse")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
