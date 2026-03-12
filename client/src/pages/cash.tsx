@@ -1125,9 +1125,11 @@ export default function CashPage() {
                                 type="number" inputMode="decimal"
                                 value={alloc.amount}
                                 onChange={e => {
-                                  const newAmt = e.target.value;
+                                  const raw = parseFloat(e.target.value || "0");
+                                  const capped = Math.min(raw, alloc.due);
+                                  const newAmt = isNaN(raw) ? "" : capped.toFixed(2);
                                   const discAmt = (parseFloat(alloc.discountPercent || "0") / 100) * alloc.due;
-                                  const newPetty = Math.max(0, alloc.due - parseFloat(newAmt || "0") - discAmt);
+                                  const newPetty = Math.max(0, alloc.due - capped - discAmt);
                                   setInwardAllocations(prev => prev.map((a, i) => i === idx ? { ...a, amount: newAmt, pettyAdj: newPetty > 0.005 ? newPetty.toFixed(2) : "0" } : a));
                                 }}
                                 onFocus={e => e.target.select()}
@@ -1165,7 +1167,7 @@ export default function CashPage() {
                                 type="number" inputMode="decimal"
                                 value={alloc.pettyAdj}
                                 readOnly
-                                className="h-7 text-xs px-1.5 bg-muted cursor-not-allowed"
+                                className={`h-7 text-xs px-1.5 bg-muted cursor-not-allowed font-medium ${parseFloat(alloc.pettyAdj || "0") > 1000 ? "text-red-600" : parseFloat(alloc.pettyAdj || "0") > 100 ? "text-orange-500" : ""}`}
                                 data-testid={`allocation-petty-${idx}`}
                               />
                             </div>
