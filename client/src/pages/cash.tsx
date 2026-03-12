@@ -341,6 +341,22 @@ export default function CashPage() {
     },
   });
 
+  const reverseGroupMutation = useMutation({
+    mutationFn: async ({ cashFlowId, reason }: { cashFlowId: string; reason?: string }) => {
+      const res = await apiRequest("PATCH", `/api/cash-entries/group-reverse`, { cashFlowId, reason });
+      return res.json();
+    },
+    onSuccess: () => {
+      invalidateCashQueries();
+      setReverseConfirmEntry(null);
+      setDetailEntry(null);
+      toast({ title: t("common.saved"), description: "Payment reversed", variant: "success" });
+    },
+    onError: (err: any) => {
+      toast({ title: t("common.error"), description: err.message, variant: "destructive" });
+    },
+  });
+
   const saveCashSettingsMutation = useMutation({
     mutationFn: async (val: string) => {
       const res = await apiRequest("POST", "/api/cash-settings", { cashInHandOpening: val });
@@ -1869,7 +1885,7 @@ export default function CashPage() {
                   </Button>
                 )}
                 {!detailEntry.isReversed && (
-                  <Button variant="outline" size="sm" className="w-full" onClick={() => { setReverseConfirmEntry(detailEntry); setDetailEntry(null); }} data-testid="button-reverse-from-detail">
+                  <Button variant="outline" size="sm" className="w-full" onClick={() => { setReverseConfirmEntry(detailEntry); setDetailEntry(null); setDetailEntryGroup([]); }} data-testid="button-reverse-from-detail">
                     {t("cash.reverseEntry")}
                   </Button>
                 )}
@@ -1888,8 +1904,11 @@ export default function CashPage() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t("common.cancel")}</AlertDialogCancel>
-            <AlertDialogAction onClick={() => reverseConfirmEntry && reverseMutation.mutate({ id: reverseConfirmEntry.id })}>
-              {t("cash.reverse")}
+            <AlertDialogAction
+              onClick={() => reverseConfirmEntry?.cashFlowId && reverseGroupMutation.mutate({ cashFlowId: reverseConfirmEntry.cashFlowId })}
+              disabled={reverseGroupMutation.isPending}
+            >
+              {reverseGroupMutation.isPending ? t("common.saving") : t("cash.reverse")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

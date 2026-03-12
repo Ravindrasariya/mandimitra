@@ -1008,6 +1008,17 @@ export async function registerRoutes(
     }
   });
 
+  app.patch("/api/cash-entries/group-reverse", requireAuth, async (req, res) => {
+    try {
+      const { cashFlowId, reason } = req.body;
+      if (!cashFlowId) return res.status(400).json({ message: "cashFlowId required" });
+      const result = await storage.reverseCashEntriesByGroup(String(cashFlowId), req.user!.businessId, reason || null);
+      res.json(result);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
   app.patch("/api/cash-entries/:id/reverse", requireAuth, async (req, res) => {
     try {
       const reason = req.body?.reason || null;

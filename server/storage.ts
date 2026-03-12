@@ -1257,6 +1257,26 @@ export class DatabaseStorage implements IStorage {
     });
   }
 
+  async reverseCashEntriesByGroup(cashFlowId: string, businessId: number, reason?: string | null): Promise<CashEntry[]> {
+    const existing = await db.select().from(cashEntries).where(and(
+      eq(cashEntries.cashFlowId, cashFlowId),
+      eq(cashEntries.businessId, businessId),
+      eq(cashEntries.isReversed, false)
+    ));
+    if (existing.length === 0) throw new Error("No active entries found for this payment");
+    const updated: CashEntry[] = [];
+    for (const e of existing) {
+      const updateData: any = { isReversed: true, reversedAt: new Date() };
+      if (reason) updateData.notes = e.notes ? `${e.notes} | ${reason}` : reason;
+      const [u] = await db.update(cashEntries).set(updateData).where(eq(cashEntries.id, e.id)).returning();
+      updated.push(u);
+    }
+    const rep = existing[0];
+    if (rep.buyerId) await this.recalculateBuyerPaymentStatus(businessId, rep.buyerId);
+    if (rep.farmerId) await this.recalculateFarmerPaymentStatus(businessId, rep.farmerId);
+    return updated;
+  }
+
   async reverseCashEntry(id: number, businessId: number, reason?: string | null): Promise<CashEntry | undefined> {
     const [existing] = await db.select().from(cashEntries).where(and(eq(cashEntries.id, id), eq(cashEntries.businessId, businessId)));
     if (!existing) return undefined;
