@@ -1129,12 +1129,18 @@ export default function CashPage() {
                                 type="number" inputMode="decimal"
                                 value={alloc.amount}
                                 onChange={e => {
+                                  const raw = e.target.value;
+                                  const discAmt = (parseFloat(alloc.discountPercent || "0") / 100) * alloc.due;
+                                  const parsed = parseFloat(raw || "0");
+                                  const newPetty = Math.max(0, alloc.due - parsed - discAmt);
+                                  setInwardAllocations(prev => prev.map((a, i) => i === idx ? { ...a, amount: raw, pettyAdj: newPetty > 0.005 ? newPetty.toFixed(2) : "0" } : a));
+                                }}
+                                onBlur={e => {
                                   const raw = parseFloat(e.target.value || "0");
-                                  const capped = Math.min(raw, alloc.due);
-                                  const newAmt = isNaN(raw) ? "" : capped.toFixed(2);
+                                  const capped = Math.min(Math.max(0, raw), alloc.due);
                                   const discAmt = (parseFloat(alloc.discountPercent || "0") / 100) * alloc.due;
                                   const newPetty = Math.max(0, alloc.due - capped - discAmt);
-                                  setInwardAllocations(prev => prev.map((a, i) => i === idx ? { ...a, amount: newAmt, pettyAdj: newPetty > 0.005 ? newPetty.toFixed(2) : "0" } : a));
+                                  setInwardAllocations(prev => prev.map((a, i) => i === idx ? { ...a, amount: capped.toFixed(2), pettyAdj: newPetty > 0.005 ? newPetty.toFixed(2) : "0" } : a));
                                 }}
                                 onFocus={e => e.target.select()}
                                 className="h-7 text-xs px-1.5"
