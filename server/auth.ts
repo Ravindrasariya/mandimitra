@@ -146,6 +146,10 @@ export async function setupAuth(app: Express): Promise<void> {
           ...safeUser,
           businessName: business?.name || "",
           businessAddress: business?.address || "",
+          businessInitials: business?.initials || "",
+          businessPhone: business?.phone || "",
+          businessLicenceNo: business?.licenceNo || "",
+          businessShopNo: business?.shopNo || "",
           allBusinesses,
         });
       });
@@ -168,6 +172,10 @@ export async function setupAuth(app: Express): Promise<void> {
       ...safeUser,
       businessName: business?.name || "",
       businessAddress: business?.address || "",
+      businessInitials: business?.initials || "",
+      businessPhone: business?.phone || "",
+      businessLicenceNo: business?.licenceNo || "",
+      businessShopNo: business?.shopNo || "",
       allBusinesses,
     });
   });
@@ -198,6 +206,10 @@ export async function setupAuth(app: Express): Promise<void> {
       ...safeUser,
       businessName: business.name,
       businessAddress: business.address || "",
+      businessInitials: business.initials || "",
+      businessPhone: business.phone || "",
+      businessLicenceNo: business.licenceNo || "",
+      businessShopNo: business.shopNo || "",
       allBusinesses,
     });
   });
@@ -242,6 +254,10 @@ export async function setupAuth(app: Express): Promise<void> {
       mustChangePassword: false,
       businessName: business?.name || "",
       businessAddress: business?.address || "",
+      businessInitials: business?.initials || "",
+      businessPhone: business?.phone || "",
+      businessLicenceNo: business?.licenceNo || "",
+      businessShopNo: business?.shopNo || "",
       allBusinesses,
     });
   });

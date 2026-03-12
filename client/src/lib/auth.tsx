@@ -22,6 +22,10 @@ type AuthUser = {
   mustChangePassword: boolean;
   businessName: string;
   businessAddress: string;
+  businessInitials: string;
+  businessPhone: string;
+  businessLicenceNo: string;
+  businessShopNo: string;
   allBusinesses: BusinessEntry[];
 };
 

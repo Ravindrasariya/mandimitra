@@ -436,11 +436,12 @@ ${totalMandi > 0 ? `<div class="summary-row"><span>Mandi (${mandiPct}%):</span><
 </body></html>`;
 }
 
-function applyBuyerTemplate(tmpl: string, lot: Lot, farmer: Farmer, tx: TransactionWithDetails, businessName?: string, businessAddress?: string): string {
+function applyBuyerTemplate(tmpl: string, lot: Lot, farmer: Farmer, tx: TransactionWithDetails, businessName?: string, businessAddress?: string, businessInitials?: string, businessPhone?: string, businessLicenceNo?: string, businessShopNo?: string): string {
   const nw = parseFloat(tx.netWeight || "0");
   const ppk = parseFloat(tx.pricePerKg || "0");
   const epkBuyer = parseFloat((tx as any).extraPerKgBuyer || "0");
   const effectiveRate = ppk + epkBuyer;
+  const ratePerQuintal = effectiveRate * 100;
   const grossAmount = nw * effectiveRate;
   const bags = tx.numberOfBags || 0;
   const hammaliBuyer = parseFloat(tx.hammaliBuyerPerBag || "0") * bags;
@@ -448,20 +449,33 @@ function applyBuyerTemplate(tmpl: string, lot: Lot, farmer: Farmer, tx: Transact
   const aadhatBuyer = grossAmount * parseFloat(tx.aadhatBuyerPercent || "0") / 100;
   const mandiBuyer = grossAmount * parseFloat(tx.mandiBuyerPercent || "0") / 100;
 
+  const singleRowHtml = `<tr><td style="text-align:left">${lot.crop}</td><td>${bags}</td><td>${nw.toFixed(2)}</td><td>${ratePerQuintal.toFixed(2)}</td><td>${grossAmount.toFixed(2)}</td></tr>`;
+
   const replacements: Record<string, string> = {
     "{{BUSINESS_NAME}}": businessName || "",
     "{{BUSINESS_ADDRESS}}": businessAddress || "",
+    "{{BUSINESS_INITIALS}}": businessInitials || "",
+    "{{BUSINESS_PHONE}}": businessPhone || "",
+    "{{BUSINESS_LICENCE}}": businessLicenceNo || "",
+    "{{BUSINESS_SHOP_NO}}": businessShopNo || "",
     "{{LOT_ID}}": lot.lotId,
+    "{{SERIAL_NUMBER}}": String(lot.serialNumber),
     "{{DATE}}": tx.date || format(new Date(), "yyyy-MM-dd"),
     "{{BUYER_NAME}}": tx.buyer.name,
     "{{BUYER_CODE}}": tx.buyer.licenceNo || "",
     "{{FARMER_NAME}}": farmer.name,
+    "{{FARMER_VILLAGE}}": farmer.village || "",
     "{{CROP}}": lot.crop,
     "{{SIZE}}": lot.size || "",
     "{{BAGS}}": String(bags),
+    "{{TOTAL_BAGS}}": String(bags),
     "{{NET_WEIGHT}}": nw.toFixed(2),
+    "{{TOTAL_NET_WEIGHT}}": nw.toFixed(2),
     "{{RATE}}": effectiveRate.toFixed(2),
+    "{{RATE_PER_QUINTAL}}": ratePerQuintal.toFixed(2),
     "{{GROSS_AMOUNT}}": grossAmount.toFixed(2),
+    "{{TOTAL_GROSS_AMOUNT}}": grossAmount.toFixed(2),
+    "{{TXN_ROWS_HTML}}": singleRowHtml,
     "{{HAMMALI}}": hammaliBuyer.toFixed(2),
     "{{EXTRA_CHARGES}}": extraBuyer.toFixed(2),
     "{{AADHAT}}": aadhatBuyer.toFixed(2),
@@ -473,7 +487,7 @@ function applyBuyerTemplate(tmpl: string, lot: Lot, farmer: Farmer, tx: Transact
   return Object.entries(replacements).reduce((html, [token, val]) => html.split(token).join(val), tmpl);
 }
 
-function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[], farmer: Farmer, serialNumber: number, date: string, businessName?: string, businessAddress?: string): string {
+function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[], farmer: Farmer, serialNumber: number, date: string, businessName?: string, businessAddress?: string, businessInitials?: string, businessPhone?: string, businessLicenceNo?: string, businessShopNo?: string): string {
   const firstTx = entries[0].tx;
   const firstLot = entries[0].lot;
   const aadhatPct = parseFloat(firstTx.aadhatBuyerPercent || "0");
@@ -486,7 +500,7 @@ function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[], farm
     const rate = ppk + epk;
     const gross = nw * rate;
     const bags = tx.numberOfBags || 0;
-    return { lotId: lot.lotId, size: lot.size || "-", bags, nw, rate, gross, hammaliBuyerPerBag: parseFloat(tx.hammaliBuyerPerBag || "0"), extra: parseFloat(tx.extraChargesBuyer || "0") };
+    return { crop: lot.crop, bags, nw, rate, gross, hammaliBuyerPerBag: parseFloat(tx.hammaliBuyerPerBag || "0"), extra: parseFloat(tx.extraChargesBuyer || "0") };
   });
 
   const totalBags = rows.reduce((s, r) => s + r.bags, 0);
@@ -497,19 +511,25 @@ function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[], farm
   const totalAadhat = totalGross * aadhatPct / 100;
   const totalMandi = totalGross * mandiPct / 100;
   const grandTotal = totalGross + totalHammali + totalExtra + totalAadhat + totalMandi;
+  const firstRatePerQuintal = rows[0].rate * 100;
 
   const txnRowsHtml = rows.map(r =>
-    `<tr><td>${r.lotId}</td><td>${r.size}</td><td>${r.bags}</td><td>${r.nw.toFixed(2)}</td><td>${r.rate.toFixed(2)}</td><td>${r.gross.toFixed(2)}</td></tr>`
+    `<tr><td style="text-align:left">${r.crop}</td><td>${r.bags}</td><td>${r.nw.toFixed(2)}</td><td>${(r.rate * 100).toFixed(2)}</td><td>${r.gross.toFixed(2)}</td></tr>`
   ).join("");
 
   const replacements: Record<string, string> = {
     "{{BUSINESS_NAME}}": businessName || "",
     "{{BUSINESS_ADDRESS}}": businessAddress || "",
+    "{{BUSINESS_INITIALS}}": businessInitials || "",
+    "{{BUSINESS_PHONE}}": businessPhone || "",
+    "{{BUSINESS_LICENCE}}": businessLicenceNo || "",
+    "{{BUSINESS_SHOP_NO}}": businessShopNo || "",
     "{{SERIAL_NUMBER}}": String(serialNumber),
     "{{DATE}}": date,
     "{{BUYER_NAME}}": firstTx.buyer.name,
     "{{BUYER_CODE}}": firstTx.buyer.licenceNo || "",
     "{{FARMER_NAME}}": farmer.name,
+    "{{FARMER_VILLAGE}}": farmer.village || "",
     "{{CROP}}": firstLot.crop,
     "{{SIZE}}": firstLot.size || "",
     "{{LOT_ID}}": firstLot.lotId,
@@ -518,6 +538,7 @@ function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[], farm
     "{{NET_WEIGHT}}": totalNw.toFixed(2),
     "{{TOTAL_NET_WEIGHT}}": totalNw.toFixed(2),
     "{{RATE}}": rows[0].rate.toFixed(2),
+    "{{RATE_PER_QUINTAL}}": firstRatePerQuintal.toFixed(2),
     "{{GROSS_AMOUNT}}": totalGross.toFixed(2),
     "{{TOTAL_GROSS_AMOUNT}}": totalGross.toFixed(2),
     "{{HAMMALI}}": totalHammali.toFixed(2),
@@ -1002,7 +1023,7 @@ export default function TransactionsPage() {
     const crop = group.lot.crop;
     const customTmpl = receiptTemplates.find(t => t.templateType === "buyer" && t.crop === crop)
       || receiptTemplates.find(t => t.templateType === "buyer" && t.crop === "");
-    if (customTmpl) return applyBuyerTemplate(customTmpl.templateHtml, group.lot, group.farmer, tx, user?.businessName, user?.businessAddress);
+    if (customTmpl) return applyBuyerTemplate(customTmpl.templateHtml, group.lot, group.farmer, tx, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo);
     return generateBuyerReceiptHtml(group.lot, group.farmer, tx, user?.businessName, user?.businessAddress);
   };
 
@@ -1029,7 +1050,7 @@ export default function TransactionsPage() {
     const crop = entries[0].lot.crop;
     const customTmpl = receiptTemplates.find(t => t.templateType === "buyer" && t.crop === crop)
       || receiptTemplates.find(t => t.templateType === "buyer" && t.crop === "");
-    if (customTmpl) return applyCombinedBuyerTemplate(customTmpl.templateHtml, entries, sg.farmer, sg.serialNumber, sg.date, user?.businessName, user?.businessAddress);
+    if (customTmpl) return applyCombinedBuyerTemplate(customTmpl.templateHtml, entries, sg.farmer, sg.serialNumber, sg.date, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo);
     return generateCombinedBuyerReceiptHtml(entries, sg.farmer, sg.serialNumber, sg.date, user?.businessName, user?.businessAddress);
   };
 
