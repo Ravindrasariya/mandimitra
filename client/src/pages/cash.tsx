@@ -594,6 +594,17 @@ export default function CashPage() {
         toast({ title: t("common.error"), description: `Allocated amount (₹${totalAllocated.toLocaleString("en-IN")}) must equal paid amount (₹${totalPaid.toLocaleString("en-IN")})`, variant: "destructive" });
         return;
       }
+      const buildFarmerSplitLog = () => {
+        if (farmerAllocations.length <= 1) return null;
+        const items = farmerAllocations.map(a => ({
+          label: a.txnLabel,
+          amount: parseFloat(a.amount || "0").toFixed(2),
+          discountPct: "0",
+          discountAmt: "0.00",
+          pettyAdj: "0.00",
+        }));
+        return JSON.stringify(items);
+      };
       createMutation.mutate({
         category: "outward",
         type: "cash_out",
@@ -604,6 +615,7 @@ export default function CashPage() {
         paymentMode: outwardPaymentMode,
         bankAccountId: outwardPaymentMode !== "Cash" ? parseInt(outwardBankAccountId) : null,
         notes: outwardNotes || null,
+        splitLog: buildFarmerSplitLog(),
         allocations: farmerAllocations.map(a => ({
           transactionIds: a.transactionIds.length > 0 ? a.transactionIds : undefined,
           transactionId: a.transactionIds.length === 0 ? null : undefined,
@@ -714,24 +726,37 @@ export default function CashPage() {
   };
 
   const downloadCSV = () => {
-    const rows = filteredEntries.map(e => ({
-      "Cash Flow ID": e.cashFlowId || "",
-      "Date": format(new Date(e.createdAt), "dd/MM/yyyy HH:mm:ss"),
-      "Category": e.category,
-      "Outflow Type": e.outflowType || "",
-      "Receiver/Party": e.partyName || (e.buyerId ? getBuyerName(e.buyerId) : e.farmerId ? getFarmerName(e.farmerId) : ""),
-      "Buyer": e.buyerId ? getBuyerName(e.buyerId) : "",
-      "Farmer": e.farmerId ? getFarmerName(e.farmerId) : "",
-      "Amount": e.amount,
-      "Discount": e.discount || "0",
-      "Petty Adj": e.pettyAdj || "0",
-      "Payment Mode": e.paymentMode,
-      "Bank Account": e.bankAccountId ? getAccountName(e.bankAccountId) : "",
-      "Notes": e.notes || "",
-      "Status": e.isReversed ? "Reversed" : "Active",
-    }));
+    const parseSplitLog = (log: string | null) => {
+      if (!log) return null;
+      try { return JSON.parse(log) as { label: string; amount: string; discountPct: string; discountAmt: string; pettyAdj: string }[]; } catch { return null; }
+    };
+    const rows = groupedEntries.map(group => {
+      const e = group.representative;
+      const splitLog = (e as any).splitLog as string | null;
+      const splits = parseSplitLog(splitLog);
+      const splitAmounts = splits ? splits.map(s => `${s.label}:${parseFloat(s.amount).toLocaleString("en-IN")}`).join(" | ") : "";
+      const splitDisc = splits ? splits.map(s => `${s.label}:${s.discountPct}%`).join(" | ") : "";
+      const splitPetty = splits ? splits.map(s => `${s.label}:${parseFloat(s.pettyAdj).toLocaleString("en-IN")}`).join(" | ") : "";
+      return {
+        "Cash Flow ID": e.cashFlowId || "",
+        "Date": format(new Date(e.createdAt), "dd/MM/yyyy HH:mm:ss"),
+        "Category": e.category,
+        "Outflow Type": e.outflowType || "",
+        "Receiver/Party": e.partyName || (e.buyerId ? getBuyerName(e.buyerId) : e.farmerId ? getFarmerName(e.farmerId) : ""),
+        "Buyer": e.buyerId ? getBuyerName(e.buyerId) : "",
+        "Farmer": e.farmerId ? getFarmerName(e.farmerId) : "",
+        "Total Amount": group.totalAmount.toFixed(2),
+        "Amount Split": splitAmounts,
+        "Disc % Split": splitDisc,
+        "Petty Adj Split": splitPetty,
+        "Payment Mode": e.paymentMode,
+        "Bank Account": e.bankAccountId ? getAccountName(e.bankAccountId) : "",
+        "Notes": e.notes || "",
+        "Status": group.isReversed ? "Reversed" : "Active",
+      };
+    });
     const headers = Object.keys(rows[0] || {});
-    const csv = [headers.join(","), ...rows.map(r => headers.map(h => `"${(r as any)[h]}"`).join(","))].join("\n");
+    const csv = [headers.join(","), ...rows.map(r => headers.map(h => `"${String((r as any)[h]).replace(/"/g, '""')}"`).join(","))].join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
