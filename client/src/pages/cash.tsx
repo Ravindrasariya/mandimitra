@@ -1059,8 +1059,12 @@ export default function CashPage() {
                                 className="px-3 py-2 hover:bg-accent cursor-pointer text-xs border-b last:border-b-0"
                                 onClick={() => {
                                   setInwardAllocations(prev => {
-                                    const willBeSingle = prev.length === 0;
-                                    const autoAmount = willBeSingle && inwardAmount && parseFloat(inwardAmount) > 0 ? inwardAmount : pt.due;
+                                    const total = parseFloat(inwardAmount || "0");
+                                    const alreadyAllocated = prev.reduce((s, a) => s + parseFloat(a.amount || "0"), 0);
+                                    const remaining = Math.max(0, total - alreadyAllocated);
+                                    const due = parseFloat(pt.due);
+                                    const autoAmt = total > 0 ? Math.min(remaining, due) : due;
+                                    const autoPetty = Math.max(0, due - autoAmt);
                                     return [...prev, {
                                       txnId: pt.id === 0 ? null : pt.id,
                                       txnLabel: pt.transactionId === "PY_OPENING" ? "PY Opening Balance" : `SR #${pt.serialNumber}`,
@@ -1068,11 +1072,11 @@ export default function CashPage() {
                                       date: pt.date,
                                       numberOfBags: pt.numberOfBags,
                                       crop: pt.crop,
-                                      due: parseFloat(pt.due),
+                                      due,
                                       dueDays,
-                                      amount: autoAmount,
+                                      amount: autoAmt.toFixed(2),
                                       discountPercent: "0",
-                                      pettyAdj: "0",
+                                      pettyAdj: autoPetty > 0.005 ? autoPetty.toFixed(2) : "0",
                                     }];
                                   });
                                   setAllocationSearch("");
