@@ -1747,9 +1747,26 @@ export default function CashPage() {
                         )}
                       </div>
                     </div>
-                    {(entry as any).splitLog && (
-                      <p className="text-[9px] text-muted-foreground mt-1 leading-tight break-all border-t pt-1">{(entry as any).splitLog}</p>
-                    )}
+                    {(entry as any).splitLog && (() => {
+                      try {
+                        const splits = JSON.parse((entry as any).splitLog);
+                        if (Array.isArray(splits) && splits.length > 0) {
+                          return (
+                            <div className="border-t pt-1 mt-1 space-y-0.5">
+                              {splits.map((s: any, i: number) => (
+                                <div key={i} className="flex items-center gap-2 text-[9px] text-muted-foreground">
+                                  <span className="font-medium">{s.label}:</span>
+                                  <span>₹{parseFloat(s.amount).toLocaleString("en-IN")}</span>
+                                  {parseFloat(s.discountPct || "0") > 0 && <span>Disc: {s.discountPct}%</span>}
+                                  {parseFloat(s.pettyAdj || "0") > 0 && <span>Petty: ₹{parseFloat(s.pettyAdj).toLocaleString("en-IN")}</span>}
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        }
+                      } catch {}
+                      return null;
+                    })()}
                   </CardContent>
                 </Card>
               ))}
