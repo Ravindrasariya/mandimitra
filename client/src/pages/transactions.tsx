@@ -345,6 +345,100 @@ function applyFarmerTemplate(tmpl: string, sg: UnifiedSerialGroup, businessName?
   return Object.entries(replacements).reduce((html, [token, val]) => html.split(token).join(val), tmpl);
 }
 
+type BuyerLotEntry = { lot: Lot; tx: TransactionWithDetails };
+
+function generateCombinedBuyerReceiptHtml(entries: BuyerLotEntry[], farmer: Farmer, serialNumber: number, date: string, businessName?: string, businessAddress?: string): string {
+  const firstTx = entries[0].tx;
+  const crop = entries[0].lot.crop;
+  const aadhatPct = parseFloat(firstTx.aadhatBuyerPercent || "0");
+  const mandiPct = parseFloat(firstTx.mandiBuyerPercent || "0");
+
+  const rows = entries.map(({ lot, tx }) => {
+    const nw = parseFloat(tx.netWeight || "0");
+    const ppk = parseFloat(tx.pricePerKg || "0");
+    const epk = parseFloat((tx as any).extraPerKgBuyer || "0");
+    const rate = ppk + epk;
+    const gross = nw * rate;
+    const bags = tx.numberOfBags || 0;
+    return { lotId: lot.lotId, size: lot.size || "-", bags, nw, rate, gross, hammaliBuyerPerBag: parseFloat(tx.hammaliBuyerPerBag || "0"), extra: parseFloat(tx.extraChargesBuyer || "0") };
+  });
+
+  const totalBags = rows.reduce((s, r) => s + r.bags, 0);
+  const totalNw = rows.reduce((s, r) => s + r.nw, 0);
+  const totalGross = rows.reduce((s, r) => s + r.gross, 0);
+  const totalHammali = rows.reduce((s, r) => s + r.hammaliBuyerPerBag * r.bags, 0);
+  const totalExtra = rows.reduce((s, r) => s + r.extra, 0);
+  const totalAadhat = totalGross * aadhatPct / 100;
+  const totalMandi = totalGross * mandiPct / 100;
+  const grandTotal = totalGross + totalHammali + totalExtra + totalAadhat + totalMandi;
+
+  const rowsHtml = rows.map(r => `
+<tr>
+  <td style="padding:6px;border:1px solid #ccc">${r.lotId}</td>
+  <td style="padding:6px;border:1px solid #ccc;text-align:center">${r.size}</td>
+  <td style="padding:6px;border:1px solid #ccc;text-align:right">${r.bags}</td>
+  <td style="padding:6px;border:1px solid #ccc;text-align:right">${r.nw.toFixed(2)}</td>
+  <td style="padding:6px;border:1px solid #ccc;text-align:right">${r.rate.toFixed(2)}</td>
+  <td style="padding:6px;border:1px solid #ccc;text-align:right">${r.gross.toFixed(2)}</td>
+</tr>`).join("");
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Buyer Receipt</title>
+<style>body{font-family:Arial,sans-serif;margin:20px;color:#333}
+table{width:100%;border-collapse:collapse;margin:10px 0}
+h2{text-align:center;margin-bottom:5px}
+.header{text-align:center;margin-bottom:15px}
+.info-table td{padding:5px 8px;border:1px solid #ccc}
+.summary{margin-top:15px;border-top:2px solid #333;padding-top:10px}
+.summary-row{display:flex;justify-content:space-between;padding:3px 0}
+.total{font-weight:bold;font-size:1.1em;color:#dc2626;border-top:2px solid #333;padding-top:8px;margin-top:8px}
+th{padding:8px;border:1px solid #ccc;background:#f5f5f5;text-align:right}
+th:first-child,th:nth-child(2){text-align:left}
+.totals-row td{font-weight:bold;background:#f0f0f0;padding:6px;border:1px solid #ccc}
+@media print{body{margin:10mm}.no-print{display:none!important}}
+</style></head><body>
+<div class="header">
+${businessName ? `<h2 style="margin-bottom:2px">${businessName}</h2>` : ""}
+${businessAddress ? `<p style="font-size:0.85em;color:#555;margin:2px 0">${businessAddress}</p>` : ""}
+<h3 style="margin:8px 0 5px 0;font-size:1.1em">Buyer Receipt</h3>
+</div>
+<table class="info-table" style="margin-bottom:12px">
+<tr><td><strong>Buyer:</strong> ${firstTx.buyer.name}</td><td><strong>Licence No:</strong> ${firstTx.buyer.licenceNo || "-"}</td></tr>
+<tr><td><strong>Farmer:</strong> ${farmer.name}</td><td><strong>SR #:</strong> ${serialNumber}</td></tr>
+<tr><td><strong>Crop:</strong> ${crop}</td><td><strong>Date:</strong> ${date}</td></tr>
+</table>
+<table>
+<thead>
+<tr>
+  <th style="text-align:left">Lot ID</th>
+  <th style="text-align:left">Size</th>
+  <th style="text-align:right">Bags</th>
+  <th style="text-align:right">Net Wt (kg)</th>
+  <th style="text-align:right">Rate (₹/kg)</th>
+  <th style="text-align:right">Gross (₹)</th>
+</tr>
+</thead>
+<tbody>
+${rowsHtml}
+<tr class="totals-row">
+  <td colspan="2">Total</td>
+  <td style="text-align:right">${totalBags}</td>
+  <td style="text-align:right">${totalNw.toFixed(2)}</td>
+  <td style="text-align:right">-</td>
+  <td style="text-align:right">${totalGross.toFixed(2)}</td>
+</tr>
+</tbody>
+</table>
+<div class="summary">
+${totalHammali > 0 ? `<div class="summary-row"><span>Hammali (${totalBags} bags):</span><span>Rs.${totalHammali.toFixed(2)}</span></div>` : ""}
+${totalExtra > 0 ? `<div class="summary-row"><span>Extra Charges:</span><span>Rs.${totalExtra.toFixed(2)}</span></div>` : ""}
+${totalAadhat > 0 ? `<div class="summary-row"><span>Aadhat (${aadhatPct}%):</span><span>Rs.${totalAadhat.toFixed(2)}</span></div>` : ""}
+${totalMandi > 0 ? `<div class="summary-row"><span>Mandi (${mandiPct}%):</span><span>Rs.${totalMandi.toFixed(2)}</span></div>` : ""}
+<div class="summary-row total"><span>Total Receivable from Buyer:</span><span>Rs.${grandTotal.toFixed(2)}</span></div>
+</div>
+<div style="text-align:center;margin-top:20px;padding-top:10px;border-top:1px dashed #ccc;font-size:15px;font-weight:bold;color:#555">हमें सेवा का अवसर देने के लिए धन्यवाद!</div>
+</body></html>`;
+}
+
 function applyBuyerTemplate(tmpl: string, lot: Lot, farmer: Farmer, tx: TransactionWithDetails, businessName?: string, businessAddress?: string): string {
   const nw = parseFloat(tx.netWeight || "0");
   const ppk = parseFloat(tx.pricePerKg || "0");
@@ -875,6 +969,19 @@ export default function TransactionsPage() {
     shareReceiptAsPdf(getBuyerReceiptHtml(tx, group), fileName);
   };
 
+  const handlePrintCombinedBuyerReceipt = (entries: BuyerLotEntry[], sg: UnifiedSerialGroup) => {
+    const html = generateCombinedBuyerReceiptHtml(entries, sg.farmer, sg.serialNumber, sg.date, user?.businessName, user?.businessAddress);
+    printReceipt(html);
+  };
+
+  const handleShareCombinedBuyerReceipt = (entries: BuyerLotEntry[], sg: UnifiedSerialGroup) => {
+    const html = generateCombinedBuyerReceiptHtml(entries, sg.farmer, sg.serialNumber, sg.date, user?.businessName, user?.businessAddress);
+    const buyerName = entries[0].tx.buyer.name.replace(/[^a-zA-Z0-9]/g, '_');
+    const crop = entries[0].lot.crop;
+    const fileName = `Buyer_Receipt_SR${sg.serialNumber}_${buyerName}_${crop}.pdf`;
+    shareReceiptAsPdf(html, fileName);
+  };
+
   const exportCSV = () => {
     const allTxns = filteredSerialGroups.flatMap(sg => sg.allCompletedTxns.filter(t => !t.isReversed));
     if (allTxns.length === 0) return;
@@ -1189,32 +1296,43 @@ export default function TransactionsPage() {
                               <Share2 className="w-4 h-4 mr-2" />
                               Share किसान रसीद
                             </DropdownMenuItem>
-                            {sg.lotGroups.map((lg) => {
-                              const lgActiveTxns = lg.completedTxns.filter(t => !t.isReversed);
-                              if (lgActiveTxns.length === 0) return null;
-                              return (
-                                <div key={lg.lot.id}>
-                                  {lgActiveTxns.map((tx) => (
-                                    <div key={tx.id}>
-                                      <DropdownMenuItem
-                                        data-testid={`button-print-buyer-${tx.id}`}
-                                        onClick={() => handlePrintBuyerReceipt(tx, lg)}
-                                      >
-                                        <Printer className="w-4 h-4 mr-2" />
-                                        Print Buyer - {tx.buyer.name} ({lg.lot.crop})
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem
-                                        data-testid={`button-share-buyer-${tx.id}`}
-                                        onClick={() => handleShareBuyerReceipt(tx, lg)}
-                                      >
-                                        <Share2 className="w-4 h-4 mr-2" />
-                                        Share Buyer - {tx.buyer.name} ({lg.lot.crop})
-                                      </DropdownMenuItem>
-                                    </div>
-                                  ))}
-                                </div>
-                              );
-                            })}
+                            {(() => {
+                              const buyerCropMap = new Map<string, BuyerLotEntry[]>();
+                              sg.lotGroups.forEach(lg => {
+                                lg.completedTxns.filter(t => !t.isReversed).forEach(tx => {
+                                  const key = `${tx.buyerId}__${lg.lot.crop}`;
+                                  if (!buyerCropMap.has(key)) buyerCropMap.set(key, []);
+                                  buyerCropMap.get(key)!.push({ lot: lg.lot, tx });
+                                });
+                              });
+                              return Array.from(buyerCropMap.entries()).map(([key, entries]) => {
+                                const { tx, lot } = entries[0];
+                                const isMulti = entries.length > 1;
+                                const singleLg = sg.lotGroups.find(lg => lg.lot.id === lot.id);
+                                return (
+                                  <div key={key}>
+                                    <DropdownMenuItem
+                                      data-testid={`button-print-buyer-${key}`}
+                                      onClick={() => isMulti
+                                        ? handlePrintCombinedBuyerReceipt(entries, sg)
+                                        : handlePrintBuyerReceipt(tx, singleLg!)}
+                                    >
+                                      <Printer className="w-4 h-4 mr-2" />
+                                      Print Buyer - {tx.buyer.name} ({lot.crop})
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      data-testid={`button-share-buyer-${key}`}
+                                      onClick={() => isMulti
+                                        ? handleShareCombinedBuyerReceipt(entries, sg)
+                                        : handleShareBuyerReceipt(tx, singleLg!)}
+                                    >
+                                      <Share2 className="w-4 h-4 mr-2" />
+                                      Share Buyer - {tx.buyer.name} ({lot.crop})
+                                    </DropdownMenuItem>
+                                  </div>
+                                );
+                              });
+                            })()}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       )}
