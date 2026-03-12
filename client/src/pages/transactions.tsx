@@ -476,6 +476,65 @@ function applyBuyerTemplate(tmpl: string, lot: Lot, farmer: Farmer, tx: Transact
   return Object.entries(replacements).reduce((html, [token, val]) => html.split(token).join(val), tmpl);
 }
 
+function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[], farmer: Farmer, serialNumber: number, date: string, businessName?: string, businessAddress?: string): string {
+  const firstTx = entries[0].tx;
+  const firstLot = entries[0].lot;
+  const aadhatPct = parseFloat(firstTx.aadhatBuyerPercent || "0");
+  const mandiPct = parseFloat(firstTx.mandiBuyerPercent || "0");
+
+  const rows = entries.map(({ lot, tx }) => {
+    const nw = parseFloat(tx.netWeight || "0");
+    const ppk = parseFloat(tx.pricePerKg || "0");
+    const epk = parseFloat((tx as any).extraPerKgBuyer || "0");
+    const rate = ppk + epk;
+    const gross = nw * rate;
+    const bags = tx.numberOfBags || 0;
+    return { lotId: lot.lotId, size: lot.size || "-", bags, nw, rate, gross, hammaliBuyerPerBag: parseFloat(tx.hammaliBuyerPerBag || "0"), extra: parseFloat(tx.extraChargesBuyer || "0") };
+  });
+
+  const totalBags = rows.reduce((s, r) => s + r.bags, 0);
+  const totalNw = rows.reduce((s, r) => s + r.nw, 0);
+  const totalGross = rows.reduce((s, r) => s + r.gross, 0);
+  const totalHammali = rows.reduce((s, r) => s + r.hammaliBuyerPerBag * r.bags, 0);
+  const totalExtra = rows.reduce((s, r) => s + r.extra, 0);
+  const totalAadhat = totalGross * aadhatPct / 100;
+  const totalMandi = totalGross * mandiPct / 100;
+  const grandTotal = totalGross + totalHammali + totalExtra + totalAadhat + totalMandi;
+
+  const txnRowsHtml = rows.map(r =>
+    `<tr><td>${r.lotId}</td><td>${r.size}</td><td>${r.bags}</td><td>${r.nw.toFixed(2)}</td><td>${r.rate.toFixed(2)}</td><td>${r.gross.toFixed(2)}</td></tr>`
+  ).join("");
+
+  const replacements: Record<string, string> = {
+    "{{BUSINESS_NAME}}": businessName || "",
+    "{{BUSINESS_ADDRESS}}": businessAddress || "",
+    "{{SERIAL_NUMBER}}": String(serialNumber),
+    "{{DATE}}": date,
+    "{{BUYER_NAME}}": firstTx.buyer.name,
+    "{{BUYER_CODE}}": firstTx.buyer.licenceNo || "",
+    "{{FARMER_NAME}}": farmer.name,
+    "{{CROP}}": firstLot.crop,
+    "{{SIZE}}": firstLot.size || "",
+    "{{LOT_ID}}": firstLot.lotId,
+    "{{BAGS}}": String(totalBags),
+    "{{TOTAL_BAGS}}": String(totalBags),
+    "{{NET_WEIGHT}}": totalNw.toFixed(2),
+    "{{TOTAL_NET_WEIGHT}}": totalNw.toFixed(2),
+    "{{RATE}}": rows[0].rate.toFixed(2),
+    "{{GROSS_AMOUNT}}": totalGross.toFixed(2),
+    "{{TOTAL_GROSS_AMOUNT}}": totalGross.toFixed(2),
+    "{{HAMMALI}}": totalHammali.toFixed(2),
+    "{{EXTRA_CHARGES}}": totalExtra.toFixed(2),
+    "{{AADHAT}}": totalAadhat.toFixed(2),
+    "{{AADHAT_PCT}}": String(aadhatPct),
+    "{{MANDI_CHARGES}}": totalMandi.toFixed(2),
+    "{{MANDI_PCT}}": String(mandiPct),
+    "{{TOTAL_RECEIVABLE}}": grandTotal.toFixed(2),
+    "{{TXN_ROWS_HTML}}": txnRowsHtml,
+  };
+  return Object.entries(replacements).reduce((html, [token, val]) => html.split(token).join(val), tmpl);
+}
+
 export default function TransactionsPage() {
   const { toast } = useToast();
   const { t } = useLanguage();
@@ -969,17 +1028,23 @@ export default function TransactionsPage() {
     shareReceiptAsPdf(getBuyerReceiptHtml(tx, group), fileName);
   };
 
+  const getCombinedBuyerReceiptHtml = (entries: BuyerLotEntry[], sg: UnifiedSerialGroup): string => {
+    const crop = entries[0].lot.crop;
+    const customTmpl = receiptTemplates.find(t => t.templateType === "buyer" && t.crop === crop)
+      || receiptTemplates.find(t => t.templateType === "buyer" && t.crop === "");
+    if (customTmpl) return applyCombinedBuyerTemplate(customTmpl.templateHtml, entries, sg.farmer, sg.serialNumber, sg.date, user?.businessName, user?.businessAddress);
+    return generateCombinedBuyerReceiptHtml(entries, sg.farmer, sg.serialNumber, sg.date, user?.businessName, user?.businessAddress);
+  };
+
   const handlePrintCombinedBuyerReceipt = (entries: BuyerLotEntry[], sg: UnifiedSerialGroup) => {
-    const html = generateCombinedBuyerReceiptHtml(entries, sg.farmer, sg.serialNumber, sg.date, user?.businessName, user?.businessAddress);
-    printReceipt(html);
+    printReceipt(getCombinedBuyerReceiptHtml(entries, sg));
   };
 
   const handleShareCombinedBuyerReceipt = (entries: BuyerLotEntry[], sg: UnifiedSerialGroup) => {
-    const html = generateCombinedBuyerReceiptHtml(entries, sg.farmer, sg.serialNumber, sg.date, user?.businessName, user?.businessAddress);
     const buyerName = entries[0].tx.buyer.name.replace(/[^a-zA-Z0-9]/g, '_');
     const crop = entries[0].lot.crop;
     const fileName = `Buyer_Receipt_SR${sg.serialNumber}_${buyerName}_${crop}.pdf`;
-    shareReceiptAsPdf(html, fileName);
+    shareReceiptAsPdf(getCombinedBuyerReceiptHtml(entries, sg), fileName);
   };
 
   const exportCSV = () => {
