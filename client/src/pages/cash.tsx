@@ -1747,26 +1747,6 @@ export default function CashPage() {
                         )}
                       </div>
                     </div>
-                    {(entry as any).splitLog && (() => {
-                      try {
-                        const splits = JSON.parse((entry as any).splitLog);
-                        if (Array.isArray(splits) && splits.length > 0) {
-                          return (
-                            <div className="border-t pt-1 mt-1 space-y-0.5">
-                              {splits.map((s: any, i: number) => (
-                                <div key={i} className="flex items-center gap-2 text-[9px] text-muted-foreground">
-                                  <span className="font-medium">{s.label}:</span>
-                                  <span>₹{parseFloat(s.amount).toLocaleString("en-IN")}</span>
-                                  {parseFloat(s.discountPct || "0") > 0 && <span>Disc: {s.discountPct}%</span>}
-                                  {parseFloat(s.pettyAdj || "0") > 0 && <span>Petty: ₹{parseFloat(s.pettyAdj).toLocaleString("en-IN")}</span>}
-                                </div>
-                              ))}
-                            </div>
-                          );
-                        }
-                      } catch {}
-                      return null;
-                    })()}
                   </CardContent>
                 </Card>
               ))}
@@ -1799,12 +1779,6 @@ export default function CashPage() {
               {detailEntry.buyerId && <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.buyer")}</span><span>{getBuyerName(detailEntry.buyerId)}</span></div>}
               {detailEntry.farmerId && <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.farmer")}</span><span>{getFarmerName(detailEntry.farmerId)}</span></div>}
               {detailEntry.notes && <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.remarks")}</span><span>{detailEntry.notes}</span></div>}
-              {(detailEntry as any).splitLog && (
-                <div className="pt-1 border-t">
-                  <p className="text-[10px] text-muted-foreground font-medium mb-0.5">Payment Split</p>
-                  <p className="text-[10px] text-muted-foreground leading-relaxed break-all">{(detailEntry as any).splitLog}</p>
-                </div>
-              )}
               <div className="flex justify-between"><span className="text-muted-foreground">Status</span><span>{detailEntry.isReversed ? "Reversed" : "Active"}</span></div>
               {!detailEntry.isReversed && detailEntry.paymentMode === "Cheque" && (
                 <Button variant="destructive" size="sm" className="w-full mt-2" onClick={() => { setChequeBounceEntry(detailEntry); setDetailEntry(null); }} data-testid="button-cheque-bounced">
