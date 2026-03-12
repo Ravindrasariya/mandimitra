@@ -450,6 +450,7 @@ function applyBuyerTemplate(tmpl: string, lot: Lot, farmer: Farmer, tx: Transact
   const mandiBuyer = grossAmount * parseFloat(tx.mandiBuyerPercent || "0") / 100;
 
   const singleRowHtml = `<tr><td style="text-align:left">${lot.crop}</td><td>${bags}</td><td>${nw.toFixed(2)}</td><td>${ratePerQuintal.toFixed(2)}</td><td>${grossAmount.toFixed(2)}</td></tr>`;
+  const singleSummaryRowHtml = `<tr><td>${grossAmount.toFixed(2)}</td><td></td><td></td><td></td><td></td><td></td></tr>`;
 
   const replacements: Record<string, string> = {
     "{{BUSINESS_NAME}}": businessName || "",
@@ -476,6 +477,7 @@ function applyBuyerTemplate(tmpl: string, lot: Lot, farmer: Farmer, tx: Transact
     "{{GROSS_AMOUNT}}": grossAmount.toFixed(2),
     "{{TOTAL_GROSS_AMOUNT}}": grossAmount.toFixed(2),
     "{{TXN_ROWS_HTML}}": singleRowHtml,
+    "{{SUMMARY_ROWS_HTML}}": singleSummaryRowHtml,
     "{{HAMMALI}}": hammaliBuyer.toFixed(2),
     "{{EXTRA_CHARGES}}": extraBuyer.toFixed(2),
     "{{AADHAT}}": aadhatBuyer.toFixed(2),
@@ -516,6 +518,9 @@ function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[], farm
   const txnRowsHtml = rows.map(r =>
     `<tr><td style="text-align:left">${r.crop}</td><td>${r.bags}</td><td>${r.nw.toFixed(2)}</td><td>${(r.rate * 100).toFixed(2)}</td><td>${r.gross.toFixed(2)}</td></tr>`
   ).join("");
+  const summaryRowsHtml = rows.map(r =>
+    `<tr><td>${r.gross.toFixed(2)}</td><td></td><td></td><td></td><td></td><td></td></tr>`
+  ).join("");
 
   const replacements: Record<string, string> = {
     "{{BUSINESS_NAME}}": businessName || "",
@@ -549,6 +554,7 @@ function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[], farm
     "{{MANDI_PCT}}": String(mandiPct),
     "{{TOTAL_RECEIVABLE}}": grandTotal.toFixed(2),
     "{{TXN_ROWS_HTML}}": txnRowsHtml,
+    "{{SUMMARY_ROWS_HTML}}": summaryRowsHtml,
   };
   return Object.entries(replacements).reduce((html, [token, val]) => html.split(token).join(val), tmpl);
 }
