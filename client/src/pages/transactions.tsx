@@ -260,10 +260,9 @@ ${businessAddress ? `<p style="font-size:0.85em;color:#555;margin:2px 0">${busin
 <h3 style="margin:8px 0 5px 0;font-size:1.1em">Buyer Receipt</h3>
 </div>
 <table class="detail-table">
-<tr><td><strong>Lot No:</strong> ${lot.lotId}</td><td><strong>Date:</strong> ${dateStr}</td></tr>
 <tr><td><strong>Buyer:</strong> ${tx.buyer.name}</td><td><strong>Licence No:</strong> ${tx.buyer.licenceNo || "-"}</td></tr>
-<tr><td><strong>Farmer:</strong> ${farmer.name}</td><td><strong>Crop:</strong> ${lot.crop}</td></tr>
-<tr><td><strong>Size:</strong> ${lot.size || "-"}</td><td></td></tr>
+<tr><td><strong>Farmer:</strong> ${farmer.name}</td><td><strong>Date:</strong> ${dateStr}</td></tr>
+<tr><td><strong>Crop:</strong> ${lot.crop}</td><td></td></tr>
 </table>
 <table style="margin-top:15px">
 <tr style="background:#f5f5f5">
@@ -360,7 +359,7 @@ function generateCombinedBuyerReceiptHtml(entries: BuyerLotEntry[], farmer: Farm
     const rate = ppk + epk;
     const gross = nw * rate;
     const bags = tx.numberOfBags || 0;
-    return { lotId: lot.lotId, size: lot.size || "-", bags, nw, rate, gross, hammaliBuyerPerBag: parseFloat(tx.hammaliBuyerPerBag || "0"), extra: parseFloat(tx.extraChargesBuyer || "0") };
+    return { crop: lot.crop, bags, nw, rate, gross, hammaliBuyerPerBag: parseFloat(tx.hammaliBuyerPerBag || "0"), extra: parseFloat(tx.extraChargesBuyer || "0") };
   });
 
   const totalBags = rows.reduce((s, r) => s + r.bags, 0);
@@ -374,8 +373,7 @@ function generateCombinedBuyerReceiptHtml(entries: BuyerLotEntry[], farmer: Farm
 
   const rowsHtml = rows.map(r => `
 <tr>
-  <td style="padding:6px;border:1px solid #ccc">${r.lotId}</td>
-  <td style="padding:6px;border:1px solid #ccc;text-align:center">${r.size}</td>
+  <td style="padding:6px;border:1px solid #ccc">${r.crop}</td>
   <td style="padding:6px;border:1px solid #ccc;text-align:right">${r.bags}</td>
   <td style="padding:6px;border:1px solid #ccc;text-align:right">${r.nw.toFixed(2)}</td>
   <td style="padding:6px;border:1px solid #ccc;text-align:right">${r.rate.toFixed(2)}</td>
@@ -392,7 +390,7 @@ h2{text-align:center;margin-bottom:5px}
 .summary-row{display:flex;justify-content:space-between;padding:3px 0}
 .total{font-weight:bold;font-size:1.1em;color:#dc2626;border-top:2px solid #333;padding-top:8px;margin-top:8px}
 th{padding:8px;border:1px solid #ccc;background:#f5f5f5;text-align:right}
-th:first-child,th:nth-child(2){text-align:left}
+th:first-child{text-align:left}
 .totals-row td{font-weight:bold;background:#f0f0f0;padding:6px;border:1px solid #ccc}
 @media print{body{margin:10mm}.no-print{display:none!important}}
 </style></head><body>
@@ -409,8 +407,7 @@ ${businessAddress ? `<p style="font-size:0.85em;color:#555;margin:2px 0">${busin
 <table>
 <thead>
 <tr>
-  <th style="text-align:left">Lot ID</th>
-  <th style="text-align:left">Size</th>
+  <th style="text-align:left">Crop</th>
   <th style="text-align:right">Bags</th>
   <th style="text-align:right">Net Wt (kg)</th>
   <th style="text-align:right">Rate (₹/kg)</th>
@@ -420,7 +417,7 @@ ${businessAddress ? `<p style="font-size:0.85em;color:#555;margin:2px 0">${busin
 <tbody>
 ${rowsHtml}
 <tr class="totals-row">
-  <td colspan="2">Total</td>
+  <td>Total</td>
   <td style="text-align:right">${totalBags}</td>
   <td style="text-align:right">${totalNw.toFixed(2)}</td>
   <td style="text-align:right">-</td>
