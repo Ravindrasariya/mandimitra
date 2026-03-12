@@ -247,6 +247,7 @@ export const cashEntries = pgTable("cash_entries", {
   date: date("date").notNull(),
   partyName: text("party_name"),
   notes: text("notes"),
+  splitLog: text("split_log"),
   isReversed: boolean("is_reversed").default(false).notNull(),
   reversedAt: timestamp("reversed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

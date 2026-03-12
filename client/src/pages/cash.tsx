@@ -486,6 +486,16 @@ export default function CashPage() {
         toast({ title: t("common.error"), description: `Allocated amount (₹${totalAllocated.toLocaleString("en-IN")}) must equal received amount (₹${totalReceived.toLocaleString("en-IN")})`, variant: "destructive" });
         return;
       }
+      const buildSplitLog = () => {
+        const label = (a: typeof inwardAllocations[0]) => a.txnId === null ? "PY" : `SR#${a.serialNumber}`;
+        const amtParts = inwardAllocations.map(a => `${label(a)}-${parseFloat(a.amount || "0").toFixed(2)}`);
+        const discParts = inwardAllocations.filter(a => parseFloat(a.discountPercent || "0") > 0).map(a => `${label(a)}-${a.discountPercent}%`);
+        const pettyParts = inwardAllocations.filter(a => parseFloat(a.pettyAdj || "0") > 0).map(a => `${label(a)}-${parseFloat(a.pettyAdj || "0").toFixed(2)}`);
+        let log = `Amt: ${amtParts.join(", ")}`;
+        if (discParts.length > 0) log += ` | Disc%: ${discParts.join(", ")}`;
+        if (pettyParts.length > 0) log += ` | Petty: ${pettyParts.join(", ")}`;
+        return log;
+      };
       createMutation.mutate({
         category: "inward",
         type: "cash_in",
@@ -496,6 +506,7 @@ export default function CashPage() {
         paymentMode: inwardPaymentMode,
         bankAccountId: inwardPaymentMode !== "Cash" ? parseInt(inwardBankAccountId) : null,
         notes: inwardNotes || null,
+        splitLog: buildSplitLog(),
         allocations: inwardAllocations.map(a => ({
           transactionId: a.txnId,
           amount: a.amount || "0",
@@ -1113,7 +1124,12 @@ export default function CashPage() {
                               <Input
                                 type="number" inputMode="decimal"
                                 value={alloc.amount}
-                                onChange={e => setInwardAllocations(prev => prev.map((a, i) => i === idx ? { ...a, amount: e.target.value } : a))}
+                                onChange={e => {
+                                  const newAmt = e.target.value;
+                                  const discAmt = (parseFloat(alloc.discountPercent || "0") / 100) * alloc.due;
+                                  const newPetty = Math.max(0, alloc.due - parseFloat(newAmt || "0") - discAmt);
+                                  setInwardAllocations(prev => prev.map((a, i) => i === idx ? { ...a, amount: newAmt, pettyAdj: newPetty > 0.005 ? newPetty.toFixed(2) : "0" } : a));
+                                }}
                                 onFocus={e => e.target.select()}
                                 className="h-7 text-xs px-1.5"
                                 data-testid={`allocation-amount-${idx}`}
@@ -1132,7 +1148,10 @@ export default function CashPage() {
                                 type="number" inputMode="decimal"
                                 value={alloc.discountPercent}
                                 onChange={e => {
-                                  setInwardAllocations(prev => prev.map((a, i) => i === idx ? { ...a, discountPercent: e.target.value } : a));
+                                  const newDiscPct = e.target.value;
+                                  const discAmt = (parseFloat(newDiscPct || "0") / 100) * alloc.due;
+                                  const newPetty = Math.max(0, alloc.due - parseFloat(alloc.amount || "0") - discAmt);
+                                  setInwardAllocations(prev => prev.map((a, i) => i === idx ? { ...a, discountPercent: newDiscPct, pettyAdj: newPetty > 0.005 ? newPetty.toFixed(2) : "0" } : a));
                                 }}
                                 onFocus={e => e.target.select()}
                                 className="h-7 text-xs px-1.5"
@@ -1141,15 +1160,12 @@ export default function CashPage() {
                               />
                             </div>
                             <div className="space-y-0.5">
-                              <Label className="text-[10px] text-muted-foreground">Petty Adj</Label>
+                              <Label className="text-[10px] text-muted-foreground">Petty Adj (auto)</Label>
                               <Input
                                 type="number" inputMode="decimal"
                                 value={alloc.pettyAdj}
-                                onChange={e => {
-                                  setInwardAllocations(prev => prev.map((a, i) => i === idx ? { ...a, pettyAdj: e.target.value } : a));
-                                }}
-                                onFocus={e => e.target.select()}
-                                className="h-7 text-xs px-1.5"
+                                readOnly
+                                className="h-7 text-xs px-1.5 bg-muted cursor-not-allowed"
                                 data-testid={`allocation-petty-${idx}`}
                               />
                             </div>
@@ -1719,6 +1735,9 @@ export default function CashPage() {
                         )}
                       </div>
                     </div>
+                    {(entry as any).splitLog && (
+                      <p className="text-[9px] text-muted-foreground mt-1 leading-tight break-all border-t pt-1">{(entry as any).splitLog}</p>
+                    )}
                   </CardContent>
                 </Card>
               ))}
@@ -1751,6 +1770,12 @@ export default function CashPage() {
               {detailEntry.buyerId && <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.buyer")}</span><span>{getBuyerName(detailEntry.buyerId)}</span></div>}
               {detailEntry.farmerId && <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.farmer")}</span><span>{getFarmerName(detailEntry.farmerId)}</span></div>}
               {detailEntry.notes && <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.remarks")}</span><span>{detailEntry.notes}</span></div>}
+              {(detailEntry as any).splitLog && (
+                <div className="pt-1 border-t">
+                  <p className="text-[10px] text-muted-foreground font-medium mb-0.5">Payment Split</p>
+                  <p className="text-[10px] text-muted-foreground leading-relaxed break-all">{(detailEntry as any).splitLog}</p>
+                </div>
+              )}
               <div className="flex justify-between"><span className="text-muted-foreground">Status</span><span>{detailEntry.isReversed ? "Reversed" : "Active"}</span></div>
               {!detailEntry.isReversed && detailEntry.paymentMode === "Cheque" && (
                 <Button variant="destructive" size="sm" className="w-full mt-2" onClick={() => { setChequeBounceEntry(detailEntry); setDetailEntry(null); }} data-testid="button-cheque-bounced">
