@@ -1802,10 +1802,11 @@ export default function CashPage() {
       </div>
 
       <Dialog open={!!detailEntry} onOpenChange={() => setDetailEntry(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
+        <DialogContent className="max-w-sm flex flex-col max-h-[85vh]">
+          <DialogHeader className="shrink-0">
             <DialogTitle>{t("cash.entryDetails")}</DialogTitle>
           </DialogHeader>
+          <div className="overflow-y-auto flex-1 pr-1">
           {detailEntry && (() => {
             const totalAmt = detailEntryGroup.reduce((s, e) => s + parseFloat(e.amount || "0"), 0);
             const splitLog = (detailEntry as any).splitLog as string | null;
@@ -1875,6 +1876,7 @@ export default function CashPage() {
               </div>
             );
           })()}
+          </div>
         </DialogContent>
       </Dialog>
 
