@@ -69,15 +69,6 @@ function buildPdf(canvas: HTMLCanvasElement): jsPDF {
   return pdf;
 }
 
-export function downloadReceiptAsHtml(html: string, fileName: string) {
-  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = fileName;
-  a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-}
-
 export async function shareReceiptAsPdf(html: string, pdfFileName: string): Promise<void> {
   const iframe = await createReceiptIframe(html);
 

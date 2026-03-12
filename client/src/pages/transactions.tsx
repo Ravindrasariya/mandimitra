@@ -20,7 +20,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Receipt, Pencil, Printer, ChevronDown, ChevronRight, Calendar, Package, Users, Landmark, HandCoins, Download, History, Share2, Calculator, Plus, X, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { useAuth } from "@/lib/auth";
-import { printReceipt, shareReceiptAsPdf, downloadReceiptAsHtml } from "@/lib/receiptUtils";
+import { printReceipt, shareReceiptAsPdf } from "@/lib/receiptUtils";
 
 type BidWithDetails = Bid & { buyer: Buyer; lot: Lot; farmer: Farmer };
 type TransactionWithDetails = Transaction & { farmer: Farmer; buyer: Buyer; lot: Lot; bid: Bid };
@@ -1071,19 +1071,6 @@ export default function TransactionsPage() {
     shareReceiptAsPdf(getCombinedBuyerReceiptHtml(entries, sg), fileName);
   };
 
-  const handleDownloadBuyerReceiptHtml = (tx: TransactionWithDetails, group: UnifiedLotGroup) => {
-    const buyerName = tx.buyer.name.replace(/[^a-zA-Z0-9]/g, '_');
-    const fileName = `Buyer_Receipt_SR${group.lot.serialNumber}_${buyerName}_${group.lot.crop}.html`;
-    downloadReceiptAsHtml(getBuyerReceiptHtml(tx, group), fileName);
-  };
-
-  const handleDownloadCombinedBuyerReceiptHtml = (entries: BuyerLotEntry[], sg: UnifiedSerialGroup) => {
-    const buyerName = entries[0].tx.buyer.name.replace(/[^a-zA-Z0-9]/g, '_');
-    const crop = entries[0].lot.crop;
-    const fileName = `Buyer_Receipt_SR${sg.serialNumber}_${buyerName}_${crop}.html`;
-    downloadReceiptAsHtml(getCombinedBuyerReceiptHtml(entries, sg), fileName);
-  };
-
   const exportCSV = () => {
     const allTxns = filteredSerialGroups.flatMap(sg => sg.allCompletedTxns.filter(t => !t.isReversed));
     if (allTxns.length === 0) return;
@@ -1430,15 +1417,6 @@ export default function TransactionsPage() {
                                     >
                                       <Share2 className="w-4 h-4 mr-2" />
                                       Share Buyer - {tx.buyer.name} ({lot.crop})
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      data-testid={`button-download-html-buyer-${key}`}
-                                      onClick={() => isMulti
-                                        ? handleDownloadCombinedBuyerReceiptHtml(entries, sg)
-                                        : handleDownloadBuyerReceiptHtml(tx, singleLg!)}
-                                    >
-                                      <Download className="w-4 h-4 mr-2" />
-                                      Download HTML - {tx.buyer.name} ({lot.crop})
                                     </DropdownMenuItem>
                                   </div>
                                 );
