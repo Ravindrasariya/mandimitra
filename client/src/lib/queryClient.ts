@@ -28,6 +28,20 @@ export async function apiRequest(
   return res;
 }
 
+export async function apiRequestJson<T = unknown>(
+  method: string,
+  url: string,
+  data?: unknown,
+): Promise<T> {
+  const res = await apiRequest(method, url, data);
+  const text = await res.text();
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new Error(`Server returned an unexpected response. Please try again.`);
+  }
+}
+
 type UnauthorizedBehavior = "returnNull" | "throw";
 export const getQueryFn: <T>(options: {
   on401: UnauthorizedBehavior;
@@ -43,7 +57,12 @@ export const getQueryFn: <T>(options: {
     }
 
     await throwIfResNotOk(res);
-    return await res.json();
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw new Error(`Server returned an unexpected response for ${queryKey[0]}.`);
+    }
   };
 
 export const queryClient = new QueryClient({

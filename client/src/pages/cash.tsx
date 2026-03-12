@@ -1,7 +1,7 @@
 import { useState, useMemo, useRef, useEffect } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
+import { apiRequest, apiRequestJson, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/lib/language";
 import { Button } from "@/components/ui/button";
@@ -153,14 +153,26 @@ export default function CashPage() {
   type PendingTxn = { id: number; transactionId: string; serialNumber: number; date: string; numberOfBags: number; crop: string; totalReceivableFromBuyer: string; paidAmount: string; due: string; bidCreatedAt: string };
   const { data: pendingTransactions = [] } = useQuery<PendingTxn[]>({
     queryKey: ["/api/buyers", inwardBuyerId, "pending-transactions"],
-    queryFn: () => inwardBuyerId ? fetch(`/api/buyers/${inwardBuyerId}/pending-transactions`, { credentials: "include" }).then(r => r.json()) : Promise.resolve([]),
+    queryFn: async () => {
+      if (!inwardBuyerId) return [];
+      const r = await fetch(`/api/buyers/${inwardBuyerId}/pending-transactions`, { credentials: "include" });
+      if (!r.ok) return [];
+      const text = await r.text();
+      try { return JSON.parse(text); } catch { return []; }
+    },
     enabled: inwardPartyType === "Buyer" && !!inwardBuyerId,
   });
 
   type FarmerPendingTxn = { groupKey: string; serialNumber: number; date: string; numberOfBags: number; crops: string; totalPayableToFarmer: string; farmerPaidAmount: string; due: string; transactionIds: { id: number; due: number }[] };
   const { data: farmerPendingTransactions = [] } = useQuery<FarmerPendingTxn[]>({
     queryKey: ["/api/farmers", outwardFarmerId, "pending-transactions"],
-    queryFn: () => outwardFarmerId ? fetch(`/api/farmers/${outwardFarmerId}/pending-transactions`, { credentials: "include" }).then(r => r.json()) : Promise.resolve([]),
+    queryFn: async () => {
+      if (!outwardFarmerId) return [];
+      const r = await fetch(`/api/farmers/${outwardFarmerId}/pending-transactions`, { credentials: "include" });
+      if (!r.ok) return [];
+      const text = await r.text();
+      try { return JSON.parse(text); } catch { return []; }
+    },
     enabled: outwardOutflowType === "Farmer-Harvest Sale" && !!outwardFarmerId,
   });
 
@@ -312,10 +324,7 @@ export default function CashPage() {
   };
 
   const createMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const res = await apiRequest("POST", "/api/cash-entries", data);
-      return res.json();
-    },
+    mutationFn: async (data: any) => apiRequestJson("POST", "/api/cash-entries", data),
     onSuccess: () => {
       invalidateCashQueries();
       toast({ title: t("common.saved"), variant: "success" });
@@ -326,10 +335,8 @@ export default function CashPage() {
   });
 
   const reverseMutation = useMutation({
-    mutationFn: async ({ id, reason }: { id: number; reason?: string }) => {
-      const res = await apiRequest("PATCH", `/api/cash-entries/${id}/reverse`, reason ? { reason } : undefined);
-      return res.json();
-    },
+    mutationFn: async ({ id, reason }: { id: number; reason?: string }) =>
+      apiRequestJson("PATCH", `/api/cash-entries/${id}/reverse`, reason ? { reason } : undefined),
     onSuccess: () => {
       invalidateCashQueries();
       setReverseConfirmEntry(null);
@@ -342,10 +349,8 @@ export default function CashPage() {
   });
 
   const reverseGroupMutation = useMutation({
-    mutationFn: async ({ cashFlowId, reason }: { cashFlowId: string; reason?: string }) => {
-      const res = await apiRequest("PATCH", `/api/cash-entries/group-reverse`, { cashFlowId, reason });
-      return res.json();
-    },
+    mutationFn: async ({ cashFlowId, reason }: { cashFlowId: string; reason?: string }) =>
+      apiRequestJson("PATCH", `/api/cash-entries/group-reverse`, { cashFlowId, reason }),
     onSuccess: () => {
       invalidateCashQueries();
       setReverseConfirmEntry(null);
@@ -358,10 +363,7 @@ export default function CashPage() {
   });
 
   const saveCashSettingsMutation = useMutation({
-    mutationFn: async (val: string) => {
-      const res = await apiRequest("POST", "/api/cash-settings", { cashInHandOpening: val });
-      return res.json();
-    },
+    mutationFn: async (val: string) => apiRequestJson("POST", "/api/cash-settings", { cashInHandOpening: val }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cash-settings"] });
       toast({ title: t("common.saved"), variant: "success" });
@@ -369,10 +371,7 @@ export default function CashPage() {
   });
 
   const createBankMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const res = await apiRequest("POST", "/api/bank-accounts", data);
-      return res.json();
-    },
+    mutationFn: async (data: any) => apiRequestJson("POST", "/api/bank-accounts", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
       setNewBankName("");
@@ -394,10 +393,8 @@ export default function CashPage() {
   });
 
   const updateBankMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: any }) => {
-      const res = await apiRequest("PATCH", `/api/bank-accounts/${id}`, data);
-      return res.json();
-    },
+    mutationFn: async ({ id, data }: { id: number; data: any }) =>
+      apiRequestJson("PATCH", `/api/bank-accounts/${id}`, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
       queryClient.invalidateQueries({ queryKey: ["/api/cash-entries"] });
@@ -407,10 +404,7 @@ export default function CashPage() {
   });
 
   const capitalExpenseMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const res = await apiRequest("POST", "/api/capital-expense", data);
-      return res.json();
-    },
+    mutationFn: async (data: any) => apiRequestJson("POST", "/api/capital-expense", data),
     onSuccess: () => {
       queryClient.invalidateQueries({ predicate: (query) => {
         const key = query.queryKey[0] as string;
