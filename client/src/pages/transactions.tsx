@@ -263,8 +263,7 @@ ${businessAddress ? `<p style="font-size:0.85em;color:#555;margin:2px 0">${busin
 </div>
 <table class="detail-table">
 <tr><td><strong>Buyer:</strong> ${tx.buyer.name}</td><td><strong>Licence No:</strong> ${tx.buyer.licenceNo || "-"}</td></tr>
-<tr><td><strong>Farmer:</strong> ${farmer.name}</td><td><strong>Date:</strong> ${dateStr}</td></tr>
-<tr><td><strong>Crop:</strong> ${lot.crop}</td><td></td></tr>
+<tr><td><strong>Crop:</strong> ${lot.crop}</td><td><strong>Date:</strong> ${dateStr}</td></tr>
 </table>
 <table style="margin-top:15px">
 <tr style="background:#f5f5f5">
@@ -348,7 +347,7 @@ function applyFarmerTemplate(tmpl: string, sg: UnifiedSerialGroup, businessName?
 
 type BuyerLotEntry = { lot: Lot; tx: TransactionWithDetails };
 
-function generateCombinedBuyerReceiptHtml(entries: BuyerLotEntry[], farmer: Farmer, serialNumber: number, date: string, businessName?: string, businessAddress?: string): string {
+function generateCombinedBuyerReceiptHtml(entries: BuyerLotEntry[], serialNumber: number, date: string, businessName?: string, businessAddress?: string): string {
   const firstTx = entries[0].tx;
   const crop = entries[0].lot.crop;
   const aadhatPct = parseFloat(firstTx.aadhatBuyerPercent || "0");
@@ -403,8 +402,7 @@ ${businessAddress ? `<p style="font-size:0.85em;color:#555;margin:2px 0">${busin
 </div>
 <table class="info-table" style="margin-bottom:12px">
 <tr><td><strong>Buyer:</strong> ${firstTx.buyer.name}</td><td><strong>Licence No:</strong> ${firstTx.buyer.licenceNo || "-"}</td></tr>
-<tr><td><strong>Farmer:</strong> ${farmer.name}</td><td><strong>SR #:</strong> ${serialNumber}</td></tr>
-<tr><td><strong>Crop:</strong> ${crop}</td><td><strong>Date:</strong> ${date}</td></tr>
+<tr><td><strong>Crop:</strong> ${crop}</td><td><strong>SR #:</strong> ${serialNumber} &nbsp; <strong>Date:</strong> ${date}</td></tr>
 </table>
 <table>
 <thead>
@@ -420,6 +418,98 @@ ${businessAddress ? `<p style="font-size:0.85em;color:#555;margin:2px 0">${busin
 ${rowsHtml}
 <tr class="totals-row">
   <td>Total</td>
+  <td style="text-align:right">${totalBags}</td>
+  <td style="text-align:right">${totalNw.toFixed(2)}</td>
+  <td style="text-align:right">-</td>
+  <td style="text-align:right">${totalGross.toFixed(2)}</td>
+</tr>
+</tbody>
+</table>
+<div class="summary">
+${totalHammali > 0 ? `<div class="summary-row"><span>Hammali (${totalBags} bags):</span><span>Rs.${totalHammali.toFixed(2)}</span></div>` : ""}
+${totalExtra > 0 ? `<div class="summary-row"><span>Extra Charges:</span><span>Rs.${totalExtra.toFixed(2)}</span></div>` : ""}
+${totalAadhat > 0 ? `<div class="summary-row"><span>Aadhat (${aadhatPct}%):</span><span>Rs.${totalAadhat.toFixed(2)}</span></div>` : ""}
+${totalMandi > 0 ? `<div class="summary-row"><span>Mandi (${mandiPct}%):</span><span>Rs.${totalMandi.toFixed(2)}</span></div>` : ""}
+<div class="summary-row total"><span>Total Receivable from Buyer:</span><span>Rs.${grandTotal.toFixed(2)}</span></div>
+</div>
+<div style="text-align:center;margin-top:20px;padding-top:10px;border-top:1px dashed #ccc;font-size:15px;font-weight:bold;color:#555">हमें सेवा का अवसर देने के लिए धन्यवाद!</div>
+</body></html>`;
+}
+
+function generateAllBuyerReceiptHtml(entries: BuyerLotEntry[], businessName?: string, businessAddress?: string): string {
+  if (entries.length === 0) return "";
+  const firstTx = entries[0].tx;
+  const buyer = firstTx.buyer;
+  const aadhatPct = parseFloat(firstTx.aadhatBuyerPercent || "0");
+  const mandiPct = parseFloat(firstTx.mandiBuyerPercent || "0");
+
+  const rows = entries.map(({ lot, tx }) => {
+    const nw = parseFloat(tx.netWeight || "0");
+    const ppk = parseFloat(tx.pricePerKg || "0");
+    const epk = parseFloat((tx as any).extraPerKgBuyer || "0");
+    const rate = ppk + epk;
+    const gross = nw * rate;
+    const bags = tx.numberOfBags || 0;
+    return { srNo: lot.serialNumber, crop: lot.crop, bags, nw, rate, gross, hammaliBuyerPerBag: parseFloat(tx.hammaliBuyerPerBag || "0"), extra: parseFloat(tx.extraChargesBuyer || "0"), date: tx.date || lot.date };
+  });
+
+  const totalBags = rows.reduce((s, r) => s + r.bags, 0);
+  const totalNw = rows.reduce((s, r) => s + r.nw, 0);
+  const totalGross = rows.reduce((s, r) => s + r.gross, 0);
+  const totalHammali = rows.reduce((s, r) => s + r.hammaliBuyerPerBag * r.bags, 0);
+  const totalExtra = rows.reduce((s, r) => s + r.extra, 0);
+  const totalAadhat = totalGross * aadhatPct / 100;
+  const totalMandi = totalGross * mandiPct / 100;
+  const grandTotal = totalGross + totalHammali + totalExtra + totalAadhat + totalMandi;
+
+  const rowsHtml = rows.map(r => `
+<tr>
+  <td style="padding:6px;border:1px solid #ccc">${r.srNo}</td>
+  <td style="padding:6px;border:1px solid #ccc">${r.crop}</td>
+  <td style="padding:6px;border:1px solid #ccc;text-align:right">${r.bags}</td>
+  <td style="padding:6px;border:1px solid #ccc;text-align:right">${r.nw.toFixed(2)}</td>
+  <td style="padding:6px;border:1px solid #ccc;text-align:right">${r.rate.toFixed(2)}</td>
+  <td style="padding:6px;border:1px solid #ccc;text-align:right">${r.gross.toFixed(2)}</td>
+</tr>`).join("");
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Buyer Receipt</title>
+<style>body{font-family:Arial,sans-serif;margin:20px;color:#333}
+table{width:100%;border-collapse:collapse;margin:10px 0}
+h2{text-align:center;margin-bottom:5px}
+.header{text-align:center;margin-bottom:15px}
+.info-table td{padding:5px 8px;border:1px solid #ccc}
+.summary{margin-top:15px;border-top:2px solid #333;padding-top:10px}
+.summary-row{display:flex;justify-content:space-between;padding:3px 0}
+.total{font-weight:bold;font-size:1.1em;color:#dc2626;border-top:2px solid #333;padding-top:8px;margin-top:8px}
+th{padding:8px;border:1px solid #ccc;background:#f5f5f5;text-align:right}
+th:first-child{text-align:left}
+.totals-row td{font-weight:bold;background:#f0f0f0;padding:6px;border:1px solid #ccc}
+@media print{body{margin:10mm}.no-print{display:none!important}}
+</style></head><body>
+<div class="header">
+${businessName ? `<h2 style="margin-bottom:2px">${businessName}</h2>` : ""}
+${businessAddress ? `<p style="font-size:0.85em;color:#555;margin:2px 0">${businessAddress}</p>` : ""}
+<h3 style="margin:8px 0 5px 0;font-size:1.1em">Buyer Receipt</h3>
+</div>
+<table class="info-table" style="margin-bottom:12px">
+<tr><td><strong>Buyer:</strong> ${buyer.name}</td><td><strong>Licence No:</strong> ${buyer.licenceNo || "-"}</td></tr>
+<tr><td><strong>Date:</strong> ${format(new Date(), "dd/MM/yyyy")}</td><td></td></tr>
+</table>
+<table>
+<thead>
+<tr>
+  <th style="text-align:left">SR #</th>
+  <th style="text-align:left">Crop</th>
+  <th style="text-align:right">Bags</th>
+  <th style="text-align:right">Net Wt (kg)</th>
+  <th style="text-align:right">Rate (₹/kg)</th>
+  <th style="text-align:right">Gross (₹)</th>
+</tr>
+</thead>
+<tbody>
+${rowsHtml}
+<tr class="totals-row">
+  <td colspan="2">Total</td>
   <td style="text-align:right">${totalBags}</td>
   <td style="text-align:right">${totalNw.toFixed(2)}</td>
   <td style="text-align:right">-</td>
@@ -466,8 +556,8 @@ function applyBuyerTemplate(tmpl: string, lot: Lot, farmer: Farmer, tx: Transact
     "{{DATE}}": tx.date || format(new Date(), "yyyy-MM-dd"),
     "{{BUYER_NAME}}": tx.buyer.name,
     "{{BUYER_CODE}}": tx.buyer.licenceNo || "",
-    "{{FARMER_NAME}}": farmer.name,
-    "{{FARMER_VILLAGE}}": farmer.village || "",
+    "{{FARMER_NAME}}": "",
+    "{{FARMER_VILLAGE}}": "",
     "{{CROP}}": lot.crop,
     "{{SIZE}}": lot.size || "",
     "{{BAGS}}": String(bags),
@@ -491,7 +581,7 @@ function applyBuyerTemplate(tmpl: string, lot: Lot, farmer: Farmer, tx: Transact
   return Object.entries(replacements).reduce((html, [token, val]) => html.split(token).join(val), tmpl);
 }
 
-function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[], farmer: Farmer, serialNumber: number, date: string, businessName?: string, businessAddress?: string, businessInitials?: string, businessPhone?: string, businessLicenceNo?: string, businessShopNo?: string): string {
+function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[], serialNumber: number, date: string, businessName?: string, businessAddress?: string, businessInitials?: string, businessPhone?: string, businessLicenceNo?: string, businessShopNo?: string): string {
   const firstTx = entries[0].tx;
   const firstLot = entries[0].lot;
   const aadhatPct = parseFloat(firstTx.aadhatBuyerPercent || "0");
@@ -535,8 +625,8 @@ function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[], farm
     "{{DATE}}": date,
     "{{BUYER_NAME}}": firstTx.buyer.name,
     "{{BUYER_CODE}}": firstTx.buyer.licenceNo || "",
-    "{{FARMER_NAME}}": farmer.name,
-    "{{FARMER_VILLAGE}}": farmer.village || "",
+    "{{FARMER_NAME}}": "",
+    "{{FARMER_VILLAGE}}": "",
     "{{CROP}}": firstLot.crop,
     "{{SIZE}}": firstLot.size || "",
     "{{LOT_ID}}": firstLot.lotId,
@@ -1102,19 +1192,23 @@ export default function TransactionsPage() {
     const crop = entries[0].lot.crop;
     const customTmpl = receiptTemplates.find(t => t.templateType === "buyer" && t.crop === crop)
       || receiptTemplates.find(t => t.templateType === "buyer" && t.crop === "");
-    if (customTmpl) return applyCombinedBuyerTemplate(customTmpl.templateHtml, entries, sg.farmer, sg.serialNumber, sg.date, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo);
-    return generateCombinedBuyerReceiptHtml(entries, sg.farmer, sg.serialNumber, sg.date, user?.businessName, user?.businessAddress);
+    if (customTmpl) return applyCombinedBuyerTemplate(customTmpl.templateHtml, entries, sg.serialNumber, sg.date, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo);
+    return generateCombinedBuyerReceiptHtml(entries, sg.serialNumber, sg.date, user?.businessName, user?.businessAddress);
   };
 
-  const handlePrintCombinedBuyerReceipt = (entries: BuyerLotEntry[], sg: UnifiedSerialGroup) => {
-    printReceipt(getCombinedBuyerReceiptHtml(entries, sg));
-  };
-
-  const handleShareCombinedBuyerReceipt = (entries: BuyerLotEntry[], sg: UnifiedSerialGroup) => {
-    const buyerName = entries[0].tx.buyer.name.replace(/[^a-zA-Z0-9]/g, '_');
-    const crop = entries[0].lot.crop;
-    const fileName = `Buyer_Receipt_SR${sg.serialNumber}_${buyerName}_${crop}.pdf`;
-    shareReceiptAsPdf(getCombinedBuyerReceiptHtml(entries, sg), fileName);
+  const handlePrintAllBuyerReceipt = () => {
+    const s = buyerNameSearch.trim().toLowerCase();
+    if (!s) return;
+    const entries: BuyerLotEntry[] = [];
+    filteredSerialGroups.forEach(sg => {
+      sg.lotGroups.forEach(lg => {
+        lg.completedTxns.filter(t => !t.isReversed && t.buyer.name.toLowerCase().includes(s)).forEach(tx => {
+          entries.push({ lot: lg.lot, tx });
+        });
+      });
+    });
+    if (entries.length === 0) return;
+    printReceipt(generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress));
   };
 
   const exportCSV = () => {
@@ -1330,33 +1424,47 @@ export default function TransactionsPage() {
           )}
         </div>
 
-        <div className="relative" ref={buyerDropdownRef}>
-          <div className="relative">
-            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
-            <Input
-              data-testid="input-buyer-name-filter"
-              value={buyerNameSearch}
-              onChange={(e) => { setBuyerNameSearch(e.target.value); setShowBuyerDropdown(true); }}
-              onFocus={() => { if (buyerNameSearch.length >= 1) setShowBuyerDropdown(true); }}
-              placeholder="Buyer..."
-              className="w-32 h-8 text-xs pl-7"
-              autoComplete="off"
-            />
-          </div>
-          {showBuyerDropdown && buyerNameSearch.length >= 1 && buyerSuggestions.length > 0 && (
-            <div className="absolute z-50 w-64 mt-1 bg-popover border border-border rounded-md shadow-md max-h-48 overflow-y-auto right-0">
-              {buyerSuggestions.map((b) => (
-                <div
-                  key={b.id}
-                  className="px-3 py-2 text-xs hover:bg-accent cursor-pointer"
-                  data-testid={`option-txn-buyer-${b.id}`}
-                  onClick={() => { setBuyerNameSearch(b.name); setShowBuyerDropdown(false); }}
-                >
-                  <span className="font-medium">{b.name}</span>
-                  {b.phone && <span className="text-muted-foreground"> — {b.phone}</span>}
-                </div>
-              ))}
+        <div className="flex items-center gap-1">
+          <div className="relative" ref={buyerDropdownRef}>
+            <div className="relative">
+              <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+              <Input
+                data-testid="input-buyer-name-filter"
+                value={buyerNameSearch}
+                onChange={(e) => { setBuyerNameSearch(e.target.value); setShowBuyerDropdown(true); }}
+                onFocus={() => { if (buyerNameSearch.length >= 1) setShowBuyerDropdown(true); }}
+                placeholder="Buyer..."
+                className="w-32 h-8 text-xs pl-7"
+                autoComplete="off"
+              />
             </div>
+            {showBuyerDropdown && buyerNameSearch.length >= 1 && buyerSuggestions.length > 0 && (
+              <div className="absolute z-50 w-64 mt-1 bg-popover border border-border rounded-md shadow-md max-h-48 overflow-y-auto right-0">
+                {buyerSuggestions.map((b) => (
+                  <div
+                    key={b.id}
+                    className="px-3 py-2 text-xs hover:bg-accent cursor-pointer"
+                    data-testid={`option-txn-buyer-${b.id}`}
+                    onClick={() => { setBuyerNameSearch(b.name); setShowBuyerDropdown(false); }}
+                  >
+                    <span className="font-medium">{b.name}</span>
+                    {b.phone && <span className="text-muted-foreground"> — {b.phone}</span>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          {buyerNameSearch.trim() && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0 shrink-0"
+              data-testid="button-print-all-buyer-receipt"
+              title={`Print receipt for ${buyerNameSearch}`}
+              onClick={handlePrintAllBuyerReceipt}
+            >
+              <Printer className="w-4 h-4" />
+            </Button>
           )}
         </div>
 
@@ -1492,43 +1600,6 @@ export default function TransactionsPage() {
                               <Share2 className="w-4 h-4 mr-2" />
                               Share किसान रसीद
                             </DropdownMenuItem>
-                            {(() => {
-                              const buyerCropMap = new Map<string, BuyerLotEntry[]>();
-                              sg.lotGroups.forEach(lg => {
-                                lg.completedTxns.filter(t => !t.isReversed).forEach(tx => {
-                                  const key = `${tx.buyerId}__${lg.lot.crop}`;
-                                  if (!buyerCropMap.has(key)) buyerCropMap.set(key, []);
-                                  buyerCropMap.get(key)!.push({ lot: lg.lot, tx });
-                                });
-                              });
-                              return Array.from(buyerCropMap.entries()).map(([key, entries]) => {
-                                const { tx, lot } = entries[0];
-                                const isMulti = entries.length > 1;
-                                const singleLg = sg.lotGroups.find(lg => lg.lot.id === lot.id);
-                                return (
-                                  <div key={key}>
-                                    <DropdownMenuItem
-                                      data-testid={`button-print-buyer-${key}`}
-                                      onClick={() => isMulti
-                                        ? handlePrintCombinedBuyerReceipt(entries, sg)
-                                        : handlePrintBuyerReceipt(tx, singleLg!)}
-                                    >
-                                      <Printer className="w-4 h-4 mr-2" />
-                                      Print Buyer - {tx.buyer.name} ({lot.crop})
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem
-                                      data-testid={`button-share-buyer-${key}`}
-                                      onClick={() => isMulti
-                                        ? handleShareCombinedBuyerReceipt(entries, sg)
-                                        : handleShareBuyerReceipt(tx, singleLg!)}
-                                    >
-                                      <Share2 className="w-4 h-4 mr-2" />
-                                      Share Buyer - {tx.buyer.name} ({lot.crop})
-                                    </DropdownMenuItem>
-                                  </div>
-                                );
-                              });
-                            })()}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       )}
