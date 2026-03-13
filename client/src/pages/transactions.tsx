@@ -1192,6 +1192,17 @@ export default function TransactionsPage() {
     return generateCombinedBuyerReceiptHtml(entries, sg.serialNumber, sg.date, user?.businessName, user?.businessAddress);
   };
 
+  const handlePrintCombinedBuyerReceipt = (entries: BuyerLotEntry[], sg: UnifiedSerialGroup) => {
+    printReceipt(getCombinedBuyerReceiptHtml(entries, sg));
+  };
+
+  const handleShareCombinedBuyerReceipt = (entries: BuyerLotEntry[], sg: UnifiedSerialGroup) => {
+    const buyerName = entries[0].tx.buyer.name.replace(/[^a-zA-Z0-9]/g, "_");
+    const crop = entries[0].lot.crop;
+    const fileName = `Buyer_Receipt_${buyerName}_${crop}_${sg.date}.pdf`;
+    shareReceiptAsPdf(getCombinedBuyerReceiptHtml(entries, sg), fileName);
+  };
+
   const handlePrintAllBuyerReceipt = () => {
     const s = buyerNameSearch.trim().toLowerCase();
     if (!s) return;
@@ -1588,6 +1599,42 @@ export default function TransactionsPage() {
                               <Share2 className="w-4 h-4 mr-2" />
                               Share किसान रसीद
                             </DropdownMenuItem>
+                            {(() => {
+                              const buyerCropMap = new Map<string, BuyerLotEntry[]>();
+                              sg.lotGroups.forEach(lg => {
+                                lg.completedTxns.filter(t => !t.isReversed).forEach(tx => {
+                                  const key = `${tx.buyerId}__${lg.lot.crop}`;
+                                  if (!buyerCropMap.has(key)) buyerCropMap.set(key, []);
+                                  buyerCropMap.get(key)!.push({ lot: lg.lot, tx });
+                                });
+                              });
+                              return Array.from(buyerCropMap.entries()).map(([key, entries]) => {
+                                const { tx, lot } = entries[0];
+                                const label = `${tx.buyer.name} (${lot.crop})`;
+                                return (
+                                  <div key={key}>
+                                    <DropdownMenuItem
+                                      data-testid={`button-print-buyer-${key}`}
+                                      onClick={() => entries.length > 1
+                                        ? handlePrintCombinedBuyerReceipt(entries, sg)
+                                        : handlePrintBuyerReceipt(tx, sg.lotGroups.find(lg => lg.lot.id === lot.id)!)}
+                                    >
+                                      <Printer className="w-4 h-4 mr-2" />
+                                      Print {label}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      data-testid={`button-share-buyer-${key}`}
+                                      onClick={() => entries.length > 1
+                                        ? handleShareCombinedBuyerReceipt(entries, sg)
+                                        : handleShareBuyerReceipt(tx, sg.lotGroups.find(lg => lg.lot.id === lot.id)!)}
+                                    >
+                                      <Share2 className="w-4 h-4 mr-2" />
+                                      Share {label}
+                                    </DropdownMenuItem>
+                                  </div>
+                                );
+                              });
+                            })()}
                           </DropdownMenuContent>
                         </DropdownMenu>
                       )}
