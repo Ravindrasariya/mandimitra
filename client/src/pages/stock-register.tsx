@@ -238,7 +238,8 @@ export default function StockRegisterPage() {
       });
     }
     return result.sort((a, b) => {
-      if (a.date !== b.date) return b.date.localeCompare(a.date);
+      const fyA = getFyYear(a.date), fyB = getFyYear(b.date);
+      if (fyA !== fyB) return fyB - fyA;
       return b.serialNumber - a.serialNumber;
     });
   }, [filtered, selectedStatuses]);

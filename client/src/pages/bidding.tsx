@@ -203,8 +203,8 @@ export default function BiddingPage() {
       result = result.filter(g => g.lots.some(lot => selectedStatuses.includes(getLotStatus(lot))));
     }
     result.sort((a, b) => {
-      const dateCompare = b.date.localeCompare(a.date);
-      if (dateCompare !== 0) return dateCompare;
+      const fyA = getFyYear(a.date), fyB = getFyYear(b.date);
+      if (fyA !== fyB) return fyB - fyA;
       return b.serialNumber - a.serialNumber;
     });
     return result;

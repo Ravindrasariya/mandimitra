@@ -832,9 +832,9 @@ export default function TransactionsPage() {
       return true;
     });
     filtered.sort((a, b) => {
-      const dateCompare = b.date.localeCompare(a.date);
-      if (dateCompare !== 0) return dateCompare;
-      return a.serialNumber - b.serialNumber;
+      const fyA = getFyYear(a.date), fyB = getFyYear(b.date);
+      if (fyA !== fyB) return fyB - fyA;
+      return b.serialNumber - a.serialNumber;
     });
     return filtered;
   }, [serialGroups, cropFilter, yearFilter, selectedMonths, selectedDays, buyerPaymentFilter, farmerPaymentFilter, billingFilter]);
