@@ -671,8 +671,6 @@ export default function TransactionsPage() {
   const [selectedMonths, setSelectedMonths] = usePersistedState<string[]>("txn-selectedMonths", [currentMonth]);
   const [selectedDays, setSelectedDays] = usePersistedState<string[]>("txn-selectedDays", [currentDay]);
   const [cropFilter, setCropFilter] = usePersistedState("txn-cropFilter", "all");
-  const [buyerPaymentFilter, setBuyerPaymentFilter] = usePersistedState("txn-buyerPaymentFilter", "all");
-  const [farmerPaymentFilter, setFarmerPaymentFilter] = usePersistedState("txn-farmerPaymentFilter", "all");
   const [billingFilter, setBillingFilter] = usePersistedState("txn-billingFilter", "all");
   const [monthPopoverOpen, setMonthPopoverOpen] = useState(false);
   const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
@@ -682,6 +680,18 @@ export default function TransactionsPage() {
   const [showBuyerDropdown, setShowBuyerDropdown] = useState(false);
   const farmerDropdownRef = useRef<HTMLDivElement>(null);
   const buyerDropdownRef = useRef<HTMLDivElement>(null);
+
+  const isFiltered = cropFilter !== "all" || billingFilter !== "all" || farmerNameSearch !== "" || buyerNameSearch !== ""
+    || selectedMonths.join(",") !== currentMonth || selectedDays.join(",") !== currentDay;
+
+  const clearFilters = () => {
+    setCropFilter("all");
+    setBillingFilter("all");
+    setSelectedMonths([currentMonth]);
+    setSelectedDays([currentDay]);
+    setFarmerNameSearch("");
+    setBuyerNameSearch("");
+  };
 
   const [netWeightInput, setNetWeightInput] = useState("");
   const [showWeightCalc, setShowWeightCalc] = useState(false);
@@ -934,20 +944,6 @@ export default function TransactionsPage() {
         return true;
       });
       if (!hasMatchingDate) return false;
-      if (buyerPaymentFilter !== "all") {
-        const activeTxns = sg.allCompletedTxns.filter(t => !t.isReversed);
-        if (activeTxns.length === 0) return false;
-        const hasMatch = activeTxns.some(t => t.paymentStatus === buyerPaymentFilter);
-        if (!hasMatch) return false;
-      }
-      if (farmerPaymentFilter !== "all") {
-        const activeTxns = sg.allCompletedTxns.filter(t => !t.isReversed);
-        if (activeTxns.length === 0) return false;
-        const totalPayable = activeTxns.reduce((s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0);
-        const totalPaid = activeTxns.reduce((s, t) => s + parseFloat(t.farmerPaidAmount || "0"), 0);
-        const groupFarmerStatus = totalPaid >= totalPayable ? "paid" : totalPaid > 0 ? "partial" : "due";
-        if (groupFarmerStatus !== farmerPaymentFilter) return false;
-      }
       if (billingFilter !== "all") {
         const isBilled = sg.lotGroups.every(lg => lg.lot.remainingBags === 0) && sg.allPendingBids.length === 0;
         if (billingFilter === "billed" && !isBilled) return false;
@@ -971,7 +967,7 @@ export default function TransactionsPage() {
       return b.serialNumber - a.serialNumber;
     });
     return filtered;
-  }, [serialGroups, cropFilter, yearFilter, selectedMonths, selectedDays, buyerPaymentFilter, farmerPaymentFilter, billingFilter, farmerNameSearch, buyerNameSearch]);
+  }, [serialGroups, cropFilter, yearFilter, selectedMonths, selectedDays, billingFilter, farmerNameSearch, buyerNameSearch]);
 
   const filteredGroups = useMemo(() => {
     return filteredSerialGroups.flatMap(sg => sg.lotGroups);
@@ -1361,28 +1357,6 @@ export default function TransactionsPage() {
             </div>
           </PopoverContent>
         </Popover>
-        <Select value={buyerPaymentFilter} onValueChange={setBuyerPaymentFilter}>
-          <SelectTrigger className="w-[120px]" data-testid="select-buyer-payment-filter">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Buyer: All</SelectItem>
-            <SelectItem value="paid">Buyer: Paid</SelectItem>
-            <SelectItem value="due">Buyer: Due</SelectItem>
-            <SelectItem value="partial">Buyer: Partial</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={farmerPaymentFilter} onValueChange={setFarmerPaymentFilter}>
-          <SelectTrigger className="w-[125px]" data-testid="select-farmer-payment-filter">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Farmer: All</SelectItem>
-            <SelectItem value="paid">Farmer: Paid</SelectItem>
-            <SelectItem value="due">Farmer: Due</SelectItem>
-            <SelectItem value="partial">Farmer: Partial</SelectItem>
-          </SelectContent>
-        </Select>
         <Select value={billingFilter} onValueChange={setBillingFilter}>
           <SelectTrigger className="w-[110px]" data-testid="select-billing-filter">
             <SelectValue />
@@ -1468,6 +1442,19 @@ export default function TransactionsPage() {
           )}
         </div>
 
+        {isFiltered && (
+          <Button
+            variant="secondary"
+            size="sm"
+            className="h-8 text-xs px-2 shrink-0 gap-1"
+            data-testid="button-clear-filters"
+            onClick={clearFilters}
+            title="Clear extra filters"
+          >
+            <X className="w-3 h-3" />
+            Clear
+          </Button>
+        )}
         <Button
           variant="outline"
           size="sm"
