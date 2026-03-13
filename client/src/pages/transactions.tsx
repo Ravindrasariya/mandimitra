@@ -1209,6 +1209,7 @@ export default function TransactionsPage() {
     const entries: BuyerLotEntry[] = [];
     filteredSerialGroups.forEach(sg => {
       sg.lotGroups.forEach(lg => {
+        if (cropFilter !== "all" && lg.lot.crop !== cropFilter) return;
         lg.completedTxns.filter(t => !t.isReversed && t.buyer.name.toLowerCase().includes(s)).forEach(tx => {
           entries.push({ lot: lg.lot, tx });
         });
@@ -1428,18 +1429,6 @@ export default function TransactionsPage() {
               </div>
             )}
           </div>
-          {buyerNameSearch.trim() && (
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 w-8 p-0 shrink-0"
-              data-testid="button-print-all-buyer-receipt"
-              title={`Print receipt for ${buyerNameSearch}`}
-              onClick={handlePrintAllBuyerReceipt}
-            >
-              <Printer className="w-4 h-4" />
-            </Button>
-          )}
         </div>
 
         <Select value={cropFilter} onValueChange={setCropFilter}>
@@ -1453,6 +1442,19 @@ export default function TransactionsPage() {
             <SelectItem value="Garlic">Garlic</SelectItem>
           </SelectContent>
         </Select>
+
+        {buyerNameSearch.trim() && (
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0 shrink-0"
+            data-testid="button-print-all-buyer-receipt"
+            title={`Print receipt for ${buyerNameSearch}${cropFilter !== "all" ? ` (${cropFilter})` : ""}`}
+            onClick={handlePrintAllBuyerReceipt}
+          >
+            <Printer className="w-4 h-4" />
+          </Button>
+        )}
 
         {isFiltered && (
           <Button
