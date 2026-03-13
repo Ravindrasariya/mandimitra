@@ -1272,17 +1272,6 @@ export default function TransactionsPage() {
           <Receipt className="w-5 h-5 text-primary" />
           {t("transactions.title")}
         </h1>
-        <Select value={cropFilter} onValueChange={setCropFilter}>
-          <SelectTrigger className="w-[110px]" data-testid="select-crop-filter">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("transactions.allCrops")}</SelectItem>
-            <SelectItem value="Potato">Potato</SelectItem>
-            <SelectItem value="Onion">Onion</SelectItem>
-            <SelectItem value="Garlic">Garlic</SelectItem>
-          </SelectContent>
-        </Select>
         <Select value={yearFilter} onValueChange={(v) => { setYearFilter(v); setSelectedDays([]); }}>
           <SelectTrigger className="w-[85px]" data-testid="select-year-filter">
             <SelectValue />
@@ -1441,6 +1430,18 @@ export default function TransactionsPage() {
             </Button>
           )}
         </div>
+
+        <Select value={cropFilter} onValueChange={setCropFilter}>
+          <SelectTrigger className="w-[110px]" data-testid="select-crop-filter">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t("transactions.allCrops")}</SelectItem>
+            <SelectItem value="Potato">Potato</SelectItem>
+            <SelectItem value="Onion">Onion</SelectItem>
+            <SelectItem value="Garlic">Garlic</SelectItem>
+          </SelectContent>
+        </Select>
 
         {isFiltered && (
           <Button
