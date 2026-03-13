@@ -685,9 +685,14 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getNextSerialNumber(businessId: number, date: string): Promise<number> {
+    const d = new Date(date);
+    const month = d.getMonth(); // 0-indexed, April = 3
+    const year = d.getFullYear();
+    const fyStart = month >= 3 ? `${year}-04-01` : `${year - 1}-04-01`;
+    const fyEnd = month >= 3 ? `${year + 1}-03-31` : `${year}-03-31`;
     const [result] = await db.select({ max: sql<string>`coalesce(max(${lots.serialNumber}), 0)` })
       .from(lots)
-      .where(and(eq(lots.businessId, businessId), eq(lots.date, date)));
+      .where(and(eq(lots.businessId, businessId), gte(lots.date, fyStart), lte(lots.date, fyEnd)));
     return parseInt(result?.max || "0", 10) + 1;
   }
 

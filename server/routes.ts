@@ -567,9 +567,19 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Sum of lot bags exceeds total bags in vehicle" });
       }
 
-      const serialNum = await storage.getNextSerialNumber(businessId, dateStr);
+      const baseSerial = await storage.getNextSerialNumber(businessId, dateStr);
       const dateFormatted = dateStr.replace(/-/g, "");
       const createdLots = [];
+
+      // Assign a unique SR# per unique crop, in order of first appearance
+      const cropSerialMap: Record<string, number> = {};
+      let serialOffset = 0;
+      for (const item of lotItems) {
+        if (!(item.crop in cropSerialMap)) {
+          cropSerialMap[item.crop] = baseSerial + serialOffset;
+          serialOffset++;
+        }
+      }
 
       for (const item of lotItems) {
         const crop = item.crop;
@@ -581,7 +591,7 @@ export async function registerRoutes(
         const data = {
           businessId,
           lotId,
-          serialNumber: serialNum,
+          serialNumber: cropSerialMap[crop],
           date: dateStr,
           farmerId: parseInt(farmerId),
           crop,
