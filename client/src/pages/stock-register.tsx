@@ -209,10 +209,12 @@ export default function StockRegisterPage() {
     return result;
   }, [allLots, yearFilter, selectedMonths, selectedDays, selectedFarmer]);
 
+  const getFyYear = (date: string) => { const d = new Date(date); return d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1; };
+
   const grouped = useMemo(() => {
     const groups = new Map<string, LotWithFarmer[]>();
     for (const lot of filtered) {
-      const key = `${lot.serialNumber}-${lot.date}-${lot.farmerId}`;
+      const key = `${getFyYear(lot.date)}-${lot.serialNumber}`;
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key)!.push(lot);
     }

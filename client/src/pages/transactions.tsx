@@ -74,11 +74,13 @@ function buildUnifiedLotGroups(
   return Array.from(map.values());
 }
 
+function getFyYear(date: string) { const d = new Date(date); return d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1; }
+
 function buildSerialGroups(lotGroups: UnifiedLotGroup[]): UnifiedSerialGroup[] {
   const map = new Map<string, UnifiedSerialGroup>();
 
   for (const lg of lotGroups) {
-    const key = `${lg.lot.date}-${lg.lot.serialNumber}`;
+    const key = `${getFyYear(lg.lot.date)}-${lg.lot.serialNumber}`;
     if (!map.has(key)) {
       map.set(key, {
         serialNumber: lg.lot.serialNumber,

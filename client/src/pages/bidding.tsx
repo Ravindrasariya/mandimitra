@@ -188,11 +188,13 @@ export default function BiddingPage() {
     });
   }, [lots, activeGrade, yearFilter, selectedMonths, selectedDays, farmerSearch]);
 
+  const getFyYear = (date: string) => { const d = new Date(date); return d.getMonth() >= 3 ? d.getFullYear() : d.getFullYear() - 1; };
+
   const groupedBySerial = useMemo(() => {
     const groups = new Map<string, { serialNumber: number; date: string; lots: LotWithFarmer[] }>();
     for (const lot of filteredLots) {
       const sr = lot.serialNumber;
-      const key = `${lot.date}-${sr}`;
+      const key = `${getFyYear(lot.date)}-${sr}`;
       if (!groups.has(key)) groups.set(key, { serialNumber: sr, date: lot.date, lots: [] });
       groups.get(key)!.lots.push(lot);
     }
@@ -203,7 +205,7 @@ export default function BiddingPage() {
     result.sort((a, b) => {
       const dateCompare = b.date.localeCompare(a.date);
       if (dateCompare !== 0) return dateCompare;
-      return a.serialNumber - b.serialNumber;
+      return b.serialNumber - a.serialNumber;
     });
     return result;
   }, [filteredLots, selectedStatuses]);
