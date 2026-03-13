@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -17,7 +17,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Receipt, Pencil, Printer, ChevronDown, ChevronRight, Calendar, Package, Users, Landmark, HandCoins, Download, History, Share2, Calculator, Plus, X, AlertTriangle } from "lucide-react";
+import { Receipt, Pencil, Printer, ChevronDown, ChevronRight, Calendar, Package, Users, Landmark, HandCoins, Download, History, Share2, Calculator, Plus, X, AlertTriangle, Search } from "lucide-react";
 import { format } from "date-fns";
 import { useAuth } from "@/lib/auth";
 import { printReceipt, shareReceiptAsPdf } from "@/lib/receiptUtils";
@@ -586,6 +586,12 @@ export default function TransactionsPage() {
   const [billingFilter, setBillingFilter] = usePersistedState("txn-billingFilter", "all");
   const [monthPopoverOpen, setMonthPopoverOpen] = useState(false);
   const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
+  const [farmerNameSearch, setFarmerNameSearch] = useState("");
+  const [buyerNameSearch, setBuyerNameSearch] = useState("");
+  const [showFarmerDropdown, setShowFarmerDropdown] = useState(false);
+  const [showBuyerDropdown, setShowBuyerDropdown] = useState(false);
+  const farmerDropdownRef = useRef<HTMLDivElement>(null);
+  const buyerDropdownRef = useRef<HTMLDivElement>(null);
 
   const [netWeightInput, setNetWeightInput] = useState("");
   const [showWeightCalc, setShowWeightCalc] = useState(false);
@@ -627,6 +633,34 @@ export default function TransactionsPage() {
   const { data: buyersWithDues = [] } = useQuery<(Buyer & { receivableDue: string; overallDue: string })[]>({
     queryKey: ["/api/buyers?withDues=true"],
   });
+
+  const farmerSuggestions = useMemo(() => {
+    if (!farmerNameSearch || farmerNameSearch.length < 1) return [];
+    const s = farmerNameSearch.toLowerCase();
+    return farmersWithDues.filter(f =>
+      f.name.toLowerCase().includes(s) ||
+      (f.phone && f.phone.includes(s)) ||
+      ((f as any).village && (f as any).village.toLowerCase().includes(s))
+    ).slice(0, 10);
+  }, [farmerNameSearch, farmersWithDues]);
+
+  const buyerSuggestions = useMemo(() => {
+    if (!buyerNameSearch || buyerNameSearch.length < 1) return [];
+    const s = buyerNameSearch.toLowerCase();
+    return buyersWithDues.filter(b =>
+      b.name.toLowerCase().includes(s) ||
+      (b.phone && b.phone.includes(s))
+    ).slice(0, 10);
+  }, [buyerNameSearch, buyersWithDues]);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (farmerDropdownRef.current && !farmerDropdownRef.current.contains(e.target as Node)) setShowFarmerDropdown(false);
+      if (buyerDropdownRef.current && !buyerDropdownRef.current.contains(e.target as Node)) setShowBuyerDropdown(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
 
   const { data: txAggregates } = useQuery<{
     totalHammali: number; totalExtraCharges: number; totalMandiCommission: number;
@@ -829,6 +863,16 @@ export default function TransactionsPage() {
         if (billingFilter === "billed" && !isBilled) return false;
         if (billingFilter === "unbilled" && isBilled) return false;
       }
+      if (farmerNameSearch.trim()) {
+        const s = farmerNameSearch.trim().toLowerCase();
+        if (!sg.farmer.name.toLowerCase().includes(s)) return false;
+      }
+      if (buyerNameSearch.trim()) {
+        const s = buyerNameSearch.trim().toLowerCase();
+        const hasBuyer = sg.allCompletedTxns.some(t => t.buyer.name.toLowerCase().includes(s))
+          || sg.allPendingBids.some(b => b.buyer.name.toLowerCase().includes(s));
+        if (!hasBuyer) return false;
+      }
       return true;
     });
     filtered.sort((a, b) => {
@@ -837,7 +881,7 @@ export default function TransactionsPage() {
       return b.serialNumber - a.serialNumber;
     });
     return filtered;
-  }, [serialGroups, cropFilter, yearFilter, selectedMonths, selectedDays, buyerPaymentFilter, farmerPaymentFilter, billingFilter]);
+  }, [serialGroups, cropFilter, yearFilter, selectedMonths, selectedDays, buyerPaymentFilter, farmerPaymentFilter, billingFilter, farmerNameSearch, buyerNameSearch]);
 
   const filteredGroups = useMemo(() => {
     return filteredSerialGroups.flatMap(sg => sg.lotGroups);
@@ -1255,6 +1299,67 @@ export default function TransactionsPage() {
             <SelectItem value="unbilled">Unbilled</SelectItem>
           </SelectContent>
         </Select>
+        <div className="relative" ref={farmerDropdownRef}>
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+            <Input
+              data-testid="input-farmer-name-filter"
+              value={farmerNameSearch}
+              onChange={(e) => { setFarmerNameSearch(e.target.value); setShowFarmerDropdown(true); }}
+              onFocus={() => { if (farmerNameSearch.length >= 1) setShowFarmerDropdown(true); }}
+              placeholder="Farmer..."
+              className="w-32 h-8 text-xs pl-7"
+              autoComplete="off"
+            />
+          </div>
+          {showFarmerDropdown && farmerNameSearch.length >= 1 && farmerSuggestions.length > 0 && (
+            <div className="absolute z-50 w-64 mt-1 bg-popover border border-border rounded-md shadow-md max-h-48 overflow-y-auto">
+              {farmerSuggestions.map((f) => (
+                <div
+                  key={f.id}
+                  className="px-3 py-2 text-xs hover:bg-accent cursor-pointer"
+                  data-testid={`option-txn-farmer-${f.id}`}
+                  onClick={() => { setFarmerNameSearch(f.name); setShowFarmerDropdown(false); }}
+                >
+                  <span className="font-medium">{f.name}</span>
+                  {f.phone && <span className="text-muted-foreground"> — {f.phone}</span>}
+                  {(f as any).village && <span className="text-muted-foreground"> — {(f as any).village}</span>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="relative" ref={buyerDropdownRef}>
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3 h-3 text-muted-foreground" />
+            <Input
+              data-testid="input-buyer-name-filter"
+              value={buyerNameSearch}
+              onChange={(e) => { setBuyerNameSearch(e.target.value); setShowBuyerDropdown(true); }}
+              onFocus={() => { if (buyerNameSearch.length >= 1) setShowBuyerDropdown(true); }}
+              placeholder="Buyer..."
+              className="w-32 h-8 text-xs pl-7"
+              autoComplete="off"
+            />
+          </div>
+          {showBuyerDropdown && buyerNameSearch.length >= 1 && buyerSuggestions.length > 0 && (
+            <div className="absolute z-50 w-64 mt-1 bg-popover border border-border rounded-md shadow-md max-h-48 overflow-y-auto right-0">
+              {buyerSuggestions.map((b) => (
+                <div
+                  key={b.id}
+                  className="px-3 py-2 text-xs hover:bg-accent cursor-pointer"
+                  data-testid={`option-txn-buyer-${b.id}`}
+                  onClick={() => { setBuyerNameSearch(b.name); setShowBuyerDropdown(false); }}
+                >
+                  <span className="font-medium">{b.name}</span>
+                  {b.phone && <span className="text-muted-foreground"> — {b.phone}</span>}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
         <Button
           variant="outline"
           size="sm"
