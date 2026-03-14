@@ -17,7 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { CROPS, SIZES } from "@shared/schema";
 import type { Lot, Farmer } from "@shared/schema";
 import BidDialog from "@/components/BidDialog";
-import { Search, Edit, Package, Wheat, X, ChevronDown, Calendar, Download, Truck, Gavel } from "lucide-react";
+import { Search, Edit, Package, Wheat, X, ChevronDown, Calendar, Download, Truck, Gavel, Pencil } from "lucide-react";
 import { format } from "date-fns";
 
 type LotWithFarmer = Lot & { farmer: Farmer };
@@ -773,17 +773,28 @@ export default function StockRegisterPage() {
                               {lot.size && <span className="text-muted-foreground">{lot.size}</span>}
                               {lot.bagMarka && <span className="text-muted-foreground">{t("stockRegister.marka")}: {lot.bagMarka}</span>}
                               {getStatusBadge(lot)}
-                              {lot.remainingBags > 0 && !lot.isReturned && (
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  className="h-5 px-1.5 text-[10px] ml-auto"
-                                  data-testid={`button-bid-lot-${lot.id}`}
-                                  onClick={() => openBidForLot(lot, group.serialNumber, group.date)}
-                                >
-                                  <Gavel className="w-3 h-3 mr-0.5" />
-                                  {t("nav.bidding")}
-                                </Button>
+                              {!lot.isReturned && (
+                                lot.remainingBags > 0 ? (
+                                  <Button
+                                    size="sm"
+                                    className="h-5 px-1.5 text-[10px] ml-auto bg-green-600 hover:bg-green-700 text-white"
+                                    data-testid={`button-bid-lot-${lot.id}`}
+                                    onClick={() => openBidForLot(lot, group.serialNumber, group.date)}
+                                  >
+                                    <Gavel className="w-3 h-3 mr-0.5" />
+                                    {t("nav.bidding")}
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-6 w-6 ml-auto text-muted-foreground hover:text-foreground"
+                                    data-testid={`button-edit-bids-lot-${lot.id}`}
+                                    onClick={() => openBidForLot(lot, group.serialNumber, group.date)}
+                                  >
+                                    <Pencil className="w-3.5 h-3.5" />
+                                  </Button>
+                                )
                               )}
                             </div>
                           );
