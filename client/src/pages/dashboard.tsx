@@ -24,7 +24,7 @@ type DashboardData = {
   lots: { id: number; lotId: string; crop: string; date: string; numberOfBags: number; remainingBags: number; farmerId: number; farmerName: string; initialTotalWeight: string | null }[];
   transactions: { id: number; transactionId: string; date: string; crop: string; lotId: string; farmerId: number; farmerName: string; buyerId: number; buyerName: string; totalPayableToFarmer: string; totalReceivableFromBuyer: string; paidAmount: string; farmerPaidAmount: string; mandiCharges: string; aadhatCharges: string; hammaliCharges: string; extraChargesFarmer: string; extraChargesBuyer: string; netWeight: string; numberOfBags: number; isReversed: boolean }[];
   farmersWithDues: { id: number; name: string; totalPayable: string; totalDue: string }[];
-  buyersWithDues: { id: number; name: string; receivableDue: string; overallDue: string }[];
+  buyersWithDues: { id: number; name: string; receivableDue: string; overallDue: string; openingBalance: string }[];
   txAggregates: { totalHammali: number; totalExtraCharges: number; totalMandiCommission: number; paidHammali: number; paidExtraCharges: number; paidMandiCommission: number };
 };
 
@@ -193,7 +193,9 @@ export default function DashboardPage() {
     const lotsCount = filteredLots.length;
     const txnCount = filteredTxns.length;
     const totalPayable = filteredTxns.reduce((s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0);
-    const totalReceivable = filteredTxns.reduce((s, t) => s + parseFloat(t.totalReceivableFromBuyer || "0"), 0);
+    const txnReceivable = filteredTxns.reduce((s, t) => s + parseFloat(t.totalReceivableFromBuyer || "0"), 0);
+    const openingBalanceTotal = filteredBuyersWithDues.reduce((s, b) => s + parseFloat(b.openingBalance || "0"), 0);
+    const totalReceivable = txnReceivable + openingBalanceTotal;
     const totalMandi = filteredTxns.reduce((s, t) => s + parseFloat(t.mandiCharges || "0"), 0);
     const totalAadhat = filteredTxns.reduce((s, t) => s + parseFloat(t.aadhatCharges || "0"), 0);
     const totalHammali = filteredTxns.reduce((s, t) => s + parseFloat(t.hammaliCharges || "0"), 0);

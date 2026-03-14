@@ -1138,7 +1138,7 @@ export async function registerRoutes(
           id: f.id, name: f.name, totalPayable: f.totalPayable, totalDue: f.totalDue,
         })),
         buyersWithDues: buyersWithDues.map(b => ({
-          id: b.id, name: b.name, receivableDue: b.receivableDue, overallDue: b.overallDue,
+          id: b.id, name: b.name, receivableDue: b.receivableDue, overallDue: b.overallDue, openingBalance: b.openingBalance,
         })),
         txAggregates,
       });
