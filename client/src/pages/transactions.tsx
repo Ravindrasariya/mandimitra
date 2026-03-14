@@ -382,28 +382,27 @@ function generateCombinedBuyerReceiptHtml(entries: BuyerLotEntry[], serialNumber
 </tr>`).join("");
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Buyer Receipt</title>
-<style>body{font-family:Arial,sans-serif;margin:12px 20px;color:#333}
-table{width:100%;border-collapse:collapse;margin:8px 0}
-h2{text-align:center;margin-bottom:3px}
-.header{text-align:center;margin-bottom:8px}
-.info-table td{padding:3px 8px}
-.summary{margin-top:10px;border-top:2px solid #333;padding-top:8px}
-.summary-row{display:flex;justify-content:space-between;padding:3px 0}
-.total{font-weight:bold;font-size:1.1em;color:#dc2626;border-top:2px solid #333;padding-top:8px;margin-top:8px}
-th{padding:8px;border:1px solid #ccc;background:#f5f5f5;text-align:right}
+<style>body{font-family:Arial,sans-serif;margin:8px 14px;color:#333}
+table{width:100%;border-collapse:collapse;margin:6px 0}
+.header{text-align:center;margin-bottom:4px}
+.info-table td{padding:2px 6px}
+.summary{margin-top:8px;border-top:2px solid #333;padding-top:6px}
+.summary-row{display:flex;justify-content:space-between;padding:2px 0}
+.total{font-weight:bold;font-size:1.1em;color:#dc2626;border-top:2px solid #333;padding-top:6px;margin-top:6px}
+th{padding:6px;border:1px solid #ccc;background:#f5f5f5;text-align:right}
 th:first-child{text-align:left}
-.totals-row td{font-weight:bold;background:#f0f0f0;padding:6px;border:1px solid #ccc}
-@media print{body{margin:8mm}.no-print{display:none!important}}
+.totals-row td{font-weight:bold;background:#f0f0f0;padding:5px;border:1px solid #ccc}
+@media print{body{margin:6mm}.no-print{display:none!important}}
 </style></head><body>
+<div style="display:flex;justify-content:flex-end;font-size:12px;margin-bottom:1px">${businessPhone ? `&#128241; ${businessPhone}` : ""}</div>
 <div class="header">
-${businessAddress ? `<p style="font-size:0.85em;color:#555;margin:1px 0">${businessAddress}</p>` : ""}
-<h3 style="margin:3px 0 4px 0;font-size:1.1em">Buyer Receipt</h3>
+${businessName ? `<div style="font-weight:bold;font-size:1.05em;margin-bottom:1px">${businessName}</div>` : ""}
+${businessAddress ? `<p style="font-size:0.82em;color:#555;margin:1px 0">${businessAddress}</p>` : ""}
+<h3 style="margin:2px 0 3px 0;font-size:1.05em">Buyer Receipt</h3>
 </div>
-<table class="info-table" style="margin-bottom:8px">
-<tr><td><strong>SR #:</strong> ${serialNumber}</td><td style="text-align:right">${businessPhone ? `<strong>Contact:</strong> ${businessPhone}` : ""}</td></tr>
-${businessName ? `<tr><td colspan="2" style="font-weight:bold;font-size:1.05em">${businessName}</td></tr>` : ""}
+<table class="info-table" style="margin-bottom:6px">
 <tr><td><strong>Buyer:</strong> ${firstTx.buyer.name}</td><td style="text-align:right"><strong>Licence No:</strong> ${firstTx.buyer.licenceNo || "-"}</td></tr>
-<tr><td><strong>Date:</strong> ${date}</td><td></td></tr>
+<tr><td><strong>Date:</strong> ${date}</td><td style="text-align:right"><strong>SR #:</strong> ${serialNumber}</td></tr>
 </table>
 <table>
 <thead>
@@ -473,28 +472,27 @@ function generateAllBuyerReceiptHtml(entries: BuyerLotEntry[], businessName?: st
 </tr>`).join("");
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Buyer Receipt</title>
-<style>body{font-family:Arial,sans-serif;margin:12px 20px;color:#333}
-table{width:100%;border-collapse:collapse;margin:8px 0}
-h2{text-align:center;margin-bottom:3px}
-.header{text-align:center;margin-bottom:8px}
-.info-table td{padding:3px 8px}
-.summary{margin-top:10px;border-top:2px solid #333;padding-top:8px}
-.summary-row{display:flex;justify-content:space-between;padding:3px 0}
-.total{font-weight:bold;font-size:1.1em;color:#dc2626;border-top:2px solid #333;padding-top:8px;margin-top:8px}
-th{padding:8px;border:1px solid #ccc;background:#f5f5f5;text-align:right}
+<style>body{font-family:Arial,sans-serif;margin:8px 14px;color:#333}
+table{width:100%;border-collapse:collapse;margin:6px 0}
+.header{text-align:center;margin-bottom:4px}
+.info-table td{padding:2px 6px}
+.summary{margin-top:8px;border-top:2px solid #333;padding-top:6px}
+.summary-row{display:flex;justify-content:space-between;padding:2px 0}
+.total{font-weight:bold;font-size:1.1em;color:#dc2626;border-top:2px solid #333;padding-top:6px;margin-top:6px}
+th{padding:6px;border:1px solid #ccc;background:#f5f5f5;text-align:right}
 th:first-child{text-align:left}
-.totals-row td{font-weight:bold;background:#f0f0f0;padding:6px;border:1px solid #ccc}
-@media print{body{margin:8mm}.no-print{display:none!important}}
+.totals-row td{font-weight:bold;background:#f0f0f0;padding:5px;border:1px solid #ccc}
+@media print{body{margin:6mm}.no-print{display:none!important}}
 </style></head><body>
+<div style="display:flex;justify-content:flex-end;font-size:12px;margin-bottom:1px">${businessPhone ? `&#128241; ${businessPhone}` : ""}</div>
 <div class="header">
-${businessAddress ? `<p style="font-size:0.85em;color:#555;margin:1px 0">${businessAddress}</p>` : ""}
-<h3 style="margin:3px 0 4px 0;font-size:1.1em">Buyer Receipt</h3>
+${businessName ? `<div style="font-weight:bold;font-size:1.05em;margin-bottom:1px">${businessName}</div>` : ""}
+${businessAddress ? `<p style="font-size:0.82em;color:#555;margin:1px 0">${businessAddress}</p>` : ""}
+<h3 style="margin:2px 0 3px 0;font-size:1.05em">Buyer Receipt</h3>
 </div>
-<table class="info-table" style="margin-bottom:8px">
-<tr><td>${receiptSerialNumber ? `<strong>Bill no.:</strong> ${receiptSerialNumber}` : ""}</td><td style="text-align:right">${businessPhone ? `<strong>Contact:</strong> ${businessPhone}` : ""}</td></tr>
-${businessName ? `<tr><td colspan="2" style="font-weight:bold;font-size:1.05em">${businessName}</td></tr>` : ""}
+<table class="info-table" style="margin-bottom:6px">
 <tr><td><strong>Buyer:</strong> ${buyer.name}</td><td style="text-align:right"><strong>Licence No:</strong> ${buyer.licenceNo || "-"}</td></tr>
-<tr><td><strong>Date:</strong> ${format(new Date(), "dd/MM/yyyy")}</td><td></td></tr>
+<tr><td><strong>Date:</strong> ${format(new Date(), "dd/MM/yyyy")}</td><td style="text-align:right">${receiptSerialNumber ? `<strong>Bill no.:</strong> ${receiptSerialNumber}` : ""}</td></tr>
 </table>
 <table>
 <thead>
