@@ -37,16 +37,21 @@ export function wrapWithDuplicate(html: string): string {
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
 <style>
-@page { size: A4; margin: 5mm; }
-body { margin: 0; padding: 4mm; font-size: 11px; }
-.copy-wrapper { padding: 4mm 2mm; page-break-inside: avoid; break-inside: avoid; }
-.cut-line { border-top: 1px dashed #999; margin: 4mm 0; text-align: center; font-size: 10px; color: #999; letter-spacing: 3px; }
+@page { size: A4 landscape; margin: 5mm; }
+body { margin: 0; padding: 0; font-size: 11px; }
+.duplex-row { display: flex; flex-direction: row; width: 100%; min-height: 100vh; box-sizing: border-box; }
+.copy-wrapper { width: 50%; box-sizing: border-box; padding: 5mm; page-break-inside: avoid; break-inside: avoid; overflow: hidden; }
+.copy-wrapper + .cut-separator + .copy-wrapper { border-left: none; }
+.cut-separator { width: 0; border-left: 1px dashed #999; margin: 5mm 0; position: relative; }
+.cut-separator::after { content: "✂"; position: absolute; top: 50%; left: -6px; font-size: 10px; color: #999; }
 </style>
 ${headContent}
 </head><body>
+<div class="duplex-row">
 <div class="copy-wrapper">${bodyContent}</div>
-<div class="cut-line">✂ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─</div>
+<div class="cut-separator"></div>
 <div class="copy-wrapper">${bodyContent}</div>
+</div>
 </body></html>`;
 }
 
