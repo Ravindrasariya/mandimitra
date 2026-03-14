@@ -223,6 +223,7 @@ export default function BuyerLedgerPage() {
       setNewPhone("");
       setNewLicenceNo("");
       setNewOpeningBalance("");
+      setNewAadhatCommission("");
       toast({ title: "Buyer Created", variant: "success" });
     },
     onError: (err: any) => {
