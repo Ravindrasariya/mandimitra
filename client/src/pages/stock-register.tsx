@@ -500,23 +500,6 @@ export default function StockRegisterPage() {
       </h1>
 
       <div className="flex items-center gap-2 flex-wrap">
-        <Select value={activeCrop} onValueChange={setActiveCrop}>
-          <SelectTrigger
-            data-testid="select-crop-filter"
-            className="w-auto font-medium border-primary/50 bg-primary/10 text-primary"
-          >
-            <Wheat className="w-3.5 h-3.5 mr-1 flex-shrink-0" />
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="All" data-testid="toggle-crop-all">{t("common.all")}</SelectItem>
-            {CROPS.map((crop) => (
-              <SelectItem key={crop} value={crop} data-testid={`toggle-crop-${crop.toLowerCase()}`}>
-                {crop}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
         <div className="flex gap-1.5 ml-auto">
           <Select value={yearFilter} onValueChange={(v) => { setYearFilter(v); setSelectedDays([]); }}>
             <SelectTrigger className="w-[75px] h-8 text-xs" data-testid="select-year-filter">
@@ -562,6 +545,39 @@ export default function StockRegisterPage() {
               </div>
             </PopoverContent>
           </Popover>
+
+          <Popover open={dayPopoverOpen} onOpenChange={setDayPopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 text-xs min-w-[65px] justify-between px-2 shrink-0" data-testid="select-day-filter">
+                <Calendar className="w-3 h-3 mr-1" />
+                {dayLabel}
+                <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-2" align="end">
+              <button
+                className="flex items-center gap-2 px-2 py-1.5 rounded text-sm w-full text-left border-b mb-1"
+                data-testid="day-select-all"
+                onClick={selectAllDays}
+              >
+                <Checkbox checked={selectedDays.length === 0} />
+                <span>{t("stockRegister.allDays")}</span>
+              </button>
+              <div className="grid grid-cols-7 gap-0.5">
+                {Array.from({ length: daysInMonths }, (_, i) => String(i + 1)).map(d => (
+                  <button
+                    key={d}
+                    className={`flex items-center justify-center rounded text-xs p-1.5 ${selectedDays.includes(d) ? "bg-primary text-primary-foreground" : ""}`}
+                    data-testid={`day-option-${d}`}
+                    onClick={() => toggleDay(d)}
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+
           <Button
             variant="outline"
             size="sm"
@@ -627,6 +643,19 @@ export default function StockRegisterPage() {
           )}
         </div>
 
+        <Select value={activeCrop} onValueChange={setActiveCrop}>
+          <SelectTrigger className="h-8 text-xs w-auto shrink-0" data-testid="select-crop-filter-row2">
+            <Wheat className="w-3 h-3 mr-1 flex-shrink-0" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="All">{t("common.all")}</SelectItem>
+            {CROPS.map((crop) => (
+              <SelectItem key={crop} value={crop}>{crop}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
         <Popover open={statusPopoverOpen} onOpenChange={setStatusPopoverOpen}>
           <PopoverTrigger asChild>
             <Button variant="outline" size="sm" className="h-8 text-xs min-w-[75px] justify-between px-2 shrink-0" data-testid="select-sale-filter">
@@ -654,38 +683,6 @@ export default function StockRegisterPage() {
                 {opt.label}
               </button>
             ))}
-          </PopoverContent>
-        </Popover>
-
-        <Popover open={dayPopoverOpen} onOpenChange={setDayPopoverOpen}>
-          <PopoverTrigger asChild>
-            <Button variant="outline" size="sm" className="h-8 text-xs min-w-[65px] justify-between px-2 shrink-0" data-testid="select-day-filter">
-              <Calendar className="w-3 h-3 mr-1" />
-              {dayLabel}
-              <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-56 p-2" align="end">
-            <button
-              className="flex items-center gap-2 px-2 py-1.5 rounded text-sm w-full text-left border-b mb-1"
-              data-testid="day-select-all"
-              onClick={selectAllDays}
-            >
-              <Checkbox checked={selectedDays.length === 0} />
-              <span>{t("stockRegister.allDays")}</span>
-            </button>
-            <div className="grid grid-cols-7 gap-0.5">
-              {Array.from({ length: daysInMonths }, (_, i) => String(i + 1)).map(d => (
-                <button
-                  key={d}
-                  className={`flex items-center justify-center rounded text-xs p-1.5 ${selectedDays.includes(d) ? "bg-primary text-primary-foreground" : ""}`}
-                  data-testid={`day-option-${d}`}
-                  onClick={() => toggleDay(d)}
-                >
-                  {d}
-                </button>
-              ))}
-            </div>
           </PopoverContent>
         </Popover>
 
