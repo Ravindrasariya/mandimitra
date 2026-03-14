@@ -71,7 +71,6 @@ function generateBuyerPaanaHtml(
     tableRows += `<tr>
       <td style="padding:6px 8px;border:1px solid #ddd;text-align:center">${dateStr}</td>
       <td style="padding:6px 8px;border:1px solid #ddd;text-align:center">${cropLabel[tx.crop] || tx.crop}</td>
-      <td style="padding:6px 8px;border:1px solid #ddd;text-align:center">${tx.lotId}</td>
       <td style="padding:6px 8px;border:1px solid #ddd;text-align:right">${tx.numberOfBags}</td>
       <td style="padding:6px 8px;border:1px solid #ddd;text-align:right">${diffDays}</td>
       <td style="padding:6px 8px;border:1px solid #ddd;text-align:right;font-weight:600">${dueAmt.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</td>
@@ -79,18 +78,18 @@ function generateBuyerPaanaHtml(
   }
 
   let totalSection = `<tr style="background:#f5f5f5;font-weight:bold">
-    <td colspan="5" style="padding:8px;border:1px solid #ddd;text-align:right">Total Receivable Due</td>
+    <td colspan="4" style="padding:8px;border:1px solid #ddd;text-align:right">Total Receivable Due</td>
     <td style="padding:8px;border:1px solid #ddd;text-align:right">\u20B9${totalDue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</td>
   </tr>`;
 
   if (openingBal > 0) {
     const grandTotal = totalDue + openingBal;
     totalSection += `<tr style="font-weight:bold">
-      <td colspan="5" style="padding:8px;border:1px solid #ddd;text-align:right">PY Receivable (Opening Balance)</td>
+      <td colspan="4" style="padding:8px;border:1px solid #ddd;text-align:right">PY Receivable (Opening Balance)</td>
       <td style="padding:8px;border:1px solid #ddd;text-align:right">\u20B9${openingBal.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</td>
     </tr>
     <tr style="background:#e8f5e9;font-weight:bold;font-size:1.1em">
-      <td colspan="5" style="padding:8px;border:1px solid #ddd;text-align:right">Grand Total Due</td>
+      <td colspan="4" style="padding:8px;border:1px solid #ddd;text-align:right">Grand Total Due</td>
       <td style="padding:8px;border:1px solid #ddd;text-align:right">\u20B9${grandTotal.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</td>
     </tr>`;
   }
@@ -116,13 +115,12 @@ function generateBuyerPaanaHtml(
     <thead><tr>
       <th>Bidding Date</th>
       <th>Crop</th>
-      <th>Lot ID</th>
       <th># Bags</th>
       <th># Days</th>
       <th>Due Amount (\u20B9)</th>
     </tr></thead>
     <tbody>
-      ${tableRows || `<tr><td colspan="6" style="padding:12px;text-align:center;color:#999;border:1px solid #ddd">No outstanding dues</td></tr>`}
+      ${tableRows || `<tr><td colspan="5" style="padding:12px;text-align:center;color:#999;border:1px solid #ddd">No outstanding dues</td></tr>`}
       ${totalSection}
     </tbody>
   </table>
