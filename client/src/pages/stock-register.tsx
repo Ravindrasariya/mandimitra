@@ -717,6 +717,12 @@ export default function StockRegisterPage() {
             const allReturned = group.lots.every(l => l.isReturned);
             const hasVehicleInfo = first.vehicleNumber || first.driverName || first.vehicleBhadaRate || first.freightType || first.driverContact;
 
+            const srBags = group.lots.reduce((sum, l) => sum + (l.actualNumberOfBags ?? l.numberOfBags), 0);
+            const totalVehicleBags = first.totalBagsInVehicle;
+            const proportionalBhada = first.vehicleBhadaRate && totalVehicleBags
+              ? ((parseFloat(first.vehicleBhadaRate) * srBags) / totalVehicleBags).toFixed(2)
+              : first.vehicleBhadaRate || null;
+
             return (
               <Card key={group.key} className={allReturned ? "opacity-50" : ""} data-testid={`card-group-${group.serialNumber}`}>
                 <CardContent className="pt-4">
@@ -733,9 +739,9 @@ export default function StockRegisterPage() {
                           {farmer.name} - {farmer.phone}
                           {farmer.village && <span className="text-muted-foreground text-xs ml-1">({farmer.village})</span>}
                         </p>
-                        {first.totalBagsInVehicle != null && (
+                        {srBags > 0 && (
                           <span className="text-xs text-muted-foreground">
-                            Total: <strong>{first.totalBagsInVehicle}</strong> {t("common.bags")}
+                            Total: <strong>{srBags}</strong> {t("common.bags")}
                           </span>
                         )}
                       </div>
@@ -768,7 +774,7 @@ export default function StockRegisterPage() {
                             </span>
                           )}
                           {first.driverName && <span>Driver: {first.driverName}</span>}
-                          {first.vehicleBhadaRate && <span>{t("stockRegister.bhada")}: Rs.{first.vehicleBhadaRate}</span>}
+                          {proportionalBhada && <span>{t("stockRegister.bhada")}: Rs.{proportionalBhada}</span>}
                           {first.freightType && <span>{first.freightType}</span>}
                           {first.driverContact && <span>{first.driverContact}</span>}
                         </div>
