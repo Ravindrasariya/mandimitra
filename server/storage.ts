@@ -1707,9 +1707,6 @@ export class DatabaseStorage implements IStorage {
     const txnRows = await db.select({
       aadhat: sql<string>`coalesce(sum(cast(${transactions.aadhatCharges} as numeric)), 0)`,
       mandi: sql<string>`coalesce(sum(cast(${transactions.mandiCharges} as numeric)), 0)`,
-      hammali: sql<string>`coalesce(sum(cast(${transactions.hammaliCharges} as numeric)), 0)`,
-      extraFarmer: sql<string>`coalesce(sum(cast(${transactions.extraChargesFarmer} as numeric)), 0)`,
-      extraBuyer: sql<string>`coalesce(sum(cast(${transactions.extraChargesBuyer} as numeric)), 0)`,
     }).from(transactions).where(and(
       eq(transactions.businessId, businessId),
       eq(transactions.isReversed, false),
@@ -1719,9 +1716,7 @@ export class DatabaseStorage implements IStorage {
 
     const aadhatIncome = parseFloat(txnRows[0]?.aadhat || "0");
     const mandiIncome = parseFloat(txnRows[0]?.mandi || "0");
-    const hammaliIncome = parseFloat(txnRows[0]?.hammali || "0");
-    const extraCharges = parseFloat(txnRows[0]?.extraFarmer || "0") + parseFloat(txnRows[0]?.extraBuyer || "0");
-    const totalIncome = aadhatIncome + mandiIncome + hammaliIncome + extraCharges;
+    const totalIncome = aadhatIncome + mandiIncome;
 
     const depLogs = await db.select({
       total: sql<string>`coalesce(sum(cast(${assetDepreciationLog.depreciationAmount} as numeric)), 0)`
@@ -1738,7 +1733,31 @@ export class DatabaseStorage implements IStorage {
     ));
     const interestOnLiabilities = parseFloat(interestResult[0]?.total || "0");
 
-    const totalExpenses = depreciation + interestOnLiabilities;
+    const salaryRows = await db.select({
+      total: sql<string>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`
+    }).from(cashEntries).where(and(
+      eq(cashEntries.businessId, businessId),
+      eq(cashEntries.category, "outward"),
+      eq(cashEntries.outflowType, "Salary"),
+      eq(cashEntries.isReversed, false),
+      gte(sql`cast(${cashEntries.createdAt} as date)`, fyStartDate),
+      lte(sql`cast(${cashEntries.createdAt} as date)`, fyEndDate),
+    ));
+    const salaryExpense = parseFloat(salaryRows[0]?.total || "0");
+
+    const generalRows = await db.select({
+      total: sql<string>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`
+    }).from(cashEntries).where(and(
+      eq(cashEntries.businessId, businessId),
+      eq(cashEntries.category, "outward"),
+      eq(cashEntries.outflowType, "General Expenses"),
+      eq(cashEntries.isReversed, false),
+      gte(sql`cast(${cashEntries.createdAt} as date)`, fyStartDate),
+      lte(sql`cast(${cashEntries.createdAt} as date)`, fyEndDate),
+    ));
+    const generalExpense = parseFloat(generalRows[0]?.total || "0");
+
+    const totalExpenses = depreciation + interestOnLiabilities + salaryExpense + generalExpense;
     const netProfitLoss = totalIncome - totalExpenses;
 
     return {
@@ -1746,13 +1765,13 @@ export class DatabaseStorage implements IStorage {
       income: {
         aadhatCommission: aadhatIncome,
         mandiCommission: mandiIncome,
-        hammaliIncome,
-        extraCharges,
         total: totalIncome,
       },
       expenses: {
         depreciation,
         interestOnLiabilities,
+        salaryExpense,
+        generalExpense,
         total: totalExpenses,
       },
       netProfitLoss,

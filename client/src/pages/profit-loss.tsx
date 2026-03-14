@@ -34,11 +34,11 @@ export default function ProfitLossPage() {
     const rows: string[][] = [["Section", "Item", "Amount"]];
     rows.push(["Income", "Aadhat Commission", String(data.income.aadhatCommission)]);
     rows.push(["Income", "Mandi Commission", String(data.income.mandiCommission)]);
-    rows.push(["Income", "Hammali Income", String(data.income.hammaliIncome)]);
-    rows.push(["Income", "Extra Charges", String(data.income.extraCharges)]);
     rows.push(["Income", "Total", String(data.income.total)]);
     rows.push(["Expenses", "Depreciation", String(data.expenses.depreciation)]);
     rows.push(["Expenses", "Interest on Liabilities", String(data.expenses.interestOnLiabilities)]);
+    rows.push(["Expenses", "Salary", String(data.expenses.salaryExpense)]);
+    rows.push(["Expenses", "General Expenses", String(data.expenses.generalExpense)]);
     rows.push(["Expenses", "Total", String(data.expenses.total)]);
     rows.push(["Net Profit/Loss", "", String(data.netProfitLoss)]);
 
@@ -85,8 +85,6 @@ export default function ProfitLossPage() {
             <CardContent className="pt-0 px-4 pb-3 space-y-1">
               <IncomeRow label={t("pnl.aadhatCommission")} value={data.income.aadhatCommission} testId="text-inc-aadhat" />
               <IncomeRow label={t("pnl.mandiCommission")} value={data.income.mandiCommission} testId="text-inc-mandi" />
-              <IncomeRow label={t("pnl.hammaliIncome")} value={data.income.hammaliIncome} testId="text-inc-hammali" />
-              <IncomeRow label={t("pnl.extraCharges")} value={data.income.extraCharges} testId="text-inc-extra" />
               <div className="flex justify-between text-sm font-semibold border-t pt-1">
                 <span>{t("pnl.totalIncome")}</span>
                 <span data-testid="text-inc-total" className="text-green-700">{fmt(data.income.total)}</span>
@@ -101,6 +99,8 @@ export default function ProfitLossPage() {
             <CardContent className="pt-0 px-4 pb-3 space-y-1">
               <IncomeRow label={t("pnl.depreciation")} value={data.expenses.depreciation} testId="text-exp-dep" />
               <IncomeRow label={t("pnl.interestOnLiabilities")} value={data.expenses.interestOnLiabilities} testId="text-exp-interest" />
+              <IncomeRow label="Salary" value={data.expenses.salaryExpense} testId="text-exp-salary" />
+              <IncomeRow label="General Expenses" value={data.expenses.generalExpense} testId="text-exp-general" />
               <div className="flex justify-between text-sm font-semibold border-t pt-1">
                 <span>{t("pnl.totalExpenses")}</span>
                 <span data-testid="text-exp-total" className="text-red-600">{fmt(data.expenses.total)}</span>

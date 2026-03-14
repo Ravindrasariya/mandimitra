@@ -400,6 +400,18 @@ function ConfirmMerchantAction({ action, onClose }: { action: { type: "toggle" |
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/admin/businesses"] });
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === "string" && key.startsWith("/api/books/");
+      }});
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === "string" && key.startsWith("/api/cash-entries");
+      }});
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"] });
       toast({ title: "Business Data Reset", variant: "success" });
       onClose();
     },
