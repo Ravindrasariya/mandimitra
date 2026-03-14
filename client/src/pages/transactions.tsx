@@ -525,6 +525,9 @@ ${!hideAadhat && totalAadhat > 0 ? `<div class="summary-row"><span>Aadhat (${aad
 ${!hideAadhat && totalMandi > 0 ? `<div class="summary-row"><span>Mandi (${mandiPct}%):</span><span>Rs.${totalMandi.toFixed(2)}</span></div>` : ""}
 ${!hideAadhat ? `<div class="summary-row total"><span>Total Receivable from Buyer:</span><span>Rs.${grandTotal.toFixed(2)}</span></div>` : ""}
 </div>
+<div style="text-align:right;margin-top:32px;font-size:13px;color:#333">
+  <div style="display:inline-block;border-top:1px solid #555;padding-top:4px;min-width:150px;text-align:center">Signature</div>
+</div>
 </body></html>`;
 }
 
