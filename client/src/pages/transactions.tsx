@@ -673,7 +673,7 @@ export default function TransactionsPage() {
   const [selectedDays, setSelectedDays] = useState<string[]>([currentDay]);
   const [cropFilter, setCropFilter] = usePersistedState("txn-cropFilter", "all");
   const [billingFilter, setBillingFilter] = usePersistedState("txn-billingFilter", "all");
-  const [printBillMode, setPrintBillMode] = usePersistedState<"show-all" | "hide-aadhat">("txn-printBillMode", "show-all");
+  const [printBillMode] = usePersistedState<"show-all" | "hide-aadhat">("txn-printBillMode", "show-all");
   const [monthPopoverOpen, setMonthPopoverOpen] = useState(false);
   const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
   const [farmerNameSearch, setFarmerNameSearch] = useState("");
@@ -1530,24 +1530,6 @@ export default function TransactionsPage() {
 
         {canPrintOverallBill && (
           <div className="flex items-center gap-1 shrink-0">
-            <div className="flex h-8 rounded-md border text-xs overflow-hidden">
-              <button
-                data-testid="button-print-mode-show-all"
-                className={`px-2 transition-colors ${printBillMode === "show-all" ? "bg-primary text-primary-foreground" : "bg-background text-foreground hover:bg-muted"}`}
-                onClick={() => setPrintBillMode("show-all")}
-                title="Both copies show full details"
-              >
-                Full
-              </button>
-              <button
-                data-testid="button-print-mode-hide-aadhat"
-                className={`px-2 border-l transition-colors ${printBillMode === "hide-aadhat" ? "bg-primary text-primary-foreground" : "bg-background text-foreground hover:bg-muted"}`}
-                onClick={() => setPrintBillMode("hide-aadhat")}
-                title="One copy hides aadhat & total"
-              >
-                Hide aadhat
-              </button>
-            </div>
             <Button
               variant="outline"
               size="sm"

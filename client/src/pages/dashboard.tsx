@@ -55,6 +55,7 @@ export default function DashboardPage() {
   const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
   const [yearPopoverOpen, setYearPopoverOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [printBillMode, setPrintBillMode] = usePersistedState<"show-all" | "hide-aadhat">("txn-printBillMode", "show-all");
   const [chargeForm, setChargeForm] = useState<ChargeSettingsData>({
     mandiCommissionFarmerPercent: "0",
     mandiCommissionBuyerPercent: "1",
@@ -760,6 +761,27 @@ export default function DashboardPage() {
                   />
                 </div>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold">Overall Buyer Bill Mode</Label>
+              <div className="flex h-9 rounded-md border text-sm overflow-hidden w-full">
+                <button
+                  data-testid="button-bill-mode-show-all"
+                  className={`flex-1 transition-colors ${printBillMode === "show-all" ? "bg-primary text-primary-foreground" : "bg-background text-foreground hover:bg-muted"}`}
+                  onClick={() => setPrintBillMode("show-all")}
+                >
+                  Full (show aadhat)
+                </button>
+                <button
+                  data-testid="button-bill-mode-hide-aadhat"
+                  className={`flex-1 border-l transition-colors ${printBillMode === "hide-aadhat" ? "bg-primary text-primary-foreground" : "bg-background text-foreground hover:bg-muted"}`}
+                  onClick={() => setPrintBillMode("hide-aadhat")}
+                >
+                  Hide aadhat copy
+                </button>
+              </div>
+              <p className="text-xs text-muted-foreground">Controls whether the buyer's copy of the overall receipt shows or hides aadhat &amp; total.</p>
             </div>
 
             <Button
