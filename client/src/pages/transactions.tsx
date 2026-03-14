@@ -700,6 +700,12 @@ export default function TransactionsPage() {
   const [extraChargesBuyer, setExtraChargesBuyer] = useState("0");
   const [extraPerKgFarmer, setExtraPerKgFarmer] = useState("0");
   const [extraPerKgBuyer, setExtraPerKgBuyer] = useState("0");
+  const [showExtraBreakdown, setShowExtraBreakdown] = useState(false);
+  const [extraTulai, setExtraTulai] = useState("0");
+  const [extraBharai, setExtraBharai] = useState("0");
+  const [extraKhadiKarai, setExtraKhadiKarai] = useState("0");
+  const [extraThelaBhada, setExtraThelaBhada] = useState("0");
+  const [extraOthers, setExtraOthers] = useState("0");
 
   type ChargeSettingsData = {
     mandiCommissionFarmerPercent: string;
@@ -1032,6 +1038,11 @@ export default function TransactionsPage() {
     setExtraChargesBuyer(tx.extraChargesBuyer || "0");
     setExtraPerKgFarmer((tx as any).extraPerKgFarmer || "0");
     setExtraPerKgBuyer((tx as any).extraPerKgBuyer || "0");
+    setExtraTulai((tx as any).extraTulaiFarmer || "0");
+    setExtraBharai((tx as any).extraBharaiFarmer || "0");
+    setExtraKhadiKarai((tx as any).extraKhadiKaraiFarmer || "0");
+    setExtraThelaBhada((tx as any).extraThelaBhadaFarmer || "0");
+    setExtraOthers((tx as any).extraOthersFarmer || "0");
   };
 
   const calcProportionateNetWeight = (bid: BidWithDetails): string => {
@@ -1048,6 +1059,12 @@ export default function TransactionsPage() {
     setExtraChargesBuyer("0");
     setExtraPerKgFarmer("0");
     setExtraPerKgBuyer("0");
+    setShowExtraBreakdown(false);
+    setExtraTulai("0");
+    setExtraBharai("0");
+    setExtraKhadiKarai("0");
+    setExtraThelaBhada("0");
+    setExtraOthers("0");
   };
 
   const handleBuyerChange = (val: string) => {
@@ -1137,6 +1154,11 @@ export default function TransactionsPage() {
       hammaliFarmerPerBag: hammaliFarmerRate.toString(),
       hammaliBuyerPerBag: hammaliBuyerRate.toString(),
       extraChargesFarmer: extraFarmer.toFixed(2),
+      extraTulaiFarmer: parseFloat(extraTulai || "0").toFixed(2),
+      extraBharaiFarmer: parseFloat(extraBharai || "0").toFixed(2),
+      extraKhadiKaraiFarmer: parseFloat(extraKhadiKarai || "0").toFixed(2),
+      extraThelaBhadaFarmer: parseFloat(extraThelaBhada || "0").toFixed(2),
+      extraOthersFarmer: parseFloat(extraOthers || "0").toFixed(2),
       extraChargesBuyer: extraBuyer.toFixed(2),
       extraPerKgFarmer: extraPerKgFarmerVal.toFixed(2),
       extraPerKgBuyer: extraPerKgBuyerVal.toFixed(2),
@@ -1933,7 +1955,15 @@ export default function TransactionsPage() {
                   <div className="flex justify-between"><span>Mandi:</span><span>{mandiFarmerPct}%</span></div>
                   <div className="flex justify-between"><span>Hammali:</span><span>₹{hammaliFarmerRate}/bag</span></div>
                   <div className="flex items-center justify-between">
-                    <span>Extra:</span>
+                    <button
+                      type="button"
+                      className="flex items-center gap-0.5 text-xs hover:text-foreground text-muted-foreground"
+                      onClick={() => setShowExtraBreakdown(v => !v)}
+                      data-testid="toggle-extra-breakdown"
+                    >
+                      {showExtraBreakdown ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                      Extra:
+                    </button>
                     <Input
                       data-testid="input-extra-charges-farmer"
                       type="text"
@@ -1944,6 +1974,41 @@ export default function TransactionsPage() {
                       className="w-20 h-6 text-xs text-right p-1"
                     />
                   </div>
+                  {showExtraBreakdown && (
+                    <div className="ml-2 border-l-2 border-muted pl-2 space-y-1">
+                      {([
+                        ["Tulai", extraTulai, setExtraTulai, "input-extra-tulai"],
+                        ["Bharai", extraBharai, setExtraBharai, "input-extra-bharai"],
+                        ["Khadi Karai", extraKhadiKarai, setExtraKhadiKarai, "input-extra-khadi-karai"],
+                        ["Thela Bhada", extraThelaBhada, setExtraThelaBhada, "input-extra-thela-bhada"],
+                        ["Others", extraOthers, setExtraOthers, "input-extra-others"],
+                      ] as [string, string, (v: string) => void, string][]).map(([label, val, setter, testId]) => (
+                        <div key={label} className="flex items-center justify-between">
+                          <span className="text-muted-foreground">{label}:</span>
+                          <Input
+                            data-testid={testId}
+                            type="text"
+                            inputMode="decimal"
+                            value={val}
+                            onChange={(e) => {
+                              setter(e.target.value);
+                              const vals = [
+                                label === "Tulai" ? e.target.value : extraTulai,
+                                label === "Bharai" ? e.target.value : extraBharai,
+                                label === "Khadi Karai" ? e.target.value : extraKhadiKarai,
+                                label === "Thela Bhada" ? e.target.value : extraThelaBhada,
+                                label === "Others" ? e.target.value : extraOthers,
+                              ];
+                              const sum = vals.reduce((acc, v) => acc + (parseFloat(v) || 0), 0);
+                              setExtraChargesFarmer(sum.toFixed(2));
+                            }}
+                            onFocus={(e) => e.target.select()}
+                            className="w-20 h-6 text-xs text-right p-1"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {srBhada > 0 && (
                     <div className="flex justify-between"><span>Freight/Bhada (Total):</span><span>₹{srBhada.toFixed(2)}</span></div>
                   )}
