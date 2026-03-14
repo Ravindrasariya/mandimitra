@@ -436,7 +436,7 @@ ${totalMandi > 0 ? `<div class="summary-row"><span>Mandi (${mandiPct}%):</span><
 </body></html>`;
 }
 
-function generateAllBuyerReceiptHtml(entries: BuyerLotEntry[], businessName?: string, businessAddress?: string): string {
+function generateAllBuyerReceiptHtml(entries: BuyerLotEntry[], businessName?: string, businessAddress?: string, receiptSerialNumber?: number): string {
   if (entries.length === 0) return "";
   const firstTx = entries[0].tx;
   const buyer = firstTx.buyer;
@@ -493,7 +493,7 @@ ${businessAddress ? `<p style="font-size:0.85em;color:#555;margin:2px 0">${busin
 </div>
 <table class="info-table" style="margin-bottom:12px">
 <tr><td><strong>Buyer:</strong> ${buyer.name}</td><td><strong>Licence No:</strong> ${buyer.licenceNo || "-"}</td></tr>
-<tr><td><strong>Date:</strong> ${format(new Date(), "dd/MM/yyyy")}</td><td></td></tr>
+<tr><td><strong>Date:</strong> ${format(new Date(), "dd/MM/yyyy")}</td><td style="text-align:right">${receiptSerialNumber ? `<strong>Receipt #:</strong> ${receiptSerialNumber}` : ""}</td></tr>
 </table>
 <table>
 <thead>
@@ -581,7 +581,7 @@ function applyBuyerTemplate(tmpl: string, lot: Lot, farmer: Farmer, tx: Transact
   return Object.entries(replacements).reduce((html, [token, val]) => html.split(token).join(val), tmpl);
 }
 
-function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[], serialNumber: number, date: string, businessName?: string, businessAddress?: string, businessInitials?: string, businessPhone?: string, businessLicenceNo?: string, businessShopNo?: string): string {
+function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[], serialNumber: number, date: string, businessName?: string, businessAddress?: string, businessInitials?: string, businessPhone?: string, businessLicenceNo?: string, businessShopNo?: string, receiptSerialNumber?: number): string {
   const firstTx = entries[0].tx;
   const firstLot = entries[0].lot;
   const aadhatPct = parseFloat(firstTx.aadhatBuyerPercent || "0");
@@ -622,6 +622,7 @@ function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[], seri
     "{{BUSINESS_LICENCE}}": businessLicenceNo || "",
     "{{BUSINESS_SHOP_NO}}": businessShopNo || "",
     "{{SERIAL_NUMBER}}": String(serialNumber),
+    "{{RECEIPT_SERIAL}}": receiptSerialNumber ? String(receiptSerialNumber) : "",
     "{{DATE}}": date,
     "{{BUYER_NAME}}": firstTx.buyer.name,
     "{{BUYER_CODE}}": firstTx.buyer.licenceNo || "",
@@ -1254,7 +1255,7 @@ export default function TransactionsPage() {
 
   const isSingleDateFilter = selectedMonths.length === 1 && selectedDays.length === 1;
 
-  const handlePrintAllBuyerReceipt = () => {
+  const handlePrintAllBuyerReceipt = async () => {
     if (!isSingleDateFilter) {
       toast({ title: "Select a single date to print overall buyer receipt", variant: "destructive" });
       return;
@@ -1271,11 +1272,27 @@ export default function TransactionsPage() {
       });
     });
     if (entries.length === 0) return;
+
+    const buyerId = entries[0].tx.buyerId;
+    const mm = String(selectedMonths[0]).padStart(2, "0");
+    const dd = String(selectedDays[0]).padStart(2, "0");
+    const receiptDate = `${yearFilter}-${mm}-${dd}`;
+    let receiptSerialNumber: number;
+    try {
+      const res = await apiRequest("POST", "/api/buyer-receipt-serial", { buyerId, date: receiptDate });
+      if (!res.ok) throw new Error("Failed to assign receipt serial");
+      const data = await res.json();
+      receiptSerialNumber = data.serialNumber;
+    } catch {
+      toast({ title: "Could not assign receipt serial number. Please try again.", variant: "destructive" });
+      return;
+    }
+
     const overallTmpl = receiptTemplates.find(t => t.templateType === "buyer-overall");
     if (overallTmpl) {
-      printReceipt(applyCombinedBuyerTemplate(overallTmpl.templateHtml, entries, 0, "", user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo));
+      printReceipt(applyCombinedBuyerTemplate(overallTmpl.templateHtml, entries, 0, receiptDate, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo, receiptSerialNumber));
     } else {
-      printReceipt(generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress));
+      printReceipt(generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress, receiptSerialNumber));
     }
   };
 

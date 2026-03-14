@@ -548,6 +548,7 @@ const BUYER_PLACEHOLDERS = [
   { token: "{{MANDI_CHARGES}}", desc: "Mandi charges" },
   { token: "{{MANDI_PCT}}", desc: "Mandi percentage" },
   { token: "{{TOTAL_RECEIVABLE}}", desc: "Total amount receivable from buyer" },
+  { token: "{{RECEIPT_SERIAL}}", desc: "Overall buyer receipt serial # (auto-assigned per buyer/date/FY)" },
 ];
 
 function ReceiptTemplatesDialog({ biz, onClose }: { biz: Business; onClose: () => void }) {

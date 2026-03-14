@@ -1430,6 +1430,16 @@ export async function registerRoutes(
     } catch (e: any) { res.status(400).json({ message: e.message }); }
   });
 
+  app.post("/api/buyer-receipt-serial", requireAuth, async (req, res) => {
+    try {
+      const { buyerId, date } = z.object({ buyerId: z.number(), date: z.string() }).parse(req.body);
+      const buyer = await storage.getBuyer(buyerId, req.user!.businessId);
+      if (!buyer) return res.status(403).json({ message: "Buyer not found" });
+      const serialNumber = await storage.getOrCreateBuyerReceiptSerial(req.user!.businessId, buyerId, date);
+      res.json({ serialNumber });
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
   app.get("/api/books/profit-and-loss", requireAuth, async (req, res) => {
     try {
       const fy = (req.query.fy as string) || getCurrentFY();

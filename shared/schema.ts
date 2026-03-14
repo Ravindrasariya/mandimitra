@@ -429,3 +429,16 @@ export const receiptTemplates = pgTable("receipt_templates", {
 export const insertReceiptTemplateSchema = createInsertSchema(receiptTemplates).omit({ id: true, createdAt: true, updatedAt: true });
 export type ReceiptTemplate = typeof receiptTemplates.$inferSelect;
 export type InsertReceiptTemplate = z.infer<typeof insertReceiptTemplateSchema>;
+
+export const buyerReceiptSerials = pgTable("buyer_receipt_serials", {
+  id: serial("id").primaryKey(),
+  businessId: integer("business_id").notNull().references(() => businesses.id),
+  buyerId: integer("buyer_id").notNull().references(() => buyers.id),
+  date: date("date").notNull(),
+  serialNumber: integer("serial_number").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  uniqueBuyerReceiptSerial: uniqueIndex("buyer_receipt_serials_business_buyer_date_unique").on(table.businessId, table.buyerId, table.date),
+}));
+
+export type BuyerReceiptSerial = typeof buyerReceiptSerials.$inferSelect;
