@@ -1252,7 +1252,13 @@ export default function TransactionsPage() {
     shareReceiptAsPdf(getCombinedBuyerReceiptHtml(entries, sg), fileName);
   };
 
+  const isSingleDateFilter = selectedMonths.length === 1 && selectedDays.length === 1;
+
   const handlePrintAllBuyerReceipt = () => {
+    if (!isSingleDateFilter) {
+      toast({ title: "Select a single date to print overall buyer receipt", variant: "destructive" });
+      return;
+    }
     const s = buyerNameSearch.trim().toLowerCase();
     if (!s) return;
     const entries: BuyerLotEntry[] = [];
@@ -1503,8 +1509,9 @@ export default function TransactionsPage() {
             size="sm"
             className="h-8 w-8 p-0 shrink-0"
             data-testid="button-print-all-buyer-receipt"
-            title={`Print receipt for ${buyerNameSearch}${cropFilter !== "all" ? ` (${cropFilter})` : ""}`}
+            title={isSingleDateFilter ? `Print receipt for ${buyerNameSearch}${cropFilter !== "all" ? ` (${cropFilter})` : ""}` : "Select a single date to print"}
             onClick={handlePrintAllBuyerReceipt}
+            disabled={!isSingleDateFilter}
           >
             <Printer className="w-4 h-4" />
           </Button>
