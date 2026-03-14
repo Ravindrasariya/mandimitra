@@ -140,24 +140,23 @@ table.summary th { background: #f0f0f0; }
 
   <table class="slip-table">
     <tr>
-      <td style="width:33%"><span class="bold">बिल दिनांक</span> : {{DATE}}</td>
-      <td style="width:33%;text-align:center"><span class="bold">बिल नंबर</span> :</td>
-      <td style="width:33%;text-align:right"><span class="bold">दिनांक</span> : {{DATE}}</td>
+      <td style="width:50%"><span class="bold">बिल दिनांक</span> : {{DATE}}</td>
+      <td style="width:25%;text-align:center"><span class="bold">बिल नंबर</span> :</td>
+      <td style="width:25%;text-align:right"><span class="bold">दिनांक</span> : {{DATE}}</td>
     </tr>
     <tr>
       <td colspan="2"><span class="bold">{{FARMER_NAME}}</span></td>
       <td style="text-align:right"><span class="bold">कुल योग :</span> {{GROSS_AMOUNT}}</td>
     </tr>
     <tr>
-      <td colspan="3" style="padding-top:3px">
+      <td colspan="2" style="padding-top:3px">
         <span class="bold">प्रवेश क्रमांक :</span> &nbsp;&nbsp;
         हमाली <span class="bold">{{HAMMALI}}</span> &nbsp;
         तुलाई <span class="bold">{{TULAI}}</span> &nbsp;
         भराई <span class="bold">{{BHARAI}}</span> &nbsp;
         खड़ी कराई <span class="bold">{{KHADI_KARAI}}</span>
-        &nbsp;&nbsp;&nbsp;&nbsp;
-        <span class="bold">कुल खर्च :</span> {{TOTAL_DEDUCTION}}
       </td>
+      <td style="text-align:right; vertical-align:middle"><span class="bold">कुल खर्च :</span> {{TOTAL_DEDUCTION}}</td>
     </tr>
     <tr>
       <td colspan="2">
