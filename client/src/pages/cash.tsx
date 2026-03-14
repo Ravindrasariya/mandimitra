@@ -1367,12 +1367,16 @@ export default function CashPage() {
                                       }).slice(0, 20)
                                     : farmerList.slice(0, 20);
                                   return list.length > 0 ? list.map(f => (
-                                    <button key={f.id} className="flex items-center gap-1.5 px-3 py-2 text-sm w-full text-left hover:bg-accent" data-testid={`outward-farmer-opt-${f.id}`}
+                                    <button key={f.id} className="flex flex-col px-3 py-2 text-sm w-full text-left hover:bg-accent" data-testid={`outward-farmer-opt-${f.id}`}
                                       onMouseDown={(e) => { e.preventDefault(); setOutwardFarmerId(f.id.toString()); setOutwardFarmerSearch(""); setOutwardFarmerOpen(false); setFarmerAllocations([]); setFarmerAllocationSearch(""); setOutwardAmount(""); }}>
-                                      <span className="font-medium">{f.name}</span>
-                                      <span className="text-muted-foreground text-xs">{f.phone}</span>
-                                      {f.village && <span className="text-muted-foreground text-xs">({f.village})</span>}
-                                      {parseFloat(f.totalDue) > 0 && <span className="ml-auto text-xs text-orange-600">Due: ₹{parseFloat(f.totalDue).toLocaleString("en-IN")}</span>}
+                                      <div className="flex items-center justify-between w-full gap-2">
+                                        <span className="font-medium">{f.name}</span>
+                                        {parseFloat(f.totalDue) > 0 && <span className="text-xs text-orange-600 shrink-0">Due: ₹{parseFloat(f.totalDue).toLocaleString("en-IN")}</span>}
+                                      </div>
+                                      <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
+                                        {f.phone && <span>{f.phone}</span>}
+                                        {f.village && <span>({f.village})</span>}
+                                      </div>
                                     </button>
                                   )) : (
                                     <div className="px-3 py-2 text-xs text-muted-foreground" data-testid="status-outward-farmer-empty">{outwardFarmerSearch ? "No farmers found" : isAdvance ? "No farmers found" : "No farmers with dues"}</div>
