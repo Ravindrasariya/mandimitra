@@ -476,7 +476,7 @@ export default function StockRegisterPage() {
       lot.serialNumber, lot.lotId, lot.date, lot.crop, lot.variety || "", lot.size || "",
       lot.farmer.farmerId, lot.farmer.name, lot.farmer.phone, lot.farmer.village || "", lot.farmer.tehsil || "", lot.farmer.district || "",
       lot.numberOfBags, lot.remainingBags, lot.bagMarka || "", lot.initialTotalWeight || "",
-      lot.vehicleNumber || "", lot.vehicleBhadaRate || "", lot.driverName || "", lot.driverContact || "", lot.freightType || "", lot.totalBagsInVehicle ?? "",
+      lot.vehicleNumber || "", (() => { const lb = lot.actualNumberOfBags ?? lot.numberOfBags; const tvb = lot.totalBagsInVehicle; return (tvb && tvb > 0 && lot.vehicleBhadaRate) ? ((parseFloat(lot.vehicleBhadaRate) * lb) / tvb).toFixed(2) : lot.vehicleBhadaRate || ""; })(), lot.driverName || "", lot.driverContact || "", lot.freightType || "", lot.actualNumberOfBags ?? lot.numberOfBags,
       lot.farmerAdvanceAmount || "", lot.farmerAdvanceMode || "",
       getLotStatus(lot)
     ].map(escCSV).join(","));

@@ -1091,8 +1091,10 @@ export default function TransactionsPage() {
   const mandiBuyerPct = parseFloat(cs.mandiCommissionBuyerPercent) || 0;
 
   const vehicleBhadaRate = parseFloat(selectedBid?.lot.vehicleBhadaRate || "0");
-  const totalBagsInVehicle = selectedBid?.lot.totalBagsInVehicle || selectedBid?.lot.actualNumberOfBags || selectedBid?.lot.numberOfBags || 1;
-  const freightFarmerTotal = totalBagsInVehicle > 0 ? (vehicleBhadaRate * bags) / totalBagsInVehicle : 0;
+  const totalVehicleBags = selectedBid?.lot.totalBagsInVehicle || 0;
+  const lotBags = selectedBid?.lot.actualNumberOfBags ?? selectedBid?.lot.numberOfBags ?? 1;
+  const srBhada = totalVehicleBags > 0 ? (vehicleBhadaRate * lotBags) / totalVehicleBags : vehicleBhadaRate;
+  const freightFarmerTotal = lotBags > 0 ? (srBhada * bags) / lotBags : 0;
 
   const hammaliFarmerTotal = hammaliFarmerRate * bags;
   const hammaliBuyerTotal = hammaliBuyerRate * bags;
@@ -1940,8 +1942,8 @@ export default function TransactionsPage() {
                       className="w-20 h-6 text-xs text-right p-1"
                     />
                   </div>
-                  {vehicleBhadaRate > 0 && (
-                    <div className="flex justify-between"><span>Freight/Bhada (Total):</span><span>₹{vehicleBhadaRate}</span></div>
+                  {srBhada > 0 && (
+                    <div className="flex justify-between"><span>Freight/Bhada (Total):</span><span>₹{srBhada.toFixed(2)}</span></div>
                   )}
                   <div className="flex items-center justify-between border-t pt-1 mt-1">
                     <span className="font-semibold">Extra ₹/Kg:</span>
@@ -2038,7 +2040,7 @@ export default function TransactionsPage() {
                   )}
                   {freightFarmerTotal > 0 && (
                     <div className="flex justify-between text-muted-foreground">
-                      <span>Freight (₹{vehicleBhadaRate} × {bags}/{totalBagsInVehicle}):</span>
+                      <span>Freight (₹{srBhada.toFixed(2)} × {bags}/{lotBags}):</span>
                       <span>-Rs.{freightFarmerTotal.toFixed(2)}</span>
                     </div>
                   )}
