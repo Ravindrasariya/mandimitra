@@ -394,15 +394,15 @@ th:first-child{text-align:left}
 .totals-row td{font-weight:bold;background:#f0f0f0;padding:5px;border:1px solid #ccc}
 @media print{body{margin:6mm}.no-print{display:none!important}}
 </style></head><body>
-<div style="display:flex;justify-content:flex-end;font-size:12px;margin-bottom:1px">${businessPhone ? `&#128241; ${businessPhone}` : ""}</div>
+<div style="display:flex;justify-content:flex-end;font-size:12px;margin-bottom:1px">${businessPhone ? `&#9742; ${businessPhone}` : ""}</div>
 <div class="header">
 ${businessName ? `<div style="font-weight:bold;font-size:1.05em;margin-bottom:1px">${businessName}</div>` : ""}
 ${businessAddress ? `<p style="font-size:0.82em;color:#555;margin:1px 0">${businessAddress}</p>` : ""}
 <h3 style="margin:2px 0 3px 0;font-size:1.05em">Buyer Receipt</h3>
 </div>
 <table class="info-table" style="margin-bottom:6px">
-<tr><td><strong>Buyer:</strong> ${firstTx.buyer.name}</td><td style="text-align:right"><strong>Licence No:</strong> ${firstTx.buyer.licenceNo || "-"}</td></tr>
-<tr><td><strong>Date:</strong> ${date}</td><td style="text-align:right"><strong>SR #:</strong> ${serialNumber}</td></tr>
+<tr><td><strong>SR #:</strong> ${serialNumber}</td><td style="text-align:right"><strong>Licence No:</strong> ${firstTx.buyer.licenceNo || "-"}</td></tr>
+<tr><td><strong>Buyer:</strong> ${firstTx.buyer.name}</td><td style="text-align:right"><strong>Date:</strong> ${date}</td></tr>
 </table>
 <table>
 <thead>
@@ -484,15 +484,15 @@ th:first-child{text-align:left}
 .totals-row td{font-weight:bold;background:#f0f0f0;padding:5px;border:1px solid #ccc}
 @media print{body{margin:6mm}.no-print{display:none!important}}
 </style></head><body>
-<div style="display:flex;justify-content:flex-end;font-size:12px;margin-bottom:1px">${businessPhone ? `&#128241; ${businessPhone}` : ""}</div>
+<div style="display:flex;justify-content:flex-end;font-size:12px;margin-bottom:1px">${businessPhone ? `&#9742; ${businessPhone}` : ""}</div>
 <div class="header">
 ${businessName ? `<div style="font-weight:bold;font-size:1.05em;margin-bottom:1px">${businessName}</div>` : ""}
 ${businessAddress ? `<p style="font-size:0.82em;color:#555;margin:1px 0">${businessAddress}</p>` : ""}
 <h3 style="margin:2px 0 3px 0;font-size:1.05em">Buyer Receipt</h3>
 </div>
 <table class="info-table" style="margin-bottom:6px">
-<tr><td><strong>Buyer:</strong> ${buyer.name}</td><td style="text-align:right"><strong>Licence No:</strong> ${buyer.licenceNo || "-"}</td></tr>
-<tr><td><strong>Date:</strong> ${format(new Date(), "dd/MM/yyyy")}</td><td style="text-align:right">${receiptSerialNumber ? `<strong>Bill no.:</strong> ${receiptSerialNumber}` : ""}</td></tr>
+<tr><td>${receiptSerialNumber ? `<strong>Bill no.:</strong> ${receiptSerialNumber}` : ""}</td><td style="text-align:right"><strong>Licence No:</strong> ${buyer.licenceNo || "-"}</td></tr>
+<tr><td><strong>Buyer:</strong> ${buyer.name}</td><td style="text-align:right"><strong>Date:</strong> ${format(new Date(), "dd/MM/yyyy")}</td></tr>
 </table>
 <table>
 <thead>
