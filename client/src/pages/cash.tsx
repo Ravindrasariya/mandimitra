@@ -311,7 +311,16 @@ export default function CashPage() {
       const res = await apiRequest("PATCH", `/api/cash-entries/${id}/reverse`, reason ? { reason } : undefined);
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      queryClient.setQueriesData(
+        { predicate: (query) => typeof query.queryKey[0] === "string" && (query.queryKey[0] as string).startsWith("/api/cash-entries") },
+        (old: any) => {
+          if (!Array.isArray(old)) return old;
+          return old.map((entry: any) =>
+            entry.id === variables.id ? { ...entry, isReversed: true, reversedAt: new Date().toISOString() } : entry
+          );
+        }
+      );
       invalidateCashQueries();
       setReverseConfirmEntry(null);
       setChequeBounceEntry(null);
