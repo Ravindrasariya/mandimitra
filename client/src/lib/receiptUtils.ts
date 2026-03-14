@@ -39,10 +39,10 @@ export function wrapWithDuplicate(html: string): string {
 <style>
 @page { size: A4; margin: 5mm; }
 body { margin: 0; padding: 4mm; font-size: 11px; }
-.copy-wrapper { padding: 4mm 2mm; }
+.copy-wrapper { padding: 4mm 2mm; page-break-inside: avoid; break-inside: avoid; }
 .cut-line { border-top: 1px dashed #999; margin: 4mm 0; text-align: center; font-size: 10px; color: #999; letter-spacing: 3px; }
 </style>
-${headContent.replace(/@media\s+print\s*\{[^}]*\}/gi, "").replace(/body\s*\{[^}]*margin:\s*[^;]+;/gi, (m) => m.replace(/margin:\s*[^;]+/, "margin:0"))}
+${headContent}
 </head><body>
 <div class="copy-wrapper">${bodyContent}</div>
 <div class="cut-line">✂ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─</div>
