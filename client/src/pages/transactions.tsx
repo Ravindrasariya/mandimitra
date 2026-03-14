@@ -347,7 +347,7 @@ function applyFarmerTemplate(tmpl: string, sg: UnifiedSerialGroup, businessName?
 
 type BuyerLotEntry = { lot: Lot; tx: TransactionWithDetails };
 
-function generateCombinedBuyerReceiptHtml(entries: BuyerLotEntry[], serialNumber: number, date: string, businessName?: string, businessAddress?: string): string {
+function generateCombinedBuyerReceiptHtml(entries: BuyerLotEntry[], serialNumber: number, date: string, businessName?: string, businessAddress?: string, businessPhone?: string): string {
   const firstTx = entries[0].tx;
   const crop = entries[0].lot.crop;
   const aadhatPct = parseFloat(firstTx.aadhatBuyerPercent || "0");
@@ -382,27 +382,28 @@ function generateCombinedBuyerReceiptHtml(entries: BuyerLotEntry[], serialNumber
 </tr>`).join("");
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Buyer Receipt</title>
-<style>body{font-family:Arial,sans-serif;margin:20px;color:#333}
-table{width:100%;border-collapse:collapse;margin:10px 0}
-h2{text-align:center;margin-bottom:5px}
-.header{text-align:center;margin-bottom:15px}
-.info-table td{padding:5px 8px;border:1px solid #ccc}
-.summary{margin-top:15px;border-top:2px solid #333;padding-top:10px}
+<style>body{font-family:Arial,sans-serif;margin:12px 20px;color:#333}
+table{width:100%;border-collapse:collapse;margin:8px 0}
+h2{text-align:center;margin-bottom:3px}
+.header{text-align:center;margin-bottom:8px}
+.info-table td{padding:3px 8px}
+.summary{margin-top:10px;border-top:2px solid #333;padding-top:8px}
 .summary-row{display:flex;justify-content:space-between;padding:3px 0}
 .total{font-weight:bold;font-size:1.1em;color:#dc2626;border-top:2px solid #333;padding-top:8px;margin-top:8px}
 th{padding:8px;border:1px solid #ccc;background:#f5f5f5;text-align:right}
 th:first-child{text-align:left}
 .totals-row td{font-weight:bold;background:#f0f0f0;padding:6px;border:1px solid #ccc}
-@media print{body{margin:10mm}.no-print{display:none!important}}
+@media print{body{margin:8mm}.no-print{display:none!important}}
 </style></head><body>
 <div class="header">
-${businessName ? `<h2 style="margin-bottom:2px">${businessName}</h2>` : ""}
-${businessAddress ? `<p style="font-size:0.85em;color:#555;margin:2px 0">${businessAddress}</p>` : ""}
-<h3 style="margin:8px 0 5px 0;font-size:1.1em">Buyer Receipt</h3>
+${businessAddress ? `<p style="font-size:0.85em;color:#555;margin:1px 0">${businessAddress}</p>` : ""}
+<h3 style="margin:3px 0 4px 0;font-size:1.1em">Buyer Receipt</h3>
 </div>
-<table class="info-table" style="margin-bottom:12px">
+<table class="info-table" style="margin-bottom:8px">
+<tr><td><strong>SR #:</strong> ${serialNumber}</td><td style="text-align:right">${businessPhone ? `<strong>Contact:</strong> ${businessPhone}` : ""}</td></tr>
+${businessName ? `<tr><td colspan="2" style="font-weight:bold;font-size:1.05em">${businessName}</td></tr>` : ""}
 <tr><td><strong>Buyer:</strong> ${firstTx.buyer.name}</td><td style="text-align:right"><strong>Licence No:</strong> ${firstTx.buyer.licenceNo || "-"}</td></tr>
-<tr><td><strong>Crop:</strong> ${crop}</td><td><strong>SR #:</strong> ${serialNumber} &nbsp; <strong>Date:</strong> ${date}</td></tr>
+<tr><td><strong>Date:</strong> ${date}</td><td></td></tr>
 </table>
 <table>
 <thead>
@@ -432,11 +433,10 @@ ${totalAadhat > 0 ? `<div class="summary-row"><span>Aadhat (${aadhatPct}%):</spa
 ${totalMandi > 0 ? `<div class="summary-row"><span>Mandi (${mandiPct}%):</span><span>Rs.${totalMandi.toFixed(2)}</span></div>` : ""}
 <div class="summary-row total"><span>Total Receivable from Buyer:</span><span>Rs.${grandTotal.toFixed(2)}</span></div>
 </div>
-<div style="text-align:center;margin-top:20px;padding-top:10px;border-top:1px dashed #ccc;font-size:15px;font-weight:bold;color:#555">हमें सेवा का अवसर देने के लिए धन्यवाद!</div>
 </body></html>`;
 }
 
-function generateAllBuyerReceiptHtml(entries: BuyerLotEntry[], businessName?: string, businessAddress?: string, receiptSerialNumber?: number, hideAadhat?: boolean): string {
+function generateAllBuyerReceiptHtml(entries: BuyerLotEntry[], businessName?: string, businessAddress?: string, receiptSerialNumber?: number, hideAadhat?: boolean, businessPhone?: string): string {
   if (entries.length === 0) return "";
   const firstTx = entries[0].tx;
   const buyer = firstTx.buyer;
@@ -473,27 +473,28 @@ function generateAllBuyerReceiptHtml(entries: BuyerLotEntry[], businessName?: st
 </tr>`).join("");
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Buyer Receipt</title>
-<style>body{font-family:Arial,sans-serif;margin:20px;color:#333}
-table{width:100%;border-collapse:collapse;margin:10px 0}
-h2{text-align:center;margin-bottom:5px}
-.header{text-align:center;margin-bottom:15px}
-.info-table td{padding:5px 8px;border:1px solid #ccc}
-.summary{margin-top:15px;border-top:2px solid #333;padding-top:10px}
+<style>body{font-family:Arial,sans-serif;margin:12px 20px;color:#333}
+table{width:100%;border-collapse:collapse;margin:8px 0}
+h2{text-align:center;margin-bottom:3px}
+.header{text-align:center;margin-bottom:8px}
+.info-table td{padding:3px 8px}
+.summary{margin-top:10px;border-top:2px solid #333;padding-top:8px}
 .summary-row{display:flex;justify-content:space-between;padding:3px 0}
 .total{font-weight:bold;font-size:1.1em;color:#dc2626;border-top:2px solid #333;padding-top:8px;margin-top:8px}
 th{padding:8px;border:1px solid #ccc;background:#f5f5f5;text-align:right}
 th:first-child{text-align:left}
 .totals-row td{font-weight:bold;background:#f0f0f0;padding:6px;border:1px solid #ccc}
-@media print{body{margin:10mm}.no-print{display:none!important}}
+@media print{body{margin:8mm}.no-print{display:none!important}}
 </style></head><body>
 <div class="header">
-${businessName ? `<h2 style="margin-bottom:2px">${businessName}</h2>` : ""}
-${businessAddress ? `<p style="font-size:0.85em;color:#555;margin:2px 0">${businessAddress}</p>` : ""}
-<h3 style="margin:8px 0 5px 0;font-size:1.1em">Buyer Receipt</h3>
+${businessAddress ? `<p style="font-size:0.85em;color:#555;margin:1px 0">${businessAddress}</p>` : ""}
+<h3 style="margin:3px 0 4px 0;font-size:1.1em">Buyer Receipt</h3>
 </div>
-<table class="info-table" style="margin-bottom:12px">
+<table class="info-table" style="margin-bottom:8px">
+<tr><td>${receiptSerialNumber ? `<strong>Bill no.:</strong> ${receiptSerialNumber}` : ""}</td><td style="text-align:right">${businessPhone ? `<strong>Contact:</strong> ${businessPhone}` : ""}</td></tr>
+${businessName ? `<tr><td colspan="2" style="font-weight:bold;font-size:1.05em">${businessName}</td></tr>` : ""}
 <tr><td><strong>Buyer:</strong> ${buyer.name}</td><td style="text-align:right"><strong>Licence No:</strong> ${buyer.licenceNo || "-"}</td></tr>
-<tr><td><strong>Date:</strong> ${format(new Date(), "dd/MM/yyyy")}</td><td style="text-align:right">${receiptSerialNumber ? `<strong>Bill no.:</strong> ${receiptSerialNumber}` : ""}</td></tr>
+<tr><td><strong>Date:</strong> ${format(new Date(), "dd/MM/yyyy")}</td><td></td></tr>
 </table>
 <table>
 <thead>
@@ -524,7 +525,6 @@ ${!hideAadhat && totalAadhat > 0 ? `<div class="summary-row"><span>Aadhat (${aad
 ${!hideAadhat && totalMandi > 0 ? `<div class="summary-row"><span>Mandi (${mandiPct}%):</span><span>Rs.${totalMandi.toFixed(2)}</span></div>` : ""}
 ${!hideAadhat ? `<div class="summary-row total"><span>Total Receivable from Buyer:</span><span>Rs.${grandTotal.toFixed(2)}</span></div>` : ""}
 </div>
-<div style="text-align:center;margin-top:20px;padding-top:10px;border-top:1px dashed #ccc;font-size:15px;font-weight:bold;color:#555">हमें सेवा का अवसर देने के लिए धन्यवाद!</div>
 </body></html>`;
 }
 
@@ -1240,7 +1240,7 @@ export default function TransactionsPage() {
     const customTmpl = receiptTemplates.find(t => t.templateType === "buyer" && t.crop === crop)
       || receiptTemplates.find(t => t.templateType === "buyer" && t.crop === "");
     if (customTmpl) return applyCombinedBuyerTemplate(customTmpl.templateHtml, entries, sg.serialNumber, sg.date, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo);
-    return generateCombinedBuyerReceiptHtml(entries, sg.serialNumber, sg.date, user?.businessName, user?.businessAddress);
+    return generateCombinedBuyerReceiptHtml(entries, sg.serialNumber, sg.date, user?.businessName, user?.businessAddress, user?.businessPhone);
   };
 
   const handlePrintCombinedBuyerReceipt = (entries: BuyerLotEntry[], sg: UnifiedSerialGroup) => {
@@ -1295,9 +1295,9 @@ export default function TransactionsPage() {
       const fullHtml = applyCombinedBuyerTemplate(overallTmpl.templateHtml, entries, 0, receiptDate, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo, receiptSerialNumber);
       printReceipt(wrapWithDuplicate(fullHtml));
     } else {
-      const fullHtml = generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress, receiptSerialNumber, false);
+      const fullHtml = generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress, receiptSerialNumber, false, user?.businessPhone);
       if (printBillMode === "hide-aadhat") {
-        const cleanHtml = generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress, receiptSerialNumber, true);
+        const cleanHtml = generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress, receiptSerialNumber, true, user?.businessPhone);
         printReceipt(wrapWithDuplicate(fullHtml, cleanHtml));
       } else {
         printReceipt(wrapWithDuplicate(fullHtml));
