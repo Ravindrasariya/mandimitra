@@ -286,7 +286,7 @@ ${mandiBuyer > 0 ? `<div class="summary-row"><span>Mandi (${tx.mandiBuyerPercent
 </body></html>`;
 }
 
-function applyFarmerTemplate(tmpl: string, sg: UnifiedSerialGroup, businessName?: string, businessAddress?: string): string {
+function applyFarmerTemplate(tmpl: string, sg: UnifiedSerialGroup, businessName?: string, businessAddress?: string, businessPhone?: string, businessLicenceNo?: string, businessShopNo?: string): string {
   const farmer = sg.farmer;
   const allTxns = sg.lotGroups.flatMap(lg => lg.completedTxns.filter(t => !t.isReversed));
   const firstLot = sg.lotGroups[0]?.lot;
@@ -315,12 +315,15 @@ function applyFarmerTemplate(tmpl: string, sg: UnifiedSerialGroup, businessName?
     const rate = parseFloat(t.pricePerKg || "0") + epk;
     const gross = nw * rate;
     const crop = t.lot?.crop || firstLot?.crop || "";
-    return `<tr><td>${cropLabel[crop] || crop}</td><td>${t.numberOfBags || 0}</td><td>${nw.toFixed(2)}</td><td>₹${rate.toFixed(2)}</td><td>₹${gross.toFixed(2)}</td></tr>`;
+    return `<tr><td>${cropLabel[crop] || crop}</td><td>${t.numberOfBags || 0}</td><td>${nw.toFixed(2)}</td><td>${(rate * 100).toFixed(2)}</td><td>${gross.toFixed(2)}</td></tr>`;
   }).join("");
 
   const replacements: Record<string, string> = {
     "{{BUSINESS_NAME}}": businessName || "",
     "{{BUSINESS_ADDRESS}}": businessAddress || "",
+    "{{BUSINESS_PHONE}}": businessPhone || "",
+    "{{BUSINESS_LICENCE}}": businessLicenceNo || "",
+    "{{BUSINESS_SHOP_NO}}": businessShopNo || "",
     "{{SERIAL_NUMBER}}": String(sg.serialNumber),
     "{{DATE}}": sg.date || format(new Date(), "yyyy-MM-dd"),
     "{{FARMER_NAME}}": farmer.name,
@@ -1205,7 +1208,7 @@ export default function TransactionsPage() {
     const crop = sg.lotGroups[0]?.lot?.crop || "";
     const customTmpl = receiptTemplates.find(t => t.templateType === "farmer" && t.crop === crop)
       || receiptTemplates.find(t => t.templateType === "farmer" && t.crop === "");
-    if (customTmpl) return applyFarmerTemplate(customTmpl.templateHtml, sg, user?.businessName, user?.businessAddress);
+    if (customTmpl) return applyFarmerTemplate(customTmpl.templateHtml, sg, user?.businessName, user?.businessAddress, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo);
     return generateFarmerReceiptHtml(sg, user?.businessName, user?.businessAddress);
   };
 
