@@ -29,11 +29,17 @@ function createReceiptIframe(html: string): Promise<HTMLIFrameElement> {
   });
 }
 
-export function wrapWithDuplicate(html: string): string {
+export function wrapWithDuplicate(html: string, altHtml?: string): string {
   const headMatch = html.match(/<head[^>]*>([\s\S]*?)<\/head>/i);
   const headContent = headMatch ? headMatch[1] : "";
   const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
   const bodyContent = bodyMatch ? bodyMatch[1] : html;
+
+  let altBodyContent = bodyContent;
+  if (altHtml) {
+    const altBodyMatch = altHtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    altBodyContent = altBodyMatch ? altBodyMatch[1] : altHtml;
+  }
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
 <style>
@@ -48,7 +54,7 @@ ${headContent}
 <div class="duplex-row">
 <div class="copy-wrapper">${bodyContent}</div>
 <div class="cut-separator"></div>
-<div class="copy-wrapper">${bodyContent}</div>
+<div class="copy-wrapper">${altBodyContent}</div>
 </div>
 </body></html>`;
 }

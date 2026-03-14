@@ -436,7 +436,7 @@ ${totalMandi > 0 ? `<div class="summary-row"><span>Mandi (${mandiPct}%):</span><
 </body></html>`;
 }
 
-function generateAllBuyerReceiptHtml(entries: BuyerLotEntry[], businessName?: string, businessAddress?: string, receiptSerialNumber?: number): string {
+function generateAllBuyerReceiptHtml(entries: BuyerLotEntry[], businessName?: string, businessAddress?: string, receiptSerialNumber?: number, hideAadhat?: boolean): string {
   if (entries.length === 0) return "";
   const firstTx = entries[0].tx;
   const buyer = firstTx.buyer;
@@ -520,9 +520,9 @@ ${rowsHtml}
 <div class="summary">
 ${totalHammali > 0 ? `<div class="summary-row"><span>Hammali (${totalBags} bags):</span><span>Rs.${totalHammali.toFixed(2)}</span></div>` : ""}
 ${totalExtra > 0 ? `<div class="summary-row"><span>Extra Charges:</span><span>Rs.${totalExtra.toFixed(2)}</span></div>` : ""}
-${totalAadhat > 0 ? `<div class="summary-row"><span>Aadhat (${aadhatPct}%):</span><span>Rs.${totalAadhat.toFixed(2)}</span></div>` : ""}
-${totalMandi > 0 ? `<div class="summary-row"><span>Mandi (${mandiPct}%):</span><span>Rs.${totalMandi.toFixed(2)}</span></div>` : ""}
-<div class="summary-row total"><span>Total Receivable from Buyer:</span><span>Rs.${grandTotal.toFixed(2)}</span></div>
+${!hideAadhat && totalAadhat > 0 ? `<div class="summary-row"><span>Aadhat (${aadhatPct}%):</span><span>Rs.${totalAadhat.toFixed(2)}</span></div>` : ""}
+${!hideAadhat && totalMandi > 0 ? `<div class="summary-row"><span>Mandi (${mandiPct}%):</span><span>Rs.${totalMandi.toFixed(2)}</span></div>` : ""}
+${!hideAadhat ? `<div class="summary-row total"><span>Total Receivable from Buyer:</span><span>Rs.${grandTotal.toFixed(2)}</span></div>` : ""}
 </div>
 <div style="text-align:center;margin-top:20px;padding-top:10px;border-top:1px dashed #ccc;font-size:15px;font-weight:bold;color:#555">हमें सेवा का अवसर देने के लिए धन्यवाद!</div>
 </body></html>`;
@@ -673,6 +673,7 @@ export default function TransactionsPage() {
   const [selectedDays, setSelectedDays] = usePersistedState<string[]>("txn-selectedDays", [currentDay]);
   const [cropFilter, setCropFilter] = usePersistedState("txn-cropFilter", "all");
   const [billingFilter, setBillingFilter] = usePersistedState("txn-billingFilter", "all");
+  const [printBillMode, setPrintBillMode] = usePersistedState<"show-all" | "hide-aadhat">("txn-printBillMode", "show-all");
   const [monthPopoverOpen, setMonthPopoverOpen] = useState(false);
   const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
   const [farmerNameSearch, setFarmerNameSearch] = useState("");
@@ -1291,9 +1292,16 @@ export default function TransactionsPage() {
 
     const overallTmpl = receiptTemplates.find(t => t.templateType === "buyer-overall");
     if (overallTmpl) {
-      printReceipt(wrapWithDuplicate(applyCombinedBuyerTemplate(overallTmpl.templateHtml, entries, 0, receiptDate, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo, receiptSerialNumber)));
+      const fullHtml = applyCombinedBuyerTemplate(overallTmpl.templateHtml, entries, 0, receiptDate, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo, receiptSerialNumber);
+      printReceipt(wrapWithDuplicate(fullHtml));
     } else {
-      printReceipt(wrapWithDuplicate(generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress, receiptSerialNumber)));
+      const fullHtml = generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress, receiptSerialNumber, false);
+      if (printBillMode === "hide-aadhat") {
+        const cleanHtml = generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress, receiptSerialNumber, true);
+        printReceipt(wrapWithDuplicate(fullHtml, cleanHtml));
+      } else {
+        printReceipt(wrapWithDuplicate(fullHtml));
+      }
     }
   };
 
@@ -1522,17 +1530,37 @@ export default function TransactionsPage() {
         </Select>
 
         {buyerNameSearch.trim() && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 w-8 p-0 shrink-0"
-            data-testid="button-print-all-buyer-receipt"
-            title={canPrintOverallBill ? `Print bill for ${buyerNameSearch} (${cropFilter})` : "Select a single date and crop to print"}
-            onClick={handlePrintAllBuyerReceipt}
-            disabled={!canPrintOverallBill}
-          >
-            <Printer className="w-4 h-4" />
-          </Button>
+          <div className="flex items-center gap-1 shrink-0">
+            <div className="flex h-8 rounded-md border text-xs overflow-hidden">
+              <button
+                data-testid="button-print-mode-show-all"
+                className={`px-2 transition-colors ${printBillMode === "show-all" ? "bg-primary text-primary-foreground" : "bg-background text-foreground hover:bg-muted"}`}
+                onClick={() => setPrintBillMode("show-all")}
+                title="Both copies show full details"
+              >
+                Full
+              </button>
+              <button
+                data-testid="button-print-mode-hide-aadhat"
+                className={`px-2 border-l transition-colors ${printBillMode === "hide-aadhat" ? "bg-primary text-primary-foreground" : "bg-background text-foreground hover:bg-muted"}`}
+                onClick={() => setPrintBillMode("hide-aadhat")}
+                title="One copy hides aadhat & total"
+              >
+                Hide aadhat
+              </button>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0"
+              data-testid="button-print-all-buyer-receipt"
+              title={canPrintOverallBill ? `Print bill for ${buyerNameSearch} (${cropFilter})` : "Select a single date and crop to print"}
+              onClick={handlePrintAllBuyerReceipt}
+              disabled={!canPrintOverallBill}
+            >
+              <Printer className="w-4 h-4" />
+            </Button>
+          </div>
         )}
 
         {isFiltered && (
