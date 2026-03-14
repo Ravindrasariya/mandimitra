@@ -1500,7 +1500,7 @@ export default function TransactionsPage() {
               />
             </div>
             {showBuyerDropdown && buyerNameSearch.length >= 1 && buyerSuggestions.length > 0 && (
-              <div className="absolute z-50 w-64 mt-1 bg-popover border border-border rounded-md shadow-md max-h-48 overflow-y-auto right-0">
+              <div className="absolute z-50 w-64 max-w-[calc(100vw-1rem)] mt-1 bg-popover border border-border rounded-md shadow-md max-h-48 overflow-y-auto left-0">
                 {buyerSuggestions.map((b) => (
                   <div
                     key={b.id}
@@ -1529,7 +1529,7 @@ export default function TransactionsPage() {
           </SelectContent>
         </Select>
 
-        {buyerNameSearch.trim() && (
+        {canPrintOverallBill && (
           <div className="flex items-center gap-1 shrink-0">
             <div className="flex h-8 rounded-md border text-xs overflow-hidden">
               <button
