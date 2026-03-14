@@ -1086,7 +1086,9 @@ export default function TransactionsPage() {
   const extraFarmer = parseFloat(extraChargesFarmer) || 0;
   const extraBuyer = parseFloat(extraChargesBuyer) || 0;
   const aadhatFarmerPct = parseFloat(cs.aadhatCommissionFarmerPercent) || 0;
-  const aadhatBuyerPct = parseFloat(cs.aadhatCommissionBuyerPercent) || 0;
+  const aadhatBuyerPct = selectedBid?.buyer?.aadhatCommissionPercent != null && selectedBid.buyer.aadhatCommissionPercent !== ""
+    ? parseFloat(selectedBid.buyer.aadhatCommissionPercent) || 0
+    : parseFloat(cs.aadhatCommissionBuyerPercent) || 0;
   const mandiFarmerPct = parseFloat(cs.mandiCommissionFarmerPercent) || 0;
   const mandiBuyerPct = parseFloat(cs.mandiCommissionBuyerPercent) || 0;
 

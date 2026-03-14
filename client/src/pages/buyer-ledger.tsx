@@ -178,12 +178,14 @@ export default function BuyerLedgerPage() {
   const [editLicenceNo, setEditLicenceNo] = useState("");
   const [editRedFlag, setEditRedFlag] = useState(false);
   const [editOpeningBalance, setEditOpeningBalance] = useState("");
+  const [editAadhatCommission, setEditAadhatCommission] = useState("");
 
   const [newName, setNewName] = useState("");
   const [newAddress, setNewAddress] = useState("");
   const [newPhone, setNewPhone] = useState("");
   const [newLicenceNo, setNewLicenceNo] = useState("");
   const [newOpeningBalance, setNewOpeningBalance] = useState("");
+  const [newAadhatCommission, setNewAadhatCommission] = useState("");
   const [yearFilter, setYearFilter] = usePersistedState("bl-yearFilter", _defaultYear);
   const [selectedMonths, setSelectedMonths] = usePersistedState<string[]>("bl-selectedMonths", [_defaultMonth]);
   const [selectedDays, setSelectedDays] = usePersistedState<string[]>("bl-selectedDays", [_defaultDay]);
@@ -482,6 +484,7 @@ export default function BuyerLedgerPage() {
     setEditLicenceNo(buyer.licenceNo || "");
     setEditRedFlag(buyer.redFlag);
     setEditOpeningBalance(buyer.openingBalance || "0");
+    setEditAadhatCommission(buyer.aadhatCommissionPercent || "");
   };
 
   const getPaanaHtml = async (buyer: BuyerWithDues) => {
@@ -527,6 +530,10 @@ export default function BuyerLedgerPage() {
 
   const saveEditDirect = () => {
     if (!editingBuyer) return;
+    if (editAadhatCommission && (isNaN(parseFloat(editAadhatCommission)) || parseFloat(editAadhatCommission) < 0 || parseFloat(editAadhatCommission) > 100)) {
+      toast({ title: "Error", description: "Aadhat Commission must be between 0 and 100", variant: "destructive" });
+      return;
+    }
     updateBuyerMutation.mutate({
       id: editingBuyer.id,
       data: {
@@ -536,6 +543,7 @@ export default function BuyerLedgerPage() {
         licenceNo: editLicenceNo || null,
         redFlag: editRedFlag,
         openingBalance: editOpeningBalance || "0",
+        aadhatCommissionPercent: editAadhatCommission || null,
       },
     });
   };
@@ -570,12 +578,17 @@ export default function BuyerLedgerPage() {
       toast({ title: "Error", description: "Buyer name is required", variant: "destructive" });
       return;
     }
+    if (newAadhatCommission && (isNaN(parseFloat(newAadhatCommission)) || parseFloat(newAadhatCommission) < 0 || parseFloat(newAadhatCommission) > 100)) {
+      toast({ title: "Error", description: "Aadhat Commission must be between 0 and 100", variant: "destructive" });
+      return;
+    }
     createBuyerMutation.mutate({
       name: newName.trim(),
       address: newAddress || null,
       phone: newPhone || null,
       licenceNo: newLicenceNo || null,
       openingBalance: newOpeningBalance || "0",
+      aadhatCommissionPercent: newAadhatCommission || null,
     });
   };
 
@@ -961,6 +974,20 @@ export default function BuyerLedgerPage() {
                 className="mobile-touch-target"
               />
             </div>
+            <div className="space-y-1">
+              <Label>{t("buyerLedger.aadhatCommission") || "Aadhat Commission %"}</Label>
+              <Input
+                data-testid="input-edit-aadhat-commission"
+                type="text"
+                inputMode="decimal"
+                value={editAadhatCommission}
+                onChange={(e) => setEditAadhatCommission(e.target.value)}
+                onFocus={(e) => e.target.select()}
+                placeholder={t("common.optional") || "Leave blank for default"}
+                className="mobile-touch-target"
+              />
+              <p className="text-xs text-muted-foreground">{t("buyerLedger.aadhatCommissionHint") || "Leave blank to use default from Dashboard settings"}</p>
+            </div>
             <div className="flex items-center justify-between">
               <Label>{t("buyerLedger.redFlagLabel")}</Label>
               <Switch
@@ -1073,6 +1100,20 @@ export default function BuyerLedgerPage() {
                 placeholder="0"
                 className="mobile-touch-target"
               />
+            </div>
+            <div className="space-y-1">
+              <Label>{t("buyerLedger.aadhatCommission") || "Aadhat Commission %"}</Label>
+              <Input
+                data-testid="input-new-aadhat-commission"
+                type="text"
+                inputMode="decimal"
+                value={newAadhatCommission}
+                onChange={(e) => setNewAadhatCommission(e.target.value)}
+                onFocus={(e) => e.target.select()}
+                placeholder={t("common.optional") || "Leave blank for default"}
+                className="mobile-touch-target"
+              />
+              <p className="text-xs text-muted-foreground">{t("buyerLedger.aadhatCommissionHint") || "Leave blank to use default from Dashboard settings"}</p>
             </div>
             <Button
               data-testid="button-submit-new-buyer"

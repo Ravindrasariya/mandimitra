@@ -320,6 +320,8 @@ const translations: Record<string, Record<Language, string>> = {
   "buyerLedger.noBuyers": { en: "No buyers found", hi: "कोई खरीदार नहीं मिला" },
   "buyerLedger.overall": { en: "Overall", hi: "कुल" },
   "buyerLedger.receivable": { en: "Receivable", hi: "प्राप्य" },
+  "buyerLedger.aadhatCommission": { en: "Aadhat Commission %", hi: "आढ़त कमीशन %" },
+  "buyerLedger.aadhatCommissionHint": { en: "Leave blank to use default from Dashboard settings", hi: "डैशबोर्ड सेटिंग्स का डिफ़ॉल्ट उपयोग करने के लिए खाली छोड़ें" },
   "buyerLedger.adding": { en: "Adding...", hi: "जोड़ रहे हैं..." },
   "buyerLedger.totalBuyers": { en: "Total Buyers", hi: "कुल खरीदार" },
   "buyerLedger.buyersWithDues": { en: "With Dues", hi: "बकाया वाले" },

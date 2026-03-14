@@ -68,6 +68,7 @@ export const buyers = pgTable("buyers", {
   redFlag: boolean("negative_flag").notNull().default(false),
   isActive: boolean("is_active").notNull().default(true),
   openingBalance: decimal("opening_balance", { precision: 12, scale: 2 }).default("0"),
+  aadhatCommissionPercent: decimal("aadhat_commission_percent", { precision: 5, scale: 2 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   uniqueBuyerPerBusiness: uniqueIndex("buyers_business_buyer_id_unique").on(table.businessId, table.buyerId),

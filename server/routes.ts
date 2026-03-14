@@ -434,6 +434,7 @@ export async function registerRoutes(
         redFlag: "Red Flag",
         isActive: "Active Status",
         openingBalance: "Opening Balance",
+        aadhatCommissionPercent: "Aadhat Commission %",
       };
 
       const changedBy = req.user!.name || req.user!.username;
