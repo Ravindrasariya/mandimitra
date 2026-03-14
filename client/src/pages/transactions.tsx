@@ -668,9 +668,9 @@ export default function TransactionsPage() {
   const currentYear = String(now.getFullYear());
   const currentMonth = String(now.getMonth() + 1);
   const currentDay = String(now.getDate());
-  const [yearFilter, setYearFilter] = usePersistedState("txn-yearFilter", currentYear);
-  const [selectedMonths, setSelectedMonths] = usePersistedState<string[]>("txn-selectedMonths", [currentMonth]);
-  const [selectedDays, setSelectedDays] = usePersistedState<string[]>("txn-selectedDays", [currentDay]);
+  const [yearFilter, setYearFilter] = useState(currentYear);
+  const [selectedMonths, setSelectedMonths] = useState<string[]>([currentMonth]);
+  const [selectedDays, setSelectedDays] = useState<string[]>([currentDay]);
   const [cropFilter, setCropFilter] = usePersistedState("txn-cropFilter", "all");
   const [billingFilter, setBillingFilter] = usePersistedState("txn-billingFilter", "all");
   const [printBillMode, setPrintBillMode] = usePersistedState<"show-all" | "hide-aadhat">("txn-printBillMode", "show-all");
@@ -1509,7 +1509,6 @@ export default function TransactionsPage() {
                     onClick={() => { setBuyerNameSearch(b.name); setShowBuyerDropdown(false); }}
                   >
                     <span className="font-medium">{b.name}</span>
-                    {b.phone && <span className="text-muted-foreground"> — {b.phone}</span>}
                   </div>
                 ))}
               </div>

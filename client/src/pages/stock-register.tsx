@@ -50,9 +50,9 @@ export default function StockRegisterPage() {
   const currentDay = now.getDate().toString();
 
   const [activeCrop, setActiveCrop] = usePersistedState("sr-activeCrop", "All");
-  const [yearFilter, setYearFilter] = usePersistedState("sr-yearFilter", currentYear);
-  const [selectedMonths, setSelectedMonths] = usePersistedState<string[]>("sr-selectedMonths", [currentMonth]);
-  const [selectedDays, setSelectedDays] = usePersistedState<string[]>("sr-selectedDays", [currentDay]);
+  const [yearFilter, setYearFilter] = useState(currentYear);
+  const [selectedMonths, setSelectedMonths] = useState<string[]>([currentMonth]);
+  const [selectedDays, setSelectedDays] = useState<string[]>([currentDay]);
   const [monthPopoverOpen, setMonthPopoverOpen] = useState(false);
   const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
 
