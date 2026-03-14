@@ -29,6 +29,27 @@ function createReceiptIframe(html: string): Promise<HTMLIFrameElement> {
   });
 }
 
+export function wrapWithDuplicate(html: string): string {
+  const headMatch = html.match(/<head[^>]*>([\s\S]*?)<\/head>/i);
+  const headContent = headMatch ? headMatch[1] : "";
+  const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+  const bodyContent = bodyMatch ? bodyMatch[1] : html;
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>
+@page { size: A4; margin: 5mm; }
+body { margin: 0; padding: 4mm; font-size: 11px; }
+.copy-wrapper { padding: 4mm 2mm; }
+.cut-line { border-top: 1px dashed #999; margin: 4mm 0; text-align: center; font-size: 10px; color: #999; letter-spacing: 3px; }
+</style>
+${headContent.replace(/@media\s+print\s*\{[^}]*\}/gi, "").replace(/body\s*\{[^}]*margin:\s*[^;]+;/gi, (m) => m.replace(/margin:\s*[^;]+/, "margin:0"))}
+</head><body>
+<div class="copy-wrapper">${bodyContent}</div>
+<div class="cut-line">✂ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─</div>
+<div class="copy-wrapper">${bodyContent}</div>
+</body></html>`;
+}
+
 export async function printReceipt(html: string) {
   const iframe = await createReceiptIframe(html);
   try {

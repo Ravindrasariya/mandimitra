@@ -20,7 +20,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Receipt, Pencil, Printer, ChevronDown, ChevronRight, Calendar, Package, Users, Landmark, HandCoins, Download, History, Share2, Calculator, Plus, X, AlertTriangle, Search } from "lucide-react";
 import { format } from "date-fns";
 import { useAuth } from "@/lib/auth";
-import { printReceipt, shareReceiptAsPdf } from "@/lib/receiptUtils";
+import { printReceipt, shareReceiptAsPdf, wrapWithDuplicate } from "@/lib/receiptUtils";
 
 type BidWithDetails = Bid & { buyer: Buyer; lot: Lot; farmer: Farmer };
 type TransactionWithDetails = Transaction & { farmer: Farmer; buyer: Buyer; lot: Lot; bid: Bid };
@@ -1291,9 +1291,9 @@ export default function TransactionsPage() {
 
     const overallTmpl = receiptTemplates.find(t => t.templateType === "buyer-overall");
     if (overallTmpl) {
-      printReceipt(applyCombinedBuyerTemplate(overallTmpl.templateHtml, entries, 0, receiptDate, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo, receiptSerialNumber));
+      printReceipt(wrapWithDuplicate(applyCombinedBuyerTemplate(overallTmpl.templateHtml, entries, 0, receiptDate, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo, receiptSerialNumber)));
     } else {
-      printReceipt(generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress, receiptSerialNumber));
+      printReceipt(wrapWithDuplicate(generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress, receiptSerialNumber)));
     }
   };
 
