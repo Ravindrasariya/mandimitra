@@ -138,7 +138,7 @@ export interface IStorage {
   upsertReceiptTemplate(businessId: number, templateType: string, crop: string, templateHtml: string): Promise<ReceiptTemplate>;
   deleteReceiptTemplate(id: number, businessId: number): Promise<void>;
 
-  getOrCreateBuyerReceiptSerial(businessId: number, buyerId: number, date: string): Promise<number>;
+  getOrCreateBuyerReceiptSerial(businessId: number, buyerId: number, date: string, crop: string): Promise<number>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1794,7 +1794,7 @@ export class DatabaseStorage implements IStorage {
     );
   }
 
-  async getOrCreateBuyerReceiptSerial(businessId: number, buyerId: number, date: string): Promise<number> {
+  async getOrCreateBuyerReceiptSerial(businessId: number, buyerId: number, date: string, crop: string): Promise<number> {
     const d = new Date(date);
     const month = d.getMonth();
     const year = d.getFullYear();
@@ -1802,13 +1802,13 @@ export class DatabaseStorage implements IStorage {
     const fyEnd = month >= 3 ? `${year + 1}-03-31` : `${year}-03-31`;
 
     const result = await db.execute<{ serial_number: number }>(sql`
-      INSERT INTO buyer_receipt_serials (business_id, buyer_id, date, serial_number)
-      SELECT ${businessId}, ${buyerId}, ${date}::date,
+      INSERT INTO buyer_receipt_serials (business_id, buyer_id, date, crop, serial_number)
+      SELECT ${businessId}, ${buyerId}, ${date}::date, ${crop},
              COALESCE((SELECT MAX(serial_number) FROM buyer_receipt_serials
                        WHERE business_id = ${businessId}
                          AND date >= ${fyStart}::date
                          AND date <= ${fyEnd}::date), 0) + 1
-      ON CONFLICT (business_id, buyer_id, date) DO NOTHING
+      ON CONFLICT (business_id, buyer_id, date, crop) DO NOTHING
       RETURNING serial_number
     `);
 
@@ -1820,7 +1820,8 @@ export class DatabaseStorage implements IStorage {
       .where(and(
         eq(buyerReceiptSerials.businessId, businessId),
         eq(buyerReceiptSerials.buyerId, buyerId),
-        eq(buyerReceiptSerials.date, date)
+        eq(buyerReceiptSerials.date, date),
+        eq(buyerReceiptSerials.crop, crop)
       ));
     return existing!.serialNumber;
   }

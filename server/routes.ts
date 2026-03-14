@@ -1432,10 +1432,10 @@ export async function registerRoutes(
 
   app.post("/api/buyer-receipt-serial", requireAuth, async (req, res) => {
     try {
-      const { buyerId, date } = z.object({ buyerId: z.number(), date: z.string() }).parse(req.body);
+      const { buyerId, date, crop } = z.object({ buyerId: z.number(), date: z.string(), crop: z.string() }).parse(req.body);
       const buyer = await storage.getBuyer(buyerId, req.user!.businessId);
       if (!buyer) return res.status(403).json({ message: "Buyer not found" });
-      const serialNumber = await storage.getOrCreateBuyerReceiptSerial(req.user!.businessId, buyerId, date);
+      const serialNumber = await storage.getOrCreateBuyerReceiptSerial(req.user!.businessId, buyerId, date, crop);
       res.json({ serialNumber });
     } catch (e: any) { res.status(400).json({ message: e.message }); }
   });

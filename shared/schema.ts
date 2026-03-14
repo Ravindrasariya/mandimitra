@@ -435,10 +435,11 @@ export const buyerReceiptSerials = pgTable("buyer_receipt_serials", {
   businessId: integer("business_id").notNull().references(() => businesses.id),
   buyerId: integer("buyer_id").notNull().references(() => buyers.id),
   date: date("date").notNull(),
+  crop: text("crop").notNull().default(""),
   serialNumber: integer("serial_number").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
-  uniqueBuyerReceiptSerial: uniqueIndex("buyer_receipt_serials_business_buyer_date_unique").on(table.businessId, table.buyerId, table.date),
+  uniqueBuyerReceiptSerial: uniqueIndex("buyer_receipt_serials_business_buyer_date_crop_unique").on(table.businessId, table.buyerId, table.date, table.crop),
 }));
 
 export type BuyerReceiptSerial = typeof buyerReceiptSerials.$inferSelect;

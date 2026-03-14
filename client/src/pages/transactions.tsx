@@ -493,7 +493,7 @@ ${businessAddress ? `<p style="font-size:0.85em;color:#555;margin:2px 0">${busin
 </div>
 <table class="info-table" style="margin-bottom:12px">
 <tr><td><strong>Buyer:</strong> ${buyer.name}</td><td><strong>Licence No:</strong> ${buyer.licenceNo || "-"}</td></tr>
-<tr><td><strong>Date:</strong> ${format(new Date(), "dd/MM/yyyy")}</td><td style="text-align:right">${receiptSerialNumber ? `<strong>Receipt #:</strong> ${receiptSerialNumber}` : ""}</td></tr>
+<tr><td><strong>Date:</strong> ${format(new Date(), "dd/MM/yyyy")}</td><td style="text-align:right">${receiptSerialNumber ? `<strong>Bill no.:</strong> ${receiptSerialNumber}` : ""}</td></tr>
 </table>
 <table>
 <thead>
@@ -1254,10 +1254,11 @@ export default function TransactionsPage() {
   };
 
   const isSingleDateFilter = selectedMonths.length === 1 && selectedDays.length === 1;
+  const canPrintOverallBill = isSingleDateFilter && cropFilter !== "all";
 
   const handlePrintAllBuyerReceipt = async () => {
-    if (!isSingleDateFilter) {
-      toast({ title: "Select a single date to print overall buyer receipt", variant: "destructive" });
+    if (!canPrintOverallBill) {
+      toast({ title: "Select a single date and a single crop to print overall buyer bill", variant: "destructive" });
       return;
     }
     const s = buyerNameSearch.trim().toLowerCase();
@@ -1279,7 +1280,7 @@ export default function TransactionsPage() {
     const receiptDate = `${yearFilter}-${mm}-${dd}`;
     let receiptSerialNumber: number;
     try {
-      const res = await apiRequest("POST", "/api/buyer-receipt-serial", { buyerId, date: receiptDate });
+      const res = await apiRequest("POST", "/api/buyer-receipt-serial", { buyerId, date: receiptDate, crop: cropFilter });
       if (!res.ok) throw new Error("Failed to assign receipt serial");
       const data = await res.json();
       receiptSerialNumber = data.serialNumber;
@@ -1526,9 +1527,9 @@ export default function TransactionsPage() {
             size="sm"
             className="h-8 w-8 p-0 shrink-0"
             data-testid="button-print-all-buyer-receipt"
-            title={isSingleDateFilter ? `Print receipt for ${buyerNameSearch}${cropFilter !== "all" ? ` (${cropFilter})` : ""}` : "Select a single date to print"}
+            title={canPrintOverallBill ? `Print bill for ${buyerNameSearch} (${cropFilter})` : "Select a single date and crop to print"}
             onClick={handlePrintAllBuyerReceipt}
-            disabled={!isSingleDateFilter}
+            disabled={!canPrintOverallBill}
           >
             <Printer className="w-4 h-4" />
           </Button>
