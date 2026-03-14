@@ -39,7 +39,7 @@ export function wrapWithDuplicate(html: string): string {
 <style>
 @page { size: A4 landscape; margin: 5mm; }
 body { margin: 0; padding: 0; font-size: 11px; }
-.duplex-row { display: flex; flex-direction: row; width: 100%; min-height: 100vh; box-sizing: border-box; }
+.duplex-row { display: flex; flex-direction: row; width: 100%; box-sizing: border-box; }
 .copy-wrapper { width: 50%; box-sizing: border-box; padding: 4mm; page-break-inside: avoid; break-inside: avoid; overflow: hidden; }
 .cut-separator { width: 0; border-left: 1px dashed #999; margin: 4mm 0; }
 </style>

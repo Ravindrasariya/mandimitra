@@ -262,7 +262,7 @@ ${businessAddress ? `<p style="font-size:0.85em;color:#555;margin:2px 0">${busin
 <h3 style="margin:8px 0 5px 0;font-size:1.1em">Buyer Receipt</h3>
 </div>
 <table class="detail-table">
-<tr><td><strong>Buyer:</strong> ${tx.buyer.name}</td><td><strong>Licence No:</strong> ${tx.buyer.licenceNo || "-"}</td></tr>
+<tr><td><strong>Buyer:</strong> ${tx.buyer.name}</td><td style="text-align:right"><strong>Licence No:</strong> ${tx.buyer.licenceNo || "-"}</td></tr>
 <tr><td><strong>Crop:</strong> ${lot.crop}</td><td><strong>Date:</strong> ${dateStr}</td></tr>
 </table>
 <table style="margin-top:15px">
@@ -401,7 +401,7 @@ ${businessAddress ? `<p style="font-size:0.85em;color:#555;margin:2px 0">${busin
 <h3 style="margin:8px 0 5px 0;font-size:1.1em">Buyer Receipt</h3>
 </div>
 <table class="info-table" style="margin-bottom:12px">
-<tr><td><strong>Buyer:</strong> ${firstTx.buyer.name}</td><td><strong>Licence No:</strong> ${firstTx.buyer.licenceNo || "-"}</td></tr>
+<tr><td><strong>Buyer:</strong> ${firstTx.buyer.name}</td><td style="text-align:right"><strong>Licence No:</strong> ${firstTx.buyer.licenceNo || "-"}</td></tr>
 <tr><td><strong>Crop:</strong> ${crop}</td><td><strong>SR #:</strong> ${serialNumber} &nbsp; <strong>Date:</strong> ${date}</td></tr>
 </table>
 <table>
@@ -492,7 +492,7 @@ ${businessAddress ? `<p style="font-size:0.85em;color:#555;margin:2px 0">${busin
 <h3 style="margin:8px 0 5px 0;font-size:1.1em">Buyer Receipt</h3>
 </div>
 <table class="info-table" style="margin-bottom:12px">
-<tr><td><strong>Buyer:</strong> ${buyer.name}</td><td><strong>Licence No:</strong> ${buyer.licenceNo || "-"}</td></tr>
+<tr><td><strong>Buyer:</strong> ${buyer.name}</td><td style="text-align:right"><strong>Licence No:</strong> ${buyer.licenceNo || "-"}</td></tr>
 <tr><td><strong>Date:</strong> ${format(new Date(), "dd/MM/yyyy")}</td><td style="text-align:right">${receiptSerialNumber ? `<strong>Bill no.:</strong> ${receiptSerialNumber}` : ""}</td></tr>
 </table>
 <table>
