@@ -1808,7 +1808,7 @@ export class DatabaseStorage implements IStorage {
                        WHERE business_id = ${businessId}
                          AND date >= ${fyStart}::date
                          AND date <= ${fyEnd}::date), 0) + 1
-      ON CONFLICT (business_id, buyer_id, date, crop) DO NOTHING
+      ON CONFLICT DO NOTHING
       RETURNING serial_number
     `);
 
