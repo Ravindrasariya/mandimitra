@@ -294,7 +294,12 @@ function applyFarmerTemplate(tmpl: string, sg: UnifiedSerialGroup, businessName?
 
   const totalHammali = allTxns.reduce((s, t) => s + parseFloat(t.hammaliCharges || "0"), 0);
   const totalExtraCharges = allTxns.reduce((s, t) => s + parseFloat(t.extraChargesFarmer || "0"), 0);
+  const totalTulai = allTxns.reduce((s, t) => s + parseFloat((t as any).extraTulaiFarmer || "0"), 0);
+  const totalBharai = allTxns.reduce((s, t) => s + parseFloat((t as any).extraBharaiFarmer || "0"), 0);
+  const totalKhadiKarai = allTxns.reduce((s, t) => s + parseFloat((t as any).extraKhadiKaraiFarmer || "0"), 0);
+  const totalThelaBhada = allTxns.reduce((s, t) => s + parseFloat((t as any).extraThelaBhadaFarmer || "0"), 0);
   const totalFreight = allTxns.reduce((s, t) => s + parseFloat(t.freightCharges || "0"), 0);
+  const hammaliAndExtras = totalHammali + totalTulai + totalBharai + totalKhadiKarai;
   const totalAadhat = allTxns.reduce((s, t) => {
     const gross = parseFloat(t.netWeight || "0") * (parseFloat(t.pricePerKg || "0") + parseFloat((t as any).extraPerKgFarmer || "0"));
     return s + gross * parseFloat(t.aadhatFarmerPercent || "0") / 100;
@@ -304,7 +309,7 @@ function applyFarmerTemplate(tmpl: string, sg: UnifiedSerialGroup, businessName?
     return s + gross * parseFloat(t.mandiFarmerPercent || "0") / 100;
   }, 0);
   const farmerAdvance = parseFloat(firstLot?.farmerAdvanceAmount || "0");
-  const totalDeduction = totalHammali + totalExtraCharges + totalFreight + totalAadhat + totalMandi + farmerAdvance;
+  const totalDeduction = hammaliAndExtras + totalThelaBhada + totalFreight + totalAadhat + totalMandi + farmerAdvance;
   const totalGross = allTxns.reduce((s, t) => s + parseFloat(t.netWeight || "0") * (parseFloat(t.pricePerKg || "0") + parseFloat((t as any).extraPerKgFarmer || "0")), 0);
   const totalNetWeight = allTxns.reduce((s, t) => s + parseFloat(t.netWeight || "0"), 0);
   const netPayable = allTxns.reduce((s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0) - farmerAdvance;
@@ -336,6 +341,11 @@ function applyFarmerTemplate(tmpl: string, sg: UnifiedSerialGroup, businessName?
     "{{NET_WEIGHT}}": totalNetWeight.toFixed(2),
     "{{GROSS_AMOUNT}}": totalGross.toFixed(2),
     "{{HAMMALI}}": totalHammali.toFixed(2),
+    "{{TULAI}}": totalTulai.toFixed(2),
+    "{{BHARAI}}": totalBharai.toFixed(2),
+    "{{KHADI_KARAI}}": totalKhadiKarai.toFixed(2),
+    "{{THELA_BHADA}}": totalThelaBhada.toFixed(2),
+    "{{HAMMALI_AND_EXTRAS}}": hammaliAndExtras.toFixed(2),
     "{{AADHAT}}": totalAadhat.toFixed(2),
     "{{MANDI_CHARGES}}": totalMandi.toFixed(2),
     "{{FREIGHT}}": totalFreight.toFixed(2),

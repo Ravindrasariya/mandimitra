@@ -113,7 +113,7 @@ table.summary th { background: #f0f0f0; }
     <tbody>
       <tr>
         <td>{{GROSS_AMOUNT}}</td>
-        <td>{{HAMMALI}}</td>
+        <td>{{HAMMALI_AND_EXTRAS}}</td>
         <td>{{FREIGHT}}</td>
         <td>{{NET_PAYABLE}}</td>
         <td></td>
@@ -152,16 +152,18 @@ table.summary th { background: #f0f0f0; }
       <td colspan="3" style="padding-top:3px">
         <span class="bold">प्रवेश क्रमांक :</span> &nbsp;&nbsp;
         हमाली <span class="bold">{{HAMMALI}}</span> &nbsp;
-        तुलाई <span class="bold">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span> &nbsp;
-        भराई <span class="bold">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span> &nbsp;
-        खड़ी कराई <span class="bold">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+        तुलाई <span class="bold">{{TULAI}}</span> &nbsp;
+        भराई <span class="bold">{{BHARAI}}</span> &nbsp;
+        खड़ी कराई <span class="bold">{{KHADI_KARAI}}</span>
         &nbsp;&nbsp;&nbsp;&nbsp;
         <span class="bold">कुल खर्च :</span> {{TOTAL_DEDUCTION}}
       </td>
     </tr>
     <tr>
       <td colspan="2">
-        थेला भाड़ा <span class="bold">{{FREIGHT}}</span>
+        थेला भाड़ा <span class="bold">{{THELA_BHADA}}</span>
+        &nbsp;&nbsp;&nbsp;
+        ट्रक भाड़ा <span class="bold">{{FREIGHT}}</span>
       </td>
       <td style="text-align:right"><span class="bold">नेट रकम :</span> {{NET_PAYABLE}}</td>
     </tr>
