@@ -78,6 +78,9 @@ export default function FarmerLedgerPage() {
   const [editPhone, setEditPhone] = useState("");
   const [editVillage, setEditVillage] = useState("");
   const [editRedFlag, setEditRedFlag] = useState("false");
+  const [editTehsil, setEditTehsil] = useState("");
+  const [editDistrict, setEditDistrict] = useState("");
+  const [editState, setEditState] = useState("");
   const [editBankName, setEditBankName] = useState("");
   const [editBankAccountNumber, setEditBankAccountNumber] = useState("");
   const [editIfscCode, setEditIfscCode] = useState("");
@@ -278,6 +281,9 @@ export default function FarmerLedgerPage() {
     setEditName(farmer.name);
     setEditPhone(farmer.phone);
     setEditVillage(farmer.village || "");
+    setEditTehsil(farmer.tehsil || "");
+    setEditDistrict(farmer.district || "");
+    setEditState(farmer.state || "");
     setEditRedFlag(farmer.redFlag ? "true" : "false");
     setEditBankName(farmer.bankName || "");
     setEditBankAccountNumber(farmer.bankAccountNumber || "");
@@ -291,7 +297,7 @@ export default function FarmerLedgerPage() {
     const newRedFlag = editRedFlag === "true";
     updateFarmerMutation.mutate({
       id: editingFarmer.id,
-      data: { name: editName, phone: editPhone, village: editVillage, redFlag: newRedFlag, bankName: editBankName, bankAccountNumber: editBankAccountNumber, ifscCode: editIfscCode },
+      data: { name: editName, phone: editPhone, village: editVillage, tehsil: editTehsil, district: editDistrict, state: editState, redFlag: newRedFlag, bankName: editBankName, bankAccountNumber: editBankAccountNumber, ifscCode: editIfscCode },
     });
   };
 
@@ -647,6 +653,33 @@ export default function FarmerLedgerPage() {
                     data-testid="input-edit-farmer-village"
                     value={editVillage}
                     onChange={(e) => setEditVillage(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Tehsil</Label>
+                  <Input
+                    data-testid="input-edit-farmer-tehsil"
+                    value={editTehsil}
+                    onChange={(e) => setEditTehsil(e.target.value)}
+                    placeholder="e.g. Ujjain"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">District</Label>
+                  <Input
+                    data-testid="input-edit-farmer-district"
+                    value={editDistrict}
+                    onChange={(e) => setEditDistrict(e.target.value)}
+                    placeholder="e.g. Ujjain"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">State</Label>
+                  <Input
+                    data-testid="input-edit-farmer-state"
+                    value={editState}
+                    onChange={(e) => setEditState(e.target.value)}
+                    placeholder="e.g. Madhya Pradesh"
                   />
                 </div>
                 <div className="space-y-1">
