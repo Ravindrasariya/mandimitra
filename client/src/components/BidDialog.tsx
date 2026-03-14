@@ -118,7 +118,10 @@ export default function BidDialog({ open, onOpenChange, lot: initialLot, serialN
       invalidateAll();
       toast({ title: "Bid Saved", variant: "success" });
       setPricePerKg("");
-      setBidBags("");
+      const bagsUsed = parseInt(bidBags) || 0;
+      const currentRemaining = selectedLot ? selectedLot.remainingBags : 0;
+      const newRemaining = Math.max(0, currentRemaining - bagsUsed);
+      setBidBags(newRemaining > 0 ? newRemaining.toString() : "");
       setSelectedBuyerId(null);
       setBuyerSearch("");
       setPaymentType("Credit");
