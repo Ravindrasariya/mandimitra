@@ -796,8 +796,15 @@ export default function TransactionsPage() {
         const key = query.queryKey[0];
         return typeof key === "string" && key.startsWith("/api/buyers");
       }});
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === "string" && key.startsWith("/api/farmers");
+      }});
       queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash-entries"] });
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === "string" && key.startsWith("/api/cash-entries");
+      }});
       queryClient.invalidateQueries({ queryKey: ["/api/transaction-edit-history"] });
       setDialogOpen(false);
       setDialogItems([]);
@@ -823,8 +830,15 @@ export default function TransactionsPage() {
         const key = query.queryKey[0];
         return typeof key === "string" && key.startsWith("/api/buyers");
       }});
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === "string" && key.startsWith("/api/farmers");
+      }});
       queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash-entries"] });
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === "string" && key.startsWith("/api/cash-entries");
+      }});
       queryClient.invalidateQueries({ queryKey: ["/api/transaction-edit-history"] });
       setDialogOpen(false);
       setDialogItems([]);
@@ -850,8 +864,15 @@ export default function TransactionsPage() {
         const key = query.queryKey[0];
         return typeof key === "string" && key.startsWith("/api/buyers");
       }});
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === "string" && key.startsWith("/api/farmers");
+      }});
       queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash-entries"] });
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === "string" && key.startsWith("/api/cash-entries");
+      }});
       setReverseConfirmOpen(false);
       setReversingTxn(null);
       setDialogOpen(false);

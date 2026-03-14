@@ -333,7 +333,10 @@ export default function StockRegisterPage() {
         const key = query.queryKey[0];
         return typeof key === "string" && key.startsWith("/api/buyers");
       }});
-      queryClient.invalidateQueries({ queryKey: ["/api/cash-entries"] });
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === "string" && key.startsWith("/api/cash-entries");
+      }});
       setReturnConfirmOpen(false);
       setReturningLot(null);
       setEditingGroup(null);

@@ -274,23 +274,22 @@ export default function CashPage() {
   }, [allEntries, cashSettingsData, bankAccountsList]);
 
   const invalidateCashQueries = () => {
-    queryClient.invalidateQueries({ predicate: (query) => {
+    queryClient.invalidateQueries({ refetchType: 'all', predicate: (query) => {
       const key = query.queryKey[0];
       return typeof key === "string" && key.startsWith("/api/cash-entries");
     }});
-    queryClient.invalidateQueries({ predicate: (query) => {
+    queryClient.invalidateQueries({ refetchType: 'all', predicate: (query) => {
       const key = query.queryKey[0];
       return typeof key === "string" && key.startsWith("/api/buyers");
     }});
-    queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
-    queryClient.invalidateQueries({ predicate: (query) => {
+    queryClient.invalidateQueries({ refetchType: 'all', predicate: (query) => {
       const key = query.queryKey[0];
       return typeof key === "string" && key.startsWith("/api/farmers");
     }});
-    queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
-    queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+    queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/transactions"] });
+    queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/transaction-aggregates"] });
+    queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/bank-accounts"] });
+    queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/dashboard"] });
   };
 
   const createMutation = useMutation({
@@ -366,7 +365,10 @@ export default function CashPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash-entries"] });
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === "string" && key.startsWith("/api/cash-entries");
+      }});
       setEditingAccountId(null);
       toast({ title: t("common.saved"), variant: "success" });
     },
