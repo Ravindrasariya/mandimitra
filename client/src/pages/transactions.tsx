@@ -1199,7 +1199,9 @@ export default function TransactionsPage() {
   const isSaving = createTxMutation.isPending || updateTxMutation.isPending;
 
   const getFarmerReceiptHtml = (sg: UnifiedSerialGroup): string => {
-    const customTmpl = receiptTemplates.find(t => t.templateType === "farmer");
+    const crop = sg.lotGroups[0]?.lot?.crop || "";
+    const customTmpl = receiptTemplates.find(t => t.templateType === "farmer" && t.crop === crop)
+      || receiptTemplates.find(t => t.templateType === "farmer" && t.crop === "");
     if (customTmpl) return applyFarmerTemplate(customTmpl.templateHtml, sg, user?.businessName, user?.businessAddress);
     return generateFarmerReceiptHtml(sg, user?.businessName, user?.businessAddress);
   };
@@ -1263,7 +1265,12 @@ export default function TransactionsPage() {
       });
     });
     if (entries.length === 0) return;
-    printReceipt(generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress));
+    const overallTmpl = receiptTemplates.find(t => t.templateType === "buyer-overall");
+    if (overallTmpl) {
+      printReceipt(applyCombinedBuyerTemplate(overallTmpl.templateHtml, entries, 0, "", user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo));
+    } else {
+      printReceipt(generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress));
+    }
   };
 
   const exportCSV = () => {

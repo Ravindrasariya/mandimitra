@@ -553,6 +553,7 @@ const BUYER_PLACEHOLDERS = [
 function ReceiptTemplatesDialog({ biz, onClose }: { biz: Business; onClose: () => void }) {
   const { toast } = useToast();
   const [buyerCrop, setBuyerCrop] = useState<string>("");
+  const [farmerCrop, setFarmerCrop] = useState<string>("");
   const [showPlaceholders, setShowPlaceholders] = useState(false);
 
   const { data: templates = [], isLoading, refetch } = useQuery<ReceiptTemplate[]>({
@@ -599,8 +600,9 @@ function ReceiptTemplatesDialog({ biz, onClose }: { biz: Business; onClose: () =
     input.click();
   };
 
-  const farmerTemplate = templates.find(t => t.templateType === "farmer");
+  const farmerTemplates = templates.filter(t => t.templateType === "farmer");
   const buyerTemplates = templates.filter(t => t.templateType === "buyer");
+  const overallBuyerTemplate = templates.find(t => t.templateType === "buyer-overall");
 
   return (
     <Dialog open onOpenChange={(v) => { if (!v) onClose(); }}>
@@ -620,38 +622,55 @@ function ReceiptTemplatesDialog({ biz, onClose }: { biz: Business; onClose: () =
         ) : (
           <div className="space-y-5">
             <div className="border rounded-lg p-4 space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-sm">Farmer Receipt</p>
-                  <p className="text-xs text-muted-foreground">One template per business, applies to all crops</p>
-                </div>
-                {farmerTemplate ? (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-green-600 font-medium flex items-center gap-1">
-                      <FileText className="w-3 h-3" /> Custom uploaded
-                    </span>
-                    <Button
-                      variant="ghost" size="icon"
-                      data-testid="button-delete-farmer-template"
-                      onClick={() => deleteMutation.mutate(farmerTemplate.id)}
-                      disabled={deleteMutation.isPending}
-                    >
-                      <Trash2 className="w-4 h-4 text-destructive" />
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => handleFileUpload("farmer", "")} disabled={uploadMutation.isPending}>
-                      <Upload className="w-3 h-3 mr-1" /> Replace
-                    </Button>
-                  </div>
-                ) : (
-                  <Button variant="outline" size="sm" data-testid="button-upload-farmer-template" onClick={() => handleFileUpload("farmer", "")} disabled={uploadMutation.isPending}>
-                    <Upload className="w-3 h-3 mr-1" /> Upload HTML
-                  </Button>
-                )}
+              <div>
+                <p className="font-medium text-sm">Farmer Receipts</p>
+                <p className="text-xs text-muted-foreground">Different template per crop — select a crop, then upload</p>
               </div>
-              {farmerTemplate && (
-                <p className="text-xs text-muted-foreground">
-                  Last updated: {new Date(farmerTemplate.updatedAt).toLocaleDateString()}
-                </p>
+
+              <div className="flex gap-2 items-end">
+                <div className="flex-1 space-y-1">
+                  <label className="text-xs text-muted-foreground">Select crop</label>
+                  <Select value={farmerCrop} onValueChange={setFarmerCrop}>
+                    <SelectTrigger data-testid="select-farmer-crop-template" className="h-8">
+                      <SelectValue placeholder="Choose a crop..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {CROPS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button
+                  variant="outline" size="sm"
+                  data-testid="button-upload-farmer-template"
+                  disabled={!farmerCrop || uploadMutation.isPending}
+                  onClick={() => farmerCrop && handleFileUpload("farmer", farmerCrop)}
+                >
+                  <Upload className="w-3 h-3 mr-1" /> Upload HTML
+                </Button>
+              </div>
+
+              {farmerTemplates.length === 0 ? (
+                <p className="text-xs text-muted-foreground italic">No farmer templates uploaded yet — using default for all crops.</p>
+              ) : (
+                <div className="space-y-2">
+                  {farmerTemplates.map(t => (
+                    <div key={t.id} className="flex items-center justify-between bg-muted/40 rounded px-3 py-2">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-3 h-3 text-green-600" />
+                        <span className="text-sm font-medium">{t.crop || "Generic"}</span>
+                        <span className="text-xs text-muted-foreground">Updated {new Date(t.updatedAt).toLocaleDateString()}</span>
+                      </div>
+                      <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => handleFileUpload("farmer", t.crop)} disabled={uploadMutation.isPending} title="Replace">
+                          <Upload className="w-3 h-3" />
+                        </Button>
+                        <Button variant="ghost" size="icon" data-testid={`button-delete-farmer-template-${t.crop || 'generic'}`} onClick={() => deleteMutation.mutate(t.id)} disabled={deleteMutation.isPending} title="Delete">
+                          <Trash2 className="w-3 h-3 text-destructive" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
 
@@ -705,6 +724,42 @@ function ReceiptTemplatesDialog({ biz, onClose }: { biz: Business; onClose: () =
                     </div>
                   ))}
                 </div>
+              )}
+            </div>
+
+            <div className="border rounded-lg p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-sm">Overall Buyer Receipt</p>
+                  <p className="text-xs text-muted-foreground">Single template for the combined/filtered buyer statement</p>
+                </div>
+                {overallBuyerTemplate ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-green-600 font-medium flex items-center gap-1">
+                      <FileText className="w-3 h-3" /> Custom uploaded
+                    </span>
+                    <Button
+                      variant="ghost" size="icon"
+                      data-testid="button-delete-overall-buyer-template"
+                      onClick={() => deleteMutation.mutate(overallBuyerTemplate.id)}
+                      disabled={deleteMutation.isPending}
+                    >
+                      <Trash2 className="w-4 h-4 text-destructive" />
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleFileUpload("buyer-overall", "")} disabled={uploadMutation.isPending}>
+                      <Upload className="w-3 h-3 mr-1" /> Replace
+                    </Button>
+                  </div>
+                ) : (
+                  <Button variant="outline" size="sm" data-testid="button-upload-overall-buyer-template" onClick={() => handleFileUpload("buyer-overall", "")} disabled={uploadMutation.isPending}>
+                    <Upload className="w-3 h-3 mr-1" /> Upload HTML
+                  </Button>
+                )}
+              </div>
+              {overallBuyerTemplate && (
+                <p className="text-xs text-muted-foreground">
+                  Last updated: {new Date(overallBuyerTemplate.updatedAt).toLocaleDateString()}
+                </p>
               )}
             </div>
 
