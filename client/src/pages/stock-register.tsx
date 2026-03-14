@@ -16,7 +16,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { CROPS, SIZES } from "@shared/schema";
 import type { Lot, Farmer } from "@shared/schema";
-import { Search, Edit, Package, Wheat, X, ChevronDown, Calendar, Download, Truck } from "lucide-react";
+import BidDialog from "@/components/BidDialog";
+import { Search, Edit, Package, Wheat, X, ChevronDown, Calendar, Download, Truck, Gavel } from "lucide-react";
 import { format } from "date-fns";
 
 type LotWithFarmer = Lot & { farmer: Farmer };
@@ -76,6 +77,10 @@ export default function StockRegisterPage() {
   const [origVehicle, setOrigVehicle] = useState({ vehicleNumber: "", driverName: "", driverContact: "", vehicleBhadaRate: "", freightType: "", totalBagsInVehicle: "", farmerAdvanceAmount: "", farmerAdvanceMode: "" });
   const [origLotFields, setOrigLotFields] = useState<Record<number, LotEditState>>({});
   const [returnConfirmOpen, setReturnConfirmOpen] = useState(false);
+  const [bidDialogOpen, setBidDialogOpen] = useState(false);
+  const [bidSelectedLot, setBidSelectedLot] = useState<LotWithFarmer | null>(null);
+  const [bidSerialNumber, setBidSerialNumber] = useState<number | null>(null);
+  const [bidDate, setBidDate] = useState("");
   const [returningLot, setReturningLot] = useState<LotWithFarmer | null>(null);
 
   const { data: allLots = [], isLoading } = useQuery<LotWithFarmer[]>({
@@ -455,6 +460,17 @@ export default function StockRegisterPage() {
       ? selectedDays[0]
       : `${selectedDays.length} ${t("stockRegister.nDays")}`;
 
+  const openBidForLot = (lot: LotWithFarmer, serialNumber: number, date: string) => {
+    setBidSelectedLot(lot);
+    setBidSerialNumber(serialNumber);
+    setBidDate(date);
+    setBidDialogOpen(true);
+  };
+
+  const onBidSuccess = () => {
+    queryClient.invalidateQueries({ queryKey: ["/api/lots"], refetchType: "all" });
+  };
+
   const exportCSV = () => {
     if (filtered.length === 0) return;
 
@@ -757,6 +773,18 @@ export default function StockRegisterPage() {
                               {lot.size && <span className="text-muted-foreground">{lot.size}</span>}
                               {lot.bagMarka && <span className="text-muted-foreground">{t("stockRegister.marka")}: {lot.bagMarka}</span>}
                               {getStatusBadge(lot)}
+                              {lot.remainingBags > 0 && !lot.isReturned && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="h-5 px-1.5 text-[10px] ml-auto"
+                                  data-testid={`button-bid-lot-${lot.id}`}
+                                  onClick={() => openBidForLot(lot, group.serialNumber, group.date)}
+                                >
+                                  <Gavel className="w-3 h-3 mr-0.5" />
+                                  {t("nav.bidding")}
+                                </Button>
+                              )}
                             </div>
                           );
                         })}
@@ -1079,6 +1107,15 @@ export default function StockRegisterPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <BidDialog
+        open={bidDialogOpen}
+        onOpenChange={setBidDialogOpen}
+        lot={bidSelectedLot}
+        serialNumber={bidSerialNumber}
+        date={bidDate}
+        onBidSuccess={onBidSuccess}
+      />
     </div>
   );
 }
