@@ -569,7 +569,7 @@ const CROP_COLORS: Record<string, string> = {
 
 // ─── Bid & lot totals calculators ─────────────────────────────────────────────
 
-function calcBidTotals(bid: BidRow, cs: ChargeSettings, vehicleBhadaRate: number, totalBagsInVehicle: number) {
+function calcBidTotals(bid: BidRow, cs: ChargeSettings, vehicleBhadaRate: number, totalBagsInVehicle: number, buyerAadhatOverride?: number | null) {
   const bidBags = parseInt(bid.numberOfBags) || 0;
   const pricePerKg = parseFloat(bid.pricePerKg) || 0;
   const txn = bid.txn;
@@ -583,7 +583,7 @@ function calcBidTotals(bid: BidRow, cs: ChargeSettings, vehicleBhadaRate: number
   const extraFarmer = parseFloat(txn.extraChargesFarmer) || 0;
   const extraBuyer = parseFloat(txn.extraChargesBuyer) || 0;
   const aadhatFPct = parseFloat(cs.aadhatCommissionFarmerPercent) || 0;
-  const aadhatBPct = parseFloat(cs.aadhatCommissionBuyerPercent) || 0;
+  const aadhatBPct = buyerAadhatOverride != null ? buyerAadhatOverride : parseFloat(cs.aadhatCommissionBuyerPercent) || 0;
   const mandiFPct = parseFloat(cs.mandiCommissionFarmerPercent) || 0;
   const mandiBPct = parseFloat(cs.mandiCommissionBuyerPercent) || 0;
   const freight = totalBagsInVehicle > 0 ? (vehicleBhadaRate * bidBags) / totalBagsInVehicle : 0;
@@ -597,9 +597,15 @@ function calcBidTotals(bid: BidRow, cs: ChargeSettings, vehicleBhadaRate: number
   };
 }
 
-function calcLotTotals(lot: LotRow, cs: ChargeSettings, vehicleBhadaRate: number, totalBagsInVehicle: number) {
+function calcLotTotals(lot: LotRow, cs: ChargeSettings, vehicleBhadaRate: number, totalBagsInVehicle: number, buyersData: any[] = []) {
   const lotBags = parseInt(lot.numberOfBags) || 0;
-  const bidTotals = lot.bids.map(b => calcBidTotals(b, cs, vehicleBhadaRate, totalBagsInVehicle));
+  const bidTotals = lot.bids.map(b => {
+    const buyerData = buyersData.find((buyer: any) => buyer.id === b.buyerId);
+    const buyerAadhat = buyerData?.aadhatCommissionPercent != null && buyerData.aadhatCommissionPercent !== ""
+      ? parseFloat(buyerData.aadhatCommissionPercent) || 0
+      : null;
+    return calcBidTotals(b, cs, vehicleBhadaRate, totalBagsInVehicle, buyerAadhat);
+  });
   return {
     lotBags,
     bidBags: bidTotals.reduce((s, t) => s + t.bidBags, 0),
@@ -637,7 +643,7 @@ function SectionToggle({ open, onToggle, icon, label, count, summary }: {
 
 // ─── Transaction / Charges section ───────────────────────────────────────────
 
-function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBagsInVehicle, cs }: {
+function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBagsInVehicle, cs, buyerAadhatOverride }: {
   txn: TxnState;
   onChange: (t: TxnState) => void;
   bags: number;
@@ -645,6 +651,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
   vehicleBhadaRate: number;
   totalBagsInVehicle: number;
   cs: ChargeSettings;
+  buyerAadhatOverride?: number | null;
 }) {
   const set = (field: keyof TxnState, val: any) => onChange({ ...txn, [field]: val });
 
@@ -679,7 +686,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
   const extraFarmer = parseFloat(txn.extraChargesFarmer) || 0;
   const extraBuyer = parseFloat(txn.extraChargesBuyer) || 0;
   const aadhatFarmerPct = parseFloat(cs.aadhatCommissionFarmerPercent) || 0;
-  const aadhatBuyerPct = parseFloat(cs.aadhatCommissionBuyerPercent) || 0;
+  const aadhatBuyerPct = buyerAadhatOverride != null ? buyerAadhatOverride : parseFloat(cs.aadhatCommissionBuyerPercent) || 0;
   const mandiFarmerPct = parseFloat(cs.mandiCommissionFarmerPercent) || 0;
   const mandiBuyerPct = parseFloat(cs.mandiCommissionBuyerPercent) || 0;
 
@@ -1008,7 +1015,7 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
   cs: ChargeSettings;
   farmerDate: string;
   overBag: boolean;
-  buyersList: { id: number; name: string; phone?: string }[];
+  buyersList: { id: number; name: string; phone?: string; aadhatCommissionPercent?: string | null }[];
 }) {
   const [showBuyerSuggestions, setShowBuyerSuggestions] = useState(false);
   const filteredBuyers = buyersList.filter(
@@ -1017,7 +1024,11 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
   const noBuyerSelected = bid.buyerName.trim().length > 0 && !bid.buyerId;
   const bags = parseInt(bid.numberOfBags) || 0;
   const pricePerKg = parseFloat(bid.pricePerKg) || 0;
-  const totals = calcBidTotals(bid, cs, vehicleBhadaRate, totalBagsInVehicle);
+  const bidBuyerData = buyersList.find(b => b.id === bid.buyerId);
+  const bidBuyerAadhat = bidBuyerData?.aadhatCommissionPercent != null && bidBuyerData.aadhatCommissionPercent !== ""
+    ? parseFloat(bidBuyerData.aadhatCommissionPercent) || 0
+    : null;
+  const totals = calcBidTotals(bid, cs, vehicleBhadaRate, totalBagsInVehicle, bidBuyerAadhat);
   const buyerLabel = bid.buyerName.trim() || "Bid";
 
   return (
@@ -1186,6 +1197,7 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
             vehicleBhadaRate={vehicleBhadaRate}
             totalBagsInVehicle={totalBagsInVehicle}
             cs={cs}
+            buyerAadhatOverride={bidBuyerAadhat}
           />
         </div>
       )}
@@ -1201,13 +1213,13 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
   onRemoveBid?: (lotIndex: number, bidIndex: number) => void;
   vehicleBhadaRate: number; totalBagsInVehicle: number;
   cs: ChargeSettings; farmerDate: string;
-  buyersList: { id: number; name: string; phone?: string }[];
+  buyersList: { id: number; name: string; phone?: string; aadhatCommissionPercent?: string | null }[];
   onReturnLot?: () => void;
 }) {
   const [pendingDeleteBidIdx, setPendingDeleteBidIdx] = useState<number | null>(null);
 
   const setField = (f: keyof Omit<LotRow, "id" | "dbId" | "bids" | "lotOpen">, v: string) => onChange({ ...lot, [f]: v });
-  const totals = calcLotTotals(lot, cs, vehicleBhadaRate, totalBagsInVehicle);
+  const totals = calcLotTotals(lot, cs, vehicleBhadaRate, totalBagsInVehicle, buyersList);
   const lotBags = parseInt(lot.numberOfBags) || 0;
 
   const updateBid = (idx: number, bid: BidRow) =>
@@ -1395,7 +1407,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
   cs: ChargeSettings; farmerDate: string; farmerName: string;
   currentUsername: string;
   onSyncSaved?: (updatedGroup: CropGroup) => void;
-  buyersList: { id: number; name: string; phone?: string }[];
+  buyersList: { id: number; name: string; phone?: string; aadhatCommissionPercent?: string | null }[];
   onReturnLot?: (lotIdx: number) => void;
   farmerCard?: FarmerCard;
 }) {
@@ -1462,7 +1474,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
     setPendingDeleteLotIdx(null);
   };
 
-  const allTotals = group.lots.map(l => calcLotTotals(l, cs, vehicleBhadaRate, totalBagsInVehicle));
+  const allTotals = group.lots.map(l => calcLotTotals(l, cs, vehicleBhadaRate, totalBagsInVehicle, buyersList));
   const totalBags = allTotals.reduce((s, t) => s + t.lotBags, 0);
   const totalBidBags = allTotals.reduce((s, t) => s + t.bidBags, 0);
   const remainingBags = totalBags - totalBidBags;
@@ -1819,7 +1831,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
   const { data: buyersData = [] } = useQuery<any[]>({
     queryKey: ["/api/buyers"],
   });
-  const buyersList = buyersData.map((b: any) => ({ id: b.id, name: b.name, phone: b.phone || "" }));
+  const buyersList = buyersData.map((b: any) => ({ id: b.id, name: b.name, phone: b.phone || "", aadhatCommissionPercent: b.aadhatCommissionPercent || null }));
 
   const filteredVillages = (locationData?.villages || []).filter(
     (v) => card.village.length >= 1 && v.toLowerCase().includes(card.village.toLowerCase()) && v.toLowerCase() !== card.village.toLowerCase()
@@ -1904,7 +1916,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
 
   const allLotTotals = card.cropGroups
     .filter(g => !g.archived)
-    .flatMap(g => g.lots.map(l => calcLotTotals(l, cs, vehicleBhadaRate, totalBagsInVehicle)));
+    .flatMap(g => g.lots.map(l => calcLotTotals(l, cs, vehicleBhadaRate, totalBagsInVehicle, buyersList)));
   const grandTotalBags = allLotTotals.reduce((s, t) => s + t.lotBags, 0);
   const grandBidBags = allLotTotals.reduce((s, t) => s + t.bidBags, 0);
   const grandRemainingBags = grandTotalBags - grandBidBags;
@@ -2816,7 +2828,10 @@ export default function StockPage() {
               const extraF = parseFloat(bid.txn.extraChargesFarmer) || 0;
               const extraB = parseFloat(bid.txn.extraChargesBuyer) || 0;
               const aadhatFPct = parseFloat(cs.aadhatCommissionFarmerPercent) || 0;
-              const aadhatBPct = parseFloat(cs.aadhatCommissionBuyerPercent) || 0;
+              const bidBuyerData = buyersData.find((b: any) => b.id === bid.buyerId);
+              const aadhatBPct = bidBuyerData?.aadhatCommissionPercent != null && bidBuyerData.aadhatCommissionPercent !== ""
+                ? parseFloat(bidBuyerData.aadhatCommissionPercent) || 0
+                : parseFloat(cs.aadhatCommissionBuyerPercent) || 0;
               const mandiFPct = parseFloat(cs.mandiCommissionFarmerPercent) || 0;
               const mandiBPct = parseFloat(cs.mandiCommissionBuyerPercent) || 0;
               const freight = totalBIV > 0 ? (vehicleBR * bidBags) / totalBIV : 0;
@@ -2851,8 +2866,8 @@ export default function StockPage() {
                 extraOthersFarmer: (parseFloat(bid.txn.extraOthers) || 0).toFixed(2),
                 hammaliCharges: hammaliFarmerTotal.toFixed(2),
                 freightCharges: freight.toFixed(2),
-                aadhatCharges: aadhatFarmer.toFixed(2),
-                mandiCharges: mandiFarmer.toFixed(2),
+                aadhatCharges: aadhatBuyer.toFixed(2),
+                mandiCharges: mandiBuyer.toFixed(2),
                 aadhatFarmerPercent: aadhatFPct.toFixed(2),
                 mandiFarmerPercent: mandiFPct.toFixed(2),
                 aadhatBuyerPercent: aadhatBPct.toFixed(2),

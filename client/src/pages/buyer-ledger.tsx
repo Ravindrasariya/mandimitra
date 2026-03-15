@@ -158,7 +158,7 @@ export default function BuyerLedgerPage() {
   const { toast } = useToast();
   const { t } = useLanguage();
   const _now = new Date();
-  const _defaultYear = String(_now.getFullYear());
+  const _defaultYear = String(_now.getMonth() < 3 ? _now.getFullYear() - 1 : _now.getFullYear());
   const _defaultMonth = String(_now.getMonth() + 1);
   const _defaultDay = String(_now.getDate());
   const [searchTerm, setSearchTerm] = usePersistedState("bl-searchTerm", "");

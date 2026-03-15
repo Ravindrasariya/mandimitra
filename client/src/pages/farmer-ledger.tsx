@@ -69,7 +69,9 @@ export default function FarmerLedgerPage() {
   const { t } = useLanguage();
   const [searchName, setSearchName] = usePersistedState("fl-searchName", "");
   const [searchVillage, setSearchVillage] = usePersistedState("fl-searchVillage", "");
-  const [yearFilter, setYearFilter] = usePersistedState("fl-yearFilter", "all");
+  const _fyNow = new Date();
+  const _fyDefault = String(_fyNow.getMonth() < 3 ? _fyNow.getFullYear() - 1 : _fyNow.getFullYear());
+  const [yearFilter, setYearFilter] = usePersistedState("fl-yearFilter", _fyDefault);
   const [showArchived, setShowArchived] = usePersistedState("fl-showArchived", false);
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
