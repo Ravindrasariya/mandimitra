@@ -1085,12 +1085,8 @@ export default function TransactionsPage() {
     setExtraOthers((tx as any).extraOthersFarmer || "0");
   };
 
-  const calcProportionateNetWeight = (bid: BidWithDetails): string => {
-    const lotWeight = parseFloat(bid.lot.initialTotalWeight || "0");
-    const lotBags = bid.lot.numberOfBags || 1;
-    const bidBags = bid.numberOfBags || 0;
-    if (lotWeight <= 0 || lotBags <= 0) return "";
-    return ((bidBags / lotBags) * lotWeight).toFixed(2);
+  const calcProportionateNetWeight = (_bid: BidWithDetails): string => {
+    return "";
   };
 
   const resetFormDefaults = (bid?: BidWithDetails) => {
