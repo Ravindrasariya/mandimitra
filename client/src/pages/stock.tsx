@@ -777,7 +777,7 @@ function LotCard({ lot, index, onChange, onRemove, vehicleBhadaRate, totalBagsIn
           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Lot #{index + 1}</span>
           {!lot.lotOpen && (
             <div className="flex items-center gap-3 text-xs ml-1">
-              <span className="text-muted-foreground">{totals.bags} bags</span>
+              <span className="text-muted-foreground">{parseInt(lot.numberOfBags) || 0} bags</span>
               {totals.hasData && (
                 <>
                   <span className="text-green-700 font-medium">Farmer: ₹{totals.farmerPayable.toFixed(0)}</span>
