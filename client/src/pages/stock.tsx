@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import {
 import {
   Plus, Trash2, ChevronDown, ChevronRight, Truck, User,
   AlertTriangle, Scale, Wheat, ChevronsUpDown, X, Calculator,
+  Archive, History, Save,
 } from "lucide-react";
 import { format } from "date-fns";
 import { CROPS, SIZES } from "@shared/schema";
@@ -92,7 +93,13 @@ type LotRow = {
   bids: BidRow[];
 };
 
-type CropGroup = { id: string; crop: string; srNumber: string; groupOpen: boolean; lots: LotRow[] };
+type EditEntry = { timestamp: string; label: string };
+
+type CropGroup = {
+  id: string; crop: string; srNumber: string; groupOpen: boolean; lots: LotRow[];
+  archived: boolean;
+  editHistory: EditEntry[];
+};
 
 type FarmerCard = {
   id: string;
@@ -113,6 +120,8 @@ type FarmerCard = {
   cardOpen: boolean;
   farmerOpen: boolean;
   vehicleOpen: boolean;
+  archived: boolean;
+  savedAt: string | null;
 };
 
 // ─── Confirm delete dialog ────────────────────────────────────────────────────
@@ -143,6 +152,101 @@ function ConfirmDeleteDialog({ open, title, description, onConfirm, onCancel }: 
             className="bg-red-600 hover:bg-red-700 focus:ring-red-600 text-white"
           >
             Yes, Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+// ─── Archive dialog ───────────────────────────────────────────────────────────
+
+function ArchiveDialog({ open, title, description, onConfirm, onCancel }: {
+  open: boolean; title: string; description: string; onConfirm: () => void; onCancel: () => void;
+}) {
+  return (
+    <AlertDialog open={open} onOpenChange={v => { if (!v) onCancel(); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2 text-amber-600 dark:text-amber-400">
+            <Archive className="w-5 h-5 shrink-0" /> {title}
+          </AlertDialogTitle>
+          <AlertDialogDescription className="text-sm text-muted-foreground">{description}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel autoFocus onClick={onCancel}>Cancel</AlertDialogCancel>
+          <AlertDialogAction onClick={onConfirm} className="bg-amber-600 hover:bg-amber-700 text-white">
+            Yes, Archive
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+// ─── Edit history dialog ───────────────────────────────────────────────────────
+
+function EditHistoryDialog({ open, crop, history, onClose }: {
+  open: boolean; crop: string; history: EditEntry[]; onClose: () => void;
+}) {
+  return (
+    <AlertDialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
+      <AlertDialogContent className="max-w-md">
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2">
+            <History className="w-5 h-5 text-blue-500" /> Edit History — {crop}
+          </AlertDialogTitle>
+          <AlertDialogDescription asChild>
+            <div className="space-y-2 mt-2 max-h-72 overflow-y-auto">
+              {history.length === 0 ? (
+                <p className="text-sm text-muted-foreground italic">No changes recorded yet. History is tracked after the first Save Entry.</p>
+              ) : (
+                <ul className="space-y-1.5">
+                  {[...history].reverse().map((e, i) => (
+                    <li key={i} className="flex items-center gap-2 text-sm bg-muted/40 rounded px-3 py-1.5">
+                      <History className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      <span className="text-muted-foreground">{e.timestamp}</span>
+                      <span className="text-foreground">{e.label}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogAction onClick={onClose}>Close</AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+// ─── Unsaved changes dialog ───────────────────────────────────────────────────
+
+function UnsavedChangesDialog({ open, farmerName, onSave, onDiscard, onKeep }: {
+  open: boolean; farmerName: string; onSave: () => void; onDiscard: () => void; onKeep: () => void;
+}) {
+  return (
+    <AlertDialog open={open} onOpenChange={v => { if (!v) onKeep(); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2">
+            <Save className="w-5 h-5 text-blue-500" /> Unsaved Changes
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            {farmerName
+              ? `"${farmerName}" has unsaved changes.`
+              : "This entry has unsaved changes."} What would you like to do?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+          <AlertDialogCancel onClick={onKeep}>Keep Editing</AlertDialogCancel>
+          <AlertDialogAction autoFocus onClick={onDiscard} className="bg-muted text-foreground hover:bg-muted/80 border border-border">
+            Discard & Close
+          </AlertDialogAction>
+          <AlertDialogAction onClick={onSave} className="bg-primary text-primary-foreground">
+            Save & Close
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -240,7 +344,29 @@ const emptyCard = (): FarmerCard => ({
   cardOpen: true,
   farmerOpen: true,
   vehicleOpen: false,
+  archived: false,
+  savedAt: null,
 });
+
+const emptyCropGroup = (crop: string, date?: string): CropGroup => ({
+  id: uid(), crop, srNumber: "XX", groupOpen: true,
+  lots: [emptyLot(date)], archived: false, editHistory: [],
+});
+
+// ─── Data fingerprint (for dirty detection, strips UI-only flags) ─────────────
+
+function getDataFingerprint(card: FarmerCard): string {
+  const stripBid = ({ id, bidOpen, txn, ...b }: BidRow) => ({
+    ...b,
+    txn: (({ showWeightCalc, showExtraBreakdown, ...t }) => t)(txn),
+  });
+  const stripLot = ({ id, lotOpen, bids, ...l }: LotRow) => ({ ...l, bids: bids.map(stripBid) });
+  const stripGroup = ({ groupOpen, editHistory, lots, ...g }: CropGroup) => ({
+    ...g, lots: lots.map(stripLot),
+  });
+  const { cardOpen, farmerOpen, vehicleOpen, savedAt, cropGroups, ...rest } = card;
+  return JSON.stringify({ ...rest, cropGroups: cropGroups.map(stripGroup) });
+}
 
 const MOCK_BUYERS = ["Ramesh Traders", "Suresh & Sons", "Patel Bros", "Kishan Vyapari"];
 
@@ -1001,13 +1127,14 @@ function LotCard({ lot, index, onChange, onRemove, vehicleBhadaRate, totalBagsIn
 
 // ─── Crop group ───────────────────────────────────────────────────────────────
 
-function CropGroupSection({ group, onChange, onRemove, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate, farmerName }: {
+function CropGroupSection({ group, onChange, onArchive, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate, farmerName }: {
   group: CropGroup;
-  onChange: (g: CropGroup) => void; onRemove: () => void;
+  onChange: (g: CropGroup) => void; onArchive: () => void;
   vehicleBhadaRate: number; totalBagsInVehicle: number;
   cs: ChargeSettings; farmerDate: string; farmerName: string;
 }) {
   const [pendingDeleteLotIdx, setPendingDeleteLotIdx] = useState<number | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
 
   const headerCls = CROP_HEADER[group.crop] || "bg-muted border-border";
   const badgeCls = CROP_COLORS[group.crop] || "bg-muted border-border text-foreground";
@@ -1020,14 +1147,16 @@ function CropGroupSection({ group, onChange, onRemove, vehicleBhadaRate, totalBa
 
   const removeLot = (idx: number) => {
     const lot = group.lots[idx];
-    // Always show dialog for last lot (consequence is group removal) or if lot has data
     if (isLastLot || hasLotUserData(lot)) { setPendingDeleteLotIdx(idx); return; }
     onChange({ ...group, lots: group.lots.filter((_, i) => i !== idx) });
   };
   const confirmDeleteLot = () => {
     if (pendingDeleteLotIdx !== null) {
-      if (isLastLot) { onRemove(); }            // last lot → remove whole group
-      else onChange({ ...group, lots: group.lots.filter((_, i) => i !== pendingDeleteLotIdx) });
+      if (isLastLot) {
+        onArchive();
+      } else {
+        onChange({ ...group, lots: group.lots.filter((_, i) => i !== pendingDeleteLotIdx) });
+      }
     }
     setPendingDeleteLotIdx(null);
   };
@@ -1040,6 +1169,21 @@ function CropGroupSection({ group, onChange, onRemove, vehicleBhadaRate, totalBa
   const totalBuyerReceivable = allTotals.reduce((s, t) => s + t.buyerReceivable, 0);
   const hasAnyData = allTotals.some(t => t.hasData);
 
+  if (group.archived) {
+    return (
+      <div className="rounded-xl border-2 border-amber-200 dark:border-amber-800 overflow-hidden opacity-50">
+        <div className="flex items-center justify-between px-4 py-2 bg-amber-50 dark:bg-amber-950/30">
+          <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400 font-medium">
+            <Archive className="w-3.5 h-3.5 shrink-0" />
+            <Wheat className="w-3.5 h-3.5 shrink-0" />
+            <span>SR# {group.srNumber} {group.crop}</span>
+            <span className="italic font-normal">— Archived</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={`rounded-xl border-2 ${headerCls} overflow-hidden`}>
       {/* Header — click to collapse/expand */}
@@ -1049,7 +1193,7 @@ function CropGroupSection({ group, onChange, onRemove, vehicleBhadaRate, totalBa
         onClick={() => onChange({ ...group, groupOpen: !group.groupOpen })}
         data-testid={`button-toggle-group-${group.crop.toLowerCase()}`}
       >
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
           {group.groupOpen ? <ChevronDown className="w-4 h-4 shrink-0" /> : <ChevronRight className="w-4 h-4 shrink-0" />}
           <Wheat className="w-4 h-4 shrink-0" />
           <span className="font-semibold text-sm">SR# {group.srNumber} {group.crop}</span>
@@ -1064,13 +1208,26 @@ function CropGroupSection({ group, onChange, onRemove, vehicleBhadaRate, totalBa
             />
           )}
         </div>
-        <Button
-          type="button" variant="ghost" size="sm"
-          onClick={e => { e.stopPropagation(); onRemove(); }}
-          className="h-7 w-7 p-0 text-red-400 hover:text-red-600 shrink-0"
-        >
-          <X className="w-3.5 h-3.5" />
-        </Button>
+        <div className="flex items-center gap-1 shrink-0">
+          <Button
+            type="button" variant="ghost" size="sm"
+            onClick={e => { e.stopPropagation(); setShowHistory(true); }}
+            className="h-7 px-2 gap-1 text-xs text-blue-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+            title="Edit History"
+            data-testid={`button-history-${group.crop.toLowerCase()}`}
+          >
+            <History className="w-3.5 h-3.5" /> History
+          </Button>
+          <Button
+            type="button" variant="ghost" size="sm"
+            onClick={e => { e.stopPropagation(); onArchive(); }}
+            className="h-7 w-7 p-0 text-amber-500 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/40 shrink-0"
+            title="Archive this crop group"
+            data-testid={`button-archive-${group.crop.toLowerCase()}`}
+          >
+            <Archive className="w-3.5 h-3.5" />
+          </Button>
+        </div>
       </button>
 
       {group.groupOpen && (
@@ -1097,11 +1254,18 @@ function CropGroupSection({ group, onChange, onRemove, vehicleBhadaRate, totalBa
         title="Delete this lot?"
         description={
           isLastLot
-            ? `This is the only lot for ${farmerLabel}'s ${group.crop}. Deleting it will also remove the entire ${group.crop} group.`
+            ? `This is the only lot for ${farmerLabel}'s ${group.crop}. Deleting it will archive the entire ${group.crop} group (crop groups cannot be permanently removed).`
             : `Lot #${(pendingDeleteLotIdx ?? 0) + 1} of ${farmerLabel}'s ${group.crop} has data that will be permanently lost. This action cannot be undone.`
         }
         onConfirm={confirmDeleteLot}
         onCancel={() => setPendingDeleteLotIdx(null)}
+      />
+
+      <EditHistoryDialog
+        open={showHistory}
+        crop={`${group.crop} (SR# ${group.srNumber})`}
+        history={group.editHistory}
+        onClose={() => setShowHistory(false)}
       />
     </div>
   );
@@ -1109,39 +1273,61 @@ function CropGroupSection({ group, onChange, onRemove, vehicleBhadaRate, totalBa
 
 // ─── Farmer card ──────────────────────────────────────────────────────────────
 
-function FarmerCardComp({ card, onChange, onRemove, cs }: {
+function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onCancel, onArchive, cs }: {
   card: FarmerCard;
-  onChange: (c: FarmerCard) => void; onRemove: () => void;
+  savedCard: FarmerCard | null;
+  onChange: (c: FarmerCard) => void;
+  onSave: () => void;
+  onSaveAndClose: () => void;
+  onCancel: () => void;
+  onArchive: () => void;
   cs: ChargeSettings;
 }) {
-  const [pendingDeleteGroupIdx, setPendingDeleteGroupIdx] = useState<number | null>(null);
+  const [pendingArchiveGroupIdx, setPendingArchiveGroupIdx] = useState<number | null>(null);
+  const [showArchiveFarmer, setShowArchiveFarmer] = useState(false);
+  const [showUnsaved, setShowUnsaved] = useState(false);
 
   const set = (f: keyof FarmerCard, v: any) => onChange({ ...card, [f]: v });
-  const usedCrops = card.cropGroups.map(g => g.crop);
+  const usedCrops = card.cropGroups.filter(g => !g.archived).map(g => g.crop);
   const availableCrops = CROPS.filter(c => !usedCrops.includes(c));
 
   const vehicleBhadaRate = parseFloat(card.vehicleBhadaRate) || 0;
   const totalBagsInVehicle = parseInt(card.totalBagsInVehicle) || 0;
 
+  const hasAnyInput = !!(
+    card.farmerName.trim() || card.farmerPhone || card.village ||
+    card.vehicleNumber || card.advanceAmount ||
+    card.cropGroups.some(g => g.lots.some(hasLotUserData))
+  );
+
+  const isDirty = savedCard
+    ? getDataFingerprint(card) !== getDataFingerprint(savedCard)
+    : hasAnyInput;
+
+  const handleCardToggle = () => {
+    if (card.cardOpen && isDirty) {
+      setShowUnsaved(true);
+      return;
+    }
+    set("cardOpen", !card.cardOpen);
+  };
+
   const addCrop = (crop: string) => onChange({
-    ...card, cropGroups: [...card.cropGroups, { id: uid(), crop, srNumber: "XX", groupOpen: true, lots: [emptyLot(card.date)] }],
+    ...card, cropGroups: [...card.cropGroups, emptyCropGroup(crop, card.date)],
   });
   const updateGroup = (idx: number, g: CropGroup) =>
     onChange({ ...card, cropGroups: card.cropGroups.map((gg, i) => (i === idx ? g : gg)) });
-  const removeGroup = (idx: number) => {
-    const group = card.cropGroups[idx];
-    const hasData = group.lots.some(hasLotUserData);
-    if (hasData) { setPendingDeleteGroupIdx(idx); return; }
-    onChange({ ...card, cropGroups: card.cropGroups.filter((_, i) => i !== idx) });
+  const archiveGroup = (idx: number) => setPendingArchiveGroupIdx(idx);
+  const confirmArchiveGroup = () => {
+    if (pendingArchiveGroupIdx !== null)
+      onChange({ ...card, cropGroups: card.cropGroups.map((g, i) => i === pendingArchiveGroupIdx ? { ...g, archived: true } : g) });
+    setPendingArchiveGroupIdx(null);
   };
-  const confirmDeleteGroup = () => {
-    if (pendingDeleteGroupIdx !== null)
-      onChange({ ...card, cropGroups: card.cropGroups.filter((_, i) => i !== pendingDeleteGroupIdx) });
-    setPendingDeleteGroupIdx(null);
-  };
-  const pendingGroupName = pendingDeleteGroupIdx !== null ? card.cropGroups[pendingDeleteGroupIdx]?.crop : "";
+  const pendingGroupName = pendingArchiveGroupIdx !== null ? card.cropGroups[pendingArchiveGroupIdx]?.crop : "";
 
-  const allLotTotals = card.cropGroups.flatMap(g => g.lots.map(l => calcLotTotals(l, cs, vehicleBhadaRate, totalBagsInVehicle)));
+  const allLotTotals = card.cropGroups
+    .filter(g => !g.archived)
+    .flatMap(g => g.lots.map(l => calcLotTotals(l, cs, vehicleBhadaRate, totalBagsInVehicle)));
   const grandTotalBags = allLotTotals.reduce((s, t) => s + t.lotBags, 0);
   const grandBidBags = allLotTotals.reduce((s, t) => s + t.bidBags, 0);
   const grandRemainingBags = grandTotalBags - grandBidBags;
@@ -1150,12 +1336,20 @@ function FarmerCardComp({ card, onChange, onRemove, cs }: {
   const grandHasData = allLotTotals.some(t => t.hasData);
 
   return (
-    <Card className="border-2 border-border shadow-md overflow-hidden">
+    <Card className={`border-2 shadow-md overflow-hidden transition-all ${card.archived ? "opacity-50 border-amber-300 dark:border-amber-700" : "border-border"}`}>
+      {/* Archived banner */}
+      {card.archived && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 text-xs font-medium">
+          <Archive className="w-3.5 h-3.5 shrink-0" />
+          Archived — excluded from all calculations
+        </div>
+      )}
+
       {/* Header */}
       <button
         type="button"
-        className="w-full flex items-center justify-between px-4 py-3 bg-muted/40 hover:bg-muted/60 transition-colors border-b border-border"
-        onClick={() => set("cardOpen", !card.cardOpen)}
+        className={`w-full flex items-center justify-between px-4 py-3 transition-colors border-b border-border ${card.archived ? "bg-muted/20 cursor-default" : "bg-muted/40 hover:bg-muted/60"}`}
+        onClick={handleCardToggle}
         data-testid="button-toggle-farmer-card"
       >
         <div className="flex items-center gap-3 min-w-0 flex-wrap">
@@ -1166,7 +1360,12 @@ function FarmerCardComp({ card, onChange, onRemove, cs }: {
           </span>
           {card.farmerPhone && <span className="text-xs text-muted-foreground">· {card.farmerPhone}</span>}
           {card.village && <span className="text-xs text-muted-foreground">· {card.village}</span>}
-          {!card.cardOpen && (
+          {isDirty && card.savedAt !== null && (
+            <span className="text-[10px] font-medium text-orange-500 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-800 rounded px-1.5 py-0.5">
+              Unsaved changes
+            </span>
+          )}
+          {!card.cardOpen && !card.archived && (
             <CollapsedSummary
               totalBags={grandTotalBags} remainingBags={grandRemainingBags}
               farmerPayable={grandFarmerPayable} buyerReceivable={grandBuyerReceivable}
@@ -1181,16 +1380,21 @@ function FarmerCardComp({ card, onChange, onRemove, cs }: {
             onClick={e => e.stopPropagation()}
             className="text-xs border border-border rounded px-2 py-1 bg-background"
             data-testid="input-farmer-date"
+            disabled={card.archived}
           />
-          <Button type="button" variant="ghost" size="sm"
-            onClick={e => { e.stopPropagation(); onRemove(); }}
-            className="h-7 w-7 p-0 text-red-400 hover:text-red-600">
-            <Trash2 className="w-3.5 h-3.5" />
-          </Button>
+          {!card.archived && (
+            <Button type="button" variant="ghost" size="sm"
+              onClick={e => { e.stopPropagation(); setShowArchiveFarmer(true); }}
+              className="h-7 w-7 p-0 text-amber-500 hover:text-amber-700"
+              title="Archive this farmer entry"
+              data-testid="button-archive-farmer">
+              <Archive className="w-3.5 h-3.5" />
+            </Button>
+          )}
         </div>
       </button>
 
-      {card.cardOpen && (
+      {card.cardOpen && !card.archived && (
         <CardContent className="p-4 space-y-3">
 
           {/* Farmer details */}
@@ -1286,7 +1490,7 @@ function FarmerCardComp({ card, onChange, onRemove, cs }: {
               <CropGroupSection
                 key={group.id} group={group}
                 onChange={g => updateGroup(idx, g)}
-                onRemove={() => removeGroup(idx)}
+                onArchive={() => archiveGroup(idx)}
                 vehicleBhadaRate={vehicleBhadaRate}
                 totalBagsInVehicle={totalBagsInVehicle}
                 cs={cs}
@@ -1312,27 +1516,62 @@ function FarmerCardComp({ card, onChange, onRemove, cs }: {
                 ))}
               </div>
             )}
-            {card.cropGroups.length === 0 && (
+            {card.cropGroups.filter(g => !g.archived).length === 0 && (
               <p className="text-xs text-muted-foreground italic text-center py-2">
                 Select a crop above to begin adding lots
               </p>
             )}
           </div>
 
-          <div className="flex justify-end pt-2 border-t border-border">
-            <Button type="button" disabled className="gap-2 opacity-50" title="Wiring coming soon">
-              Save Entry
+          {/* Footer: Cancel + Save */}
+          <div className="flex items-center justify-between pt-2 border-t border-border">
+            <Button type="button" variant="outline" size="sm"
+              onClick={onCancel}
+              className="h-8 text-sm gap-1.5 text-muted-foreground"
+              data-testid="button-cancel-entry">
+              <X className="w-3.5 h-3.5" /> Cancel
             </Button>
+            <div className="flex items-center gap-2">
+              {card.savedAt && (
+                <span className="text-[10px] text-muted-foreground">Last saved: {card.savedAt}</span>
+              )}
+              <Button type="button"
+                onClick={onSave}
+                disabled={!isDirty}
+                className={`h-8 gap-1.5 text-sm transition-all ${isDirty ? "bg-primary text-primary-foreground" : "opacity-50"}`}
+                data-testid="button-save-entry">
+                <Save className="w-3.5 h-3.5" /> Save Entry
+              </Button>
+            </div>
           </div>
         </CardContent>
       )}
 
-      <ConfirmDeleteDialog
-        open={pendingDeleteGroupIdx !== null}
-        title={`Delete ${card.farmerName.trim() || "this farmer"}'s "${pendingGroupName}" group?`}
-        description={`All lots and data for ${card.farmerName.trim() || "this farmer"}'s "${pendingGroupName}" crop will be permanently lost. This action cannot be undone.`}
-        onConfirm={confirmDeleteGroup}
-        onCancel={() => setPendingDeleteGroupIdx(null)}
+      {/* Archive farmer dialog */}
+      <ArchiveDialog
+        open={showArchiveFarmer}
+        title={`Archive ${card.farmerName.trim() || "this farmer"}?`}
+        description="This farmer entry will be archived and grayed out. All their lots and bids will be excluded from calculations. Archived entries cannot be permanently deleted here — only a full account Reset from the Admin page can remove them."
+        onConfirm={() => { setShowArchiveFarmer(false); onArchive(); }}
+        onCancel={() => setShowArchiveFarmer(false)}
+      />
+
+      {/* Archive crop group dialog */}
+      <ArchiveDialog
+        open={pendingArchiveGroupIdx !== null}
+        title={`Archive "${pendingGroupName}" group?`}
+        description={`This crop group will be archived and excluded from all calculations. Archived groups cannot be permanently deleted — only a full account Reset from the Admin page can remove them.`}
+        onConfirm={confirmArchiveGroup}
+        onCancel={() => setPendingArchiveGroupIdx(null)}
+      />
+
+      {/* Unsaved changes on collapse */}
+      <UnsavedChangesDialog
+        open={showUnsaved}
+        farmerName={card.farmerName.trim()}
+        onSave={() => { setShowUnsaved(false); onSaveAndClose(); }}
+        onDiscard={() => { setShowUnsaved(false); onCancel(); }}
+        onKeep={() => setShowUnsaved(false)}
       />
     </Card>
   );
@@ -1342,6 +1581,7 @@ function FarmerCardComp({ card, onChange, onRemove, cs }: {
 
 export default function StockPage() {
   const [cards, setCards] = useState<FarmerCard[]>([emptyCard()]);
+  const [savedCardMap, setSavedCardMap] = useState<Map<string, FarmerCard>>(new Map());
 
   const { data: chargeSettings } = useQuery<ChargeSettings>({
     queryKey: ["/api/charge-settings"],
@@ -1349,11 +1589,57 @@ export default function StockPage() {
 
   const cs = chargeSettings || DEFAULT_CS;
 
+  const anyDirty = cards.some(c => {
+    if (c.archived) return false;
+    const saved = savedCardMap.get(c.id) ?? null;
+    return saved ? getDataFingerprint(c) !== getDataFingerprint(saved) : true;
+  });
+
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => {
+      if (anyDirty) { e.preventDefault(); e.returnValue = ""; }
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [anyDirty]);
+
   const addCard = () => setCards(prev => [emptyCard(), ...prev]);
   const updateCard = (idx: number, card: FarmerCard) =>
     setCards(prev => prev.map((c, i) => (i === idx ? card : c)));
-  const removeCard = (idx: number) =>
-    setCards(prev => prev.filter((_, i) => i !== idx));
+
+  const saveCard = (idx: number, collapseAfter = false) => {
+    const card = cards[idx];
+    const isFirstSave = !savedCardMap.has(card.id);
+    const now = format(new Date(), "dd/MM/yyyy HH:mm");
+    const updatedCard: FarmerCard = {
+      ...card,
+      cardOpen: collapseAfter ? false : card.cardOpen,
+      savedAt: now,
+      cropGroups: card.cropGroups.map(g => ({
+        ...g,
+        editHistory: isFirstSave
+          ? g.editHistory
+          : [...g.editHistory, { timestamp: now, label: "Entry updated & saved" }],
+      })),
+    };
+    setCards(prev => prev.map((c, i) => (i === idx ? updatedCard : c)));
+    setSavedCardMap(prev => new Map(prev).set(card.id, updatedCard));
+  };
+
+  const cancelCard = (idx: number) => {
+    const card = cards[idx];
+    const saved = savedCardMap.get(card.id);
+    if (saved) {
+      setCards(prev => prev.map((c, i) =>
+        i === idx ? { ...saved, cardOpen: false, farmerOpen: c.farmerOpen, vehicleOpen: c.vehicleOpen } : c
+      ));
+    } else {
+      setCards(prev => prev.filter((_, i) => i !== idx));
+    }
+  };
+
+  const archiveCard = (idx: number) =>
+    setCards(prev => prev.map((c, i) => (i === idx ? { ...c, archived: true, cardOpen: false } : c)));
 
   return (
     <div className="flex flex-col h-full">
@@ -1370,8 +1656,12 @@ export default function StockPage() {
         {cards.map((card, idx) => (
           <FarmerCardComp
             key={card.id} card={card}
+            savedCard={savedCardMap.get(card.id) ?? null}
             onChange={c => updateCard(idx, c)}
-            onRemove={() => removeCard(idx)}
+            onSave={() => saveCard(idx)}
+            onSaveAndClose={() => saveCard(idx, true)}
+            onCancel={() => cancelCard(idx)}
+            onArchive={() => archiveCard(idx)}
             cs={cs}
           />
         ))}
