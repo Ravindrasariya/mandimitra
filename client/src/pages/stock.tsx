@@ -2414,21 +2414,24 @@ export default function StockPage() {
           const savedBidMap = new Map((savedLot?.bids || []).filter(b => b.bidDbId).map(b => [b.bidDbId!, b]));
 
           const currentBidDbIds = new Set(lot.bids.filter(b => b.bidDbId).map(b => b.bidDbId!));
+          const restoredBids: BidRow[] = [];
           for (const [deletedBidDbId, deletedBid] of Array.from(savedBidMap.entries())) {
             if (!currentBidDbIds.has(deletedBidDbId)) {
               if (deletedBid.txnDbId) {
-                toast({ title: "Warning", description: `Cannot delete bid for ${deletedBid.buyerName} — it has an active transaction. Skipping.`, variant: "destructive" });
+                toast({ title: "Warning", description: `Cannot delete bid for ${deletedBid.buyerName} — it has an active transaction. Restoring bid.`, variant: "destructive" });
+                restoredBids.push(deletedBid);
                 continue;
               }
               try {
                 await apiRequest("DELETE", `/api/bids/${deletedBidDbId}`);
               } catch (err: any) {
                 toast({ title: "Warning", description: `Failed to delete bid: ${err.message}`, variant: "destructive" });
+                restoredBids.push(deletedBid);
               }
             }
           }
 
-          const updatedBids: BidRow[] = [];
+          const updatedBids: BidRow[] = [...restoredBids];
           for (const bid of lot.bids) {
             if (!bid.buyerId || !bid.pricePerKg || !(parseInt(bid.numberOfBags) > 0)) {
               updatedBids.push(bid);
@@ -2482,10 +2485,10 @@ export default function StockPage() {
 
             if (bidDbId && nw <= 0 && txnDbId) {
               try {
-                await apiRequest("DELETE", `/api/transactions/${txnDbId}`);
+                await apiRequest("POST", `/api/transactions/${txnDbId}/reverse`);
                 txnDbId = undefined;
               } catch (err: any) {
-                toast({ title: "Warning", description: `Failed to remove transaction: ${err.message}`, variant: "destructive" });
+                toast({ title: "Warning", description: `Failed to reverse transaction: ${err.message}`, variant: "destructive" });
               }
             }
 
@@ -2518,7 +2521,7 @@ export default function StockPage() {
               const farmerPayable = farmerGross - farmerDed;
               const buyerReceivable = buyerGross + buyerAdd;
 
-              const txnPayload: any = {
+              const txnPayload: Record<string, string | number | null> = {
                 lotId: lot.dbId,
                 bidId: bidDbId,
                 buyerId: bid.buyerId,
