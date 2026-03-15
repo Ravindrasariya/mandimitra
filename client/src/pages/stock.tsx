@@ -639,10 +639,10 @@ function SectionToggle({ open, onToggle, icon, label, count, summary }: {
     <button
       type="button"
       onClick={onToggle}
-      className="w-full flex items-center gap-2 px-3 py-2 rounded-md bg-muted/50 hover:bg-muted transition-colors text-sm font-medium text-left"
+      className="w-full flex items-start gap-2 px-3 py-2 rounded-md bg-muted/50 hover:bg-muted transition-colors text-sm font-medium text-left"
     >
-      {open ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
-      {icon}
+      {open ? <ChevronDown className="w-4 h-4 shrink-0 mt-0.5 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 shrink-0 mt-0.5 text-muted-foreground" />}
+      <span className="shrink-0 mt-0.5">{icon}</span>
       <span>{label}</span>
       {!open && summary && summary.length > 0 && (
         <span className="flex items-center gap-1.5 flex-wrap ml-1">
@@ -2242,11 +2242,11 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                 <Input data-testid="input-driver-contact" type="tel" inputMode="numeric" placeholder="Optional" value={card.driverContact} onChange={e => set("driverContact", e.target.value.replace(/\D/g, "").slice(0, 10))} className="h-8 text-sm" />
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground">Freight/Bhada (₹) <span className="text-destructive">*</span></Label>
+                <Label className="text-[10px] text-muted-foreground">Freight/Bhada (₹) <span className="text-destructive">*</span></Label>
                 <Input data-testid="input-bhada-rate" type="text" inputMode="decimal" placeholder="0.00" value={card.vehicleBhadaRate} onChange={e => set("vehicleBhadaRate", toNum(e.target.value))} onFocus={e => e.target.select()} className="h-8 text-sm" />
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground">Advance / Credit <span className="text-destructive">*</span></Label>
+                <Label className="text-[10px] text-muted-foreground">Advance / Credit <span className="text-destructive">*</span></Label>
                 <Select value={card.freightType} onValueChange={v => set("freightType", v)}>
                   <SelectTrigger data-testid="select-freight-type" className="h-8 text-sm">
                     <SelectValue placeholder="Select type" />
@@ -2258,7 +2258,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                 </Select>
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground">Total # of Bags <span className="text-destructive">*</span></Label>
+                <Label className="text-[10px] text-muted-foreground">Total # of Bags <span className="text-destructive">*</span></Label>
                 <Input data-testid="input-total-bags-vehicle" type="text" inputMode="numeric" placeholder="0" value={card.totalBagsInVehicle} onChange={e => set("totalBagsInVehicle", e.target.value.replace(/\D/g, ""))} onFocus={e => e.target.select()} className="h-8 text-sm" />
                 {(() => {
                   const allocated = card.cropGroups.reduce((sum, g) => sum + g.lots.reduce((s, l) => s + (parseInt(l.numberOfBags) || 0), 0), 0);
