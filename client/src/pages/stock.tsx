@@ -426,7 +426,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
           </div>
 
           {nw > 0 && pricePerKg > 0 && (
-            <div className="border-t pt-1.5 mt-1.5 space-y-0.5">
+            <div className="border-t pt-1.5 mt-1.5 bg-green-50 dark:bg-green-950/30 rounded-md p-2 -mx-0.5 space-y-0.5">
               <div className="flex justify-between">
                 <span>Gross ({nw.toFixed(0)} × ₹{(pricePerKg + epkFarmer).toFixed(2)}):</span>
                 <span className="font-medium">₹{farmerGross.toFixed(2)}</span>
@@ -501,7 +501,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
           </div>
 
           {nw > 0 && pricePerKg > 0 && (
-            <div className="border-t pt-1.5 mt-1.5 space-y-0.5">
+            <div className="border-t pt-1.5 mt-1.5 bg-blue-50 dark:bg-blue-950/30 rounded-md p-2 -mx-0.5 space-y-0.5">
               <div className="flex justify-between">
                 <span>Gross ({nw.toFixed(0)} × ₹{(pricePerKg + epkBuyer).toFixed(2)}):</span>
                 <span className="font-medium">₹{buyerGross.toFixed(2)}</span>
