@@ -1479,7 +1479,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
     const lotDbIds = group.lots.filter(l => l.dbId).map(l => l.dbId!);
     if (lotDbIds.length === 0) return null;
     try {
-      const res = await apiRequest("GET", `/api/transactions?dateFrom=${farmerCard.date}&dateTo=${farmerCard.date}`);
+      const res = await apiRequest("GET", `/api/transactions`);
       const allTxns: (Transaction & { farmer: Farmer; buyer: Buyer; lot: Lot; bid: Bid })[] = await res.json();
       const groupTxns = allTxns.filter(t => lotDbIds.includes(t.lotId) && !t.isReversed);
       if (groupTxns.length === 0) return null;
@@ -1488,7 +1488,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
         id: farmerCard.farmerId || 0,
         businessId: user?.businessId || 0,
         name: farmerCard.farmerName,
-        phone: farmerCard.farmerPhone || null,
+        phone: farmerCard.farmerPhone || "",
         village: farmerCard.village || null,
         tehsil: farmerCard.tehsil || null,
         district: farmerCard.district || null,
@@ -1506,7 +1506,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
         }
         lotMap.get(key)!.completedTxns.push(tx);
       }
-      lotGroups.push(...lotMap.values());
+      lotGroups.push(...Array.from(lotMap.values()));
 
       const sg: UnifiedSerialGroup = {
         serialNumber: parseInt(group.srNumber) || 0,
