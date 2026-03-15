@@ -18,6 +18,7 @@ import {
   Plus, Trash2, ChevronDown, ChevronRight, Truck, User,
   AlertTriangle, Scale, Wheat, ChevronsUpDown, X, Calculator,
   Archive, History, Save, Check, Printer, Share2,
+  Layers, Landmark, ShoppingBag,
 } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
@@ -589,10 +590,12 @@ function calcBidTotals(bid: BidRow, cs: ChargeSettings, vehicleBhadaRate: number
   const freight = totalBagsInVehicle > 0 ? (vehicleBhadaRate * bidBags) / totalBagsInVehicle : 0;
   const farmerDed = hfRate * bidBags + extraFarmer + (farmerGross * aadhatFPct) / 100 + (farmerGross * mandiFPct) / 100 + freight;
   const buyerAdd = hbRate * bidBags + extraBuyer + (buyerGross * aadhatBPct) / 100 + (buyerGross * mandiBPct) / 100;
+  const aadhatBuyer = (buyerGross * aadhatBPct) / 100;
   return {
     bidBags,
     farmerPayable: farmerGross - farmerDed,
     buyerReceivable: buyerGross + buyerAdd,
+    aadhatBuyer,
     hasData: nw > 0 && pricePerKg > 0,
   };
 }
@@ -611,6 +614,7 @@ function calcLotTotals(lot: LotRow, cs: ChargeSettings, vehicleBhadaRate: number
     bidBags: bidTotals.reduce((s, t) => s + t.bidBags, 0),
     farmerPayable: bidTotals.reduce((s, t) => s + t.farmerPayable, 0),
     buyerReceivable: bidTotals.reduce((s, t) => s + t.buyerReceivable, 0),
+    aadhatBuyer: bidTotals.reduce((s, t) => s + t.aadhatBuyer, 0),
     hasData: bidTotals.some(t => t.hasData),
   };
 }
@@ -2493,6 +2497,95 @@ function loadDraftsFromStorage(businessId: number): FarmerCard[] {
   }
 }
 
+const fmtInr = (n: number) => {
+  const abs = Math.abs(n);
+  if (abs >= 1e7) return `₹${(n / 1e7).toFixed(2)}Cr`;
+  if (abs >= 1e5) return `₹${(n / 1e5).toFixed(2)}L`;
+  return `₹${Math.round(n).toLocaleString("en-IN")}`;
+};
+
+function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
+  cards: FarmerCard[];
+  savedCardMap: Map<string, FarmerCard>;
+  cs: ChargeSettings;
+  buyersList: { id: number; name: string; phone?: string; aadhatCommissionPercent?: string | null }[];
+}) {
+  let totalLots = 0, totalTxns = 0;
+  let farmerPayableTotal = 0, farmerDue = 0;
+  let buyerReceivableTotal = 0, buyerDue = 0;
+  let aadhatTotal = 0;
+
+  for (const card of cards) {
+    if (card.archived || !savedCardMap.has(card.id)) continue;
+    const vbr = parseFloat(card.vehicleBhadaRate) || 0;
+    const tbi = parseInt(card.totalBagsInVehicle) || 0;
+    for (const g of card.cropGroups) {
+      if (g.archived) continue;
+      for (const lot of g.lots) {
+        if (lot.isReturned) continue;
+        totalLots++;
+        const lt = calcLotTotals(lot, cs, vbr, tbi, buyersList);
+        farmerPayableTotal += lt.farmerPayable;
+        buyerReceivableTotal += lt.buyerReceivable;
+        aadhatTotal += lt.aadhatBuyer;
+        for (const bid of lot.bids) {
+          if (!bid.buyerName) continue;
+          totalTxns++;
+          const buyerData = buyersList.find(b => b.id === bid.buyerId);
+          const buyerAadhat = buyerData?.aadhatCommissionPercent != null && buyerData.aadhatCommissionPercent !== ""
+            ? parseFloat(buyerData.aadhatCommissionPercent) || 0 : null;
+          const bt = calcBidTotals(bid, cs, vbr, tbi, buyerAadhat);
+          if (bid.farmerPaymentStatus !== "paid") farmerDue += bt.farmerPayable;
+          if (bid.paymentStatus !== "paid") buyerDue += bt.buyerReceivable;
+        }
+      }
+    }
+  }
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-2" data-testid="stock-summary-bar">
+      <div className="rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 px-4 py-3">
+        <div className="flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 mb-1">
+          <Layers className="w-3.5 h-3.5" /> Lots / Txns
+        </div>
+        <div className="text-xl font-bold text-blue-700 dark:text-blue-300" data-testid="text-lots-txns">
+          {totalLots} / {totalTxns}
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 px-4 py-3">
+        <div className="flex items-center gap-1.5 text-xs font-medium text-green-600 dark:text-green-400 mb-1">
+          <User className="w-3.5 h-3.5" /> Farmer Payable
+        </div>
+        <div className="text-xl font-bold text-green-700 dark:text-green-300" data-testid="text-farmer-payable">
+          {fmtInr(farmerPayableTotal)}
+        </div>
+        <div className="text-xs text-red-500 dark:text-red-400 font-medium">Due: {fmtInr(farmerDue)}</div>
+      </div>
+
+      <div className="rounded-xl border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/30 px-4 py-3">
+        <div className="flex items-center gap-1.5 text-xs font-medium text-purple-600 dark:text-purple-400 mb-1">
+          <ShoppingBag className="w-3.5 h-3.5" /> Buyer Receivable
+        </div>
+        <div className="text-xl font-bold text-purple-700 dark:text-purple-300" data-testid="text-buyer-receivable">
+          {fmtInr(buyerReceivableTotal)}
+        </div>
+        <div className="text-xs text-red-500 dark:text-red-400 font-medium">Due: {fmtInr(buyerDue)}</div>
+      </div>
+
+      <div className="rounded-xl border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/30 px-4 py-3">
+        <div className="flex items-center gap-1.5 text-xs font-medium text-orange-600 dark:text-orange-400 mb-1">
+          <Landmark className="w-3.5 h-3.5" /> Aadhat Comm.
+        </div>
+        <div className="text-xl font-bold text-orange-700 dark:text-orange-300" data-testid="text-aadhat-comm">
+          {fmtInr(aadhatTotal)}
+        </div>
+        <div className="text-xs text-green-600 dark:text-green-400 font-medium">Earned (via Buyer Dues)</div>
+      </div>
+    </div>
+  );
+}
+
 function sortCardsByMaxSr(cards: FarmerCard[]): FarmerCard[] {
   return [...cards].sort((a, b) => {
     const maxSr = (c: FarmerCard) => Math.max(0, ...c.cropGroups.map(g => parseInt(g.srNumber) || 0));
@@ -2519,6 +2612,11 @@ export default function StockPage() {
   const { data: chargeSettings } = useQuery<ChargeSettings>({
     queryKey: ["/api/charge-settings"],
   });
+
+  const { data: pageBuyersData = [] } = useQuery<any[]>({
+    queryKey: ["/api/buyers"],
+  });
+  const pageBuyersList = pageBuyersData.map((b: any) => ({ id: b.id, name: b.name, phone: b.phone || "", aadhatCommissionPercent: b.aadhatCommissionPercent || null }));
 
   const cs = chargeSettings || DEFAULT_CS;
 
@@ -3016,6 +3114,7 @@ export default function StockPage() {
             <div className="text-sm text-muted-foreground">Loading stock entries...</div>
           </div>
         )}
+        {!loadingCards && <StockSummaryBar cards={cards} savedCardMap={savedCardMap} cs={cs} buyersList={pageBuyersList} />}
         {cards.map((card, idx) => (
           <FarmerCardComp
             key={card.id} card={card}
