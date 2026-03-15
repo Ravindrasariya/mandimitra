@@ -1510,7 +1510,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
 
 // ─── Farmer card ──────────────────────────────────────────────────────────────
 
-function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onCancel, onArchive, cs, currentUsername }: {
+function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onCancel, onArchive, onSyncSaved, cs, currentUsername }: {
   card: FarmerCard;
   savedCard: FarmerCard | null;
   onChange: (c: FarmerCard) => void;
@@ -1518,6 +1518,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
   onSaveAndClose: () => void;
   onCancel: () => void;
   onArchive: () => void;
+  onSyncSaved: (c: FarmerCard) => void;
   cs: ChargeSettings;
   currentUsername: string;
 }) {
@@ -1573,7 +1574,10 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
           queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
           queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
         }
-        onChange({ ...card, cropGroups: card.cropGroups.map((g, i) => i === pendingArchiveGroupIdx ? { ...g, archived: true } : g) });
+        const updatedCard = { ...card, cropGroups: card.cropGroups.map((g, i) => i === pendingArchiveGroupIdx ? { ...g, archived: true } : g) };
+        onChange(updatedCard);
+        onSyncSaved(updatedCard);
+        toast({ title: "Crop group archived" });
       } catch (err: any) {
         toast({ title: "Failed to archive crop group", description: err?.message || "Please try again", variant: "destructive" });
       }
@@ -2222,6 +2226,7 @@ export default function StockPage() {
             onSaveAndClose={() => saveCard(idx, true)}
             onCancel={() => cancelCard(idx)}
             onArchive={() => archiveCard(idx)}
+            onSyncSaved={c => setSavedCardMap(prev => new Map(prev).set(c.id, JSON.parse(JSON.stringify(c))))}
             cs={cs}
             currentUsername={currentUsername}
           />
