@@ -2258,11 +2258,11 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                 <Input data-testid="input-driver-contact" type="tel" inputMode="numeric" placeholder="Optional" value={card.driverContact} onChange={e => set("driverContact", e.target.value.replace(/\D/g, "").slice(0, 10))} className="h-8 text-sm" />
               </div>
               <div>
-                <Label className="text-[10px] text-muted-foreground">Freight/Bhada (₹) <span className="text-destructive">*</span></Label>
+                <Label className="text-[10px] sm:text-xs text-muted-foreground">Freight/Bhada (₹) <span className="text-destructive">*</span></Label>
                 <Input data-testid="input-bhada-rate" type="text" inputMode="decimal" placeholder="0.00" value={card.vehicleBhadaRate} onChange={e => set("vehicleBhadaRate", toNum(e.target.value))} onFocus={e => e.target.select()} className="h-8 text-sm" />
               </div>
               <div>
-                <Label className="text-[10px] text-muted-foreground">Advance / Credit <span className="text-destructive">*</span></Label>
+                <Label className="text-[10px] sm:text-xs text-muted-foreground">Advance / Credit <span className="text-destructive">*</span></Label>
                 <Select value={card.freightType} onValueChange={v => set("freightType", v)}>
                   <SelectTrigger data-testid="select-freight-type" className="h-8 text-sm">
                     <SelectValue placeholder="Select type" />
@@ -2274,7 +2274,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                 </Select>
               </div>
               <div>
-                <Label className="text-[10px] text-muted-foreground">Total # of Bags <span className="text-destructive">*</span></Label>
+                <Label className="text-[10px] sm:text-xs text-muted-foreground">Total # of Bags <span className="text-destructive">*</span></Label>
                 <Input data-testid="input-total-bags-vehicle" type="text" inputMode="numeric" placeholder="0" value={card.totalBagsInVehicle} onChange={e => set("totalBagsInVehicle", e.target.value.replace(/\D/g, ""))} onFocus={e => e.target.select()} className="h-8 text-sm" />
                 {(() => {
                   const allocated = card.cropGroups.reduce((sum, g) => sum + g.lots.reduce((s, l) => s + (parseInt(l.numberOfBags) || 0), 0), 0);
