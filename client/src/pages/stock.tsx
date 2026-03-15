@@ -1484,18 +1484,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
       const groupTxns = allTxns.filter(t => lotDbIds.includes(t.lotId) && !t.isReversed);
       if (groupTxns.length === 0) return null;
 
-      const farmer: Farmer = {
-        id: farmerCard.farmerId || 0,
-        businessId: user?.businessId || 0,
-        name: farmerCard.farmerName,
-        phone: farmerCard.farmerPhone || "",
-        village: farmerCard.village || null,
-        tehsil: farmerCard.tehsil || null,
-        district: farmerCard.district || null,
-        state: farmerCard.state || null,
-        isActive: true,
-        isArchived: false,
-      };
+      const farmer: Farmer = groupTxns[0].farmer;
 
       const lotGroups: UnifiedLotGroup[] = [];
       const lotMap = new Map<number, UnifiedLotGroup>();
