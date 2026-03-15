@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/lib/auth";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -93,7 +94,12 @@ type LotRow = {
   bids: BidRow[];
 };
 
-type EditEntry = { timestamp: string; label: string };
+type ChangeRecord =
+  | { kind: "field"; path: string; oldVal: string; newVal: string }
+  | { kind: "deleted"; path: string; detail?: string }
+  | { kind: "added"; path: string };
+
+type EditEntry = { timestamp: string; username: string; changes: ChangeRecord[] };
 
 type CropGroup = {
   id: string; crop: string; srNumber: string; groupOpen: boolean; lots: LotRow[];
@@ -188,30 +194,63 @@ function ArchiveDialog({ open, title, description, onConfirm, onCancel }: {
 
 // ─── Edit history dialog ───────────────────────────────────────────────────────
 
+function ChangeRecordLine({ c }: { c: ChangeRecord }) {
+  if (c.kind === "field") {
+    return (
+      <div className="flex flex-wrap items-baseline gap-1 text-xs" data-testid="change-field">
+        <span className="text-muted-foreground font-medium">{c.path}:</span>
+        <span className="line-through text-red-500">{c.oldVal}</span>
+        <span className="text-muted-foreground">→</span>
+        <span className="text-green-600 font-medium">{c.newVal}</span>
+      </div>
+    );
+  }
+  if (c.kind === "deleted") {
+    return (
+      <div className="flex items-baseline gap-1 text-xs" data-testid="change-deleted">
+        <span className="text-red-500 font-medium">{c.path}</span>
+        {c.detail && <span className="text-muted-foreground">({c.detail})</span>}
+        <Badge variant="outline" className="text-[10px] px-1 py-0 border-red-300 text-red-500 h-4">deleted</Badge>
+      </div>
+    );
+  }
+  return (
+    <div className="flex items-baseline gap-1 text-xs" data-testid="change-added">
+      <span className="text-green-600 font-medium">{c.path}</span>
+      <Badge variant="outline" className="text-[10px] px-1 py-0 border-green-300 text-green-600 h-4">added</Badge>
+    </div>
+  );
+}
+
 function EditHistoryDialog({ open, crop, history, onClose }: {
   open: boolean; crop: string; history: EditEntry[]; onClose: () => void;
 }) {
   return (
     <AlertDialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
-      <AlertDialogContent className="max-w-md">
+      <AlertDialogContent className="max-w-lg">
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
             <History className="w-5 h-5 text-blue-500" /> Edit History — {crop}
           </AlertDialogTitle>
           <AlertDialogDescription asChild>
-            <div className="space-y-2 mt-2 max-h-72 overflow-y-auto">
+            <div className="space-y-3 mt-2 max-h-[28rem] overflow-y-auto">
               {history.length === 0 ? (
                 <p className="text-sm text-muted-foreground italic">No changes recorded yet. History is tracked after the first Save Entry.</p>
               ) : (
-                <ul className="space-y-1.5">
-                  {[...history].reverse().map((e, i) => (
-                    <li key={i} className="flex items-center gap-2 text-sm bg-muted/40 rounded px-3 py-1.5">
-                      <History className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                      <span className="text-muted-foreground">{e.timestamp}</span>
-                      <span className="text-foreground">{e.label}</span>
-                    </li>
-                  ))}
-                </ul>
+                [...history].reverse().map((entry, i) => (
+                  <div key={i} className="rounded-lg border bg-muted/30 overflow-hidden" data-testid={`history-entry-${i}`}>
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 border-b">
+                      <History className="w-3 h-3 text-muted-foreground shrink-0" />
+                      <span className="text-[11px] text-muted-foreground">{entry.timestamp}</span>
+                      <span className="text-[11px] font-medium text-foreground">by {entry.username}</span>
+                    </div>
+                    <div className="px-3 py-2 space-y-1">
+                      {entry.changes.map((c, j) => (
+                        <ChangeRecordLine key={j} c={c} />
+                      ))}
+                    </div>
+                  </div>
+                ))
               )}
             </div>
           </AlertDialogDescription>
@@ -368,6 +407,71 @@ function getDataFingerprint(card: FarmerCard): string {
   });
   const { cardOpen, farmerOpen, vehicleOpen, savedAt, cropGroups, ...rest } = card;
   return JSON.stringify({ ...rest, cropGroups: cropGroups.map(stripGroup) });
+}
+
+function diffCropGroup(saved: CropGroup, current: CropGroup): ChangeRecord[] {
+  const changes: ChangeRecord[] = [];
+  const savedLotMap = new Map(saved.lots.map(l => [l.id, l]));
+
+  const lotFields: { key: keyof Omit<LotRow, "id" | "lotOpen" | "bids">; label: string }[] = [
+    { key: "numberOfBags", label: "Bags" },
+    { key: "size", label: "Size" },
+    { key: "variety", label: "Variety" },
+    { key: "bagMarka", label: "Bag Marka" },
+  ];
+  const bidFields: { key: keyof Omit<BidRow, "id" | "bidOpen" | "txn" | "txnDate">; label: string }[] = [
+    { key: "buyerName", label: "Buyer Name" },
+    { key: "pricePerKg", label: "Price/kg" },
+    { key: "numberOfBags", label: "Bags" },
+    { key: "paymentType", label: "Payment Type" },
+    { key: "advanceAmount", label: "Advance" },
+  ];
+  const txnFields: { key: keyof TxnState; label: string }[] = [
+    { key: "netWeightInput", label: "Net Weight" },
+    { key: "extraChargesFarmer", label: "Extra Charges (Farmer)" },
+    { key: "extraChargesBuyer", label: "Extra Charges (Buyer)" },
+    { key: "extraPerKgFarmer", label: "Extra/kg (Farmer)" },
+    { key: "extraPerKgBuyer", label: "Extra/kg (Buyer)" },
+    { key: "extraTulai", label: "Tulai" },
+    { key: "extraBharai", label: "Bharai" },
+    { key: "extraKhadiKarai", label: "Khadi Karai" },
+    { key: "extraThelaBhada", label: "Thela Bhada" },
+    { key: "extraOthers", label: "Others" },
+  ];
+
+  current.lots.forEach((cLot, lotIdx) => {
+    const lotLabel = `Lot ${lotIdx + 1}`;
+    const sLot = savedLotMap.get(cLot.id);
+    if (!sLot) {
+      changes.push({ kind: "added", path: lotLabel });
+      return;
+    }
+    for (const f of lotFields) {
+      const ov = sLot[f.key]; const nv = cLot[f.key];
+      if (ov !== nv) changes.push({ kind: "field", path: `${lotLabel} > ${f.label}`, oldVal: ov || "(empty)", newVal: nv || "(empty)" });
+    }
+    const savedBidMap = new Map(sLot.bids.map(b => [b.id, b]));
+
+    cLot.bids.forEach((cBid, bidIdx) => {
+      const bidLabel = `${lotLabel} > Bid ${bidIdx + 1}`;
+      const sBid = savedBidMap.get(cBid.id);
+      if (!sBid) {
+        changes.push({ kind: "added", path: bidLabel });
+        return;
+      }
+      for (const f of bidFields) {
+        const ov = sBid[f.key]; const nv = cBid[f.key];
+        if (ov !== nv) changes.push({ kind: "field", path: `${bidLabel} > ${f.label}`, oldVal: ov || "(empty)", newVal: nv || "(empty)" });
+      }
+      for (const f of txnFields) {
+        const ov = sBid.txn[f.key]; const nv = cBid.txn[f.key];
+        if (typeof ov === "string" && typeof nv === "string" && ov !== nv)
+          changes.push({ kind: "field", path: `${bidLabel} > ${f.label}`, oldVal: ov || "0", newVal: nv || "0" });
+      }
+    });
+  });
+
+  return changes;
 }
 
 const MOCK_BUYERS = ["Ramesh Traders", "Suresh & Sons", "Patel Bros", "Kishan Vyapari"];
@@ -978,9 +1082,10 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
 
 // ─── Lot card ─────────────────────────────────────────────────────────────────
 
-function LotCard({ lot, index, onChange, onRemove, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate }: {
+function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate }: {
   lot: LotRow; index: number;
   onChange: (l: LotRow) => void; onRemove: () => void;
+  onRemoveBid?: (lotIndex: number, bidIndex: number) => void;
   vehicleBhadaRate: number; totalBagsInVehicle: number;
   cs: ChargeSettings; farmerDate: string;
 }) {
@@ -993,8 +1098,13 @@ function LotCard({ lot, index, onChange, onRemove, vehicleBhadaRate, totalBagsIn
   const updateBid = (idx: number, bid: BidRow) =>
     onChange({ ...lot, bids: lot.bids.map((b, i) => (i === idx ? bid : b)) });
   const confirmRemoveBid = () => {
-    if (pendingDeleteBidIdx !== null)
-      onChange({ ...lot, bids: lot.bids.filter((_, i) => i !== pendingDeleteBidIdx) });
+    if (pendingDeleteBidIdx !== null) {
+      if (onRemoveBid) {
+        onRemoveBid(index, pendingDeleteBidIdx);
+      } else {
+        onChange({ ...lot, bids: lot.bids.filter((_, i) => i !== pendingDeleteBidIdx) });
+      }
+    }
     setPendingDeleteBidIdx(null);
   };
   const addBid = () =>
@@ -1129,11 +1239,12 @@ function LotCard({ lot, index, onChange, onRemove, vehicleBhadaRate, totalBagsIn
 
 // ─── Crop group ───────────────────────────────────────────────────────────────
 
-function CropGroupSection({ group, onChange, onArchive, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate, farmerName }: {
+function CropGroupSection({ group, onChange, onArchive, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate, farmerName, currentUsername }: {
   group: CropGroup;
   onChange: (g: CropGroup) => void; onArchive: () => void;
   vehicleBhadaRate: number; totalBagsInVehicle: number;
   cs: ChargeSettings; farmerDate: string; farmerName: string;
+  currentUsername: string;
 }) {
   const [pendingDeleteLotIdx, setPendingDeleteLotIdx] = useState<number | null>(null);
   const [showHistory, setShowHistory] = useState(false);
@@ -1152,14 +1263,36 @@ function CropGroupSection({ group, onChange, onArchive, vehicleBhadaRate, totalB
     if (isLastLot || hasLotUserData(lot)) { setPendingDeleteLotIdx(idx); return; }
     onChange({ ...group, lots: group.lots.filter((_, i) => i !== idx) });
   };
+  const handleRemoveBid = (lotIndex: number, bidIndex: number) => {
+    const lot = group.lots[lotIndex];
+    if (!lot) return;
+    const deletedBid = lot.bids[bidIndex];
+    const buyerName = deletedBid?.buyerName?.trim() || "";
+    const now = format(new Date(), "dd/MM/yyyy HH:mm");
+    const entry: EditEntry = {
+      timestamp: now,
+      username: currentUsername,
+      changes: [{ kind: "deleted", path: `Lot ${lotIndex + 1} > Bid ${bidIndex + 1}`, detail: buyerName || undefined }],
+    };
+    onChange({
+      ...group,
+      lots: group.lots.map((l, i) => i === lotIndex ? { ...l, bids: l.bids.filter((_, j) => j !== bidIndex) } : l),
+      editHistory: [...group.editHistory, entry],
+    });
+  };
+
   const confirmDeleteLot = () => {
     if (pendingDeleteLotIdx !== null) {
       const now = format(new Date(), "dd/MM/yyyy HH:mm");
-      const lotLabel = `Lot #${pendingDeleteLotIdx + 1}`;
+      const entry: EditEntry = {
+        timestamp: now,
+        username: currentUsername,
+        changes: [{ kind: "deleted", path: `Lot ${pendingDeleteLotIdx + 1}` }],
+      };
       onChange({
         ...group,
         lots: group.lots.filter((_, i) => i !== pendingDeleteLotIdx),
-        editHistory: [...group.editHistory, { timestamp: now, label: `${lotLabel} deleted` }],
+        editHistory: [...group.editHistory, entry],
       });
     }
     setPendingDeleteLotIdx(null);
@@ -1247,6 +1380,7 @@ function CropGroupSection({ group, onChange, onArchive, vehicleBhadaRate, totalB
               key={lot.id} lot={lot} index={idx}
               onChange={lot => updateLot(idx, lot)}
               onRemove={() => removeLot(idx)}
+              onRemoveBid={handleRemoveBid}
               vehicleBhadaRate={vehicleBhadaRate}
               totalBagsInVehicle={totalBagsInVehicle}
               cs={cs}
@@ -1283,7 +1417,7 @@ function CropGroupSection({ group, onChange, onArchive, vehicleBhadaRate, totalB
 
 // ─── Farmer card ──────────────────────────────────────────────────────────────
 
-function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onCancel, onArchive, cs }: {
+function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onCancel, onArchive, cs, currentUsername }: {
   card: FarmerCard;
   savedCard: FarmerCard | null;
   onChange: (c: FarmerCard) => void;
@@ -1292,6 +1426,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
   onCancel: () => void;
   onArchive: () => void;
   cs: ChargeSettings;
+  currentUsername: string;
 }) {
   const [pendingArchiveGroupIdx, setPendingArchiveGroupIdx] = useState<number | null>(null);
   const [showArchiveFarmer, setShowArchiveFarmer] = useState(false);
@@ -1514,6 +1649,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                 cs={cs}
                 farmerDate={card.date}
                 farmerName={card.farmerName}
+                currentUsername={currentUsername}
               />
             ))}
             {availableCrops.length > 0 && (
@@ -1600,6 +1736,8 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
 export default function StockPage() {
   const [cards, setCards] = useState<FarmerCard[]>([emptyCard()]);
   const [savedCardMap, setSavedCardMap] = useState<Map<string, FarmerCard>>(new Map());
+  const { user } = useAuth();
+  const currentUsername = user?.name || user?.username || "Unknown";
 
   const { data: chargeSettings } = useQuery<ChargeSettings>({
     queryKey: ["/api/charge-settings"],
@@ -1627,18 +1765,21 @@ export default function StockPage() {
 
   const saveCard = (idx: number, collapseAfter = false) => {
     const card = cards[idx];
-    const isFirstSave = !savedCardMap.has(card.id);
+    const savedCard = savedCardMap.get(card.id);
+    const isFirstSave = !savedCard;
     const now = format(new Date(), "dd/MM/yyyy HH:mm");
     const updatedCard: FarmerCard = {
       ...card,
       cardOpen: collapseAfter ? false : card.cardOpen,
       savedAt: now,
-      cropGroups: card.cropGroups.map(g => ({
-        ...g,
-        editHistory: isFirstSave
-          ? g.editHistory
-          : [...g.editHistory, { timestamp: now, label: "Entry updated & saved" }],
-      })),
+      cropGroups: card.cropGroups.map(g => {
+        if (isFirstSave) return g;
+        const savedGroup = savedCard.cropGroups.find(sg => sg.id === g.id);
+        if (!savedGroup) return g;
+        const changes = diffCropGroup(savedGroup, g);
+        if (changes.length === 0) return g;
+        return { ...g, editHistory: [...g.editHistory, { timestamp: now, username: currentUsername, changes }] };
+      }),
     };
     setCards(prev => prev.map((c, i) => (i === idx ? updatedCard : c)));
     setSavedCardMap(prev => new Map(prev).set(card.id, updatedCard));
@@ -1681,6 +1822,7 @@ export default function StockPage() {
             onCancel={() => cancelCard(idx)}
             onArchive={() => archiveCard(idx)}
             cs={cs}
+            currentUsername={currentUsername}
           />
         ))}
       </div>
