@@ -15,10 +15,12 @@ import {
 import {
   Plus, Trash2, ChevronDown, ChevronRight, Truck, User,
   AlertTriangle, Scale, Wheat, ChevronsUpDown, X, Calculator,
-  Archive, History, Save,
+  Archive, History, Save, Check,
 } from "lucide-react";
 import { format } from "date-fns";
-import { CROPS, SIZES } from "@shared/schema";
+import { CROPS, SIZES, DISTRICTS } from "@shared/schema";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandItem, CommandGroup } from "@/components/ui/command";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -115,6 +117,7 @@ type FarmerCard = {
   village: string;
   tehsil: string;
   district: string;
+  state: string;
   vehicleNumber: string;
   driverName: string;
   vehicleBhadaRate: string;
@@ -402,6 +405,7 @@ const emptyCard = (): FarmerCard => ({
   village: "",
   tehsil: "",
   district: "",
+  state: "Madhya Pradesh",
   vehicleNumber: "",
   driverName: "",
   vehicleBhadaRate: "",
@@ -1482,6 +1486,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
   const [showArchiveFarmer, setShowArchiveFarmer] = useState(false);
   const [showReinstateConfirm, setShowReinstateConfirm] = useState(false);
   const [showUnsaved, setShowUnsaved] = useState(false);
+  const [districtOpen, setDistrictOpen] = useState(false);
 
   const set = (f: keyof FarmerCard, v: any) => onChange({ ...card, [f]: v });
   const usedCrops = card.cropGroups.filter(g => !g.archived).map(g => g.crop);
@@ -1605,50 +1610,85 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
           <SectionToggle open={card.farmerOpen} onToggle={() => set("farmerOpen", !card.farmerOpen)}
             icon={<User className="w-3.5 h-3.5" />} label="Farmer Details" />
           {card.farmerOpen && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pl-2">
-              <div>
-                <Label className="text-xs text-muted-foreground">Name *</Label>
-                <Input data-testid="input-farmer-name" placeholder="Farmer name" value={card.farmerName} onChange={e => set("farmerName", e.target.value)} className="h-8 text-sm" />
+            <div className="space-y-3 pl-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground">Name *</Label>
+                  <Input data-testid="input-farmer-name" placeholder="Farmer name" value={card.farmerName} onChange={e => set("farmerName", e.target.value)} className="h-8 text-sm" />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Phone</Label>
+                  <Input data-testid="input-farmer-phone" placeholder="10-digit mobile" value={card.farmerPhone} onChange={e => set("farmerPhone", e.target.value.replace(/\D/g, "").slice(0, 10))} className="h-8 text-sm" />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Village</Label>
+                  <Input data-testid="input-village" placeholder="Village" value={card.village} onChange={e => set("village", e.target.value)} className="h-8 text-sm" />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Tehsil</Label>
+                  <Input data-testid="input-tehsil" placeholder="Tehsil" value={card.tehsil} onChange={e => set("tehsil", e.target.value)} className="h-8 text-sm" />
+                </div>
               </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Phone</Label>
-                <Input data-testid="input-farmer-phone" placeholder="10-digit mobile" value={card.farmerPhone} onChange={e => set("farmerPhone", e.target.value.replace(/\D/g, "").slice(0, 10))} className="h-8 text-sm" />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Village</Label>
-                <Input data-testid="input-village" placeholder="Village" value={card.village} onChange={e => set("village", e.target.value)} className="h-8 text-sm" />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">Tehsil</Label>
-                <Input data-testid="input-tehsil" placeholder="Tehsil" value={card.tehsil} onChange={e => set("tehsil", e.target.value)} className="h-8 text-sm" />
-              </div>
-              <div>
-                <Label className="text-xs text-muted-foreground">District</Label>
-                <Input data-testid="input-district" placeholder="District" value={card.district} onChange={e => set("district", e.target.value)} className="h-8 text-sm" />
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div>
+                  <Label className="text-xs text-muted-foreground">District</Label>
+                  <Popover open={districtOpen} onOpenChange={setDistrictOpen}>
+                    <PopoverTrigger asChild>
+                      <Button data-testid="select-district" variant="outline" role="combobox" aria-expanded={districtOpen} className="h-8 w-full justify-between text-sm font-normal">
+                        {card.district || <span className="text-muted-foreground">Select district</span>}
+                        <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[200px] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Search district..." className="h-9 text-sm" />
+                        <CommandList>
+                          <CommandEmpty className="py-3 text-xs">No district found.</CommandEmpty>
+                          <CommandGroup>
+                            {DISTRICTS.map(d => (
+                              <CommandItem key={d} value={d} onSelect={() => { set("district", d); setDistrictOpen(false); }} className="text-sm">
+                                <Check className={`mr-2 h-3.5 w-3.5 ${card.district === d ? "opacity-100" : "opacity-0"}`} />
+                                {d}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">State</Label>
+                  <Select value={card.state} onValueChange={v => set("state", v)}>
+                    <SelectTrigger data-testid="select-state" className="h-8 text-sm">
+                      <SelectValue placeholder="Select state" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Madhya Pradesh">Madhya Pradesh</SelectItem>
+                      <SelectItem value="Gujarat">Gujarat</SelectItem>
+                      <SelectItem value="Uttar Pradesh">Uttar Pradesh</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Farmer Advance ₹</Label>
+                  <Input data-testid="input-farmer-advance" type="number" placeholder="0" value={card.advanceAmount} onChange={e => set("advanceAmount", e.target.value)} className="h-8 text-sm" />
+                </div>
+                <div>
+                  <Label className="text-xs text-muted-foreground">Mode</Label>
+                  <Select value={card.advanceMode} onValueChange={v => set("advanceMode", v)}>
+                    <SelectTrigger data-testid="select-advance-mode" className="h-8 text-sm">
+                      <SelectValue placeholder="Select" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Cash">Cash</SelectItem>
+                      <SelectItem value="Account">Account</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
             </div>
           )}
-
-          {/* Advance */}
-          <div className="flex items-center gap-3 pl-2">
-            <div>
-              <Label className="text-xs text-muted-foreground">Farmer Advance ₹</Label>
-              <Input data-testid="input-farmer-advance" type="number" placeholder="0" value={card.advanceAmount} onChange={e => set("advanceAmount", e.target.value)} className="h-8 w-32 text-sm" />
-            </div>
-            <div>
-              <Label className="text-xs text-muted-foreground">Mode</Label>
-              <Select value={card.advanceMode} onValueChange={v => set("advanceMode", v)}>
-                <SelectTrigger data-testid="select-advance-mode" className="h-8 w-28 text-sm">
-                  <SelectValue placeholder="Select" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Cash">Cash</SelectItem>
-                  <SelectItem value="UPI">UPI</SelectItem>
-                  <SelectItem value="Bank">Bank</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
 
           {/* Vehicle info */}
           <SectionToggle open={card.vehicleOpen} onToggle={() => set("vehicleOpen", !card.vehicleOpen)}
