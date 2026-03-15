@@ -158,9 +158,9 @@ const PAYMENT_COLORS: Record<string, string> = {
 
 function PaymentBadge({ status = "Due" }: { status?: "Due" | "Paid" | "Partial Paid" }) {
   return (
-    <span className={`inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded border leading-none ${PAYMENT_COLORS[status] || PAYMENT_COLORS.Due}`}>
+    <Badge variant="outline" className={`text-[10px] font-semibold px-1.5 py-0 h-4 leading-none ${PAYMENT_COLORS[status] || PAYMENT_COLORS.Due}`}>
       {status}
-    </span>
+    </Badge>
   );
 }
 
@@ -172,10 +172,10 @@ function CollapsedSummary({ totalBags, remainingBags, farmerPayable, buyerReceiv
 }) {
   return (
     <div className="flex items-center gap-2 text-xs flex-wrap">
-      <span className="text-muted-foreground">{totalBags} bags</span>
-      {remainingBags > 0 && remainingBags !== totalBags && (
-        <span className="text-orange-600 dark:text-orange-400 font-medium">({remainingBags} unsold)</span>
-      )}
+      <span className="text-muted-foreground font-medium">Total: {totalBags}</span>
+      <span className={`font-medium ${remainingBags > 0 ? "text-orange-600 dark:text-orange-400" : "text-green-600 dark:text-green-400"}`}>
+        Rem: {remainingBags}
+      </span>
       {hasData && (
         <>
           <span className="text-green-700 dark:text-green-400 font-medium">Farmer: ₹{farmerPayable.toFixed(0)}</span>
@@ -1065,7 +1065,7 @@ function FarmerCardComp({ card, onChange, onRemove, cs }: {
           </span>
           {card.farmerPhone && <span className="text-xs text-muted-foreground">· {card.farmerPhone}</span>}
           {card.village && <span className="text-xs text-muted-foreground">· {card.village}</span>}
-          {!card.cardOpen && grandTotalBags > 0 && (
+          {!card.cardOpen && (
             <CollapsedSummary
               totalBags={grandTotalBags} remainingBags={grandRemainingBags}
               farmerPayable={grandFarmerPayable} buyerReceivable={grandBuyerReceivable}
