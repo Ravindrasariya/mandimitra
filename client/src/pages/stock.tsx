@@ -460,7 +460,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
         )}
       </div>
 
-      {nw > 0 && pricePerKg > 0 && (
+      {nw > 0 && pricePerKg > 0 && (epkFarmer > 0 || epkBuyer > 0) && (
         <div className="bg-muted/40 rounded-md px-3 py-2 text-xs space-y-1" data-testid="txn-bid-rate-header">
           {epkFarmer > 0 && (
             <div className="flex justify-between text-green-600">
