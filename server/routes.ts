@@ -505,6 +505,112 @@ export async function registerRoutes(
     res.json(result);
   });
 
+  app.get("/api/stock-cards", requireAuth, async (req, res) => {
+    try {
+      const businessId = req.user!.businessId;
+      const allLots = await storage.getLots(businessId);
+
+      const cardMap = new Map<string, {
+        farmer: any;
+        date: string;
+        vehicleNumber: string | null;
+        driverName: string | null;
+        driverContact: string | null;
+        vehicleBhadaRate: string | null;
+        freightType: string | null;
+        totalBagsInVehicle: number | null;
+        farmerAdvanceAmount: string | null;
+        farmerAdvanceMode: string | null;
+        latestCreatedAt: Date;
+        cropMap: Map<string, { lots: any[]; srNumber: string }>;
+      }>();
+
+      for (const lotRow of allLots) {
+        const { farmer, hasPendingBids, ...lot } = lotRow;
+        const vn = lot.vehicleNumber || "";
+        const cardKey = `${lot.farmerId}-${lot.date}-${vn}`;
+
+        if (!cardMap.has(cardKey)) {
+          cardMap.set(cardKey, {
+            farmer,
+            date: lot.date,
+            vehicleNumber: lot.vehicleNumber,
+            driverName: lot.driverName,
+            driverContact: lot.driverContact,
+            vehicleBhadaRate: lot.vehicleBhadaRate,
+            freightType: lot.freightType,
+            totalBagsInVehicle: lot.totalBagsInVehicle,
+            farmerAdvanceAmount: lot.farmerAdvanceAmount,
+            farmerAdvanceMode: lot.farmerAdvanceMode,
+            latestCreatedAt: lot.createdAt,
+            cropMap: new Map(),
+          });
+        }
+
+        const card = cardMap.get(cardKey)!;
+        if (lot.createdAt > card.latestCreatedAt) {
+          card.latestCreatedAt = lot.createdAt;
+        }
+
+        const cropKey = lot.crop;
+        if (!card.cropMap.has(cropKey)) {
+          card.cropMap.set(cropKey, {
+            lots: [],
+            srNumber: lot.serialNumber.toString(),
+          });
+        }
+        card.cropMap.get(cropKey)!.lots.push({
+          dbId: lot.id,
+          lotId: lot.lotId,
+          crop: lot.crop,
+          variety: lot.variety,
+          numberOfBags: lot.numberOfBags,
+          size: lot.size,
+          bagMarka: lot.bagMarka,
+          initialTotalWeight: lot.initialTotalWeight,
+          remainingBags: lot.remainingBags,
+          isArchived: lot.isArchived,
+        });
+      }
+
+      const cards = Array.from(cardMap.entries()).map(([cardKey, card]) => {
+        const cropGroups = Array.from(card.cropMap.entries()).map(([crop, group]) => ({
+          crop,
+          srNumber: group.srNumber,
+          isArchived: group.lots.every((l: any) => l.isArchived),
+          lots: group.lots,
+        }));
+
+        return {
+          cardKey,
+          farmer: card.farmer,
+          date: card.date,
+          vehicleNumber: card.vehicleNumber,
+          driverName: card.driverName,
+          driverContact: card.driverContact,
+          vehicleBhadaRate: card.vehicleBhadaRate,
+          freightType: card.freightType,
+          totalBagsInVehicle: card.totalBagsInVehicle,
+          farmerAdvanceAmount: card.farmerAdvanceAmount,
+          farmerAdvanceMode: card.farmerAdvanceMode,
+          latestCreatedAt: card.latestCreatedAt,
+          cropGroups,
+        };
+      });
+
+      cards.sort((a, b) => {
+        const da = new Date(a.date).getTime();
+        const db = new Date(b.date).getTime();
+        if (db !== da) return db - da;
+        return b.latestCreatedAt.getTime() - a.latestCreatedAt.getTime();
+      });
+
+      res.json(cards);
+    } catch (e: any) {
+      res.status(500).json({ message: e.message });
+    }
+  });
+
   app.get("/api/lots/:id", requireAuth, async (req, res) => {
     const lot = await storage.getLot(paramId(req.params.id), req.user!.businessId);
     if (!lot) return res.status(404).json({ message: "Lot not found" });

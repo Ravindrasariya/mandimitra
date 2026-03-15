@@ -142,6 +142,7 @@ export const lots = pgTable("lots", {
   farmerAdvanceAmount: decimal("farmer_advance_amount", { precision: 10, scale: 2 }).default("0"),
   farmerAdvanceMode: text("farmer_advance_mode"),
   isReturned: boolean("is_returned").default(false).notNull(),
+  isArchived: boolean("is_archived").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   uniqueLotPerBusiness: uniqueIndex("lots_business_lot_id_unique").on(table.businessId, table.lotId),
