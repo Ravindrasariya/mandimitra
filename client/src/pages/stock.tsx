@@ -382,12 +382,13 @@ function aggregatePaymentStatus(statuses: string[]): "Due" | "Paid" | "Partial P
   return "Due";
 }
 
-function CollapsedSummary({ totalBags, remainingBags, farmerPayable, buyerReceivable, hasData, farmerPaymentStatus, buyerPaymentStatus, advancePaid }: {
+function CollapsedSummary({ totalBags, remainingBags, farmerPayable, buyerReceivable, hasData, farmerPaymentStatus, buyerPaymentStatus, advancePaid, showAdvanceLabel = true }: {
   totalBags: number; remainingBags: number;
   farmerPayable: number; buyerReceivable: number; hasData: boolean;
   farmerPaymentStatus?: "Due" | "Paid" | "Partial Paid";
   buyerPaymentStatus?: "Due" | "Paid" | "Partial Paid";
   advancePaid?: number;
+  showAdvanceLabel?: boolean;
 }) {
   const netFarmerPayable = advancePaid && advancePaid > 0 ? Math.max(0, farmerPayable - advancePaid) : farmerPayable;
   return (
@@ -399,7 +400,7 @@ function CollapsedSummary({ totalBags, remainingBags, farmerPayable, buyerReceiv
       {hasData && (
         <>
           <span className="text-green-700 dark:text-green-400 font-bold">Farmer: ₹{netFarmerPayable.toFixed(0)}</span>
-          {advancePaid && advancePaid > 0 ? (
+          {showAdvanceLabel && advancePaid && advancePaid > 0 ? (
             <span className="text-[10px] text-blue-600 dark:text-blue-400">(Adv: -₹{advancePaid.toFixed(0)})</span>
           ) : null}
           <PaymentBadge status={farmerPaymentStatus || "Due"} />
@@ -2066,6 +2067,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
               farmerPayable={grandFarmerPayable} buyerReceivable={grandBuyerReceivable}
               hasData={grandHasData}
               advancePaid={parseFloat(card.advanceAmount || "0")}
+              showAdvanceLabel={false}
               farmerPaymentStatus={aggregatePaymentStatus(card.cropGroups.flatMap(g => g.lots.flatMap(l => l.bids.filter(b => b.txnDbId).map(b => b.farmerPaymentStatus || "due"))))}
               buyerPaymentStatus={aggregatePaymentStatus(card.cropGroups.flatMap(g => g.lots.flatMap(l => l.bids.filter(b => b.txnDbId).map(b => b.paymentStatus || "due"))))}
             />
