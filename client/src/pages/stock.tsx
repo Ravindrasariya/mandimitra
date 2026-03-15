@@ -109,6 +109,7 @@ type EditEntry = { timestamp: string; username: string; changes: ChangeRecord[];
 type CropGroup = {
   id: string; crop: string; srNumber: string; groupOpen: boolean; lots: LotRow[];
   archived: boolean;
+  persisted: boolean;
   editHistory: EditEntry[];
 };
 
@@ -428,7 +429,7 @@ const emptyCard = (): FarmerCard => ({
 
 const emptyCropGroup = (crop: string, date?: string): CropGroup => ({
   id: uid(), crop, srNumber: "XX", groupOpen: true,
-  lots: [emptyLot(date)], archived: false, editHistory: [],
+  lots: [emptyLot(date)], archived: false, persisted: false, editHistory: [],
 });
 
 // ─── Data fingerprint (for dirty detection, strips UI-only flags) ─────────────
@@ -439,7 +440,7 @@ function getDataFingerprint(card: FarmerCard): string {
     txn: (({ showWeightCalc, showExtraBreakdown, ...t }) => t)(txn),
   });
   const stripLot = ({ id, lotOpen, bids, ...l }: LotRow) => ({ ...l, bids: bids.map(stripBid) });
-  const stripGroup = ({ groupOpen, editHistory, lots, ...g }: CropGroup) => ({
+  const stripGroup = ({ groupOpen, editHistory, persisted, lots, ...g }: CropGroup) => ({
     ...g, lots: lots.map(stripLot),
   });
   const { cardOpen, farmerOpen, vehicleOpen, savedAt, cropGroups, ...rest } = card;
@@ -1288,9 +1289,10 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
 
 // ─── Crop group ───────────────────────────────────────────────────────────────
 
-function CropGroupSection({ group, onChange, onArchive, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate, farmerName, currentUsername }: {
+function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate, farmerName, currentUsername }: {
   group: CropGroup;
-  onChange: (g: CropGroup) => void; onArchive: () => void;
+  onChange: (g: CropGroup) => void; onArchive: () => void; onDelete: () => void;
+  isPersisted: boolean;
   vehicleBhadaRate: number; totalBagsInVehicle: number;
   cs: ChargeSettings; farmerDate: string; farmerName: string;
   currentUsername: string;
@@ -1298,6 +1300,7 @@ function CropGroupSection({ group, onChange, onArchive, vehicleBhadaRate, totalB
   const [pendingDeleteLotIdx, setPendingDeleteLotIdx] = useState<number | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showReinstateConfirm, setShowReinstateConfirm] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const headerCls = CROP_HEADER[group.crop] || "bg-muted border-border";
   const badgeCls = CROP_COLORS[group.crop] || "bg-muted border-border text-foreground";
@@ -1420,15 +1423,31 @@ function CropGroupSection({ group, onChange, onArchive, vehicleBhadaRate, totalB
           >
             <History className="w-3.5 h-3.5" /> History
           </Button>
-          <Button
-            type="button" variant="ghost" size="sm"
-            onClick={e => { e.stopPropagation(); onArchive(); }}
-            className="h-7 w-7 p-0 text-amber-500 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/40 shrink-0"
-            title="Archive this crop group"
-            data-testid={`button-archive-${group.crop.toLowerCase()}`}
-          >
-            <Archive className="w-3.5 h-3.5" />
-          </Button>
+          {isPersisted ? (
+            <Button
+              type="button" variant="ghost" size="sm"
+              onClick={e => { e.stopPropagation(); onArchive(); }}
+              className="h-7 w-7 p-0 text-amber-500 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/40 shrink-0"
+              title="Archive this crop group"
+              data-testid={`button-archive-${group.crop.toLowerCase()}`}
+            >
+              <Archive className="w-3.5 h-3.5" />
+            </Button>
+          ) : (
+            <Button
+              type="button" variant="ghost" size="sm"
+              onClick={e => {
+                e.stopPropagation();
+                if (group.lots.some(hasLotUserData)) { setShowDeleteConfirm(true); return; }
+                onDelete();
+              }}
+              className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/40 shrink-0"
+              title="Delete this crop group"
+              data-testid={`button-delete-${group.crop.toLowerCase()}`}
+            >
+              <X className="w-3.5 h-3.5" />
+            </Button>
+          )}
         </div>
       </button>
 
@@ -1469,6 +1488,14 @@ function CropGroupSection({ group, onChange, onArchive, vehicleBhadaRate, totalB
         crop={`${group.crop} (SR# ${group.srNumber})`}
         history={group.editHistory}
         onClose={() => setShowHistory(false)}
+      />
+
+      <ConfirmDeleteDialog
+        open={showDeleteConfirm}
+        title={`Delete "${group.crop}" group?`}
+        description={`This crop group has data that will be permanently lost. This action cannot be undone.`}
+        onConfirm={() => { setShowDeleteConfirm(false); onDelete(); }}
+        onCancel={() => setShowDeleteConfirm(false)}
       />
     </div>
   );
@@ -1523,6 +1550,8 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
   });
   const updateGroup = (idx: number, g: CropGroup) =>
     onChange({ ...card, cropGroups: card.cropGroups.map((gg, i) => (i === idx ? g : gg)) });
+  const deleteGroup = (idx: number) =>
+    onChange({ ...card, cropGroups: card.cropGroups.filter((_, i) => i !== idx) });
   const archiveGroup = (idx: number) => setPendingArchiveGroupIdx(idx);
   const confirmArchiveGroup = () => {
     if (pendingArchiveGroupIdx !== null)
@@ -1596,7 +1625,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
             data-testid="input-farmer-date"
             disabled={card.archived}
           />
-          {!card.archived && (
+          {!card.archived && card.savedAt !== null && (
             <Button type="button" variant="ghost" size="sm"
               onClick={e => { e.stopPropagation(); setShowArchiveFarmer(true); }}
               className="h-7 w-7 p-0 text-amber-500 hover:text-amber-700"
@@ -1743,6 +1772,8 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                 key={group.id} group={group}
                 onChange={g => updateGroup(idx, g)}
                 onArchive={() => archiveGroup(idx)}
+                onDelete={() => deleteGroup(idx)}
+                isPersisted={group.persisted}
                 vehicleBhadaRate={vehicleBhadaRate}
                 totalBagsInVehicle={totalBagsInVehicle}
                 cs={cs}
@@ -1881,9 +1912,10 @@ export default function StockPage() {
       cardOpen: collapseAfter ? false : card.cardOpen,
       savedAt: now,
       cropGroups: card.cropGroups.map(g => {
-        if (isFirstSave) return g;
+        const withPersisted = { ...g, persisted: true };
+        if (isFirstSave) return withPersisted;
         const savedGroup = savedCard.cropGroups.find(sg => sg.id === g.id);
-        if (!savedGroup) return g;
+        if (!savedGroup) return withPersisted;
         const allDiffChanges = diffCropGroup(savedGroup, g);
         const alreadyLogged = new Set(
           g.editHistory
@@ -1891,8 +1923,8 @@ export default function StockPage() {
             .flatMap(e => e.changes?.filter(c => c.kind === "deleted").map(c => c.path) ?? [])
         );
         const changes = allDiffChanges.filter(c => !(c.kind === "deleted" && alreadyLogged.has(c.path)));
-        if (changes.length === 0) return g;
-        return { ...g, editHistory: [...g.editHistory, { timestamp: now, username: currentUsername, changes }] };
+        if (changes.length === 0) return withPersisted;
+        return { ...withPersisted, editHistory: [...g.editHistory, { timestamp: now, username: currentUsername, changes }] };
       }),
     };
     setCards(prev => prev.map((c, i) => (i === idx ? updatedCard : c)));
