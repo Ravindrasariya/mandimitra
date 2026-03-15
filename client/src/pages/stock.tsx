@@ -626,7 +626,7 @@ function SectionToggle({ open, onToggle, icon, label, count, summary }: {
       {!open && summary && summary.length > 0 && (
         <span className="flex items-center gap-1.5 flex-wrap ml-1">
           {summary.map((s, i) => (
-            <Badge key={i} variant="secondary" className="text-[10px] font-normal px-1.5 py-0">{s}</Badge>
+            <Badge key={i} variant="secondary" className="text-xs font-normal px-1.5 py-0.5">{s}</Badge>
           ))}
         </span>
       )}
@@ -2180,6 +2180,16 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
               <div>
                 <Label className="text-xs text-muted-foreground">Total # of Bags <span className="text-destructive">*</span></Label>
                 <Input data-testid="input-total-bags-vehicle" type="text" inputMode="numeric" placeholder="0" value={card.totalBagsInVehicle} onChange={e => set("totalBagsInVehicle", e.target.value.replace(/\D/g, ""))} onFocus={e => e.target.select()} className="h-8 text-sm" />
+                {(() => {
+                  const allocated = card.cropGroups.reduce((sum, g) => sum + g.lots.reduce((s, l) => s + (parseInt(l.numberOfBags) || 0), 0), 0);
+                  const total = parseInt(card.totalBagsInVehicle) || 0;
+                  const over = total > 0 && allocated > total;
+                  return (
+                    <span data-testid="text-allocated-bags" className={`text-[11px] mt-0.5 block ${over ? "text-destructive font-semibold" : "text-muted-foreground"}`}>
+                      Allocated {allocated} / {total || "—"}
+                    </span>
+                  );
+                })()}
               </div>
             </div>
           )}
@@ -2535,6 +2545,13 @@ export default function StockPage() {
     const card = cards[idx];
     if (!card.farmerName.trim()) {
       toast({ title: "Error", description: "Farmer name is required", variant: "destructive" });
+      return;
+    }
+
+    const vehicleBags = parseInt(card.totalBagsInVehicle) || 0;
+    const allocatedBags = card.cropGroups.reduce((sum, g) => sum + g.lots.reduce((s, l) => s + (parseInt(l.numberOfBags) || 0), 0), 0);
+    if (vehicleBags > 0 && allocatedBags > vehicleBags) {
+      toast({ title: "Error", description: `Total lot bags (${allocatedBags}) exceeds vehicle capacity (${vehicleBags})`, variant: "destructive" });
       return;
     }
 
