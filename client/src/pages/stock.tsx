@@ -1079,7 +1079,7 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
 
       {bid.bidOpen && (
         <div className="p-3 space-y-3">
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 uppercase tracking-wide">
               <span className="w-1.5 h-1.5 rounded-full bg-blue-400 inline-block" />
               Bid & Transaction Details
@@ -1660,18 +1660,96 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
       {/* Header — click to collapse/expand */}
       <button
         type="button"
-        className={`w-full flex items-center justify-between px-4 py-2 ${headerCls} border-b hover:brightness-95 transition-all`}
+        className={`w-full flex flex-col gap-1 px-4 py-2 ${headerCls} border-b hover:brightness-95 transition-all text-left`}
         onClick={() => onChange({ ...group, groupOpen: !group.groupOpen })}
         data-testid={`button-toggle-group-${group.crop.toLowerCase()}`}
       >
-        <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
-          {group.groupOpen ? <ChevronDown className="w-4 h-4 shrink-0" /> : <ChevronRight className="w-4 h-4 shrink-0" />}
-          <Wheat className="w-4 h-4 shrink-0" />
-          <span className="font-bold text-sm">SR# {group.srNumber} {group.crop}</span>
-          <Badge variant="outline" className={`text-xs ${badgeCls} shrink-0`}>
-            {group.lots.length} lot{group.lots.length !== 1 ? "s" : ""}
-          </Badge>
-          {!group.groupOpen && (
+        {/* Top row: title + action buttons */}
+        <div className="flex items-center justify-between gap-1 w-full">
+          <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
+            {group.groupOpen ? <ChevronDown className="w-4 h-4 shrink-0" /> : <ChevronRight className="w-4 h-4 shrink-0" />}
+            <Wheat className="w-4 h-4 shrink-0" />
+            <span className="font-bold text-sm truncate">SR# {group.srNumber} {group.crop}</span>
+            <Badge variant="outline" className={`text-xs ${badgeCls} shrink-0`}>
+              {group.lots.length} lot{group.lots.length !== 1 ? "s" : ""}
+            </Badge>
+          </div>
+          {/* Action buttons */}
+          <div className="flex items-center gap-1 shrink-0">
+            {hasTransactions && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button" variant="ghost" size="sm"
+                    onClick={e => e.stopPropagation()}
+                    disabled={receiptLoading}
+                    className="h-7 w-7 p-0 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950/40 shrink-0"
+                    title="Print / Share Receipt"
+                    data-testid={`button-receipt-${group.crop.toLowerCase()}`}
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
+                  <DropdownMenuItem onClick={() => handleFarmerReceipt("print")} data-testid="receipt-print-farmer">
+                    <Printer className="w-3.5 h-3.5 mr-2" /> Print किसान रसीद
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleFarmerReceipt("share")} data-testid="receipt-share-farmer">
+                    <Share2 className="w-3.5 h-3.5 mr-2" /> Share किसान रसीद
+                  </DropdownMenuItem>
+                  {uniqueBuyers.length > 0 && <DropdownMenuSeparator />}
+                  {uniqueBuyers.map(b => (
+                    <div key={b.id}>
+                      <DropdownMenuItem onClick={() => handleBuyerReceipt(b.id, b.name, "print")} data-testid={`receipt-print-buyer-${b.id}`}>
+                        <Printer className="w-3.5 h-3.5 mr-2" /> Print {b.name} Receipt
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => handleBuyerReceipt(b.id, b.name, "share")} data-testid={`receipt-share-buyer-${b.id}`}>
+                        <Share2 className="w-3.5 h-3.5 mr-2" /> Share {b.name} Receipt
+                      </DropdownMenuItem>
+                    </div>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+            <Button
+              type="button" variant="ghost" size="sm"
+              onClick={e => { e.stopPropagation(); setShowHistory(true); }}
+              className="h-7 w-7 p-0 text-blue-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/40"
+              title="Edit History"
+              data-testid={`button-history-${group.crop.toLowerCase()}`}
+            >
+              <History className="w-3.5 h-3.5" />
+            </Button>
+            {isPersisted ? (
+              <Button
+                type="button" variant="ghost" size="sm"
+                onClick={e => { e.stopPropagation(); onArchive(); }}
+                className="h-7 w-7 p-0 text-amber-500 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/40 shrink-0"
+                title="Archive this crop group"
+                data-testid={`button-archive-${group.crop.toLowerCase()}`}
+              >
+                <Archive className="w-3.5 h-3.5" />
+              </Button>
+            ) : (
+              <Button
+                type="button" variant="ghost" size="sm"
+                onClick={e => {
+                  e.stopPropagation();
+                  if (group.lots.some(hasLotUserData)) { setShowDeleteConfirm(true); return; }
+                  onDelete();
+                }}
+                className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/40 shrink-0"
+                title="Delete this crop group"
+                data-testid={`button-delete-${group.crop.toLowerCase()}`}
+              >
+                <X className="w-3.5 h-3.5" />
+              </Button>
+            )}
+          </div>
+        </div>
+        {/* Collapsed summary row */}
+        {!group.groupOpen && (
+          <div className="pl-6">
             <CollapsedSummary
               totalBags={totalBags} remainingBags={remainingBags}
               farmerPayable={totalFarmerPayable} buyerReceivable={totalBuyerReceivable}
@@ -1679,79 +1757,8 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
               farmerPaymentStatus={aggregatePaymentStatus(group.lots.flatMap(l => l.bids.filter(b => b.txnDbId).map(b => b.farmerPaymentStatus || "due")))}
               buyerPaymentStatus={aggregatePaymentStatus(group.lots.flatMap(l => l.bids.filter(b => b.txnDbId).map(b => b.paymentStatus || "due")))}
             />
-          )}
-        </div>
-        <div className="flex items-center gap-1 shrink-0">
-          {hasTransactions && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button" variant="ghost" size="sm"
-                  onClick={e => e.stopPropagation()}
-                  disabled={receiptLoading}
-                  className="h-7 w-7 p-0 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950/40 shrink-0"
-                  title="Print / Share Receipt"
-                  data-testid={`button-receipt-${group.crop.toLowerCase()}`}
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
-                <DropdownMenuItem onClick={() => handleFarmerReceipt("print")} data-testid="receipt-print-farmer">
-                  <Printer className="w-3.5 h-3.5 mr-2" /> Print किसान रसीद
-                </DropdownMenuItem>
-                <DropdownMenuItem onClick={() => handleFarmerReceipt("share")} data-testid="receipt-share-farmer">
-                  <Share2 className="w-3.5 h-3.5 mr-2" /> Share किसान रसीद
-                </DropdownMenuItem>
-                {uniqueBuyers.length > 0 && <DropdownMenuSeparator />}
-                {uniqueBuyers.map(b => (
-                  <div key={b.id}>
-                    <DropdownMenuItem onClick={() => handleBuyerReceipt(b.id, b.name, "print")} data-testid={`receipt-print-buyer-${b.id}`}>
-                      <Printer className="w-3.5 h-3.5 mr-2" /> Print {b.name} Receipt
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={() => handleBuyerReceipt(b.id, b.name, "share")} data-testid={`receipt-share-buyer-${b.id}`}>
-                      <Share2 className="w-3.5 h-3.5 mr-2" /> Share {b.name} Receipt
-                    </DropdownMenuItem>
-                  </div>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-          <Button
-            type="button" variant="ghost" size="sm"
-            onClick={e => { e.stopPropagation(); setShowHistory(true); }}
-            className="h-7 px-2 gap-1 text-xs text-blue-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/40"
-            title="Edit History"
-            data-testid={`button-history-${group.crop.toLowerCase()}`}
-          >
-            <History className="w-3.5 h-3.5" /> History
-          </Button>
-          {isPersisted ? (
-            <Button
-              type="button" variant="ghost" size="sm"
-              onClick={e => { e.stopPropagation(); onArchive(); }}
-              className="h-7 w-7 p-0 text-amber-500 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/40 shrink-0"
-              title="Archive this crop group"
-              data-testid={`button-archive-${group.crop.toLowerCase()}`}
-            >
-              <Archive className="w-3.5 h-3.5" />
-            </Button>
-          ) : (
-            <Button
-              type="button" variant="ghost" size="sm"
-              onClick={e => {
-                e.stopPropagation();
-                if (group.lots.some(hasLotUserData)) { setShowDeleteConfirm(true); return; }
-                onDelete();
-              }}
-              className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/40 shrink-0"
-              title="Delete this crop group"
-              data-testid={`button-delete-${group.crop.toLowerCase()}`}
-            >
-              <X className="w-3.5 h-3.5" />
-            </Button>
-          )}
-        </div>
+          </div>
+        )}
       </button>
 
       {group.groupOpen && (
@@ -1957,24 +1964,54 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
       {/* Header */}
       <button
         type="button"
-        className={`w-full flex items-center justify-between px-4 py-3 transition-colors border-b border-border ${card.archived ? "bg-muted/20 cursor-default" : "bg-muted/40 hover:bg-muted/60"}`}
+        className={`w-full flex flex-col gap-1 px-4 py-3 transition-colors border-b border-border text-left ${card.archived ? "bg-muted/20 cursor-default" : "bg-muted/40 hover:bg-muted/60"}`}
         onClick={handleCardToggle}
         data-testid="button-toggle-farmer-card"
       >
-        <div className="flex items-center gap-3 min-w-0 flex-wrap">
-          {card.cardOpen ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
-          <User className="w-4 h-4 text-primary shrink-0" />
-          <span className="font-bold text-sm">
-            {card.farmerName.trim() || <span className="text-muted-foreground italic">New Farmer Entry</span>}
-          </span>
-          {card.farmerPhone && <span className="text-xs text-muted-foreground">· {card.farmerPhone}</span>}
-          {card.village && <span className="text-xs text-muted-foreground">· {card.village}</span>}
-          {isDirty && card.savedAt !== null && (
-            <span className="text-[10px] font-medium text-orange-500 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-800 rounded px-1.5 py-0.5">
-              Unsaved changes
+        {/* Top row: chevron + icon + name + date + archive */}
+        <div className="flex items-center justify-between gap-2 w-full min-w-0">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
+            {card.cardOpen ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
+            <User className="w-4 h-4 text-primary shrink-0" />
+            <span className="font-bold text-sm truncate">
+              {card.farmerName.trim() || <span className="text-muted-foreground italic">New Farmer Entry</span>}
             </span>
-          )}
-          {!card.cardOpen && !card.archived && (
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <input
+              type="date" value={card.date}
+              onChange={e => { e.stopPropagation(); set("date", e.target.value); }}
+              onClick={e => e.stopPropagation()}
+              className="text-xs border border-border rounded px-2 py-1 bg-background"
+              data-testid="input-farmer-date"
+              disabled={card.archived}
+            />
+            {!card.archived && card.savedAt !== null && (
+              <Button type="button" variant="ghost" size="sm"
+                onClick={e => { e.stopPropagation(); setShowArchiveFarmer(true); }}
+                className="h-7 w-7 p-0 text-amber-500 hover:text-amber-700"
+                title="Archive this farmer entry"
+                data-testid="button-archive-farmer">
+                <Archive className="w-3.5 h-3.5" />
+              </Button>
+            )}
+          </div>
+        </div>
+        {/* Second row: phone, village, unsaved badge */}
+        {(card.farmerPhone || card.village || (isDirty && card.savedAt !== null)) && (
+          <div className="flex items-center gap-2 pl-6 flex-wrap">
+            {card.farmerPhone && <span className="text-xs text-muted-foreground">· {card.farmerPhone}</span>}
+            {card.village && <span className="text-xs text-muted-foreground">· {card.village}</span>}
+            {isDirty && card.savedAt !== null && (
+              <span className="text-[10px] font-medium text-orange-500 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-800 rounded px-1.5 py-0.5">
+                Unsaved changes
+              </span>
+            )}
+          </div>
+        )}
+        {/* Third row: collapsed summary */}
+        {!card.cardOpen && !card.archived && (
+          <div className="pl-6">
             <CollapsedSummary
               totalBags={grandTotalBags} remainingBags={grandRemainingBags}
               farmerPayable={grandFarmerPayable} buyerReceivable={grandBuyerReceivable}
@@ -1982,27 +2019,8 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
               farmerPaymentStatus={aggregatePaymentStatus(card.cropGroups.flatMap(g => g.lots.flatMap(l => l.bids.filter(b => b.txnDbId).map(b => b.farmerPaymentStatus || "due"))))}
               buyerPaymentStatus={aggregatePaymentStatus(card.cropGroups.flatMap(g => g.lots.flatMap(l => l.bids.filter(b => b.txnDbId).map(b => b.paymentStatus || "due"))))}
             />
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <input
-            type="date" value={card.date}
-            onChange={e => { e.stopPropagation(); set("date", e.target.value); }}
-            onClick={e => e.stopPropagation()}
-            className="text-xs border border-border rounded px-2 py-1 bg-background"
-            data-testid="input-farmer-date"
-            disabled={card.archived}
-          />
-          {!card.archived && card.savedAt !== null && (
-            <Button type="button" variant="ghost" size="sm"
-              onClick={e => { e.stopPropagation(); setShowArchiveFarmer(true); }}
-              className="h-7 w-7 p-0 text-amber-500 hover:text-amber-700"
-              title="Archive this farmer entry"
-              data-testid="button-archive-farmer">
-              <Archive className="w-3.5 h-3.5" />
-            </Button>
-          )}
-        </div>
+          </div>
+        )}
       </button>
 
       {card.cardOpen && !card.archived && (
