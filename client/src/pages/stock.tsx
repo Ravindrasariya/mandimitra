@@ -856,14 +856,19 @@ function LotCard({ lot, index, onChange, onRemove, vehicleBhadaRate, totalBagsIn
   vehicleBhadaRate: number; totalBagsInVehicle: number;
   cs: ChargeSettings; farmerDate: string;
 }) {
+  const [pendingDeleteBidIdx, setPendingDeleteBidIdx] = useState<number | null>(null);
+
   const setField = (f: keyof Omit<LotRow, "id" | "bids" | "lotOpen">, v: string) => onChange({ ...lot, [f]: v });
   const totals = calcLotTotals(lot, cs, vehicleBhadaRate, totalBagsInVehicle);
   const lotBags = parseInt(lot.numberOfBags) || 0;
 
   const updateBid = (idx: number, bid: BidRow) =>
     onChange({ ...lot, bids: lot.bids.map((b, i) => (i === idx ? bid : b)) });
-  const removeBid = (idx: number) =>
-    onChange({ ...lot, bids: lot.bids.filter((_, i) => i !== idx) });
+  const confirmRemoveBid = () => {
+    if (pendingDeleteBidIdx !== null)
+      onChange({ ...lot, bids: lot.bids.filter((_, i) => i !== pendingDeleteBidIdx) });
+    setPendingDeleteBidIdx(null);
+  };
   const addBid = () =>
     onChange({ ...lot, bids: [...lot.bids, emptyBid(farmerDate)] });
 
@@ -872,6 +877,9 @@ function LotCard({ lot, index, onChange, onRemove, vehicleBhadaRate, totalBagsIn
     runningBags += parseInt(b.numberOfBags) || 0;
     return lotBags > 0 && runningBags > lotBags;
   });
+
+  const pendingBid = pendingDeleteBidIdx !== null ? lot.bids[pendingDeleteBidIdx] : null;
+  const pendingBidLabel = pendingBid?.buyerName.trim() || `Bid #${(pendingDeleteBidIdx ?? 0) + 1}`;
 
   return (
     <div className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
@@ -950,14 +958,17 @@ function LotCard({ lot, index, onChange, onRemove, vehicleBhadaRate, totalBagsIn
           </div>
 
           <div className="ml-4 space-y-1">
+            {lot.bids.length === 0 && (
+              <p className="text-xs text-muted-foreground italic px-3 py-2">No bids. Add one below.</p>
+            )}
             {lot.bids.map((bid, bidIdx) => (
               <BidSection
                 key={bid.id}
                 bid={bid}
                 bidIndex={bidIdx}
                 onChange={b => updateBid(bidIdx, b)}
-                onRemove={() => removeBid(bidIdx)}
-                canRemove={lot.bids.length > 1}
+                onRemove={() => setPendingDeleteBidIdx(bidIdx)}
+                canRemove={true}
                 vehicleBhadaRate={vehicleBhadaRate}
                 totalBagsInVehicle={totalBagsInVehicle}
                 cs={cs}
@@ -976,6 +987,14 @@ function LotCard({ lot, index, onChange, onRemove, vehicleBhadaRate, totalBagsIn
           </div>
         </div>
       )}
+
+      <ConfirmDeleteDialog
+        open={pendingDeleteBidIdx !== null}
+        title={`Delete ${pendingBidLabel}?`}
+        description={`This bid will be permanently removed from Lot #${index + 1}. The lot itself will remain.`}
+        onConfirm={confirmRemoveBid}
+        onCancel={() => setPendingDeleteBidIdx(null)}
+      />
     </div>
   );
 }
