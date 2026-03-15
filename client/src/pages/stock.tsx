@@ -123,6 +123,7 @@ type FarmerCard = {
   state: string;
   vehicleNumber: string;
   driverName: string;
+  driverContact: string;
   vehicleBhadaRate: string;
   totalBagsInVehicle: string;
   freightType: string;
@@ -411,6 +412,7 @@ const emptyCard = (): FarmerCard => ({
   state: "Madhya Pradesh",
   vehicleNumber: "",
   driverName: "",
+  driverContact: "",
   vehicleBhadaRate: "",
   totalBagsInVehicle: "",
   freightType: "",
@@ -1701,32 +1703,35 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pl-2">
               <div>
                 <Label className="text-xs text-muted-foreground">Vehicle #</Label>
-                <Input data-testid="input-vehicle-number" placeholder="MP09XX0000" value={card.vehicleNumber} onChange={e => set("vehicleNumber", e.target.value.toUpperCase())} className="h-8 text-sm" />
+                <Input data-testid="input-vehicle-number" placeholder="E.G. MP09AB1234" value={card.vehicleNumber} onChange={e => set("vehicleNumber", e.target.value.toUpperCase())} className="h-8 text-sm" />
               </div>
               <div>
                 <Label className="text-xs text-muted-foreground">Driver Name</Label>
-                <Input data-testid="input-driver-name" placeholder="Driver name" value={card.driverName} onChange={e => set("driverName", capFirst(e.target.value))} className="h-8 text-sm" />
+                <Input data-testid="input-driver-name" placeholder="Optional" value={card.driverName} onChange={e => set("driverName", capFirst(e.target.value))} className="h-8 text-sm" />
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground">Bhada Rate (₹)</Label>
-                <Input data-testid="input-bhada-rate" type="number" placeholder="0" value={card.vehicleBhadaRate} onChange={e => set("vehicleBhadaRate", e.target.value)} className="h-8 text-sm" />
+                <Label className="text-xs text-muted-foreground">Driver Contact</Label>
+                <Input data-testid="input-driver-contact" type="tel" inputMode="numeric" placeholder="Optional" value={card.driverContact} onChange={e => set("driverContact", e.target.value.replace(/\D/g, "").slice(0, 10))} className="h-8 text-sm" />
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground">Total Bags in Vehicle</Label>
-                <Input data-testid="input-total-bags-vehicle" type="number" placeholder="0" value={card.totalBagsInVehicle} onChange={e => set("totalBagsInVehicle", e.target.value)} className="h-8 text-sm" />
+                <Label className="text-xs text-muted-foreground">Freight/Bhada (₹) <span className="text-destructive">*</span></Label>
+                <Input data-testid="input-bhada-rate" type="text" inputMode="decimal" placeholder="0.00" value={card.vehicleBhadaRate} onChange={e => set("vehicleBhadaRate", toNum(e.target.value))} onFocus={e => e.target.select()} className="h-8 text-sm" />
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground">Freight Type</Label>
+                <Label className="text-xs text-muted-foreground">Advance / Credit <span className="text-destructive">*</span></Label>
                 <Select value={card.freightType} onValueChange={v => set("freightType", v)}>
                   <SelectTrigger data-testid="select-freight-type" className="h-8 text-sm">
-                    <SelectValue placeholder="Select" />
+                    <SelectValue placeholder="Select type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Per Bag">Per Bag</SelectItem>
-                    <SelectItem value="Fixed">Fixed Amount</SelectItem>
-                    <SelectItem value="None">None</SelectItem>
+                    <SelectItem value="Advance">Advance</SelectItem>
+                    <SelectItem value="Credit">Credit</SelectItem>
                   </SelectContent>
                 </Select>
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Total # of Bags <span className="text-destructive">*</span></Label>
+                <Input data-testid="input-total-bags-vehicle" type="text" inputMode="numeric" placeholder="0" value={card.totalBagsInVehicle} onChange={e => set("totalBagsInVehicle", e.target.value.replace(/\D/g, ""))} onFocus={e => e.target.select()} className="h-8 text-sm" />
               </div>
             </div>
           )}
