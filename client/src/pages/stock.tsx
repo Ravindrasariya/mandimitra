@@ -753,8 +753,12 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
             <Calculator className="w-3.5 h-3.5" /> Calc Wt
           </Button>
         </div>
-        {bags > 0 && <p className="text-xs text-muted-foreground">Total — {bags} bags</p>}
-        {bags > 0 && nw > 0 && <p data-testid="text-net-wt-avg" className="text-xs font-medium text-orange-500 dark:text-orange-400">Net wt/bag: {(nw / bags).toFixed(2)} kg</p>}
+        {bags > 0 && (
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground">Total — {bags} bags</p>
+            {nw > 0 && <p data-testid="text-net-wt-avg" className="text-xs font-medium text-orange-500 dark:text-orange-400">Avg Weight: {(nw / bags).toFixed(2)} kg</p>}
+          </div>
+        )}
 
         {/* ── Weight calculator ── */}
         {txn.showWeightCalc && (
