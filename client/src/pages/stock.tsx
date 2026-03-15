@@ -877,15 +877,19 @@ function CropGroupSection({ group, onChange, onRemove, vehicleBhadaRate, totalBa
   const addLot = () => onChange({ ...group, lots: [...group.lots, emptyLot(farmerDate)] });
   const updateLot = (idx: number, lot: LotRow) =>
     onChange({ ...group, lots: group.lots.map((l, i) => (i === idx ? lot : l)) });
+  const isLastLot = group.lots.length === 1;
+
   const removeLot = (idx: number) => {
-    if (group.lots.length === 1) return;           // can't remove the only lot — use group × instead
     const lot = group.lots[idx];
-    if (hasLotUserData(lot)) { setPendingDeleteLotIdx(idx); return; }
+    // Always show dialog for last lot (consequence is group removal) or if lot has data
+    if (isLastLot || hasLotUserData(lot)) { setPendingDeleteLotIdx(idx); return; }
     onChange({ ...group, lots: group.lots.filter((_, i) => i !== idx) });
   };
   const confirmDeleteLot = () => {
-    if (pendingDeleteLotIdx !== null)
-      onChange({ ...group, lots: group.lots.filter((_, i) => i !== pendingDeleteLotIdx) });
+    if (pendingDeleteLotIdx !== null) {
+      if (isLastLot) { onRemove(); }            // last lot → remove whole group
+      else onChange({ ...group, lots: group.lots.filter((_, i) => i !== pendingDeleteLotIdx) });
+    }
     setPendingDeleteLotIdx(null);
   };
 
@@ -954,7 +958,11 @@ function CropGroupSection({ group, onChange, onRemove, vehicleBhadaRate, totalBa
       <ConfirmDeleteDialog
         open={pendingDeleteLotIdx !== null}
         title="Delete this lot?"
-        description={`Lot #${(pendingDeleteLotIdx ?? 0) + 1} of ${farmerLabel}'s ${group.crop} has data that will be permanently lost. This action cannot be undone.`}
+        description={
+          isLastLot
+            ? `This is the only lot for ${farmerLabel}'s ${group.crop}. Deleting it will also remove the entire ${group.crop} group.`
+            : `Lot #${(pendingDeleteLotIdx ?? 0) + 1} of ${farmerLabel}'s ${group.crop} has data that will be permanently lost. This action cannot be undone.`
+        }
         onConfirm={confirmDeleteLot}
         onCancel={() => setPendingDeleteLotIdx(null)}
       />
