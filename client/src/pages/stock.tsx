@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,14 +8,62 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import {
   Plus, Trash2, ChevronDown, ChevronRight, Truck, User,
-  AlertTriangle, Scale, Wheat, ChevronsUpDown, X,
+  AlertTriangle, Scale, Wheat, ChevronsUpDown, X, Calculator,
 } from "lucide-react";
 import { format } from "date-fns";
 import { CROPS, SIZES } from "@shared/schema";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type WeightRow = { id: string; grossWeight: string; tare: string };
+type ChargeSettings = {
+  mandiCommissionFarmerPercent: string;
+  mandiCommissionBuyerPercent: string;
+  aadhatCommissionFarmerPercent: string;
+  aadhatCommissionBuyerPercent: string;
+  hammaliFarmerPerBag: string;
+  hammaliBuyerPerBag: string;
+};
+
+const DEFAULT_CS: ChargeSettings = {
+  mandiCommissionFarmerPercent: "0",
+  mandiCommissionBuyerPercent: "1",
+  aadhatCommissionFarmerPercent: "0",
+  aadhatCommissionBuyerPercent: "2",
+  hammaliFarmerPerBag: "0",
+  hammaliBuyerPerBag: "0",
+};
+
+type TxnState = {
+  netWeightInput: string;
+  showWeightCalc: boolean;
+  sampleWeights: string[];
+  extraChargesFarmer: string;
+  extraChargesBuyer: string;
+  extraPerKgFarmer: string;
+  extraPerKgBuyer: string;
+  showExtraBreakdown: boolean;
+  extraTulai: string;
+  extraBharai: string;
+  extraKhadiKarai: string;
+  extraThelaBhada: string;
+  extraOthers: string;
+};
+
+const emptyTxn = (): TxnState => ({
+  netWeightInput: "",
+  showWeightCalc: false,
+  sampleWeights: ["", "", ""],
+  extraChargesFarmer: "0",
+  extraChargesBuyer: "0",
+  extraPerKgFarmer: "0",
+  extraPerKgBuyer: "0",
+  showExtraBreakdown: false,
+  extraTulai: "0",
+  extraBharai: "0",
+  extraKhadiKarai: "0",
+  extraThelaBhada: "0",
+  extraOthers: "0",
+});
 
 type BidRow = {
   buyerName: string;
@@ -22,7 +71,7 @@ type BidRow = {
   numberOfBags: string;
   paymentType: string;
   advanceAmount: string;
-  weights: WeightRow[];
+  txn: TxnState;
 };
 
 type LotRow = {
@@ -47,6 +96,7 @@ type FarmerCard = {
   vehicleNumber: string;
   driverName: string;
   vehicleBhadaRate: string;
+  totalBagsInVehicle: string;
   freightType: string;
   advanceAmount: string;
   advanceMode: string;
@@ -66,7 +116,7 @@ const emptyBid = (): BidRow => ({
   numberOfBags: "",
   paymentType: "Credit",
   advanceAmount: "500",
-  weights: [{ id: uid(), grossWeight: "", tare: "" }],
+  txn: emptyTxn(),
 });
 
 const emptyLot = (): LotRow => ({
@@ -89,6 +139,7 @@ const emptyCard = (): FarmerCard => ({
   vehicleNumber: "",
   driverName: "",
   vehicleBhadaRate: "",
+  totalBagsInVehicle: "",
   freightType: "",
   advanceAmount: "",
   advanceMode: "",
@@ -99,18 +150,19 @@ const emptyCard = (): FarmerCard => ({
 });
 
 const MOCK_BUYERS = ["Ramesh Traders", "Suresh & Sons", "Patel Bros", "Kishan Vyapari"];
-const CROP_COLORS: Record<string, string> = {
-  Potato: "bg-violet-50 border-violet-300 text-violet-700",
-  Onion:  "bg-rose-50 border-rose-300 text-rose-700",
-  Garlic: "bg-amber-50 border-amber-300 text-amber-700",
-};
+
 const CROP_HEADER: Record<string, string> = {
   Potato: "bg-violet-100 border-violet-300",
-  Onion:  "bg-rose-100 border-rose-300",
+  Onion: "bg-rose-100 border-rose-300",
   Garlic: "bg-amber-100 border-amber-300",
 };
+const CROP_COLORS: Record<string, string> = {
+  Potato: "bg-violet-50 border-violet-300 text-violet-700",
+  Onion: "bg-rose-50 border-rose-300 text-rose-700",
+  Garlic: "bg-amber-50 border-amber-300 text-amber-700",
+};
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── Section toggle ───────────────────────────────────────────────────────────
 
 function SectionToggle({ open, onToggle, icon, label, count }: {
   open: boolean; onToggle: () => void; icon: React.ReactNode; label: string; count?: string;
@@ -129,71 +181,383 @@ function SectionToggle({ open, onToggle, icon, label, count }: {
   );
 }
 
-function WeightRowComp({ row, onChange, onRemove, canRemove }: {
-  row: WeightRow;
-  onChange: (field: keyof Omit<WeightRow, "id">, val: string) => void;
-  onRemove: () => void;
-  canRemove: boolean;
+// ─── Transaction / Charges section ───────────────────────────────────────────
+
+function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBagsInVehicle, cs }: {
+  txn: TxnState;
+  onChange: (t: TxnState) => void;
+  bags: number;
+  pricePerKg: number;
+  vehicleBhadaRate: number;
+  totalBagsInVehicle: number;
+  cs: ChargeSettings;
 }) {
-  const gross = parseFloat(row.grossWeight) || 0;
-  const tare = parseFloat(row.tare) || 0;
-  const net = gross > 0 && tare > 0 ? (gross - tare).toFixed(2) : "";
+  const set = (field: keyof TxnState, val: any) => onChange({ ...txn, [field]: val });
+
+  // ── Weight calc ──
+  const updateSample = (idx: number, val: string) => {
+    const updated = [...txn.sampleWeights];
+    updated[idx] = val;
+    const nzw = updated.map(s => parseFloat(s) || 0).filter(w => w > 0);
+    const avg = nzw.length > 0 ? nzw.reduce((a, b) => a + b, 0) / nzw.length : 0;
+    onChange({ ...txn, sampleWeights: updated, netWeightInput: avg > 0 ? (avg * bags).toFixed(2) : txn.netWeightInput });
+  };
+  const addSample = () => set("sampleWeights", [...txn.sampleWeights, ""]);
+  const removeSample = (idx: number) => {
+    if (txn.sampleWeights.length <= 1) return;
+    const updated = txn.sampleWeights.filter((_, i) => i !== idx);
+    const nzw = updated.map(s => parseFloat(s) || 0).filter(w => w > 0);
+    const avg = nzw.length > 0 ? nzw.reduce((a, b) => a + b, 0) / nzw.length : 0;
+    onChange({ ...txn, sampleWeights: updated, netWeightInput: avg > 0 ? (avg * bags).toFixed(2) : txn.netWeightInput });
+  };
+  const nonZero = txn.sampleWeights.map(s => parseFloat(s) || 0).filter(w => w > 0);
+  const average = nonZero.length > 0 ? nonZero.reduce((a, b) => a + b, 0) / nonZero.length : 0;
+
+  // ── Calculations ──
+  const nw = parseFloat(txn.netWeightInput) || 0;
+  const epkFarmer = parseFloat(txn.extraPerKgFarmer) || 0;
+  const epkBuyer = parseFloat(txn.extraPerKgBuyer) || 0;
+  const farmerGross = nw * (pricePerKg + epkFarmer);
+  const buyerGross = nw * (pricePerKg + epkBuyer);
+
+  const hammaliFarmerRate = parseFloat(cs.hammaliFarmerPerBag) || 0;
+  const hammaliBuyerRate = parseFloat(cs.hammaliBuyerPerBag) || 0;
+  const extraFarmer = parseFloat(txn.extraChargesFarmer) || 0;
+  const extraBuyer = parseFloat(txn.extraChargesBuyer) || 0;
+  const aadhatFarmerPct = parseFloat(cs.aadhatCommissionFarmerPercent) || 0;
+  const aadhatBuyerPct = parseFloat(cs.aadhatCommissionBuyerPercent) || 0;
+  const mandiFarmerPct = parseFloat(cs.mandiCommissionFarmerPercent) || 0;
+  const mandiBuyerPct = parseFloat(cs.mandiCommissionBuyerPercent) || 0;
+
+  const freightFarmerTotal = totalBagsInVehicle > 0 ? (vehicleBhadaRate * bags) / totalBagsInVehicle : 0;
+
+  const hammaliFarmerTotal = hammaliFarmerRate * bags;
+  const hammaliBuyerTotal = hammaliBuyerRate * bags;
+  const aadhatFarmer = (farmerGross * aadhatFarmerPct) / 100;
+  const aadhatBuyer = (buyerGross * aadhatBuyerPct) / 100;
+  const mandiFarmer = (farmerGross * mandiFarmerPct) / 100;
+  const mandiBuyer = (buyerGross * mandiBuyerPct) / 100;
+
+  const farmerDeductions = hammaliFarmerTotal + extraFarmer + aadhatFarmer + mandiFarmer + freightFarmerTotal;
+  const buyerAdditions = hammaliBuyerTotal + extraBuyer + aadhatBuyer + mandiBuyer;
+  const farmerPayable = farmerGross - farmerDeductions;
+  const buyerReceivable = buyerGross + buyerAdditions;
+
+  const updateExtraBreakdown = (field: string, val: string) => {
+    const next = {
+      extraTulai: field === "extraTulai" ? val : txn.extraTulai,
+      extraBharai: field === "extraBharai" ? val : txn.extraBharai,
+      extraKhadiKarai: field === "extraKhadiKarai" ? val : txn.extraKhadiKarai,
+      extraThelaBhada: field === "extraThelaBhada" ? val : txn.extraThelaBhada,
+      extraOthers: field === "extraOthers" ? val : txn.extraOthers,
+    };
+    const sum = Object.values(next).reduce((a, v) => a + (parseFloat(v) || 0), 0);
+    onChange({ ...txn, ...next, [field]: val, extraChargesFarmer: sum.toFixed(2) });
+  };
 
   return (
-    <div className="flex items-end gap-2 flex-wrap">
-      <div className="flex-1 min-w-[100px]">
-        <Label className="text-xs text-muted-foreground">Gross Wt (kg)</Label>
-        <Input
-          data-testid="input-gross-weight"
-          type="number"
-          placeholder="e.g. 1200"
-          value={row.grossWeight}
-          onChange={e => onChange("grossWeight", e.target.value)}
-          className="h-8 text-sm"
-        />
+    <div className="ml-8 mt-2 rounded-lg border border-green-200 bg-green-50/30 p-3 space-y-3">
+      <div className="flex items-center gap-1.5 text-xs font-semibold text-green-700 uppercase tracking-wide">
+        <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+        <Scale className="w-3.5 h-3.5" />
+        Weight & Charges
       </div>
-      <div className="flex-1 min-w-[90px]">
-        <Label className="text-xs text-muted-foreground">Tare (kg)</Label>
-        <Input
-          data-testid="input-tare"
-          type="number"
-          placeholder="e.g. 200"
-          value={row.tare}
-          onChange={e => onChange("tare", e.target.value)}
-          className="h-8 text-sm"
-        />
+
+      {/* ── Net Weight ── */}
+      <div className="space-y-1">
+        <Label className="text-xs text-muted-foreground">Net Weight (kg)</Label>
+        <div className="flex gap-2">
+          <Input
+            data-testid="input-net-weight"
+            type="text"
+            inputMode="decimal"
+            placeholder="0.00"
+            value={txn.netWeightInput}
+            onChange={e => set("netWeightInput", e.target.value)}
+            onFocus={e => e.currentTarget.select()}
+            className="h-8 text-sm flex-1"
+          />
+          <Button
+            type="button"
+            size="sm"
+            variant={txn.showWeightCalc ? "default" : "outline"}
+            className="h-8 whitespace-nowrap text-xs gap-1"
+            onClick={() => set("showWeightCalc", !txn.showWeightCalc)}
+            data-testid="button-calc-weight"
+          >
+            <Calculator className="w-3.5 h-3.5" /> Calc Wt
+          </Button>
+        </div>
+        {bags > 0 && <p className="text-xs text-muted-foreground">Total — {bags} bags</p>}
+
+        {/* ── Weight calculator ── */}
+        {txn.showWeightCalc && (
+          <div className="bg-muted/50 rounded-md p-2 space-y-2 mt-1" data-testid="weight-calculator">
+            <p className="text-xs font-semibold text-muted-foreground">Sample Bag Weights (kg)</p>
+            <div className="grid grid-cols-2 gap-2">
+              {txn.sampleWeights.map((w, idx) => (
+                <div key={idx} className="space-y-0.5">
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs text-muted-foreground w-5">{idx + 1}.</span>
+                    <Input
+                      data-testid={`input-sample-weight-${idx}`}
+                      type="text"
+                      inputMode="decimal"
+                      value={w}
+                      onChange={e => updateSample(idx, e.target.value)}
+                      onFocus={e => e.currentTarget.select()}
+                      placeholder="0.00"
+                      className="h-7 text-xs flex-1"
+                    />
+                    {txn.sampleWeights.length > 1 && (
+                      <Button type="button" variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => removeSample(idx)}>
+                        <X className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                  {(parseFloat(w) || 0) > 100 && (
+                    <p className="text-xs text-orange-500 font-medium ml-6 flex items-center gap-1">
+                      <AlertTriangle className="h-3 w-3" /> Over 100kg
+                    </p>
+                  )}
+                </div>
+              ))}
+            </div>
+            <Button type="button" variant="ghost" size="sm" className="h-7 text-xs w-full" onClick={addSample}>
+              <Plus className="h-3 w-3 mr-1" /> Add Sample
+            </Button>
+            <div className="border-t pt-1 flex justify-between text-xs font-medium">
+              <span>Average ({nonZero.length} samples):</span>
+              <span>{average > 0 ? `${average.toFixed(2)} kg` : "—"}</span>
+            </div>
+            <div className="flex justify-between text-xs text-muted-foreground">
+              <span>Net Weight ({average.toFixed(2)} × {bags} bags):</span>
+              <span>{average > 0 ? `${(average * bags).toFixed(2)} kg` : "—"}</span>
+            </div>
+          </div>
+        )}
       </div>
-      <div className="flex-1 min-w-[90px]">
-        <Label className="text-xs text-muted-foreground">Net Wt (kg)</Label>
-        <div className={`h-8 px-3 flex items-center rounded-md border text-sm font-semibold ${net ? "bg-green-50 border-green-300 text-green-700" : "bg-muted border-border text-muted-foreground"}`}>
-          {net || "—"}
+
+      {/* ── Farmer + Buyer charges ── */}
+      <div className="grid grid-cols-2 gap-2 text-xs" data-testid="charge-rates-display">
+        {/* Farmer */}
+        <div className="bg-background rounded border border-border p-2 space-y-1">
+          <p className="font-semibold text-muted-foreground">Farmer Charges</p>
+          <div className="flex justify-between"><span>Aadhat:</span><span>{aadhatFarmerPct}%</span></div>
+          <div className="flex justify-between"><span>Mandi:</span><span>{mandiFarmerPct}%</span></div>
+          <div className="flex justify-between"><span>Hammali:</span><span>₹{hammaliFarmerRate}/bag</span></div>
+          {freightFarmerTotal > 0 && (
+            <div className="flex justify-between text-muted-foreground">
+              <span>Freight (auto):</span><span>₹{freightFarmerTotal.toFixed(2)}</span>
+            </div>
+          )}
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              className="flex items-center gap-0.5 text-xs hover:text-foreground text-muted-foreground"
+              onClick={() => set("showExtraBreakdown", !txn.showExtraBreakdown)}
+            >
+              {txn.showExtraBreakdown ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+              Extra:
+            </button>
+            <Input
+              data-testid="input-extra-charges-farmer"
+              type="text" inputMode="decimal"
+              value={txn.extraChargesFarmer}
+              onChange={e => set("extraChargesFarmer", e.target.value)}
+              onFocus={e => e.currentTarget.select()}
+              className="w-16 h-6 text-xs text-right p-1"
+            />
+          </div>
+          {txn.showExtraBreakdown && (
+            <div className="ml-2 border-l-2 border-muted pl-2 space-y-1">
+              {([
+                ["Tulai", "extraTulai", txn.extraTulai],
+                ["Bharai", "extraBharai", txn.extraBharai],
+                ["Khadi Karai", "extraKhadiKarai", txn.extraKhadiKarai],
+                ["Thela Bhada", "extraThelaBhada", txn.extraThelaBhada],
+                ["Others", "extraOthers", txn.extraOthers],
+              ] as [string, string, string][]).map(([label, field, val]) => (
+                <div key={field} className="flex items-center justify-between">
+                  <span className="text-muted-foreground">{label}:</span>
+                  <Input
+                    data-testid={`input-${field}`}
+                    type="text" inputMode="decimal"
+                    value={val}
+                    onChange={e => updateExtraBreakdown(field, e.target.value)}
+                    onFocus={e => e.currentTarget.select()}
+                    className="w-16 h-6 text-xs text-right p-1"
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+          <div className="flex items-center justify-between border-t pt-1 mt-1">
+            <span className="font-semibold">Extra ₹/Kg:</span>
+            <Input
+              data-testid="input-extra-per-kg-farmer"
+              type="text" inputMode="decimal"
+              value={txn.extraPerKgFarmer}
+              onChange={e => set("extraPerKgFarmer", e.target.value)}
+              onFocus={e => e.currentTarget.select()}
+              className="w-16 h-6 text-xs text-right p-1"
+            />
+          </div>
+        </div>
+
+        {/* Buyer */}
+        <div className="bg-background rounded border border-border p-2 space-y-1">
+          <p className="font-semibold text-muted-foreground">Buyer Charges</p>
+          <div className="flex justify-between"><span>Aadhat:</span><span>{aadhatBuyerPct}%</span></div>
+          <div className="flex justify-between"><span>Mandi:</span><span>{mandiBuyerPct}%</span></div>
+          <div className="flex justify-between"><span>Hammali:</span><span>₹{hammaliBuyerRate}/bag</span></div>
+          <div className="flex items-center justify-between">
+            <span>Extra:</span>
+            <Input
+              data-testid="input-extra-charges-buyer"
+              type="text" inputMode="decimal"
+              value={txn.extraChargesBuyer}
+              onChange={e => set("extraChargesBuyer", e.target.value)}
+              onFocus={e => e.currentTarget.select()}
+              className="w-16 h-6 text-xs text-right p-1"
+            />
+          </div>
+          <div className="flex items-center justify-between border-t pt-1 mt-1">
+            <span className="font-semibold">Extra ₹/Kg:</span>
+            <Input
+              data-testid="input-extra-per-kg-buyer"
+              type="text" inputMode="decimal"
+              value={txn.extraPerKgBuyer}
+              onChange={e => set("extraPerKgBuyer", e.target.value)}
+              onFocus={e => e.currentTarget.select()}
+              className="w-16 h-6 text-xs text-right p-1"
+            />
+          </div>
         </div>
       </div>
-      {canRemove && (
-        <Button type="button" variant="ghost" size="sm" onClick={onRemove} className="h-8 w-8 p-0 text-red-400 hover:text-red-600">
-          <X className="w-3.5 h-3.5" />
-        </Button>
+
+      {/* ── Calculation summary ── */}
+      {nw > 0 && pricePerKg > 0 && (
+        <div className="bg-muted rounded-md p-3 space-y-1.5 text-xs" data-testid="txn-calculation-summary">
+          <div className="flex justify-between">
+            <span>Bid Rate:</span>
+            <span className="font-medium">₹{pricePerKg.toFixed(2)}/kg</span>
+          </div>
+          {epkFarmer > 0 && (
+            <div className="flex justify-between text-green-600">
+              <span>Farmer Rate ({pricePerKg.toFixed(2)} + {epkFarmer.toFixed(2)}):</span>
+              <span className="font-medium">₹{(pricePerKg + epkFarmer).toFixed(2)}/kg</span>
+            </div>
+          )}
+          {epkBuyer > 0 && (
+            <div className="flex justify-between text-blue-600">
+              <span>Buyer Rate ({pricePerKg.toFixed(2)} + {epkBuyer.toFixed(2)}):</span>
+              <span className="font-medium">₹{(pricePerKg + epkBuyer).toFixed(2)}/kg</span>
+            </div>
+          )}
+
+          {/* Farmer side */}
+          <div className="border-t pt-1.5 space-y-0.5">
+            <div className="flex justify-between">
+              <span>Farmer Gross ({nw.toFixed(2)} × ₹{(pricePerKg + epkFarmer).toFixed(2)}):</span>
+              <span className="font-medium">₹{farmerGross.toFixed(2)}</span>
+            </div>
+            <p className="text-muted-foreground font-semibold mt-0.5">Farmer Deductions:</p>
+            {hammaliFarmerRate > 0 && (
+              <div className="flex justify-between text-muted-foreground pl-2">
+                <span>Hammali ({bags} × ₹{hammaliFarmerRate}):</span>
+                <span>-₹{hammaliFarmerTotal.toFixed(2)}</span>
+              </div>
+            )}
+            {extraFarmer > 0 && (
+              <div className="flex justify-between text-muted-foreground pl-2">
+                <span>Extra Charges:</span>
+                <span>-₹{extraFarmer.toFixed(2)}</span>
+              </div>
+            )}
+            {aadhatFarmerPct > 0 && (
+              <div className="flex justify-between text-muted-foreground pl-2">
+                <span>Aadhat ({aadhatFarmerPct}%):</span>
+                <span>-₹{aadhatFarmer.toFixed(2)}</span>
+              </div>
+            )}
+            {mandiFarmerPct > 0 && (
+              <div className="flex justify-between text-muted-foreground pl-2">
+                <span>Mandi ({mandiFarmerPct}%):</span>
+                <span>-₹{mandiFarmer.toFixed(2)}</span>
+              </div>
+            )}
+            {freightFarmerTotal > 0 && (
+              <div className="flex justify-between text-muted-foreground pl-2">
+                <span>Freight:</span>
+                <span>-₹{freightFarmerTotal.toFixed(2)}</span>
+              </div>
+            )}
+            {farmerDeductions === 0 && <div className="text-muted-foreground italic pl-2">No deductions</div>}
+            <div className="flex justify-between font-bold text-green-700 border-t pt-1 mt-0.5">
+              <span>Farmer Payable:</span>
+              <span>₹{farmerPayable.toFixed(2)}</span>
+            </div>
+          </div>
+
+          {/* Buyer side */}
+          <div className="border-t pt-1.5 space-y-0.5">
+            <div className="flex justify-between">
+              <span>Buyer Gross ({nw.toFixed(2)} × ₹{(pricePerKg + epkBuyer).toFixed(2)}):</span>
+              <span className="font-medium">₹{buyerGross.toFixed(2)}</span>
+            </div>
+            <p className="text-muted-foreground font-semibold mt-0.5">Buyer Additions:</p>
+            {hammaliBuyerRate > 0 && (
+              <div className="flex justify-between text-muted-foreground pl-2">
+                <span>Hammali ({bags} × ₹{hammaliBuyerRate}):</span>
+                <span>+₹{hammaliBuyerTotal.toFixed(2)}</span>
+              </div>
+            )}
+            {extraBuyer > 0 && (
+              <div className="flex justify-between text-muted-foreground pl-2">
+                <span>Extra Charges:</span>
+                <span>+₹{extraBuyer.toFixed(2)}</span>
+              </div>
+            )}
+            {aadhatBuyerPct > 0 && (
+              <div className="flex justify-between text-muted-foreground pl-2">
+                <span>Aadhat ({aadhatBuyerPct}%):</span>
+                <span>+₹{aadhatBuyer.toFixed(2)}</span>
+              </div>
+            )}
+            {mandiBuyerPct > 0 && (
+              <div className="flex justify-between text-muted-foreground pl-2">
+                <span>Mandi ({mandiBuyerPct}%):</span>
+                <span>+₹{mandiBuyer.toFixed(2)}</span>
+              </div>
+            )}
+            {buyerAdditions === 0 && <div className="text-muted-foreground italic pl-2">No additions</div>}
+            <div className="flex justify-between font-bold text-blue-700 border-t pt-1 mt-0.5">
+              <span>Buyer Receivable:</span>
+              <span>₹{buyerReceivable.toFixed(2)}</span>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
 }
 
-function BidSection({ bid, onChange }: {
+// ─── Bid section (row 2) ──────────────────────────────────────────────────────
+
+function BidSection({ bid, onChange, vehicleBhadaRate, totalBagsInVehicle, cs }: {
   bid: BidRow;
-  onChange: (updated: BidRow) => void;
+  onChange: (b: BidRow) => void;
+  vehicleBhadaRate: number;
+  totalBagsInVehicle: number;
+  cs: ChargeSettings;
 }) {
   const isNewBuyer = bid.buyerName.trim().length > 0 && !MOCK_BUYERS.includes(bid.buyerName.trim());
-
-  const updateWeight = (idx: number, field: keyof Omit<WeightRow, "id">, val: string) => {
-    const weights = bid.weights.map((w, i) => i === idx ? { ...w, [field]: val } : w);
-    onChange({ ...bid, weights });
-  };
-  const addWeight = () => onChange({ ...bid, weights: [...bid.weights, { id: uid(), grossWeight: "", tare: "" }] });
-  const removeWeight = (idx: number) => onChange({ ...bid, weights: bid.weights.filter((_, i) => i !== idx) });
+  const bags = parseInt(bid.numberOfBags) || 0;
+  const pricePerKg = parseFloat(bid.pricePerKg) || 0;
 
   return (
-    <div className="ml-5 mt-2 rounded-lg border border-blue-200 bg-blue-50/40 p-3 space-y-3">
-      {/* Bid header */}
+    <div className="ml-4 mt-2 rounded-lg border border-blue-200 bg-blue-50/40 p-3 space-y-3">
       <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 uppercase tracking-wide">
         <span className="w-1.5 h-1.5 rounded-full bg-blue-400 inline-block" />
         Bid Details
@@ -219,8 +583,7 @@ function BidSection({ bid, onChange }: {
           </div>
           {isNewBuyer && (
             <div className="flex items-center gap-1 mt-1 text-orange-600 text-xs">
-              <AlertTriangle className="w-3 h-3" />
-              New buyer will be added
+              <AlertTriangle className="w-3 h-3" /> New buyer will be added
             </div>
           )}
         </div>
@@ -228,8 +591,7 @@ function BidSection({ bid, onChange }: {
           <Label className="text-xs text-muted-foreground">Price / kg (₹)</Label>
           <Input
             data-testid="input-price-per-kg"
-            type="number"
-            placeholder="0.00"
+            type="number" placeholder="0.00"
             value={bid.pricePerKg}
             onChange={e => onChange({ ...bid, pricePerKg: e.target.value })}
             className="h-8 text-sm"
@@ -239,8 +601,7 @@ function BidSection({ bid, onChange }: {
           <Label className="text-xs text-muted-foreground"># Bags</Label>
           <Input
             data-testid="input-bid-bags"
-            type="number"
-            placeholder="0"
+            type="number" placeholder="0"
             value={bid.numberOfBags}
             onChange={e => onChange({ ...bid, numberOfBags: e.target.value })}
             className="h-8 text-sm"
@@ -261,7 +622,6 @@ function BidSection({ bid, onChange }: {
         </div>
       </div>
 
-      {/* Advance if Cash */}
       {bid.paymentType === "Cash" && (
         <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-200 rounded-md px-3 py-1.5">
           <span className="text-xs text-yellow-700 font-medium">Cash advance ₹</span>
@@ -275,42 +635,32 @@ function BidSection({ bid, onChange }: {
         </div>
       )}
 
-      {/* Weight rows */}
-      <div className="ml-4 mt-1 rounded-lg border border-green-200 bg-green-50/40 p-3 space-y-2">
-        <div className="flex items-center gap-1.5 text-xs font-semibold text-green-600 uppercase tracking-wide">
-          <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" />
-          <Scale className="w-3.5 h-3.5" />
-          Weight Entry
-        </div>
-        {bid.weights.map((w, idx) => (
-          <WeightRowComp
-            key={w.id}
-            row={w}
-            onChange={(f, v) => updateWeight(idx, f, v)}
-            onRemove={() => removeWeight(idx)}
-            canRemove={bid.weights.length > 1}
-          />
-        ))}
-        <Button type="button" variant="outline" size="sm" onClick={addWeight} className="h-7 text-xs gap-1 border-dashed border-green-400 text-green-600 hover:bg-green-50">
-          <Plus className="w-3 h-3" /> Add Weight Row
-        </Button>
-      </div>
+      {/* Row 3 — Weight + Charges + Calculations */}
+      <TxnSection
+        txn={bid.txn}
+        onChange={txn => onChange({ ...bid, txn })}
+        bags={bags}
+        pricePerKg={pricePerKg}
+        vehicleBhadaRate={vehicleBhadaRate}
+        totalBagsInVehicle={totalBagsInVehicle}
+        cs={cs}
+      />
     </div>
   );
 }
 
-function LotCard({ lot, index, onChange, onRemove }: {
-  lot: LotRow;
-  index: number;
-  onChange: (updated: LotRow) => void;
-  onRemove: () => void;
+// ─── Lot card ─────────────────────────────────────────────────────────────────
+
+function LotCard({ lot, index, onChange, onRemove, vehicleBhadaRate, totalBagsInVehicle, cs }: {
+  lot: LotRow; index: number;
+  onChange: (l: LotRow) => void; onRemove: () => void;
+  vehicleBhadaRate: number; totalBagsInVehicle: number;
+  cs: ChargeSettings;
 }) {
-  const setField = (field: keyof Omit<LotRow, "id" | "bid">, val: string) =>
-    onChange({ ...lot, [field]: val });
+  const setField = (f: keyof Omit<LotRow, "id" | "bid">, v: string) => onChange({ ...lot, [f]: v });
 
   return (
     <div className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
-      {/* Lot header */}
       <div className="flex items-center justify-between px-3 py-2 bg-muted/30 border-b border-border">
         <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Lot #{index + 1}</span>
         <Button type="button" variant="ghost" size="sm" onClick={onRemove} className="h-6 w-6 p-0 text-red-400 hover:text-red-600">
@@ -325,8 +675,7 @@ function LotCard({ lot, index, onChange, onRemove }: {
             <Label className="text-xs text-muted-foreground"># Bags *</Label>
             <Input
               data-testid={`input-lot-bags-${index}`}
-              type="number"
-              placeholder="0"
+              type="number" placeholder="0"
               value={lot.numberOfBags}
               onChange={e => setField("numberOfBags", e.target.value.replace(/\D/g, ""))}
               className="h-8 text-sm"
@@ -366,20 +715,26 @@ function LotCard({ lot, index, onChange, onRemove }: {
           </div>
         </div>
 
-        {/* Row 2+3 — Bid + Weights */}
+        {/* Row 2+3 — Bid + Txn */}
         <BidSection
           bid={lot.bid}
           onChange={bid => onChange({ ...lot, bid })}
+          vehicleBhadaRate={vehicleBhadaRate}
+          totalBagsInVehicle={totalBagsInVehicle}
+          cs={cs}
         />
       </div>
     </div>
   );
 }
 
-function CropGroupSection({ group, onChange, onRemove }: {
+// ─── Crop group ───────────────────────────────────────────────────────────────
+
+function CropGroupSection({ group, onChange, onRemove, vehicleBhadaRate, totalBagsInVehicle, cs }: {
   group: CropGroup;
-  onChange: (updated: CropGroup) => void;
-  onRemove: () => void;
+  onChange: (g: CropGroup) => void; onRemove: () => void;
+  vehicleBhadaRate: number; totalBagsInVehicle: number;
+  cs: ChargeSettings;
 }) {
   const headerCls = CROP_HEADER[group.crop] || "bg-muted border-border";
   const badgeCls = CROP_COLORS[group.crop] || "bg-muted border-border text-foreground";
@@ -394,7 +749,6 @@ function CropGroupSection({ group, onChange, onRemove }: {
 
   return (
     <div className={`rounded-xl border-2 ${headerCls} overflow-hidden`}>
-      {/* Crop header */}
       <div className={`flex items-center justify-between px-4 py-2 ${headerCls} border-b`}>
         <div className="flex items-center gap-2">
           <Wheat className="w-4 h-4" />
@@ -403,29 +757,22 @@ function CropGroupSection({ group, onChange, onRemove }: {
             {group.lots.length} lot{group.lots.length !== 1 ? "s" : ""}
           </Badge>
         </div>
-        <Button type="button" variant="ghost" size="sm" onClick={onRemove} className="h-7 w-7 p-0 text-red-400 hover:text-red-600" title="Remove crop">
+        <Button type="button" variant="ghost" size="sm" onClick={onRemove} className="h-7 w-7 p-0 text-red-400 hover:text-red-600">
           <X className="w-3.5 h-3.5" />
         </Button>
       </div>
-
-      {/* Lots */}
       <div className="p-3 space-y-3 bg-background/60">
         {group.lots.map((lot, idx) => (
           <LotCard
-            key={lot.id}
-            lot={lot}
-            index={idx}
+            key={lot.id} lot={lot} index={idx}
             onChange={lot => updateLot(idx, lot)}
             onRemove={() => removeLot(idx)}
+            vehicleBhadaRate={vehicleBhadaRate}
+            totalBagsInVehicle={totalBagsInVehicle}
+            cs={cs}
           />
         ))}
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={addLot}
-          className="w-full h-8 text-xs gap-1.5 border-dashed"
-        >
+        <Button type="button" variant="outline" size="sm" onClick={addLot} className="w-full h-8 text-xs gap-1.5 border-dashed">
           <Plus className="w-3.5 h-3.5" /> Add Lot under {group.crop}
         </Button>
       </div>
@@ -433,32 +780,31 @@ function CropGroupSection({ group, onChange, onRemove }: {
   );
 }
 
-function FarmerCardComp({ card, onChange, onRemove }: {
-  card: FarmerCard;
-  onChange: (updated: FarmerCard) => void;
-  onRemove: () => void;
-}) {
-  const set = (field: keyof FarmerCard, val: any) => onChange({ ...card, [field]: val });
+// ─── Farmer card ──────────────────────────────────────────────────────────────
 
+function FarmerCardComp({ card, onChange, onRemove, cs }: {
+  card: FarmerCard;
+  onChange: (c: FarmerCard) => void; onRemove: () => void;
+  cs: ChargeSettings;
+}) {
+  const set = (f: keyof FarmerCard, v: any) => onChange({ ...card, [f]: v });
   const usedCrops = card.cropGroups.map(g => g.crop);
   const availableCrops = CROPS.filter(c => !usedCrops.includes(c));
 
-  const addCrop = (crop: string) => {
-    onChange({
-      ...card,
-      cropGroups: [...card.cropGroups, { id: uid(), crop, lots: [emptyLot()] }],
-    });
-  };
+  const vehicleBhadaRate = parseFloat(card.vehicleBhadaRate) || 0;
+  const totalBagsInVehicle = parseInt(card.totalBagsInVehicle) || 0;
 
-  const updateGroup = (idx: number, group: CropGroup) =>
-    onChange({ ...card, cropGroups: card.cropGroups.map((g, i) => (i === idx ? group : g)) });
-
+  const addCrop = (crop: string) => onChange({
+    ...card, cropGroups: [...card.cropGroups, { id: uid(), crop, lots: [emptyLot()] }],
+  });
+  const updateGroup = (idx: number, g: CropGroup) =>
+    onChange({ ...card, cropGroups: card.cropGroups.map((gg, i) => (i === idx ? g : gg)) });
   const removeGroup = (idx: number) =>
     onChange({ ...card, cropGroups: card.cropGroups.filter((_, i) => i !== idx) });
 
   return (
     <Card className="border-2 border-border shadow-md overflow-hidden">
-      {/* ── Card header ─────────────────────────────── */}
+      {/* Header */}
       <button
         type="button"
         className="w-full flex items-center justify-between px-4 py-3 bg-muted/40 hover:bg-muted/60 transition-colors border-b border-border"
@@ -476,36 +822,26 @@ function FarmerCardComp({ card, onChange, onRemove }: {
         </div>
         <div className="flex items-center gap-2">
           <input
-            type="date"
-            value={card.date}
+            type="date" value={card.date}
             onChange={e => { e.stopPropagation(); set("date", e.target.value); }}
             onClick={e => e.stopPropagation()}
             className="text-xs border border-border rounded px-2 py-1 bg-background"
             data-testid="input-farmer-date"
           />
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
+          <Button type="button" variant="ghost" size="sm"
             onClick={e => { e.stopPropagation(); onRemove(); }}
-            className="h-7 w-7 p-0 text-red-400 hover:text-red-600"
-          >
+            className="h-7 w-7 p-0 text-red-400 hover:text-red-600">
             <Trash2 className="w-3.5 h-3.5" />
           </Button>
         </div>
       </button>
 
-      {/* ── Card body ───────────────────────────────── */}
       {card.cardOpen && (
         <CardContent className="p-4 space-y-3">
 
-          {/* ── Farmer Details ──────────────────────── */}
-          <SectionToggle
-            open={card.farmerOpen}
-            onToggle={() => set("farmerOpen", !card.farmerOpen)}
-            icon={<User className="w-3.5 h-3.5" />}
-            label="Farmer Details"
-          />
+          {/* Farmer details */}
+          <SectionToggle open={card.farmerOpen} onToggle={() => set("farmerOpen", !card.farmerOpen)}
+            icon={<User className="w-3.5 h-3.5" />} label="Farmer Details" />
           {card.farmerOpen && (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pl-2">
               <div>
@@ -531,18 +867,11 @@ function FarmerCardComp({ card, onChange, onRemove }: {
             </div>
           )}
 
-          {/* Advance at farmer level */}
+          {/* Advance */}
           <div className="flex items-center gap-3 pl-2">
             <div>
               <Label className="text-xs text-muted-foreground">Farmer Advance ₹</Label>
-              <Input
-                data-testid="input-farmer-advance"
-                type="number"
-                placeholder="0"
-                value={card.advanceAmount}
-                onChange={e => set("advanceAmount", e.target.value)}
-                className="h-8 w-32 text-sm"
-              />
+              <Input data-testid="input-farmer-advance" type="number" placeholder="0" value={card.advanceAmount} onChange={e => set("advanceAmount", e.target.value)} className="h-8 w-32 text-sm" />
             </div>
             <div>
               <Label className="text-xs text-muted-foreground">Mode</Label>
@@ -559,14 +888,10 @@ function FarmerCardComp({ card, onChange, onRemove }: {
             </div>
           </div>
 
-          {/* ── Vehicle Info ────────────────────────── */}
-          <SectionToggle
-            open={card.vehicleOpen}
-            onToggle={() => set("vehicleOpen", !card.vehicleOpen)}
-            icon={<Truck className="w-3.5 h-3.5" />}
-            label="Vehicle Info"
-            count={card.vehicleNumber || undefined}
-          />
+          {/* Vehicle info */}
+          <SectionToggle open={card.vehicleOpen} onToggle={() => set("vehicleOpen", !card.vehicleOpen)}
+            icon={<Truck className="w-3.5 h-3.5" />} label="Vehicle Info"
+            count={card.vehicleNumber || undefined} />
           {card.vehicleOpen && (
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pl-2">
               <div>
@@ -578,8 +903,12 @@ function FarmerCardComp({ card, onChange, onRemove }: {
                 <Input data-testid="input-driver-name" placeholder="Driver name" value={card.driverName} onChange={e => set("driverName", e.target.value)} className="h-8 text-sm" />
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground">Bhada Rate</Label>
-                <Input data-testid="input-bhada-rate" type="number" placeholder="₹/bag or flat" value={card.vehicleBhadaRate} onChange={e => set("vehicleBhadaRate", e.target.value)} className="h-8 text-sm" />
+                <Label className="text-xs text-muted-foreground">Bhada Rate (₹)</Label>
+                <Input data-testid="input-bhada-rate" type="number" placeholder="0" value={card.vehicleBhadaRate} onChange={e => set("vehicleBhadaRate", e.target.value)} className="h-8 text-sm" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Total Bags in Vehicle</Label>
+                <Input data-testid="input-total-bags-vehicle" type="number" placeholder="0" value={card.totalBagsInVehicle} onChange={e => set("totalBagsInVehicle", e.target.value)} className="h-8 text-sm" />
               </div>
               <div>
                 <Label className="text-xs text-muted-foreground">Freight Type</Label>
@@ -597,26 +926,22 @@ function FarmerCardComp({ card, onChange, onRemove }: {
             </div>
           )}
 
-          {/* ── Crop Groups ─────────────────────────── */}
+          {/* Crop groups */}
           <div className="space-y-3 pt-1">
             {card.cropGroups.map((group, idx) => (
               <CropGroupSection
-                key={group.id}
-                group={group}
+                key={group.id} group={group}
                 onChange={g => updateGroup(idx, g)}
                 onRemove={() => removeGroup(idx)}
+                vehicleBhadaRate={vehicleBhadaRate}
+                totalBagsInVehicle={totalBagsInVehicle}
+                cs={cs}
               />
             ))}
-
-            {/* Add crop button(s) */}
             {availableCrops.length > 0 && (
               <div className="flex flex-wrap gap-2 pt-1">
                 {availableCrops.map(crop => (
-                  <Button
-                    key={crop}
-                    type="button"
-                    variant="outline"
-                    size="sm"
+                  <Button key={crop} type="button" variant="outline" size="sm"
                     onClick={() => addCrop(crop)}
                     className={`h-8 gap-1.5 text-sm border-dashed font-medium ${
                       crop === "Potato" ? "border-violet-400 text-violet-600 hover:bg-violet-50" :
@@ -631,7 +956,6 @@ function FarmerCardComp({ card, onChange, onRemove }: {
                 ))}
               </div>
             )}
-
             {card.cropGroups.length === 0 && (
               <p className="text-xs text-muted-foreground italic text-center py-2">
                 Select a crop above to begin adding lots
@@ -639,7 +963,6 @@ function FarmerCardComp({ card, onChange, onRemove }: {
             )}
           </div>
 
-          {/* ── Save row ────────────────────────────── */}
           <div className="flex justify-end pt-2 border-t border-border">
             <Button type="button" disabled className="gap-2 opacity-50" title="Wiring coming soon">
               Save Entry
@@ -656,6 +979,12 @@ function FarmerCardComp({ card, onChange, onRemove }: {
 export default function StockPage() {
   const [cards, setCards] = useState<FarmerCard[]>([emptyCard()]);
 
+  const { data: chargeSettings } = useQuery<ChargeSettings>({
+    queryKey: ["/api/charge-settings"],
+  });
+
+  const cs = chargeSettings || DEFAULT_CS;
+
   const addCard = () => setCards(prev => [emptyCard(), ...prev]);
   const updateCard = (idx: number, card: FarmerCard) =>
     setCards(prev => prev.map((c, i) => (i === idx ? card : c)));
@@ -664,30 +993,22 @@ export default function StockPage() {
 
   return (
     <div className="flex flex-col h-full">
-      {/* ── Page header ── */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background sticky top-0 z-10">
         <div>
           <h1 className="text-lg font-bold">Stock Entry</h1>
           <p className="text-xs text-muted-foreground">Add farmers, lots, bids and weights in one place</p>
         </div>
-        <Button
-          type="button"
-          onClick={addCard}
-          data-testid="button-add-farmer-entry"
-          className="gap-2"
-        >
+        <Button type="button" onClick={addCard} data-testid="button-add-farmer-entry" className="gap-2">
           <Plus className="w-4 h-4" /> New Farmer Entry
         </Button>
       </div>
-
-      {/* ── Cards list ── */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {cards.map((card, idx) => (
           <FarmerCardComp
-            key={card.id}
-            card={card}
+            key={card.id} card={card}
             onChange={c => updateCard(idx, c)}
             onRemove={() => removeCard(idx)}
+            cs={cs}
           />
         ))}
       </div>
