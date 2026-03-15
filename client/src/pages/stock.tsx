@@ -3526,10 +3526,10 @@ export default function StockPage() {
   const exportStockCsv = () => {
     const headers = [
       "SR#", "Lot ID", "Date", "Crop", "Variety", "Size", "Bag Marka",
-      "Farmer Name", "Farmer Phone", "Farmer Village", "Farmer Tehsil", "Farmer District",
-      "Vehicle Number", "Driver Name", "Driver Contact", "Freight Type", "Total Bags In Vehicle",
-      "Lot Bags", "Proportionate Freight",
-      "Farmer Advance Amount", "Farmer Advance Mode",
+      "Farmer Name", "Phone", "Village", "Tehsil", "District",
+      "Vehicle #", "Driver Name", "Driver Contact", "Advance/Credit", "Total # of Bags",
+      "# Bags", "Proportionate Freight (₹)",
+      "Farmer Advance (₹)", "Advance Mode",
     ];
     const rows: string[] = [];
     for (const card of filteredCards) {
@@ -3566,14 +3566,14 @@ export default function StockPage() {
   const exportTxnCsv = () => {
     const headers = [
       "Transaction ID", "Date", "Lot ID", "SR#", "Crop", "Variety",
-      "Farmer Name", "Farmer Phone", "Farmer Village",
+      "Farmer Name", "Phone", "Village",
       "Buyer Name",
-      "Vehicle #", "Driver Name", "Driver Contact", "Freight Type",
-      "No. of Bags", "Rate/Kg", "Net Weight",
-      "Extra Charges Farmer", "Extra Charges Buyer",
-      "Extra/Kg Farmer", "Extra/Kg Buyer",
-      "Proportionate Freight",
-      "Payable to Farmer", "Receivable from Buyer",
+      "Vehicle #", "Driver Name", "Driver Contact", "Advance/Credit",
+      "# Bags", "Price/kg (₹)", "Net Weight (kg)",
+      "Extra Charges (Farmer)", "Extra Charges (Buyer)",
+      "Extra/kg (Farmer)", "Extra/kg (Buyer)",
+      "Proportionate Freight (₹)",
+      "Payable to Farmer (₹)", "Receivable from Buyer (₹)",
       "Farmer Payment Status", "Buyer Payment Status",
     ];
     const rows: string[] = [];
