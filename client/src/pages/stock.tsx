@@ -2907,7 +2907,7 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
         <div className="flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 mb-1">
           <Layers className="w-3.5 h-3.5" /> Lots / Txns
         </div>
-        <div className="text-xl font-bold text-blue-700 dark:text-blue-300" data-testid="text-lots-txns">
+        <div className="text-sm font-bold text-blue-700 dark:text-blue-300" data-testid="text-lots-txns">
           {totalLots} / {totalTxns}
         </div>
       </div>
@@ -2916,28 +2916,28 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
         <div className="flex items-center gap-1.5 text-xs font-medium text-green-600 dark:text-green-400 mb-1">
           <User className="w-3.5 h-3.5" /> Farmer Payable
         </div>
-        <div className="text-xl font-bold text-green-700 dark:text-green-300" data-testid="text-farmer-payable">
-          {fmtInr(farmerPayableTotal)}
+        <div className="text-sm font-bold text-green-700 dark:text-green-300" data-testid="text-farmer-payable">
+          ₹{Math.round(farmerPayableTotal).toLocaleString("en-IN")}
         </div>
-        <div className="text-xs text-red-500 dark:text-red-400 font-medium">Due: {fmtInr(farmerDue)}</div>
+        <div className="text-xs text-red-500 dark:text-red-400 font-medium">Due: ₹{Math.round(farmerDue).toLocaleString("en-IN")}</div>
       </div>
 
       <div className="rounded-xl border border-cyan-200 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-950/30 px-4 py-3">
         <div className="flex items-center gap-1.5 text-xs font-medium text-cyan-600 dark:text-cyan-400 mb-1">
           <ShoppingBag className="w-3.5 h-3.5" /> Buyer Receivable
         </div>
-        <div className="text-xl font-bold text-cyan-700 dark:text-cyan-300" data-testid="text-buyer-receivable">
-          {fmtInr(buyerReceivableTotal)}
+        <div className="text-sm font-bold text-cyan-700 dark:text-cyan-300" data-testid="text-buyer-receivable">
+          ₹{Math.round(buyerReceivableTotal).toLocaleString("en-IN")}
         </div>
-        <div className="text-xs text-red-500 dark:text-red-400 font-medium">Due: {fmtInr(buyerDue)}</div>
+        <div className="text-xs text-red-500 dark:text-red-400 font-medium">Due: ₹{Math.round(buyerDue).toLocaleString("en-IN")}</div>
       </div>
 
       <div className="rounded-xl border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/30 px-4 py-3">
         <div className="flex items-center gap-1.5 text-xs font-medium text-orange-600 dark:text-orange-400 mb-1">
           <Landmark className="w-3.5 h-3.5" /> Aadhat Comm.
         </div>
-        <div className="text-xl font-bold text-orange-700 dark:text-orange-300" data-testid="text-aadhat-comm">
-          {fmtInr(aadhatTotal)}
+        <div className="text-sm font-bold text-orange-700 dark:text-orange-300" data-testid="text-aadhat-comm">
+          ₹{Math.round(aadhatTotal).toLocaleString("en-IN")}
         </div>
         <div className="text-xs text-green-600 dark:text-green-400 font-medium">Earned (via Buyer Dues)</div>
       </div>
