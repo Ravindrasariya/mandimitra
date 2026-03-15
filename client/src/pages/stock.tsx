@@ -2522,14 +2522,12 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
     for (const g of card.cropGroups) {
       if (g.archived) continue;
       for (const lot of g.lots) {
-        if (lot.isReturned) continue;
         totalLots++;
         const lt = calcLotTotals(lot, cs, vbr, tbi, buyersList);
         farmerPayableTotal += lt.farmerPayable;
         buyerReceivableTotal += lt.buyerReceivable;
         aadhatTotal += lt.aadhatBuyer;
         for (const bid of lot.bids) {
-          if (!bid.buyerName) continue;
           totalTxns++;
           const buyerData = buyersList.find(b => b.id === bid.buyerId);
           const buyerAadhat = buyerData?.aadhatCommissionPercent != null && buyerData.aadhatCommissionPercent !== ""
@@ -2563,11 +2561,11 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
         <div className="text-xs text-red-500 dark:text-red-400 font-medium">Due: {fmtInr(farmerDue)}</div>
       </div>
 
-      <div className="rounded-xl border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/30 px-4 py-3">
-        <div className="flex items-center gap-1.5 text-xs font-medium text-purple-600 dark:text-purple-400 mb-1">
+      <div className="rounded-xl border border-cyan-200 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-950/30 px-4 py-3">
+        <div className="flex items-center gap-1.5 text-xs font-medium text-cyan-600 dark:text-cyan-400 mb-1">
           <ShoppingBag className="w-3.5 h-3.5" /> Buyer Receivable
         </div>
-        <div className="text-xl font-bold text-purple-700 dark:text-purple-300" data-testid="text-buyer-receivable">
+        <div className="text-xl font-bold text-cyan-700 dark:text-cyan-300" data-testid="text-buyer-receivable">
           {fmtInr(buyerReceivableTotal)}
         </div>
         <div className="text-xs text-red-500 dark:text-red-400 font-medium">Due: {fmtInr(buyerDue)}</div>
