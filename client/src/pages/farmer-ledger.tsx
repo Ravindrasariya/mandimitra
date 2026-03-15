@@ -234,7 +234,7 @@ export default function FarmerLedgerPage() {
       if (searchVillage && !(f.village || "").toLowerCase().includes(searchVillage.toLowerCase())) return false;
       if (anyFilterActive) {
         const farmerTxns = allTransactions.filter(t => t.farmerId === f.id && !t.isReversed);
-        if (farmerTxns.length === 0) return false;
+        if (farmerTxns.length === 0) return true;
         const hasMatch = farmerTxns.some(t => {
           const [y, m, day] = t.date.split("-");
           if (yearFilter !== "all" && y !== yearFilter) return false;

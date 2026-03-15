@@ -362,7 +362,7 @@ export default function BuyerLedgerPage() {
     return buyers.filter(b => {
       if (yearFilter !== "all" || selectedMonths.length > 0 || selectedDays.length > 0) {
         const buyerTxns = allTransactions.filter(t => t.buyerId === b.id && !t.isReversed);
-        if (buyerTxns.length === 0) return false;
+        if (buyerTxns.length === 0) return true;
         const hasMatchingDate = buyerTxns.some(t => {
           const [y, m, day] = t.date.split("-");
           if (yearFilter !== "all" && y !== yearFilter) return false;
