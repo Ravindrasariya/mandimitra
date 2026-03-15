@@ -8,8 +8,8 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { db } from "./db";
-import { transactions, insertAssetSchema, insertLiabilitySchema, type Farmer } from "@shared/schema";
-import { eq, and } from "drizzle-orm";
+import { transactions, bids, buyers, lots, insertAssetSchema, insertLiabilitySchema, type Farmer } from "@shared/schema";
+import { eq, and, inArray, sql } from "drizzle-orm";
 
 const uploadsDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
@@ -510,6 +510,41 @@ export async function registerRoutes(
       const businessId = req.user!.businessId;
       const allLots = await storage.getLots(businessId);
 
+      interface StockCardBid {
+        bidId: number;
+        buyerId: number;
+        buyerName: string;
+        pricePerKg: string;
+        numberOfBags: number;
+        paymentType: string;
+        advanceAmount: string | null;
+        transaction: {
+          txnId: number;
+          transactionId: string;
+          netWeight: string | null;
+          numberOfBags: number | null;
+          totalWeight: string | null;
+          pricePerKg: string | null;
+          extraChargesFarmer: string | null;
+          extraChargesBuyer: string | null;
+          extraPerKgFarmer: string | null;
+          extraPerKgBuyer: string | null;
+          extraTulaiFarmer: string | null;
+          extraBharaiFarmer: string | null;
+          extraKhadiKaraiFarmer: string | null;
+          extraThelaBhadaFarmer: string | null;
+          extraOthersFarmer: string | null;
+          hammaliCharges: string | null;
+          freightCharges: string | null;
+          aadhatCharges: string | null;
+          mandiCharges: string | null;
+          totalPayableToFarmer: string | null;
+          totalReceivableFromBuyer: string | null;
+          date: string | null;
+          isReversed: boolean;
+        } | null;
+      }
+
       interface StockCardLot {
         dbId: number;
         lotId: string;
@@ -521,6 +556,8 @@ export async function registerRoutes(
         
         remainingBags: number;
         isArchived: boolean;
+        isReturned: boolean;
+        bids: StockCardBid[];
       }
 
       const cardMap = new Map<string, {
@@ -582,7 +619,75 @@ export async function registerRoutes(
           bagMarka: lot.bagMarka,
           remainingBags: lot.remainingBags,
           isArchived: lot.isArchived,
+          isReturned: lot.isReturned ?? false,
+          bids: [],
         });
+      }
+
+      const allLotIds = allLots.map(l => l.id);
+      if (allLotIds.length > 0) {
+        const allBids = await db.select({
+          bid: bids,
+          buyerName: buyers.name,
+        }).from(bids)
+          .innerJoin(buyers, eq(bids.buyerId, buyers.id))
+          .where(and(eq(bids.businessId, businessId), inArray(bids.lotId, allLotIds)));
+
+        const allTxns = await db.select().from(transactions)
+          .where(and(eq(transactions.businessId, businessId), inArray(transactions.lotId, allLotIds), eq(transactions.isReversed, false)));
+
+        const txnByBidId = new Map<number, typeof allTxns[0]>();
+        for (const txn of allTxns) {
+          txnByBidId.set(txn.bidId, txn);
+        }
+
+        const bidsByLotId = new Map<number, StockCardBid[]>();
+        for (const { bid, buyerName } of allBids) {
+          if (!bidsByLotId.has(bid.lotId)) bidsByLotId.set(bid.lotId, []);
+          const txn = txnByBidId.get(bid.id);
+          bidsByLotId.get(bid.lotId)!.push({
+            bidId: bid.id,
+            buyerId: bid.buyerId,
+            buyerName,
+            pricePerKg: bid.pricePerKg,
+            numberOfBags: bid.numberOfBags,
+            paymentType: bid.paymentType,
+            advanceAmount: bid.advanceAmount,
+            transaction: txn ? {
+              txnId: txn.id,
+              transactionId: txn.transactionId,
+              netWeight: txn.netWeight,
+              numberOfBags: txn.numberOfBags,
+              totalWeight: txn.totalWeight,
+              pricePerKg: txn.pricePerKg,
+              extraChargesFarmer: txn.extraChargesFarmer,
+              extraChargesBuyer: txn.extraChargesBuyer,
+              extraPerKgFarmer: txn.extraPerKgFarmer,
+              extraPerKgBuyer: txn.extraPerKgBuyer,
+              extraTulaiFarmer: txn.extraTulaiFarmer,
+              extraBharaiFarmer: txn.extraBharaiFarmer,
+              extraKhadiKaraiFarmer: txn.extraKhadiKaraiFarmer,
+              extraThelaBhadaFarmer: txn.extraThelaBhadaFarmer,
+              extraOthersFarmer: txn.extraOthersFarmer,
+              hammaliCharges: txn.hammaliCharges,
+              freightCharges: txn.freightCharges,
+              aadhatCharges: txn.aadhatCharges,
+              mandiCharges: txn.mandiCharges,
+              totalPayableToFarmer: txn.totalPayableToFarmer,
+              totalReceivableFromBuyer: txn.totalReceivableFromBuyer,
+              date: txn.date,
+              isReversed: txn.isReversed,
+            } : null,
+          });
+        }
+
+        for (const card of Array.from(cardMap.values())) {
+          for (const group of Array.from(card.cropMap.values())) {
+            for (const lot of group.lots) {
+              lot.bids = bidsByLotId.get(lot.dbId) || [];
+            }
+          }
+        }
       }
 
       const cards = Array.from(cardMap.entries()).map(([cardKey, card]) => {
@@ -852,10 +957,6 @@ export async function registerRoutes(
   app.patch("/api/bids/:id", requireAuth, async (req, res) => {
     const bidId = paramId(req.params.id);
     const businessId = req.user!.businessId;
-    const existingTx = await db.select({ id: transactions.id }).from(transactions)
-      .where(and(eq(transactions.bidId, bidId), eq(transactions.businessId, businessId), eq(transactions.isReversed, false)))
-      .limit(1);
-    if (existingTx.length > 0) return res.status(400).json({ message: "Cannot edit a bid that has an active transaction" });
     const updated = await storage.updateBid(bidId, businessId, req.body);
     if (!updated) return res.status(404).json({ message: "Bid not found" });
     res.json(updated);

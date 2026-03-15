@@ -81,6 +81,9 @@ const emptyTxn = (): TxnState => ({
 
 type BidRow = {
   id: string;
+  bidDbId?: number;
+  buyerId?: number;
+  txnDbId?: number;
   bidOpen: boolean;
   buyerName: string;
   pricePerKg: string;
@@ -99,6 +102,7 @@ type LotRow = {
   size: string;
   variety: string;
   bagMarka: string;
+  isReturned?: boolean;
   bids: BidRow[];
 };
 
@@ -439,8 +443,9 @@ const emptyCropGroup = (crop: string, date?: string): CropGroup => ({
 // ─── Data fingerprint (for dirty detection, strips UI-only flags) ─────────────
 
 function getDataFingerprint(card: FarmerCard): string {
-  const stripBid = ({ id, bidOpen, txn, ...b }: BidRow) => ({
+  const stripBid = ({ id, bidDbId, buyerId, txnDbId, bidOpen, txn, ...b }: BidRow) => ({
     ...b,
+    bidDbId, buyerId, txnDbId,
     txn: (({ showWeightCalc, showExtraBreakdown, ...t }) => t)(txn),
   });
   const stripLot = ({ id, dbId, lotOpen, bids, ...l }: LotRow) => ({ ...l, bids: bids.map(stripBid) });
@@ -490,7 +495,7 @@ function diffCropGroup(saved: CropGroup, current: CropGroup): ChangeRecord[] {
     }
     for (const f of lotFields) {
       const ov = sLot[f.key]; const nv = cLot[f.key];
-      if (ov !== nv) changes.push({ kind: "field", path: `${lotLabel} > ${f.label}`, oldVal: ov || "(empty)", newVal: nv || "(empty)" });
+      if (ov !== nv) changes.push({ kind: "field", path: `${lotLabel} > ${f.label}`, oldVal: String(ov || "(empty)"), newVal: String(nv || "(empty)") });
     }
     const savedBidMap = new Map(sLot.bids.map(b => [b.id, b]));
 
@@ -503,7 +508,7 @@ function diffCropGroup(saved: CropGroup, current: CropGroup): ChangeRecord[] {
       }
       for (const f of bidFields) {
         const ov = sBid[f.key]; const nv = cBid[f.key];
-        if (ov !== nv) changes.push({ kind: "field", path: `${bidLabel} > ${f.label}`, oldVal: ov || "(empty)", newVal: nv || "(empty)" });
+        if (ov !== nv) changes.push({ kind: "field", path: `${bidLabel} > ${f.label}`, oldVal: String(ov || "(empty)"), newVal: String(nv || "(empty)") });
       }
       for (const f of txnFields) {
         const ov = sBid.txn[f.key]; const nv = cBid.txn[f.key];
@@ -527,8 +532,6 @@ function diffCropGroup(saved: CropGroup, current: CropGroup): ChangeRecord[] {
 
   return changes;
 }
-
-const MOCK_BUYERS = ["Ramesh Traders", "Suresh & Sons", "Patel Bros", "Kishan Vyapari"];
 
 const CROP_HEADER: Record<string, string> = {
   Potato: "bg-violet-100 border-violet-300",
@@ -963,7 +966,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
 
 // ─── Bid section (row 2) ──────────────────────────────────────────────────────
 
-function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate, overBag }: {
+function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate, overBag, buyersList }: {
   bid: BidRow;
   bidIndex: number;
   onChange: (b: BidRow) => void;
@@ -974,8 +977,13 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
   cs: ChargeSettings;
   farmerDate: string;
   overBag: boolean;
+  buyersList: { id: number; name: string; phone?: string }[];
 }) {
-  const isNewBuyer = bid.buyerName.trim().length > 0 && !MOCK_BUYERS.includes(bid.buyerName.trim());
+  const [showBuyerSuggestions, setShowBuyerSuggestions] = useState(false);
+  const filteredBuyers = buyersList.filter(
+    b => bid.buyerName.length >= 1 && b.name.toLowerCase().includes(bid.buyerName.toLowerCase())
+  ).slice(0, 10);
+  const noBuyerSelected = bid.buyerName.trim().length > 0 && !bid.buyerId;
   const bags = parseInt(bid.numberOfBags) || 0;
   const pricePerKg = parseFloat(bid.pricePerKg) || 0;
   const totals = calcBidTotals(bid, cs, vehicleBhadaRate, totalBagsInVehicle);
@@ -1044,25 +1052,46 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <div className="col-span-2 sm:col-span-1">
+            <div className="col-span-2 sm:col-span-1 relative">
               <Label className="text-xs text-muted-foreground">Buyer</Label>
               <div className="relative">
                 <Input
                   data-testid={`input-buyer-name-${bidIndex}`}
-                  list={`buyer-list-${bid.id}`}
-                  placeholder="Select or type buyer…"
+                  placeholder="Select buyer…"
                   value={bid.buyerName}
-                  onChange={e => onChange({ ...bid, buyerName: e.target.value })}
+                  onChange={e => {
+                    onChange({ ...bid, buyerName: e.target.value, buyerId: undefined });
+                    setShowBuyerSuggestions(true);
+                  }}
+                  onFocus={() => setShowBuyerSuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowBuyerSuggestions(false), 150)}
                   className="h-8 text-sm pr-7"
+                  autoComplete="off"
                 />
-                <datalist id={`buyer-list-${bid.id}`}>
-                  {MOCK_BUYERS.map(b => <option key={b} value={b} />)}
-                </datalist>
                 <ChevronsUpDown className="w-3.5 h-3.5 absolute right-2 top-2 text-muted-foreground pointer-events-none" />
               </div>
-              {isNewBuyer && (
+              {showBuyerSuggestions && filteredBuyers.length > 0 && !bid.buyerId && (
+                <div className="absolute z-50 w-full bg-popover border rounded-md shadow-lg max-h-48 overflow-y-auto top-full mt-1">
+                  {filteredBuyers.map(b => (
+                    <button
+                      key={b.id}
+                      data-testid={`suggestion-buyer-${b.id}`}
+                      type="button"
+                      className="w-full text-left px-3 py-2 hover:bg-muted text-sm border-b last:border-b-0"
+                      onMouseDown={() => {
+                        onChange({ ...bid, buyerName: b.name, buyerId: b.id });
+                        setShowBuyerSuggestions(false);
+                      }}
+                    >
+                      <div className="font-medium">{b.name}</div>
+                      {b.phone && <div className="text-xs text-muted-foreground">{b.phone}</div>}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {noBuyerSelected && (
                 <div className="flex items-center gap-1 mt-1 text-orange-600 text-xs">
-                  <AlertTriangle className="w-3 h-3" /> New buyer will be added
+                  <AlertTriangle className="w-3 h-3" /> Select a buyer from the list
                 </div>
               )}
             </div>
@@ -1136,12 +1165,14 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
 
 // ─── Lot card ─────────────────────────────────────────────────────────────────
 
-function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate }: {
+function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate, buyersList, onReturnLot }: {
   lot: LotRow; index: number;
   onChange: (l: LotRow) => void; onRemove: () => void;
   onRemoveBid?: (lotIndex: number, bidIndex: number) => void;
   vehicleBhadaRate: number; totalBagsInVehicle: number;
   cs: ChargeSettings; farmerDate: string;
+  buyersList: { id: number; name: string; phone?: string }[];
+  onReturnLot?: () => void;
 }) {
   const [pendingDeleteBidIdx, setPendingDeleteBidIdx] = useState<number | null>(null);
 
@@ -1173,8 +1204,10 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
   const pendingBid = pendingDeleteBidIdx !== null ? lot.bids[pendingDeleteBidIdx] : null;
   const pendingBidLabel = pendingBid?.buyerName.trim() || `Bid #${(pendingDeleteBidIdx ?? 0) + 1}`;
 
+  const [showReturnConfirm, setShowReturnConfirm] = useState(false);
+
   return (
-    <div className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
+    <div className={`rounded-lg border ${lot.isReturned ? "border-orange-300 bg-orange-50/30 dark:border-orange-700 dark:bg-orange-950/20" : "border-border bg-card"} shadow-sm overflow-hidden`}>
       <div className="flex items-center bg-muted/30 border-b border-border">
         <button
           type="button"
@@ -1184,6 +1217,11 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
         >
           {lot.lotOpen ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />}
           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Lot #{index + 1}</span>
+          {lot.isReturned && (
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-orange-300 text-orange-600 dark:border-orange-700 dark:text-orange-400">
+              Returned
+            </Badge>
+          )}
           {!lot.lotOpen && (
             <CollapsedSummary
               totalBags={totals.lotBags} remainingBags={totals.lotBags - totals.bidBags}
@@ -1192,15 +1230,38 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
             />
           )}
         </button>
-        <button
-          type="button"
-          data-testid={`button-remove-lot-${index}`}
-          onClick={onRemove}
-          className="h-8 w-8 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors shrink-0 mr-1 rounded"
-        >
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
+        <div className="flex items-center gap-0.5 shrink-0 mr-1">
+          {lot.dbId && !lot.isReturned && onReturnLot && (
+            <button
+              type="button"
+              data-testid={`button-return-lot-${index}`}
+              onClick={() => setShowReturnConfirm(true)}
+              className="h-8 w-8 flex items-center justify-center text-orange-400 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/30 transition-colors rounded"
+              title="Return lot to farmer"
+            >
+              <Truck className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {!lot.isReturned && (
+            <button
+              type="button"
+              data-testid={`button-remove-lot-${index}`}
+              onClick={onRemove}
+              className="h-8 w-8 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors rounded"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       </div>
+
+      <ConfirmDeleteDialog
+        open={showReturnConfirm}
+        title="Return this lot to farmer?"
+        description={`Lot #${index + 1} will be marked as returned. Any unsold bags will be returned to the farmer. This cannot be undone.`}
+        onConfirm={() => { setShowReturnConfirm(false); onReturnLot?.(); }}
+        onCancel={() => setShowReturnConfirm(false)}
+      />
 
       {lot.lotOpen && (
         <div className="p-3 space-y-3">
@@ -1266,6 +1327,7 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
                 cs={cs}
                 farmerDate={farmerDate}
                 overBag={bidOverFlags[bidIdx]}
+                buyersList={buyersList}
               />
             ))}
             <Button
@@ -1293,7 +1355,7 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
 
 // ─── Crop group ───────────────────────────────────────────────────────────────
 
-function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate, farmerName, currentUsername, onSyncSaved }: {
+function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate, farmerName, currentUsername, onSyncSaved, buyersList, onReturnLot }: {
   group: CropGroup;
   onChange: (g: CropGroup) => void; onArchive: () => void; onDelete: () => void;
   isPersisted: boolean;
@@ -1301,6 +1363,8 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
   cs: ChargeSettings; farmerDate: string; farmerName: string;
   currentUsername: string;
   onSyncSaved?: (updatedGroup: CropGroup) => void;
+  buyersList: { id: number; name: string; phone?: string }[];
+  onReturnLot?: (lotIdx: number) => void;
 }) {
   const { toast } = useToast();
   const [pendingDeleteLotIdx, setPendingDeleteLotIdx] = useState<number | null>(null);
@@ -1489,6 +1553,8 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
               totalBagsInVehicle={totalBagsInVehicle}
               cs={cs}
               farmerDate={farmerDate}
+              buyersList={buyersList}
+              onReturnLot={onReturnLot ? () => onReturnLot(idx) : undefined}
             />
           ))}
           <Button type="button" variant="outline" size="sm" onClick={addLot} className="w-full h-8 text-xs gap-1.5 border-dashed">
@@ -1560,6 +1626,11 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
   const { data: locationData } = useQuery<{ villages: string[]; tehsils: string[] }>({
     queryKey: ["/api/farmers/locations"],
   });
+
+  const { data: buyersData = [] } = useQuery<any[]>({
+    queryKey: ["/api/buyers"],
+  });
+  const buyersList = buyersData.map((b: any) => ({ id: b.id, name: b.name, phone: b.phone || "" }));
 
   const filteredVillages = (locationData?.villages || []).filter(
     (v) => card.village.length >= 1 && v.toLowerCase().includes(card.village.toLowerCase()) && v.toLowerCase() !== card.village.toLowerCase()
@@ -1936,6 +2007,29 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                   const updatedCard = { ...card, cropGroups: card.cropGroups.map((g, i) => i === idx ? updatedGroup : g) };
                   onSyncSaved(updatedCard);
                 }}
+                buyersList={buyersList}
+                onReturnLot={async (lotIdx) => {
+                  const lot = group.lots[lotIdx];
+                  if (!lot?.dbId) return;
+                  try {
+                    await apiRequest("POST", `/api/lots/${lot.dbId}/return`);
+                    const updatedLots = group.lots.map((l, i) => i === lotIdx ? { ...l, isReturned: true } : l);
+                    const updatedGroup = { ...group, lots: updatedLots };
+                    updateGroup(idx, updatedGroup);
+                    onSyncSaved({ ...card, cropGroups: card.cropGroups.map((g, i) => i === idx ? updatedGroup : g) });
+                    queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
+                    queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
+                    queryClient.invalidateQueries({ queryKey: ["/api/bids"] });
+                    queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
+                    queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+                    queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
+                    queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
+                    queryClient.invalidateQueries({ queryKey: ["/api/cash-entries"] });
+                    toast({ title: "Lot returned", description: `Lot #${lotIdx + 1} has been returned to farmer` });
+                  } catch (err: any) {
+                    toast({ title: "Failed to return lot", description: err?.message || "Please try again", variant: "destructive" });
+                  }
+                }}
               />
             ))}
             {availableCrops.length > 0 && (
@@ -2081,7 +2175,38 @@ function stockCardsToFarmerCards(apiCards: any[]): FarmerCard[] {
           size: lot.size || "None",
           variety: lot.variety || "",
           bagMarka: lot.bagMarka || "",
-          bids: [],
+          isReturned: lot.isReturned || false,
+          bids: (lot.bids || []).map((b: any) => {
+            const txn = b.transaction;
+            return {
+              id: uid(),
+              bidDbId: b.bidId,
+              buyerId: b.buyerId,
+              txnDbId: txn?.txnId,
+              bidOpen: false,
+              buyerName: b.buyerName || "",
+              pricePerKg: b.pricePerKg?.toString() || "",
+              numberOfBags: b.numberOfBags?.toString() || "",
+              paymentType: b.paymentType || "Credit",
+              advanceAmount: b.advanceAmount?.toString() || "0",
+              txnDate: txn?.date || lot.date || c.date || format(new Date(), "yyyy-MM-dd"),
+              txn: txn ? {
+                netWeightInput: txn.netWeight?.toString() || "",
+                showWeightCalc: false,
+                sampleWeights: ["", "", ""],
+                extraChargesFarmer: txn.extraChargesFarmer?.toString() || "0",
+                extraChargesBuyer: txn.extraChargesBuyer?.toString() || "0",
+                extraPerKgFarmer: txn.extraPerKgFarmer?.toString() || "0",
+                extraPerKgBuyer: txn.extraPerKgBuyer?.toString() || "0",
+                showExtraBreakdown: false,
+                extraTulai: txn.extraTulaiFarmer?.toString() || "0",
+                extraBharai: txn.extraBharaiFarmer?.toString() || "0",
+                extraKhadiKarai: txn.extraKhadiKaraiFarmer?.toString() || "0",
+                extraThelaBhada: txn.extraThelaBhadaFarmer?.toString() || "0",
+                extraOthers: txn.extraOthersFarmer?.toString() || "0",
+              } : emptyTxn(),
+            } as BidRow;
+          }),
         })),
         archived: cg.isArchived || false,
         persisted: true,
@@ -2276,6 +2401,182 @@ export default function StockPage() {
         return { ...g, lots: updatedLots, srNumber: updatedSrNumber };
       });
 
+      const prevSavedCard = savedCardMap.get(card.id);
+
+      for (let gIdx = 0; gIdx < finalGroups.length; gIdx++) {
+        const group = finalGroups[gIdx];
+        for (let lIdx = 0; lIdx < group.lots.length; lIdx++) {
+          const lot = group.lots[lIdx];
+          if (!lot.dbId || lot.isReturned) continue;
+
+          const savedGroup = prevSavedCard?.cropGroups.find(sg => sg.id === group.id);
+          const savedLot = savedGroup?.lots.find(sl => sl.id === lot.id);
+          const savedBidMap = new Map((savedLot?.bids || []).filter(b => b.bidDbId).map(b => [b.bidDbId!, b]));
+
+          const currentBidDbIds = new Set(lot.bids.filter(b => b.bidDbId).map(b => b.bidDbId!));
+          for (const [deletedBidDbId, deletedBid] of Array.from(savedBidMap.entries())) {
+            if (!currentBidDbIds.has(deletedBidDbId)) {
+              if (deletedBid.txnDbId) {
+                toast({ title: "Warning", description: `Cannot delete bid for ${deletedBid.buyerName} — it has an active transaction. Skipping.`, variant: "destructive" });
+                continue;
+              }
+              try {
+                await apiRequest("DELETE", `/api/bids/${deletedBidDbId}`);
+              } catch (err: any) {
+                toast({ title: "Warning", description: `Failed to delete bid: ${err.message}`, variant: "destructive" });
+              }
+            }
+          }
+
+          const updatedBids: BidRow[] = [];
+          for (const bid of lot.bids) {
+            if (!bid.buyerId || !bid.pricePerKg || !(parseInt(bid.numberOfBags) > 0)) {
+              updatedBids.push(bid);
+              continue;
+            }
+
+            let bidDbId = bid.bidDbId;
+
+            if (!bidDbId) {
+              try {
+                const bidRes = await apiRequest("POST", "/api/bids", {
+                  lotId: lot.dbId,
+                  buyerId: bid.buyerId,
+                  pricePerKg: bid.pricePerKg,
+                  numberOfBags: parseInt(bid.numberOfBags),
+                  paymentType: bid.paymentType || "Credit",
+                  advanceAmount: bid.advanceAmount || "0",
+                });
+                const createdBid = await bidRes.json();
+                bidDbId = createdBid.id;
+              } catch (err: any) {
+                toast({ title: "Warning", description: `Failed to create bid: ${err.message}`, variant: "destructive" });
+                updatedBids.push(bid);
+                continue;
+              }
+            } else {
+              const savedBid = savedBidMap.get(bidDbId);
+              const changed = !savedBid ||
+                savedBid.buyerId !== bid.buyerId ||
+                savedBid.pricePerKg !== bid.pricePerKg ||
+                savedBid.numberOfBags !== bid.numberOfBags ||
+                savedBid.paymentType !== bid.paymentType ||
+                savedBid.advanceAmount !== bid.advanceAmount;
+              if (changed) {
+                try {
+                  await apiRequest("PATCH", `/api/bids/${bidDbId}`, {
+                    buyerId: bid.buyerId,
+                    pricePerKg: bid.pricePerKg,
+                    numberOfBags: parseInt(bid.numberOfBags),
+                    paymentType: bid.paymentType || "Credit",
+                    advanceAmount: bid.advanceAmount || "0",
+                  });
+                } catch (err: any) {
+                  toast({ title: "Warning", description: `Failed to update bid: ${err.message}`, variant: "destructive" });
+                }
+              }
+            }
+
+            let txnDbId = bid.txnDbId;
+            const nw = parseFloat(bid.txn.netWeightInput) || 0;
+
+            if (bidDbId && nw <= 0 && txnDbId) {
+              try {
+                await apiRequest("DELETE", `/api/transactions/${txnDbId}`);
+                txnDbId = undefined;
+              } catch (err: any) {
+                toast({ title: "Warning", description: `Failed to remove transaction: ${err.message}`, variant: "destructive" });
+              }
+            }
+
+            if (bidDbId && nw > 0) {
+              const vehicleBR = parseFloat(card.vehicleBhadaRate) || 0;
+              const totalBIV = parseInt(card.totalBagsInVehicle) || 0;
+              const bidBags = parseInt(bid.numberOfBags) || 0;
+              const ppk = parseFloat(bid.pricePerKg) || 0;
+              const epkF = parseFloat(bid.txn.extraPerKgFarmer) || 0;
+              const epkB = parseFloat(bid.txn.extraPerKgBuyer) || 0;
+              const farmerGross = nw * (ppk + epkF);
+              const buyerGross = nw * (ppk + epkB);
+              const hfRate = parseFloat(cs.hammaliFarmerPerBag) || 0;
+              const hbRate = parseFloat(cs.hammaliBuyerPerBag) || 0;
+              const extraF = parseFloat(bid.txn.extraChargesFarmer) || 0;
+              const extraB = parseFloat(bid.txn.extraChargesBuyer) || 0;
+              const aadhatFPct = parseFloat(cs.aadhatCommissionFarmerPercent) || 0;
+              const aadhatBPct = parseFloat(cs.aadhatCommissionBuyerPercent) || 0;
+              const mandiFPct = parseFloat(cs.mandiCommissionFarmerPercent) || 0;
+              const mandiBPct = parseFloat(cs.mandiCommissionBuyerPercent) || 0;
+              const freight = totalBIV > 0 ? (vehicleBR * bidBags) / totalBIV : 0;
+              const hammaliFarmerTotal = hfRate * bidBags;
+              const hammaliBuyerTotal = hbRate * bidBags;
+              const aadhatFarmer = (farmerGross * aadhatFPct) / 100;
+              const mandiFarmer = (farmerGross * mandiFPct) / 100;
+              const aadhatBuyer = (buyerGross * aadhatBPct) / 100;
+              const mandiBuyer = (buyerGross * mandiBPct) / 100;
+              const farmerDed = hammaliFarmerTotal + extraF + aadhatFarmer + mandiFarmer + freight;
+              const buyerAdd = hammaliBuyerTotal + extraB + aadhatBuyer + mandiBuyer;
+              const farmerPayable = farmerGross - farmerDed;
+              const buyerReceivable = buyerGross + buyerAdd;
+
+              const txnPayload: any = {
+                lotId: lot.dbId,
+                bidId: bidDbId,
+                buyerId: bid.buyerId,
+                farmerId: currentFarmerId,
+                netWeight: nw.toFixed(2),
+                totalWeight: nw.toFixed(2),
+                numberOfBags: bidBags,
+                pricePerKg: ppk.toFixed(2),
+                extraChargesFarmer: extraF.toFixed(2),
+                extraChargesBuyer: extraB.toFixed(2),
+                extraPerKgFarmer: epkF.toFixed(2),
+                extraPerKgBuyer: epkB.toFixed(2),
+                extraTulaiFarmer: (parseFloat(bid.txn.extraTulai) || 0).toFixed(2),
+                extraBharaiFarmer: (parseFloat(bid.txn.extraBharai) || 0).toFixed(2),
+                extraKhadiKaraiFarmer: (parseFloat(bid.txn.extraKhadiKarai) || 0).toFixed(2),
+                extraThelaBhadaFarmer: (parseFloat(bid.txn.extraThelaBhada) || 0).toFixed(2),
+                extraOthersFarmer: (parseFloat(bid.txn.extraOthers) || 0).toFixed(2),
+                hammaliCharges: hammaliFarmerTotal.toFixed(2),
+                freightCharges: freight.toFixed(2),
+                aadhatCharges: aadhatFarmer.toFixed(2),
+                mandiCharges: mandiFarmer.toFixed(2),
+                aadhatFarmerPercent: aadhatFPct.toFixed(2),
+                mandiFarmerPercent: mandiFPct.toFixed(2),
+                aadhatBuyerPercent: aadhatBPct.toFixed(2),
+                mandiBuyerPercent: mandiBPct.toFixed(2),
+                hammaliFarmerPerBag: hfRate.toFixed(2),
+                hammaliBuyerPerBag: hbRate.toFixed(2),
+                totalPayableToFarmer: farmerPayable.toFixed(2),
+                totalReceivableFromBuyer: buyerReceivable.toFixed(2),
+                date: bid.txnDate || card.date,
+              };
+
+              if (!txnDbId) {
+                try {
+                  const txnRes = await apiRequest("POST", "/api/transactions", txnPayload);
+                  const createdTxn = await txnRes.json();
+                  txnDbId = createdTxn.id;
+                } catch (err: any) {
+                  toast({ title: "Warning", description: `Failed to create transaction: ${err.message}`, variant: "destructive" });
+                }
+              } else {
+                try {
+                  await apiRequest("PATCH", `/api/transactions/${txnDbId}`, txnPayload);
+                } catch (err: any) {
+                  toast({ title: "Warning", description: `Failed to update transaction: ${err.message}`, variant: "destructive" });
+                }
+              }
+            }
+
+            updatedBids.push({ ...bid, bidDbId, txnDbId });
+          }
+
+          finalGroups = finalGroups.map((fg, gi) =>
+            gi === gIdx ? { ...fg, lots: fg.lots.map((fl, li) => li === lIdx ? { ...fl, bids: updatedBids } : fl) } : fg
+          );
+        }
+      }
+
       const savedCard = savedCardMap.get(card.id);
       const isFirstSave = !savedCard;
       const now = format(new Date(), "dd/MM/yyyy HH:mm");
@@ -2306,10 +2607,14 @@ export default function StockPage() {
 
       queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
       queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/bids"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
       queryClient.invalidateQueries({ queryKey: ["/api/farmers/locations"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/cash-entries"] });
 
       toast({ title: "Saved", description: `${card.farmerName.trim()} entry saved successfully` });
     } catch (err: any) {

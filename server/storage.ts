@@ -1119,7 +1119,7 @@ export class DatabaseStorage implements IStorage {
       txnAllocMap.set(alloc.transactionId, Math.round(((txnAllocMap.get(alloc.transactionId) || 0) + allocTotal) * 100) / 100);
     }
 
-    for (const [txnId, newPayment] of txnAllocMap) {
+    for (const [txnId, newPayment] of Array.from(txnAllocMap.entries())) {
       const [lockedTxn] = await txDb.select({
         id: transactions.id,
         totalReceivableFromBuyer: transactions.totalReceivableFromBuyer,
