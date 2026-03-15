@@ -132,6 +132,12 @@ const emptyLot = (date?: string): LotRow => ({
   bid: emptyBid(date),
 });
 
+const hasLotUserData = (lot: LotRow): boolean =>
+  [lot.numberOfBags, lot.variety, lot.bagMarka,
+    lot.bid.buyerName, lot.bid.pricePerKg, lot.bid.numberOfBags,
+    lot.bid.txn.netWeight, lot.bid.txn.calcWeight,
+  ].some(v => v.trim() !== "" && v.trim() !== "0");
+
 const emptyCard = (): FarmerCard => ({
   id: uid(),
   date: format(new Date(), "yyyy-MM-dd"),
@@ -828,6 +834,8 @@ function CropGroupSection({ group, onChange, onRemove, vehicleBhadaRate, totalBa
     onChange({ ...group, lots: group.lots.map((l, i) => (i === idx ? lot : l)) });
   const removeLot = (idx: number) => {
     if (group.lots.length === 1) return;
+    const lot = group.lots[idx];
+    if (hasLotUserData(lot) && !window.confirm("This lot has data. Remove it anyway?")) return;
     onChange({ ...group, lots: group.lots.filter((_, i) => i !== idx) });
   };
 
@@ -915,8 +923,12 @@ function FarmerCardComp({ card, onChange, onRemove, cs }: {
   });
   const updateGroup = (idx: number, g: CropGroup) =>
     onChange({ ...card, cropGroups: card.cropGroups.map((gg, i) => (i === idx ? g : gg)) });
-  const removeGroup = (idx: number) =>
+  const removeGroup = (idx: number) => {
+    const group = card.cropGroups[idx];
+    const hasData = group.lots.some(hasLotUserData);
+    if (hasData && !window.confirm(`"${group.crop}" has data. Remove entire group anyway?`)) return;
     onChange({ ...card, cropGroups: card.cropGroups.filter((_, i) => i !== idx) });
+  };
 
   return (
     <Card className="border-2 border-border shadow-md overflow-hidden">
