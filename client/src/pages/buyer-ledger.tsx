@@ -215,6 +215,7 @@ export default function BuyerLedgerPage() {
         return typeof key === "string" && key.startsWith("/api/buyers");
       }});
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
       setShowAddDialog(false);
       setNewName("");
       setNewAddress("");
@@ -248,6 +249,7 @@ export default function BuyerLedgerPage() {
       }});
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
       setEditingBuyer(null);
       toast({ title: "Buyer Updated", variant: "success" });
     },
@@ -275,6 +277,7 @@ export default function BuyerLedgerPage() {
       }});
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
     },
   });
 
@@ -297,6 +300,7 @@ export default function BuyerLedgerPage() {
       }});
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
       setMergeConfirmOpen(false);
       setDuplicateBuyer(null);
       setEditingBuyer(null);
@@ -608,6 +612,7 @@ export default function BuyerLedgerPage() {
     }});
     queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
     queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
     toast({ title: "Data Synced", variant: "success" });
   };
 
