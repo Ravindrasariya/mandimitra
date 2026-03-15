@@ -313,6 +313,14 @@ export default function StockEntryPage() {
         {t("stockEntry.title")}
       </h1>
 
+      <div className="flex items-center gap-3 p-4 rounded-lg border-2 border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700" data-testid="stock-entry-deprecated-banner">
+        <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+        <div>
+          <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Stock entries are now managed from the Stock tab</p>
+          <p className="text-xs text-amber-600 dark:text-amber-400">This page is read-only. Please use the Stock tab to create new entries.</p>
+        </div>
+      </div>
+
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-base">{t("stockEntry.farmerDetails")}</CardTitle>
@@ -803,11 +811,11 @@ export default function StockEntryPage() {
         </Button>
         <Button
           data-testid="button-submit-stock"
-          className="mobile-touch-target flex-1 sm:flex-none"
-          onClick={handleSubmit}
-          disabled={createBatchMutation.isPending || createFarmerMutation.isPending || (farmerPhone.length > 0 && farmerPhone.length !== 10)}
+          className="mobile-touch-target flex-1 sm:flex-none opacity-50 cursor-not-allowed"
+          disabled
+          title="Stock entries are now managed from the Stock tab"
         >
-          {createBatchMutation.isPending ? t("common.saving") : t("stockEntry.saveToRegister")}
+          {t("stockEntry.saveToRegister")} (Disabled)
         </Button>
       </div>
     </div>

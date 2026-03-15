@@ -1,6 +1,8 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
+import { apiRequest, queryClient } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -91,11 +93,13 @@ type BidRow = {
 
 type LotRow = {
   id: string;
+  dbId?: number;
   lotOpen: boolean;
   numberOfBags: string;
   size: string;
   variety: string;
   bagMarka: string;
+  initialTotalWeight: string;
   bids: BidRow[];
 };
 
@@ -115,6 +119,7 @@ type CropGroup = {
 
 type FarmerCard = {
   id: string;
+  farmerId?: number;
   date: string;
   farmerName: string;
   farmerPhone: string;
@@ -394,6 +399,7 @@ const emptyLot = (date?: string): LotRow => ({
   size: "None",
   variety: "",
   bagMarka: "",
+  initialTotalWeight: "",
   bids: [emptyBid(date)],
 });
 
@@ -439,11 +445,11 @@ function getDataFingerprint(card: FarmerCard): string {
     ...b,
     txn: (({ showWeightCalc, showExtraBreakdown, ...t }) => t)(txn),
   });
-  const stripLot = ({ id, lotOpen, bids, ...l }: LotRow) => ({ ...l, bids: bids.map(stripBid) });
+  const stripLot = ({ id, dbId, lotOpen, bids, ...l }: LotRow) => ({ ...l, bids: bids.map(stripBid) });
   const stripGroup = ({ groupOpen, editHistory, persisted, lots, ...g }: CropGroup) => ({
     ...g, lots: lots.map(stripLot),
   });
-  const { cardOpen, farmerOpen, vehicleOpen, savedAt, cropGroups, ...rest } = card;
+  const { cardOpen, farmerOpen, vehicleOpen, savedAt, farmerId, cropGroups, ...rest } = card;
   return JSON.stringify({ ...rest, cropGroups: cropGroups.map(stripGroup) });
 }
 
@@ -451,11 +457,12 @@ function diffCropGroup(saved: CropGroup, current: CropGroup): ChangeRecord[] {
   const changes: ChangeRecord[] = [];
   const savedLotMap = new Map(saved.lots.map(l => [l.id, l]));
 
-  const lotFields: { key: keyof Omit<LotRow, "id" | "lotOpen" | "bids">; label: string }[] = [
+  const lotFields: { key: keyof Omit<LotRow, "id" | "dbId" | "lotOpen" | "bids">; label: string }[] = [
     { key: "numberOfBags", label: "Bags" },
     { key: "size", label: "Size" },
     { key: "variety", label: "Variety" },
     { key: "bagMarka", label: "Bag Marka" },
+    { key: "initialTotalWeight", label: "Initial Weight" },
   ];
   const bidFields: { key: keyof Omit<BidRow, "id" | "bidOpen" | "txn" | "txnDate">; label: string }[] = [
     { key: "buyerName", label: "Buyer Name" },
@@ -1141,7 +1148,7 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
 }) {
   const [pendingDeleteBidIdx, setPendingDeleteBidIdx] = useState<number | null>(null);
 
-  const setField = (f: keyof Omit<LotRow, "id" | "bids" | "lotOpen">, v: string) => onChange({ ...lot, [f]: v });
+  const setField = (f: keyof Omit<LotRow, "id" | "dbId" | "bids" | "lotOpen">, v: string) => onChange({ ...lot, [f]: v });
   const totals = calcLotTotals(lot, cs, vehicleBhadaRate, totalBagsInVehicle);
   const lotBags = parseInt(lot.numberOfBags) || 0;
 
@@ -1553,9 +1560,21 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
   const deleteGroup = (idx: number) =>
     onChange({ ...card, cropGroups: card.cropGroups.filter((_, i) => i !== idx) });
   const archiveGroup = (idx: number) => setPendingArchiveGroupIdx(idx);
-  const confirmArchiveGroup = () => {
-    if (pendingArchiveGroupIdx !== null)
+  const confirmArchiveGroup = async () => {
+    if (pendingArchiveGroupIdx !== null) {
+      const group = card.cropGroups[pendingArchiveGroupIdx];
+      const dbLots = group.lots.filter(l => l.dbId);
+      for (const lot of dbLots) {
+        try {
+          await apiRequest("PATCH", `/api/lots/${lot.dbId}`, { isArchived: true });
+        } catch {}
+      }
+      if (dbLots.length > 0) {
+        queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
+      }
       onChange({ ...card, cropGroups: card.cropGroups.map((g, i) => i === pendingArchiveGroupIdx ? { ...g, archived: true } : g) });
+    }
     setPendingArchiveGroupIdx(null);
   };
   const pendingGroupName = pendingArchiveGroupIdx !== null ? card.cropGroups[pendingArchiveGroupIdx]?.crop : "";
@@ -1870,13 +1889,73 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
   );
 }
 
+// ─── Convert API stock-card response into FarmerCard[] ────────────────────────
+
+function stockCardsToFarmerCards(apiCards: any[]): FarmerCard[] {
+  return apiCards.map((c: any) => {
+    const farmer = c.farmer || {};
+    const card: FarmerCard = {
+      id: c.cardKey || uid(),
+      farmerId: farmer.id,
+      date: c.date,
+      farmerName: farmer.name || "",
+      farmerPhone: farmer.phone || "",
+      village: farmer.village || "",
+      tehsil: farmer.tehsil || "",
+      district: farmer.district || "",
+      state: farmer.state || "Madhya Pradesh",
+      vehicleNumber: c.vehicleNumber || "",
+      driverName: c.driverName || "",
+      driverContact: c.driverContact || "",
+      vehicleBhadaRate: c.vehicleBhadaRate || "",
+      totalBagsInVehicle: c.totalBagsInVehicle?.toString() || "",
+      freightType: c.freightType || "",
+      advanceAmount: c.farmerAdvanceAmount || "",
+      advanceMode: c.farmerAdvanceMode || "",
+      cropGroups: (c.cropGroups || []).map((cg: any) => ({
+        id: uid(),
+        crop: cg.crop,
+        srNumber: cg.srNumber || "XX",
+        groupOpen: false,
+        lots: (cg.lots || []).map((lot: any) => ({
+          id: uid(),
+          dbId: lot.dbId,
+          lotOpen: false,
+          numberOfBags: lot.numberOfBags?.toString() || "",
+          size: lot.size || "None",
+          variety: lot.variety || "",
+          bagMarka: lot.bagMarka || "",
+          initialTotalWeight: lot.initialTotalWeight || "",
+          bids: [],
+        })),
+        archived: cg.isArchived || false,
+        persisted: true,
+        editHistory: [],
+      })),
+      cardOpen: false,
+      farmerOpen: false,
+      vehicleOpen: false,
+      archived: farmer.isArchived || false,
+      savedAt: "loaded",
+    };
+    return card;
+  });
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function StockPage() {
-  const [cards, setCards] = useState<FarmerCard[]>([emptyCard()]);
+  const [cards, setCards] = useState<FarmerCard[]>([]);
   const [savedCardMap, setSavedCardMap] = useState<Map<string, FarmerCard>>(new Map());
+  const [saving, setSaving] = useState(false);
+  const dbLoaded = useRef(false);
   const { user } = useAuth();
+  const { toast } = useToast();
   const currentUsername = user?.name || user?.username || "Unknown";
+
+  const { data: stockCardsData, isLoading: loadingCards } = useQuery<any[]>({
+    queryKey: ["/api/stock-cards"],
+  });
 
   const { data: chargeSettings } = useQuery<ChargeSettings>({
     queryKey: ["/api/charge-settings"],
@@ -1884,10 +1963,20 @@ export default function StockPage() {
 
   const cs = chargeSettings || DEFAULT_CS;
 
+  useEffect(() => {
+    if (!stockCardsData || dbLoaded.current) return;
+    dbLoaded.current = true;
+    const loaded = stockCardsToFarmerCards(stockCardsData);
+    const map = new Map<string, FarmerCard>();
+    loaded.forEach(c => map.set(c.id, JSON.parse(JSON.stringify(c))));
+    setCards(loaded.length > 0 ? loaded : [emptyCard()]);
+    setSavedCardMap(map);
+  }, [stockCardsData]);
+
   const anyDirty = cards.some(c => {
     if (c.archived) return false;
     const saved = savedCardMap.get(c.id) ?? null;
-    return saved ? getDataFingerprint(c) !== getDataFingerprint(saved) : true;
+    return saved ? getDataFingerprint(c) !== getDataFingerprint(saved) : !!(c.farmerName.trim() || c.farmerPhone || c.village || c.vehicleNumber || c.advanceAmount || c.cropGroups.some(g => g.lots.some(hasLotUserData)));
   });
 
   useEffect(() => {
@@ -1902,33 +1991,180 @@ export default function StockPage() {
   const updateCard = (idx: number, card: FarmerCard) =>
     setCards(prev => prev.map((c, i) => (i === idx ? card : c)));
 
-  const saveCard = (idx: number, collapseAfter = false) => {
+  const saveCard = async (idx: number, collapseAfter = false) => {
     const card = cards[idx];
-    const savedCard = savedCardMap.get(card.id);
-    const isFirstSave = !savedCard;
-    const now = format(new Date(), "dd/MM/yyyy HH:mm");
-    const updatedCard: FarmerCard = {
-      ...card,
-      cardOpen: collapseAfter ? false : card.cardOpen,
-      savedAt: now,
-      cropGroups: card.cropGroups.map(g => {
-        const withPersisted = { ...g, persisted: true };
-        if (isFirstSave) return withPersisted;
-        const savedGroup = savedCard.cropGroups.find(sg => sg.id === g.id);
-        if (!savedGroup) return withPersisted;
-        const allDiffChanges = diffCropGroup(savedGroup, g);
-        const alreadyLogged = new Set(
-          g.editHistory
-            .slice(savedGroup.editHistory.length)
-            .flatMap(e => e.changes?.filter(c => c.kind === "deleted").map(c => c.path) ?? [])
-        );
-        const changes = allDiffChanges.filter(c => !(c.kind === "deleted" && alreadyLogged.has(c.path)));
-        if (changes.length === 0) return withPersisted;
-        return { ...withPersisted, editHistory: [...g.editHistory, { timestamp: now, username: currentUsername, changes }] };
-      }),
-    };
-    setCards(prev => prev.map((c, i) => (i === idx ? updatedCard : c)));
-    setSavedCardMap(prev => new Map(prev).set(card.id, updatedCard));
+    if (!card.farmerName.trim()) {
+      toast({ title: "Error", description: "Farmer name is required", variant: "destructive" });
+      return;
+    }
+
+    setSaving(true);
+    try {
+      let currentFarmerId = card.farmerId;
+
+      if (!currentFarmerId) {
+        const dupRes = await apiRequest("POST", "/api/farmers/check-duplicate", {
+          name: card.farmerName.trim(),
+          phone: card.farmerPhone.trim(),
+          village: card.village.trim(),
+        });
+        const dupData = await dupRes.json();
+        if (dupData.duplicate) {
+          currentFarmerId = dupData.duplicate.id;
+        } else {
+          const createRes = await apiRequest("POST", "/api/farmers", {
+            name: capFirst(card.farmerName.trim()),
+            phone: card.farmerPhone.trim(),
+            village: capFirst(card.village.trim()),
+            tehsil: capFirst(card.tehsil.trim()),
+            district: card.district,
+            state: card.state,
+          });
+          const newFarmer = await createRes.json();
+          currentFarmerId = newFarmer.id;
+        }
+      } else {
+        await apiRequest("PATCH", `/api/farmers/${currentFarmerId}`, {
+          name: capFirst(card.farmerName.trim()),
+          phone: card.farmerPhone.trim(),
+          village: capFirst(card.village.trim()),
+          tehsil: capFirst(card.tehsil.trim()),
+          district: card.district,
+          state: card.state,
+        });
+      }
+
+      const newLots: { groupIdx: number; lotIdx: number; lotData: any }[] = [];
+      const existingLots: { dbId: number; lotData: any }[] = [];
+      const dbIdUpdates: { groupIdx: number; lotIdx: number; dbId: number; srNumber?: string }[] = [];
+
+      for (let gIdx = 0; gIdx < card.cropGroups.length; gIdx++) {
+        const group = card.cropGroups[gIdx];
+        for (let lIdx = 0; lIdx < group.lots.length; lIdx++) {
+          const lot = group.lots[lIdx];
+          const lotPayload = {
+            crop: group.crop,
+            variety: lot.variety || null,
+            numberOfBags: parseInt(lot.numberOfBags) || 0,
+            size: lot.size === "None" ? null : lot.size || null,
+            bagMarka: lot.bagMarka || null,
+            initialTotalWeight: lot.initialTotalWeight || null,
+            vehicleNumber: card.vehicleNumber ? card.vehicleNumber.toUpperCase() : null,
+            vehicleBhadaRate: card.vehicleBhadaRate || null,
+            driverName: card.driverName || null,
+            driverContact: card.driverContact || null,
+            freightType: card.freightType || null,
+            totalBagsInVehicle: card.totalBagsInVehicle ? parseInt(card.totalBagsInVehicle) : null,
+            farmerAdvanceAmount: card.advanceAmount || null,
+            farmerAdvanceMode: card.advanceMode || null,
+            isArchived: group.archived,
+          };
+
+          if (lot.dbId) {
+            existingLots.push({ dbId: lot.dbId, lotData: lotPayload });
+          } else {
+            if (parseInt(lot.numberOfBags) > 0) {
+              newLots.push({ groupIdx: gIdx, lotIdx: lIdx, lotData: lotPayload });
+            }
+          }
+        }
+      }
+
+      for (const { dbId, lotData } of existingLots) {
+        await apiRequest("PATCH", `/api/lots/${dbId}`, lotData);
+      }
+
+      if (newLots.length > 0) {
+        const batchRes = await apiRequest("POST", "/api/lots/batch", {
+          farmerId: currentFarmerId,
+          date: card.date,
+          vehicleNumber: card.vehicleNumber ? card.vehicleNumber.toUpperCase() : null,
+          driverName: card.driverName || null,
+          driverContact: card.driverContact || null,
+          vehicleBhadaRate: card.vehicleBhadaRate || null,
+          freightType: card.freightType || null,
+          totalBagsInVehicle: card.totalBagsInVehicle ? parseInt(card.totalBagsInVehicle) : null,
+          farmerAdvanceAmount: card.advanceAmount || null,
+          farmerAdvanceMode: card.advanceMode || null,
+          lots: newLots.map(nl => ({
+            crop: nl.lotData.crop,
+            variety: nl.lotData.variety,
+            numberOfBags: nl.lotData.numberOfBags,
+            size: nl.lotData.size,
+            bagMarka: nl.lotData.bagMarka,
+            initialTotalWeight: nl.lotData.initialTotalWeight,
+          })),
+        });
+        const createdLots = await batchRes.json();
+
+        newLots.forEach((nl, i) => {
+          if (createdLots[i]) {
+            dbIdUpdates.push({
+              groupIdx: nl.groupIdx,
+              lotIdx: nl.lotIdx,
+              dbId: createdLots[i].id,
+              srNumber: createdLots[i].serialNumber?.toString(),
+            });
+          }
+        });
+      }
+
+      let finalGroups = card.cropGroups.map((g, gIdx) => {
+        let updatedLots = g.lots;
+        let updatedSrNumber = g.srNumber;
+        const groupUpdates = dbIdUpdates.filter(u => u.groupIdx === gIdx);
+        if (groupUpdates.length > 0) {
+          updatedLots = g.lots.map((lot, lIdx) => {
+            const update = groupUpdates.find(u => u.lotIdx === lIdx);
+            return update ? { ...lot, dbId: update.dbId } : lot;
+          });
+          if (updatedSrNumber === "XX" && groupUpdates[0]?.srNumber) {
+            updatedSrNumber = groupUpdates[0].srNumber;
+          }
+        }
+        return { ...g, lots: updatedLots, srNumber: updatedSrNumber };
+      });
+
+      const savedCard = savedCardMap.get(card.id);
+      const isFirstSave = !savedCard;
+      const now = format(new Date(), "dd/MM/yyyy HH:mm");
+      const updatedCard: FarmerCard = {
+        ...card,
+        farmerId: currentFarmerId,
+        cardOpen: collapseAfter ? false : card.cardOpen,
+        savedAt: now,
+        cropGroups: finalGroups.map(g => {
+          const withPersisted = { ...g, persisted: true };
+          if (isFirstSave) return withPersisted;
+          const savedGroup = savedCard!.cropGroups.find(sg => sg.id === g.id);
+          if (!savedGroup) return withPersisted;
+          const allDiffChanges = diffCropGroup(savedGroup, g);
+          const alreadyLogged = new Set(
+            g.editHistory
+              .slice(savedGroup.editHistory.length)
+              .flatMap(e => e.changes?.filter(c => c.kind === "deleted").map(c => c.path) ?? [])
+          );
+          const changes = allDiffChanges.filter(c => !(c.kind === "deleted" && alreadyLogged.has(c.path)));
+          if (changes.length === 0) return withPersisted;
+          return { ...withPersisted, editHistory: [...g.editHistory, { timestamp: now, username: currentUsername, changes }] };
+        }),
+      };
+
+      setCards(prev => prev.map((c, i) => (i === idx ? updatedCard : c)));
+      setSavedCardMap(prev => new Map(prev).set(card.id, JSON.parse(JSON.stringify(updatedCard))));
+
+      queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
+
+      toast({ title: "Saved", description: `${card.farmerName.trim()} entry saved successfully` });
+    } catch (err: any) {
+      toast({ title: "Save Failed", description: err.message || "An error occurred while saving", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
   };
 
   const cancelCard = (idx: number) => {
@@ -1943,8 +2179,21 @@ export default function StockPage() {
     }
   };
 
-  const archiveCard = (idx: number) =>
+  const archiveCard = async (idx: number) => {
+    const card = cards[idx];
+    if (card.farmerId) {
+      try {
+        await apiRequest("PATCH", `/api/farmers/${card.farmerId}`, { isArchived: true });
+        queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
+      } catch (err: any) {
+        toast({ title: "Archive Failed", description: err.message, variant: "destructive" });
+        return;
+      }
+    }
     setCards(prev => prev.map((c, i) => (i === idx ? { ...c, archived: true, cardOpen: false } : c)));
+  };
 
   return (
     <div className="flex flex-col h-full">
@@ -1958,6 +2207,11 @@ export default function StockPage() {
         </Button>
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {loadingCards && (
+          <div className="flex items-center justify-center py-12">
+            <div className="text-sm text-muted-foreground">Loading stock entries...</div>
+          </div>
+        )}
         {cards.map((card, idx) => (
           <FarmerCardComp
             key={card.id} card={card}
