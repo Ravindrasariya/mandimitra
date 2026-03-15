@@ -2520,9 +2520,21 @@ export default function StockPage() {
             let txnDbId = bid.txnDbId;
             const nw = parseFloat(bid.txn.netWeightInput) || 0;
 
-            if (nw <= 0 && txnDbId) {
-              toast({ title: "Save blocked", description: `Net weight cannot be 0 for a bid with an existing transaction (buyer: ${bid.buyerName}). Please enter a valid weight.`, variant: "destructive" });
-              throw new Error("Net weight cannot be 0 for a bid with an existing transaction.");
+            if (txnDbId) {
+              const ppkCheck = parseFloat(bid.pricePerKg) || 0;
+              const bagsCheck = parseInt(bid.numberOfBags) || 0;
+              if (ppkCheck <= 0) {
+                toast({ title: "Save blocked", description: `Price per kg cannot be 0 for a bid with an existing transaction (buyer: ${bid.buyerName}). Please enter a valid price.`, variant: "destructive" });
+                throw new Error("Price per kg cannot be 0 for a bid with an existing transaction.");
+              }
+              if (bagsCheck <= 0) {
+                toast({ title: "Save blocked", description: `Number of bags cannot be 0 for a bid with an existing transaction (buyer: ${bid.buyerName}). Please enter a valid bag count.`, variant: "destructive" });
+                throw new Error("Number of bags cannot be 0 for a bid with an existing transaction.");
+              }
+              if (nw <= 0) {
+                toast({ title: "Save blocked", description: `Net weight cannot be 0 for a bid with an existing transaction (buyer: ${bid.buyerName}). Please enter a valid weight.`, variant: "destructive" });
+                throw new Error("Net weight cannot be 0 for a bid with an existing transaction.");
+              }
             }
 
             if (bidDbId && nw > 0) {
