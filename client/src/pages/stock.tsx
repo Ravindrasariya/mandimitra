@@ -99,7 +99,7 @@ type ChangeRecord =
   | { kind: "deleted"; path: string; detail?: string }
   | { kind: "added"; path: string };
 
-type EditEntry = { timestamp: string; username: string; changes: ChangeRecord[] };
+type EditEntry = { timestamp: string; username: string; changes: ChangeRecord[]; label?: string };
 
 type CropGroup = {
   id: string; crop: string; srNumber: string; groupOpen: boolean; lots: LotRow[];
@@ -242,12 +242,15 @@ function EditHistoryDialog({ open, crop, history, onClose }: {
                     <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 border-b">
                       <History className="w-3 h-3 text-muted-foreground shrink-0" />
                       <span className="text-[11px] text-muted-foreground">{entry.timestamp}</span>
-                      <span className="text-[11px] font-medium text-foreground">by {entry.username}</span>
+                      {entry.username && <span className="text-[11px] font-medium text-foreground">by {entry.username}</span>}
                     </div>
                     <div className="px-3 py-2 space-y-1">
-                      {entry.changes.map((c, j) => (
-                        <ChangeRecordLine key={j} c={c} />
-                      ))}
+                      {Array.isArray(entry.changes) && entry.changes.length > 0
+                        ? entry.changes.map((c, j) => <ChangeRecordLine key={j} c={c} />)
+                        : entry.label
+                          ? <span className="text-xs text-foreground">{entry.label}</span>
+                          : <span className="text-xs text-muted-foreground italic">Entry saved</span>
+                      }
                     </div>
                   </div>
                 ))
@@ -469,6 +472,18 @@ function diffCropGroup(saved: CropGroup, current: CropGroup): ChangeRecord[] {
           changes.push({ kind: "field", path: `${bidLabel} > ${f.label}`, oldVal: ov || "0", newVal: nv || "0" });
       }
     });
+
+    sLot.bids.forEach((sBid, bidIdx) => {
+      if (!cLot.bids.some(b => b.id === sBid.id)) {
+        changes.push({ kind: "deleted", path: `${lotLabel} > Bid ${bidIdx + 1}`, detail: sBid.buyerName.trim() || undefined });
+      }
+    });
+  });
+
+  saved.lots.forEach((sLot, lotIdx) => {
+    if (!current.lots.some(l => l.id === sLot.id)) {
+      changes.push({ kind: "deleted", path: `Lot ${lotIdx + 1}` });
+    }
   });
 
   return changes;
@@ -1239,12 +1254,11 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
 
 // ─── Crop group ───────────────────────────────────────────────────────────────
 
-function CropGroupSection({ group, onChange, onArchive, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate, farmerName, currentUsername }: {
+function CropGroupSection({ group, onChange, onArchive, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate, farmerName }: {
   group: CropGroup;
   onChange: (g: CropGroup) => void; onArchive: () => void;
   vehicleBhadaRate: number; totalBagsInVehicle: number;
   cs: ChargeSettings; farmerDate: string; farmerName: string;
-  currentUsername: string;
 }) {
   const [pendingDeleteLotIdx, setPendingDeleteLotIdx] = useState<number | null>(null);
   const [showHistory, setShowHistory] = useState(false);
@@ -1264,35 +1278,17 @@ function CropGroupSection({ group, onChange, onArchive, vehicleBhadaRate, totalB
     onChange({ ...group, lots: group.lots.filter((_, i) => i !== idx) });
   };
   const handleRemoveBid = (lotIndex: number, bidIndex: number) => {
-    const lot = group.lots[lotIndex];
-    if (!lot) return;
-    const deletedBid = lot.bids[bidIndex];
-    const buyerName = deletedBid?.buyerName?.trim() || "";
-    const now = format(new Date(), "dd/MM/yyyy HH:mm");
-    const entry: EditEntry = {
-      timestamp: now,
-      username: currentUsername,
-      changes: [{ kind: "deleted", path: `Lot ${lotIndex + 1} > Bid ${bidIndex + 1}`, detail: buyerName || undefined }],
-    };
     onChange({
       ...group,
       lots: group.lots.map((l, i) => i === lotIndex ? { ...l, bids: l.bids.filter((_, j) => j !== bidIndex) } : l),
-      editHistory: [...group.editHistory, entry],
     });
   };
 
   const confirmDeleteLot = () => {
     if (pendingDeleteLotIdx !== null) {
-      const now = format(new Date(), "dd/MM/yyyy HH:mm");
-      const entry: EditEntry = {
-        timestamp: now,
-        username: currentUsername,
-        changes: [{ kind: "deleted", path: `Lot ${pendingDeleteLotIdx + 1}` }],
-      };
       onChange({
         ...group,
         lots: group.lots.filter((_, i) => i !== pendingDeleteLotIdx),
-        editHistory: [...group.editHistory, entry],
       });
     }
     setPendingDeleteLotIdx(null);
@@ -1417,7 +1413,7 @@ function CropGroupSection({ group, onChange, onArchive, vehicleBhadaRate, totalB
 
 // ─── Farmer card ──────────────────────────────────────────────────────────────
 
-function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onCancel, onArchive, cs, currentUsername }: {
+function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onCancel, onArchive, cs }: {
   card: FarmerCard;
   savedCard: FarmerCard | null;
   onChange: (c: FarmerCard) => void;
@@ -1426,7 +1422,6 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
   onCancel: () => void;
   onArchive: () => void;
   cs: ChargeSettings;
-  currentUsername: string;
 }) {
   const [pendingArchiveGroupIdx, setPendingArchiveGroupIdx] = useState<number | null>(null);
   const [showArchiveFarmer, setShowArchiveFarmer] = useState(false);
@@ -1649,7 +1644,6 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                 cs={cs}
                 farmerDate={card.date}
                 farmerName={card.farmerName}
-                currentUsername={currentUsername}
               />
             ))}
             {availableCrops.length > 0 && (
@@ -1822,7 +1816,6 @@ export default function StockPage() {
             onCancel={() => cancelCard(idx)}
             onArchive={() => archiveCard(idx)}
             cs={cs}
-            currentUsername={currentUsername}
           />
         ))}
       </div>
