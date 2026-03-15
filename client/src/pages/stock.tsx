@@ -148,6 +148,46 @@ function ConfirmDeleteDialog({ open, title, description, onConfirm, onCancel }: 
   );
 }
 
+// ─── Payment badge ────────────────────────────────────────────────────────────
+
+const PAYMENT_COLORS: Record<string, string> = {
+  Due: "bg-red-100 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-800",
+  Paid: "bg-green-100 text-green-700 border-green-200 dark:bg-green-950/40 dark:text-green-400 dark:border-green-800",
+  "Partial Paid": "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800",
+};
+
+function PaymentBadge({ status = "Due" }: { status?: "Due" | "Paid" | "Partial Paid" }) {
+  return (
+    <span className={`inline-flex items-center text-[10px] font-semibold px-1.5 py-0.5 rounded border leading-none ${PAYMENT_COLORS[status] || PAYMENT_COLORS.Due}`}>
+      {status}
+    </span>
+  );
+}
+
+// ─── Summary line (shared across lot, crop, farmer) ──────────────────────────
+
+function CollapsedSummary({ totalBags, remainingBags, farmerPayable, buyerReceivable, hasData }: {
+  totalBags: number; remainingBags: number;
+  farmerPayable: number; buyerReceivable: number; hasData: boolean;
+}) {
+  return (
+    <div className="flex items-center gap-2 text-xs flex-wrap">
+      <span className="text-muted-foreground">{totalBags} bags</span>
+      {remainingBags > 0 && remainingBags !== totalBags && (
+        <span className="text-orange-600 dark:text-orange-400 font-medium">({remainingBags} unsold)</span>
+      )}
+      {hasData && (
+        <>
+          <span className="text-green-700 dark:text-green-400 font-medium">Farmer: ₹{farmerPayable.toFixed(0)}</span>
+          <PaymentBadge status="Due" />
+          <span className="text-blue-700 dark:text-blue-400 font-medium">Buyer: ₹{buyerReceivable.toFixed(0)}</span>
+          <PaymentBadge status="Due" />
+        </>
+      )}
+    </div>
+  );
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const uid = () => Math.random().toString(36).slice(2, 8);
@@ -215,7 +255,8 @@ const CROP_COLORS: Record<string, string> = {
 // ─── Lot totals calculator ─────────────────────────────────────────────────────
 
 function calcLotTotals(lot: LotRow, cs: ChargeSettings, vehicleBhadaRate: number, totalBagsInVehicle: number) {
-  const bags = parseInt(lot.bid.numberOfBags) || 0;
+  const bidBags = parseInt(lot.bid.numberOfBags) || 0;
+  const lotBags = parseInt(lot.numberOfBags) || 0;
   const pricePerKg = parseFloat(lot.bid.pricePerKg) || 0;
   const txn = lot.bid.txn;
   const nw = parseFloat(txn.netWeightInput) || 0;
@@ -231,11 +272,12 @@ function calcLotTotals(lot: LotRow, cs: ChargeSettings, vehicleBhadaRate: number
   const aadhatBPct = parseFloat(cs.aadhatCommissionBuyerPercent) || 0;
   const mandiFPct = parseFloat(cs.mandiCommissionFarmerPercent) || 0;
   const mandiBPct = parseFloat(cs.mandiCommissionBuyerPercent) || 0;
-  const freight = totalBagsInVehicle > 0 ? (vehicleBhadaRate * bags) / totalBagsInVehicle : 0;
-  const farmerDed = hfRate * bags + extraFarmer + (farmerGross * aadhatFPct) / 100 + (farmerGross * mandiFPct) / 100 + freight;
-  const buyerAdd = hbRate * bags + extraBuyer + (buyerGross * aadhatBPct) / 100 + (buyerGross * mandiBPct) / 100;
+  const freight = totalBagsInVehicle > 0 ? (vehicleBhadaRate * bidBags) / totalBagsInVehicle : 0;
+  const farmerDed = hfRate * bidBags + extraFarmer + (farmerGross * aadhatFPct) / 100 + (farmerGross * mandiFPct) / 100 + freight;
+  const buyerAdd = hbRate * bidBags + extraBuyer + (buyerGross * aadhatBPct) / 100 + (buyerGross * mandiBPct) / 100;
   return {
-    bags,
+    lotBags,
+    bidBags,
     farmerPayable: farmerGross - farmerDed,
     buyerReceivable: buyerGross + buyerAdd,
     hasData: nw > 0 && pricePerKg > 0,
@@ -776,15 +818,11 @@ function LotCard({ lot, index, onChange, onRemove, vehicleBhadaRate, totalBagsIn
           {lot.lotOpen ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />}
           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Lot #{index + 1}</span>
           {!lot.lotOpen && (
-            <div className="flex items-center gap-3 text-xs ml-1">
-              <span className="text-muted-foreground">{parseInt(lot.numberOfBags) || 0} bags</span>
-              {totals.hasData && (
-                <>
-                  <span className="text-green-700 font-medium">Farmer: ₹{totals.farmerPayable.toFixed(0)}</span>
-                  <span className="text-blue-700 font-medium">Buyer: ₹{totals.buyerReceivable.toFixed(0)}</span>
-                </>
-              )}
-            </div>
+            <CollapsedSummary
+              totalBags={totals.lotBags} remainingBags={totals.lotBags - totals.bidBags}
+              farmerPayable={totals.farmerPayable} buyerReceivable={totals.buyerReceivable}
+              hasData={totals.hasData}
+            />
           )}
         </button>
         <button
@@ -894,7 +932,9 @@ function CropGroupSection({ group, onChange, onRemove, vehicleBhadaRate, totalBa
   };
 
   const allTotals = group.lots.map(l => calcLotTotals(l, cs, vehicleBhadaRate, totalBagsInVehicle));
-  const totalBags = allTotals.reduce((s, t) => s + t.bags, 0);
+  const totalBags = allTotals.reduce((s, t) => s + t.lotBags, 0);
+  const totalBidBags = allTotals.reduce((s, t) => s + t.bidBags, 0);
+  const remainingBags = totalBags - totalBidBags;
   const totalFarmerPayable = allTotals.reduce((s, t) => s + t.farmerPayable, 0);
   const totalBuyerReceivable = allTotals.reduce((s, t) => s + t.buyerReceivable, 0);
   const hasAnyData = allTotals.some(t => t.hasData);
@@ -916,15 +956,11 @@ function CropGroupSection({ group, onChange, onRemove, vehicleBhadaRate, totalBa
             {group.lots.length} lot{group.lots.length !== 1 ? "s" : ""}
           </Badge>
           {!group.groupOpen && (
-            <div className="flex items-center gap-3 text-xs ml-1">
-              <span className="text-muted-foreground">{totalBags} bags</span>
-              {hasAnyData && (
-                <>
-                  <span className="text-green-700 font-medium">Farmer: ₹{totalFarmerPayable.toFixed(0)}</span>
-                  <span className="text-blue-700 font-medium">Buyer: ₹{totalBuyerReceivable.toFixed(0)}</span>
-                </>
-              )}
-            </div>
+            <CollapsedSummary
+              totalBags={totalBags} remainingBags={remainingBags}
+              farmerPayable={totalFarmerPayable} buyerReceivable={totalBuyerReceivable}
+              hasData={hasAnyData}
+            />
           )}
         </div>
         <Button
@@ -1004,6 +1040,14 @@ function FarmerCardComp({ card, onChange, onRemove, cs }: {
   };
   const pendingGroupName = pendingDeleteGroupIdx !== null ? card.cropGroups[pendingDeleteGroupIdx]?.crop : "";
 
+  const allLotTotals = card.cropGroups.flatMap(g => g.lots.map(l => calcLotTotals(l, cs, vehicleBhadaRate, totalBagsInVehicle)));
+  const grandTotalBags = allLotTotals.reduce((s, t) => s + t.lotBags, 0);
+  const grandBidBags = allLotTotals.reduce((s, t) => s + t.bidBags, 0);
+  const grandRemainingBags = grandTotalBags - grandBidBags;
+  const grandFarmerPayable = allLotTotals.reduce((s, t) => s + t.farmerPayable, 0);
+  const grandBuyerReceivable = allLotTotals.reduce((s, t) => s + t.buyerReceivable, 0);
+  const grandHasData = allLotTotals.some(t => t.hasData);
+
   return (
     <Card className="border-2 border-border shadow-md overflow-hidden">
       {/* Header */}
@@ -1013,14 +1057,21 @@ function FarmerCardComp({ card, onChange, onRemove, cs }: {
         onClick={() => set("cardOpen", !card.cardOpen)}
         data-testid="button-toggle-farmer-card"
       >
-        <div className="flex items-center gap-3">
-          {card.cardOpen ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
-          <User className="w-4 h-4 text-primary" />
+        <div className="flex items-center gap-3 min-w-0 flex-wrap">
+          {card.cardOpen ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
+          <User className="w-4 h-4 text-primary shrink-0" />
           <span className="font-semibold text-sm">
             {card.farmerName.trim() || <span className="text-muted-foreground italic">New Farmer Entry</span>}
           </span>
           {card.farmerPhone && <span className="text-xs text-muted-foreground">· {card.farmerPhone}</span>}
           {card.village && <span className="text-xs text-muted-foreground">· {card.village}</span>}
+          {!card.cardOpen && grandTotalBags > 0 && (
+            <CollapsedSummary
+              totalBags={grandTotalBags} remainingBags={grandRemainingBags}
+              farmerPayable={grandFarmerPayable} buyerReceivable={grandBuyerReceivable}
+              hasData={grandHasData}
+            />
+          )}
         </div>
         <div className="flex items-center gap-2">
           <input
