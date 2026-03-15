@@ -174,10 +174,12 @@ function ArchiveDialog({ open, title, description, onConfirm, onCancel }: {
           <AlertDialogDescription className="text-sm text-muted-foreground">{description}</AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel autoFocus onClick={onCancel}>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={onConfirm} className="bg-amber-600 hover:bg-amber-700 text-white">
-            Yes, Archive
+          <AlertDialogAction autoFocus onClick={onCancel} className="bg-amber-600 hover:bg-amber-700 text-white">
+            Cancel
           </AlertDialogAction>
+          <AlertDialogCancel onClick={onConfirm} className="border-border text-foreground hover:bg-muted">
+            Yes, Archive
+          </AlertDialogCancel>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -1171,14 +1173,20 @@ function CropGroupSection({ group, onChange, onArchive, vehicleBhadaRate, totalB
 
   if (group.archived) {
     return (
-      <div className="rounded-xl border-2 border-amber-200 dark:border-amber-800 overflow-hidden opacity-50">
+      <div className="rounded-xl border-2 border-amber-200 dark:border-amber-800 overflow-hidden">
         <div className="flex items-center justify-between px-4 py-2 bg-amber-50 dark:bg-amber-950/30">
-          <div className="flex items-center gap-2 text-xs text-amber-700 dark:text-amber-400 font-medium">
+          <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 font-medium opacity-60">
             <Archive className="w-3.5 h-3.5 shrink-0" />
             <Wheat className="w-3.5 h-3.5 shrink-0" />
             <span>SR# {group.srNumber} {group.crop}</span>
             <span className="italic font-normal">— Archived</span>
           </div>
+          <Button type="button" variant="outline" size="sm"
+            onClick={() => onChange({ ...group, archived: false, groupOpen: true })}
+            className="h-6 px-2 text-[11px] border-amber-400 text-amber-700 hover:bg-amber-100 dark:border-amber-600 dark:text-amber-400 dark:hover:bg-amber-950/60"
+            data-testid={`button-reinstate-${group.crop.toLowerCase()}`}>
+            Reinstate
+          </Button>
         </div>
       </div>
     );
@@ -1339,9 +1347,17 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
     <Card className={`border-2 shadow-md overflow-hidden transition-all ${card.archived ? "opacity-50 border-amber-300 dark:border-amber-700" : "border-border"}`}>
       {/* Archived banner */}
       {card.archived && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400 text-xs font-medium">
-          <Archive className="w-3.5 h-3.5 shrink-0" />
-          Archived — excluded from all calculations
+        <div className="flex items-center justify-between px-4 py-2 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800">
+          <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 text-xs font-medium">
+            <Archive className="w-3.5 h-3.5 shrink-0" />
+            Archived — excluded from all calculations
+          </div>
+          <Button type="button" variant="outline" size="sm"
+            onClick={() => onChange({ ...card, archived: false, cardOpen: true })}
+            className="h-6 px-2 text-[11px] border-amber-400 text-amber-700 hover:bg-amber-100 dark:border-amber-600 dark:text-amber-400 dark:hover:bg-amber-950/60"
+            data-testid="button-reinstate-farmer">
+            Reinstate
+          </Button>
         </div>
       )}
 
@@ -1551,7 +1567,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
       <ArchiveDialog
         open={showArchiveFarmer}
         title={`Archive ${card.farmerName.trim() || "this farmer"}?`}
-        description="This farmer entry will be archived and grayed out. All their lots and bids will be excluded from calculations. Archived entries cannot be permanently deleted here — only a full account Reset from the Admin page can remove them."
+        description="This farmer entry will be archived and excluded from all calculations."
         onConfirm={() => { setShowArchiveFarmer(false); onArchive(); }}
         onCancel={() => setShowArchiveFarmer(false)}
       />
@@ -1560,7 +1576,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
       <ArchiveDialog
         open={pendingArchiveGroupIdx !== null}
         title={`Archive "${pendingGroupName}" group?`}
-        description={`This crop group will be archived and excluded from all calculations. Archived groups cannot be permanently deleted — only a full account Reset from the Admin page can remove them.`}
+        description={`This crop group will be archived and excluded from all calculations.`}
         onConfirm={confirmArchiveGroup}
         onCancel={() => setPendingArchiveGroupIdx(null)}
       />
