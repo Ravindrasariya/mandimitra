@@ -468,6 +468,9 @@ function diffCropGroup(saved: CropGroup, current: CropGroup): ChangeRecord[] {
   ];
   const bidFields: { key: keyof Omit<BidRow, "id" | "bidOpen" | "txn" | "txnDate">; label: string }[] = [
     { key: "buyerName", label: "Buyer Name" },
+    { key: "buyerId", label: "Buyer ID" },
+    { key: "bidDbId", label: "Bid DB ID" },
+    { key: "txnDbId", label: "Txn DB ID" },
     { key: "pricePerKg", label: "Price/kg" },
     { key: "numberOfBags", label: "Bags" },
     { key: "paymentType", label: "Payment Type" },
@@ -2312,6 +2315,20 @@ export default function StockPage() {
           district: card.district,
           state: card.state,
         });
+      }
+
+      const unmatchedBuyers: string[] = [];
+      for (const group of card.cropGroups) {
+        for (const lot of group.lots) {
+          for (const bid of lot.bids) {
+            if (bid.buyerName.trim() && !bid.buyerId) {
+              unmatchedBuyers.push(bid.buyerName.trim());
+            }
+          }
+        }
+      }
+      if (unmatchedBuyers.length > 0) {
+        toast({ title: "Buyer not selected", description: `Please select a buyer from the dropdown for: ${unmatchedBuyers.join(", ")}. Bids without a matched buyer will not be saved.`, variant: "destructive" });
       }
 
       const newLots: { groupIdx: number; lotIdx: number; lotData: any }[] = [];
