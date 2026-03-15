@@ -2183,10 +2183,10 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                 {(() => {
                   const allocated = card.cropGroups.reduce((sum, g) => sum + g.lots.reduce((s, l) => s + (parseInt(l.numberOfBags) || 0), 0), 0);
                   const total = parseInt(card.totalBagsInVehicle) || 0;
-                  const over = total > 0 && allocated > total;
+                  const over = allocated > total;
                   return (
-                    <span data-testid="text-allocated-bags" className={`text-[11px] mt-0.5 block ${over ? "text-destructive font-semibold" : "text-muted-foreground"}`}>
-                      Allocated {allocated} / {total || "—"}
+                    <span data-testid="text-allocated-bags" className={`text-[11px] mt-0.5 block font-medium ${over ? "text-destructive font-semibold" : "text-green-600 dark:text-green-500"}`}>
+                      Allocated {allocated} / {total || "—"} bags
                     </span>
                   );
                 })()}
@@ -2550,7 +2550,7 @@ export default function StockPage() {
 
     const vehicleBags = parseInt(card.totalBagsInVehicle) || 0;
     const allocatedBags = card.cropGroups.reduce((sum, g) => sum + g.lots.reduce((s, l) => s + (parseInt(l.numberOfBags) || 0), 0), 0);
-    if (vehicleBags > 0 && allocatedBags > vehicleBags) {
+    if (allocatedBags > vehicleBags) {
       toast({ title: "Error", description: `Total lot bags (${allocatedBags}) exceeds vehicle capacity (${vehicleBags})`, variant: "destructive" });
       return;
     }
