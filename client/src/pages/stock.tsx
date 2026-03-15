@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -18,8 +18,9 @@ import {
   Plus, Trash2, ChevronDown, ChevronRight, Truck, User,
   AlertTriangle, Scale, Wheat, ChevronsUpDown, X, Calculator,
   Archive, History, Save, Check, Printer, Share2,
-  Layers, Landmark, ShoppingBag,
+  Layers, Landmark, ShoppingBag, Calendar, Search, Filter, RotateCcw,
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { CROPS, SIZES, DISTRICTS } from "@shared/schema";
@@ -2508,6 +2509,318 @@ const fmtInr = (n: number) => {
   return `₹${Math.round(n).toLocaleString("en-IN")}`;
 };
 
+const MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+
+function StockFilterBar({
+  cards,
+  dateMode, setDateMode,
+  yearFilter, setYearFilter,
+  selectedMonths, setSelectedMonths,
+  selectedDays, setSelectedDays,
+  farmerFilter, setFarmerFilter,
+  buyerFilter, setBuyerFilter,
+  cropFilter, setCropFilter,
+  buyersList,
+}: {
+  cards: FarmerCard[];
+  dateMode: "stock" | "txn";
+  setDateMode: (v: "stock" | "txn") => void;
+  yearFilter: string;
+  setYearFilter: (v: string) => void;
+  selectedMonths: string[];
+  setSelectedMonths: (v: string[] | ((p: string[]) => string[])) => void;
+  selectedDays: string[];
+  setSelectedDays: (v: string[] | ((p: string[]) => string[])) => void;
+  farmerFilter: string;
+  setFarmerFilter: (v: string) => void;
+  buyerFilter: string;
+  setBuyerFilter: (v: string) => void;
+  cropFilter: string;
+  setCropFilter: (v: string) => void;
+  buyersList: { id: number; name: string; phone?: string; aadhatCommissionPercent?: string | null }[];
+}) {
+  const [monthPopoverOpen, setMonthPopoverOpen] = useState(false);
+  const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
+  const [farmerDropOpen, setFarmerDropOpen] = useState(false);
+  const [buyerDropOpen, setBuyerDropOpen] = useState(false);
+  const farmerRef = useRef<HTMLDivElement>(null);
+  const buyerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (farmerRef.current && !farmerRef.current.contains(e.target as Node)) setFarmerDropOpen(false);
+      if (buyerRef.current && !buyerRef.current.contains(e.target as Node)) setBuyerDropOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const years = useMemo(() => {
+    const yearSet = new Set<string>();
+    for (const card of cards) {
+      if (card.archived) continue;
+      if (dateMode === "stock") {
+        if (card.date) yearSet.add(card.date.substring(0, 4));
+      } else {
+        for (const g of card.cropGroups) {
+          if (g.archived) continue;
+          for (const lot of g.lots) {
+            for (const bid of lot.bids) {
+              if (bid.txnDate) yearSet.add(bid.txnDate.substring(0, 4));
+            }
+          }
+        }
+      }
+    }
+    const fromData = Array.from(yearSet).sort().reverse();
+    if (fromData.length === 0) return [String(new Date().getFullYear())];
+    return fromData;
+  }, [cards, dateMode]);
+
+  const daysInMonths = useMemo(() => {
+    if (selectedMonths.length === 0) return 31;
+    const year = yearFilter !== "all" ? parseInt(yearFilter) : new Date().getFullYear();
+    return Math.max(...selectedMonths.map(m => new Date(year, parseInt(m), 0).getDate()));
+  }, [selectedMonths, yearFilter]);
+
+  const toggleMonth = (month: string) => {
+    setSelectedMonths((prev: string[]) => prev.includes(month) ? prev.filter(m => m !== month) : [...prev, month]);
+    setSelectedDays([]);
+  };
+  const selectAllMonths = () => { setSelectedMonths([]); setSelectedDays([]); setMonthPopoverOpen(false); };
+  const toggleDay = (day: string) => {
+    setSelectedDays((prev: string[]) => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
+  };
+  const selectAllDays = () => { setSelectedDays([]); setDayPopoverOpen(false); };
+
+  const monthLabel = selectedMonths.length === 0
+    ? "All Months"
+    : selectedMonths.length === 1
+      ? MONTH_LABELS[parseInt(selectedMonths[0]) - 1]
+      : `${selectedMonths.length} Months`;
+
+  const dayLabel = selectedDays.length === 0
+    ? "All Days"
+    : selectedDays.length === 1
+      ? selectedDays[0]
+      : `${selectedDays.length} Days`;
+
+  const farmerSuggestions = useMemo(() => {
+    const seen = new Set<string>();
+    const list: { name: string; phone: string; village: string }[] = [];
+    for (const card of cards) {
+      if (card.archived || !card.farmerName.trim()) continue;
+      const key = card.farmerName.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      list.push({ name: card.farmerName, phone: card.farmerPhone || "", village: card.village || "" });
+    }
+    return list;
+  }, [cards]);
+
+  const filteredFarmerSuggestions = farmerFilter.trim()
+    ? farmerSuggestions.filter(f => f.name.toLowerCase().includes(farmerFilter.toLowerCase()))
+    : farmerSuggestions;
+
+  const buyerSuggestions = useMemo(() => {
+    return buyersList.map(b => ({ id: b.id, name: b.name, phone: b.phone || "" }));
+  }, [buyersList]);
+
+  const filteredBuyerSuggestions = buyerFilter.trim()
+    ? buyerSuggestions.filter(b => b.name.toLowerCase().includes(buyerFilter.toLowerCase()))
+    : buyerSuggestions;
+
+  const currentYear = String(new Date().getFullYear());
+  const anyActive = dateMode !== "stock" || yearFilter !== currentYear || selectedMonths.length > 0 || selectedDays.length > 0 || farmerFilter !== "" || buyerFilter !== "" || cropFilter !== "all";
+
+  const clearAll = () => {
+    setDateMode("stock");
+    setYearFilter(currentYear);
+    setSelectedMonths([]);
+    setSelectedDays([]);
+    setFarmerFilter("");
+    setBuyerFilter("");
+    setCropFilter("all");
+  };
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 mb-3" data-testid="stock-filter-bar">
+      <Filter className="w-4 h-4 text-muted-foreground shrink-0" />
+
+      <Select value={dateMode} onValueChange={(v) => setDateMode(v as "stock" | "txn")}>
+        <SelectTrigger className="w-[80px] h-8 text-xs" data-testid="select-date-mode">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="stock">Stock</SelectItem>
+          <SelectItem value="txn">Txn</SelectItem>
+        </SelectContent>
+      </Select>
+
+      <Select value={yearFilter} onValueChange={(v) => { setYearFilter(v); setSelectedDays([]); }}>
+        <SelectTrigger className="w-[90px] h-8 text-xs" data-testid="select-year-filter">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Years</SelectItem>
+          {years.map(y => (
+            <SelectItem key={y} value={y}>{y}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      <Popover open={monthPopoverOpen} onOpenChange={setMonthPopoverOpen}>
+        <PopoverTrigger asChild>
+          <Button variant="outline" size="sm" className="h-8 text-xs min-w-[65px] justify-between px-2 shrink-0" data-testid="stk-select-month-filter">
+            {monthLabel}
+            <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-56 p-2" align="start">
+          <button
+            className="flex items-center gap-2 px-2 py-1.5 rounded text-sm w-full text-left border-b mb-1"
+            data-testid="stk-month-select-all"
+            onClick={selectAllMonths}
+          >
+            <Checkbox checked={selectedMonths.length === 0} />
+            <span>All Months</span>
+          </button>
+          <div className="grid grid-cols-4 gap-0.5">
+            {MONTH_LABELS.map((m, i) => {
+              const val = String(i + 1);
+              return (
+                <button
+                  key={val}
+                  className={`flex items-center justify-center rounded text-xs p-1.5 ${selectedMonths.includes(val) ? "bg-primary text-primary-foreground" : ""}`}
+                  data-testid={`stk-month-option-${val}`}
+                  onClick={() => toggleMonth(val)}
+                >
+                  {m}
+                </button>
+              );
+            })}
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      <Popover open={dayPopoverOpen} onOpenChange={setDayPopoverOpen}>
+        <PopoverTrigger asChild>
+          <Button variant="outline" size="sm" className="h-8 text-xs min-w-[65px] justify-between px-2 shrink-0" data-testid="stk-select-day-filter">
+            <Calendar className="w-3 h-3 mr-1" />
+            {dayLabel}
+            <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-56 p-2" align="start">
+          <button
+            className="flex items-center gap-2 px-2 py-1.5 rounded text-sm w-full text-left border-b mb-1"
+            data-testid="stk-day-select-all"
+            onClick={selectAllDays}
+          >
+            <Checkbox checked={selectedDays.length === 0} />
+            <span>All Days</span>
+          </button>
+          <div className="grid grid-cols-7 gap-0.5">
+            {Array.from({ length: daysInMonths }, (_, i) => String(i + 1)).map(d => (
+              <button
+                key={d}
+                className={`flex items-center justify-center rounded text-xs p-1.5 ${selectedDays.includes(d) ? "bg-primary text-primary-foreground" : ""}`}
+                data-testid={`stk-day-option-${d}`}
+                onClick={() => toggleDay(d)}
+              >
+                {d}
+              </button>
+            ))}
+          </div>
+        </PopoverContent>
+      </Popover>
+
+      <div className="relative" ref={farmerRef}>
+        <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+        <Input
+          data-testid="input-farmer-filter"
+          value={farmerFilter}
+          onChange={(e) => { setFarmerFilter(e.target.value); setFarmerDropOpen(true); }}
+          onFocus={() => setFarmerDropOpen(true)}
+          placeholder="Farmer"
+          className="pl-7 w-[140px] h-8 text-xs"
+        />
+        {farmerFilter && (
+          <button className="absolute right-1.5 top-1/2 -translate-y-1/2" onClick={() => { setFarmerFilter(""); setFarmerDropOpen(false); }}>
+            <X className="w-3 h-3 text-muted-foreground" />
+          </button>
+        )}
+        {farmerDropOpen && filteredFarmerSuggestions.length > 0 && (
+          <div className="absolute top-full left-0 z-50 mt-1 w-[280px] max-h-48 overflow-y-auto rounded-md border bg-popover shadow-md">
+            {filteredFarmerSuggestions.map((f, i) => (
+              <button
+                key={i}
+                className="w-full text-left px-3 py-2 text-xs hover:bg-accent truncate"
+                data-testid={`farmer-suggestion-${i}`}
+                onClick={() => { setFarmerFilter(f.name); setFarmerDropOpen(false); }}
+              >
+                <span className="font-medium">{f.name}</span>
+                {f.phone && <span className="text-muted-foreground"> · {f.phone}</span>}
+                {f.village && <span className="text-muted-foreground"> · {f.village}</span>}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="relative" ref={buyerRef}>
+        <Search className="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+        <Input
+          data-testid="input-buyer-filter"
+          value={buyerFilter}
+          onChange={(e) => { setBuyerFilter(e.target.value); setBuyerDropOpen(true); }}
+          onFocus={() => setBuyerDropOpen(true)}
+          placeholder="Buyer"
+          className="pl-7 w-[140px] h-8 text-xs"
+        />
+        {buyerFilter && (
+          <button className="absolute right-1.5 top-1/2 -translate-y-1/2" onClick={() => { setBuyerFilter(""); setBuyerDropOpen(false); }}>
+            <X className="w-3 h-3 text-muted-foreground" />
+          </button>
+        )}
+        {buyerDropOpen && filteredBuyerSuggestions.length > 0 && (
+          <div className="absolute top-full left-0 z-50 mt-1 w-[220px] max-h-48 overflow-y-auto rounded-md border bg-popover shadow-md">
+            {filteredBuyerSuggestions.map((b, i) => (
+              <button
+                key={i}
+                className="w-full text-left px-3 py-2 text-xs hover:bg-accent truncate"
+                data-testid={`buyer-suggestion-${i}`}
+                onClick={() => { setBuyerFilter(b.name); setBuyerDropOpen(false); }}
+              >
+                <span className="font-medium">{b.name}</span>
+                {b.phone && <span className="text-muted-foreground"> · {b.phone}</span>}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <Select value={cropFilter} onValueChange={setCropFilter}>
+        <SelectTrigger className="w-[100px] h-8 text-xs" data-testid="select-crop-filter">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Crops</SelectItem>
+          {CROPS.map(c => (
+            <SelectItem key={c} value={c}>{c}</SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+
+      {anyActive && (
+        <Button variant="ghost" size="sm" className="h-8 text-xs gap-1 text-muted-foreground" onClick={clearAll} data-testid="button-clear-filters">
+          <RotateCcw className="w-3 h-3" /> Clear
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
   cards: FarmerCard[];
   savedCardMap: Map<string, FarmerCard>;
@@ -2621,6 +2934,80 @@ export default function StockPage() {
   const pageBuyersList = pageBuyersData.map((b: any) => ({ id: b.id, name: b.name, phone: b.phone || "", aadhatCommissionPercent: b.aadhatCommissionPercent || null }));
 
   const cs = chargeSettings || DEFAULT_CS;
+
+  const [dateMode, setDateMode] = useState<"stock" | "txn">("stock");
+  const [yearFilter, setYearFilter] = useState(String(new Date().getFullYear()));
+  const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
+  const [selectedDays, setSelectedDays] = useState<string[]>([]);
+  const [farmerFilter, setFarmerFilter] = useState("");
+  const [buyerFilter, setBuyerFilter] = useState("");
+  const [cropFilter, setCropFilter] = useState("all");
+
+  const filteredCards = useMemo(() => {
+    const anyDateFilter = yearFilter !== "all" || selectedMonths.length > 0 || selectedDays.length > 0;
+
+    const dateMatchesValue = (dateStr: string) => {
+      if (!dateStr) return false;
+      const [y, m, d] = dateStr.split("-");
+      if (yearFilter !== "all" && y !== yearFilter) return false;
+      if (selectedMonths.length > 0 && !selectedMonths.includes(String(parseInt(m)))) return false;
+      if (selectedDays.length > 0 && !selectedDays.includes(String(parseInt(d)))) return false;
+      return true;
+    };
+
+    const dateMatchesCard = (card: FarmerCard) => {
+      if (!anyDateFilter) return true;
+      if (dateMode === "stock") {
+        return dateMatchesValue(card.date);
+      } else {
+        for (const g of card.cropGroups) {
+          if (g.archived) continue;
+          for (const lot of g.lots) {
+            for (const bid of lot.bids) {
+              if (dateMatchesValue(bid.txnDate)) return true;
+            }
+          }
+        }
+        return false;
+      }
+    };
+
+    const farmerMatchesCard = (card: FarmerCard) => {
+      if (!farmerFilter.trim()) return true;
+      return card.farmerName.toLowerCase().includes(farmerFilter.toLowerCase());
+    };
+
+    const buyerMatchesCard = (card: FarmerCard) => {
+      if (!buyerFilter.trim()) return true;
+      const q = buyerFilter.toLowerCase();
+      for (const g of card.cropGroups) {
+        if (g.archived) continue;
+        for (const lot of g.lots) {
+          for (const bid of lot.bids) {
+            if (bid.buyerName.toLowerCase().includes(q)) return true;
+          }
+        }
+      }
+      return false;
+    };
+
+    const cropMatchesCard = (card: FarmerCard) => {
+      if (cropFilter === "all") return true;
+      return card.cropGroups.some(g => !g.archived && g.crop === cropFilter);
+    };
+
+    const applyCropFilter = (card: FarmerCard): FarmerCard => {
+      if (cropFilter === "all") return card;
+      return { ...card, cropGroups: card.cropGroups.filter(g => g.archived || g.crop === cropFilter) };
+    };
+
+    return cards
+      .filter(dateMatchesCard)
+      .filter(farmerMatchesCard)
+      .filter(buyerMatchesCard)
+      .filter(cropMatchesCard)
+      .map(applyCropFilter);
+  }, [cards, dateMode, yearFilter, selectedMonths, selectedDays, farmerFilter, buyerFilter, cropFilter]);
 
   useEffect(() => {
     if (!stockCardsData || !businessId || dbLoaded.current) return;
@@ -3116,21 +3503,37 @@ export default function StockPage() {
             <div className="text-sm text-muted-foreground">Loading stock entries...</div>
           </div>
         )}
-        {!loadingCards && <StockSummaryBar cards={cards} savedCardMap={savedCardMap} cs={cs} buyersList={pageBuyersList} />}
-        {cards.map((card, idx) => (
-          <FarmerCardComp
-            key={card.id} card={card}
-            savedCard={savedCardMap.get(card.id) ?? null}
-            onChange={c => updateCard(idx, c)}
-            onSave={() => saveCard(idx)}
-            onSaveAndClose={() => saveCard(idx, true)}
-            onCancel={() => cancelCard(idx)}
-            onArchive={() => archiveCard(idx)}
-            onSyncSaved={c => setSavedCardMap(prev => new Map(prev).set(c.id, JSON.parse(JSON.stringify(c))))}
-            cs={cs}
-            currentUsername={currentUsername}
+        {!loadingCards && (
+          <StockFilterBar
+            cards={cards}
+            dateMode={dateMode} setDateMode={setDateMode}
+            yearFilter={yearFilter} setYearFilter={setYearFilter}
+            selectedMonths={selectedMonths} setSelectedMonths={setSelectedMonths}
+            selectedDays={selectedDays} setSelectedDays={setSelectedDays}
+            farmerFilter={farmerFilter} setFarmerFilter={setFarmerFilter}
+            buyerFilter={buyerFilter} setBuyerFilter={setBuyerFilter}
+            cropFilter={cropFilter} setCropFilter={setCropFilter}
+            buyersList={pageBuyersList}
           />
-        ))}
+        )}
+        {!loadingCards && <StockSummaryBar cards={filteredCards} savedCardMap={savedCardMap} cs={cs} buyersList={pageBuyersList} />}
+        {filteredCards.map((card) => {
+          const idx = cards.findIndex(c => c.id === card.id);
+          return (
+            <FarmerCardComp
+              key={card.id} card={card}
+              savedCard={savedCardMap.get(card.id) ?? null}
+              onChange={c => updateCard(idx, c)}
+              onSave={() => saveCard(idx)}
+              onSaveAndClose={() => saveCard(idx, true)}
+              onCancel={() => cancelCard(idx)}
+              onArchive={() => archiveCard(idx)}
+              onSyncSaved={c => setSavedCardMap(prev => new Map(prev).set(c.id, JSON.parse(JSON.stringify(c))))}
+              cs={cs}
+              currentUsername={currentUsername}
+            />
+          );
+        })}
       </div>
     </div>
   );
