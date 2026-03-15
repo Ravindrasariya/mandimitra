@@ -2520,13 +2520,9 @@ export default function StockPage() {
             let txnDbId = bid.txnDbId;
             const nw = parseFloat(bid.txn.netWeightInput) || 0;
 
-            if (bidDbId && nw <= 0 && txnDbId) {
-              try {
-                await apiRequest("POST", `/api/transactions/${txnDbId}/reverse`);
-                txnDbId = undefined;
-              } catch (err: any) {
-                toast({ title: "Warning", description: `Failed to reverse transaction: ${err.message}`, variant: "destructive" });
-              }
+            if (nw <= 0 && txnDbId) {
+              toast({ title: "Save blocked", description: `Net weight cannot be 0 for a bid with an existing transaction (buyer: ${bid.buyerName}). Please enter a valid weight.`, variant: "destructive" });
+              throw new Error("Net weight cannot be 0 for a bid with an existing transaction.");
             }
 
             if (bidDbId && nw > 0) {
