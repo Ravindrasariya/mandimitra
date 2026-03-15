@@ -106,6 +106,8 @@ type BidRow = {
   txn: TxnState;
   paymentStatus?: "due" | "paid" | "partial";
   farmerPaymentStatus?: "due" | "paid" | "partial";
+  farmerPaidAmount?: string;
+  paidAmount?: string;
 };
 
 type LotRow = {
@@ -2536,6 +2538,8 @@ function stockCardsToFarmerCards(apiCards: any[]): FarmerCard[] {
               } : emptyTxn(),
               paymentStatus: txn?.paymentStatus || "due",
               farmerPaymentStatus: txn?.farmerPaymentStatus || "due",
+              farmerPaidAmount: txn?.farmerPaidAmount?.toString() || "0",
+              paidAmount: txn?.paidAmount?.toString() || "0",
             } as BidRow;
           }),
         })),
@@ -2979,8 +2983,14 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
           const buyerAadhat = buyerData?.aadhatCommissionPercent != null && buyerData.aadhatCommissionPercent !== ""
             ? parseFloat(buyerData.aadhatCommissionPercent) || 0 : null;
           const bt = calcBidTotals(bid, cs, vbr, tbi, buyerAadhat);
-          if (bid.farmerPaymentStatus !== "paid") cardFarmerDue += bt.farmerPayable;
-          if (bid.paymentStatus !== "paid") buyerDue += bt.buyerReceivable;
+          if (bid.farmerPaymentStatus !== "paid") {
+            const farmerPaid = parseFloat(bid.farmerPaidAmount || "0");
+            cardFarmerDue += Math.max(0, bt.farmerPayable - farmerPaid);
+          }
+          if (bid.paymentStatus !== "paid") {
+            const buyerPaid = parseFloat(bid.paidAmount || "0");
+            buyerDue += Math.max(0, bt.buyerReceivable - buyerPaid);
+          }
         }
       }
     }

@@ -681,6 +681,8 @@ export async function registerRoutes(
               isReversed: txn.isReversed,
               paymentStatus: txn.paymentStatus,
               farmerPaymentStatus: txn.farmerPaymentStatus,
+              farmerPaidAmount: txn.farmerPaidAmount,
+              paidAmount: txn.paidAmount,
             } : null,
           });
         }
