@@ -860,37 +860,32 @@ function LotCard({ lot, index, onChange, onRemove, vehicleBhadaRate, totalBagsIn
 
 // ─── Crop group ───────────────────────────────────────────────────────────────
 
-function CropGroupSection({ group, onChange, onRemove, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate }: {
+function CropGroupSection({ group, onChange, onRemove, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate, farmerName }: {
   group: CropGroup;
   onChange: (g: CropGroup) => void; onRemove: () => void;
   vehicleBhadaRate: number; totalBagsInVehicle: number;
-  cs: ChargeSettings; farmerDate: string;
+  cs: ChargeSettings; farmerDate: string; farmerName: string;
 }) {
   const [pendingDeleteLotIdx, setPendingDeleteLotIdx] = useState<number | null>(null);
 
   const headerCls = CROP_HEADER[group.crop] || "bg-muted border-border";
   const badgeCls = CROP_COLORS[group.crop] || "bg-muted border-border text-foreground";
+  const farmerLabel = farmerName.trim() || "this farmer";
 
   const addLot = () => onChange({ ...group, lots: [...group.lots, emptyLot(farmerDate)] });
   const updateLot = (idx: number, lot: LotRow) =>
     onChange({ ...group, lots: group.lots.map((l, i) => (i === idx ? lot : l)) });
   const removeLot = (idx: number) => {
+    if (group.lots.length === 1) return;           // can't remove the only lot — use group × instead
     const lot = group.lots[idx];
-    const isLastLot = group.lots.length === 1;
-    if (hasLotUserData(lot) || isLastLot) {
-      setPendingDeleteLotIdx(idx);
-      return;
-    }
+    if (hasLotUserData(lot)) { setPendingDeleteLotIdx(idx); return; }
     onChange({ ...group, lots: group.lots.filter((_, i) => i !== idx) });
   };
   const confirmDeleteLot = () => {
-    if (pendingDeleteLotIdx !== null) {
-      if (group.lots.length === 1) { onRemove(); }
-      else onChange({ ...group, lots: group.lots.filter((_, i) => i !== pendingDeleteLotIdx) });
-    }
+    if (pendingDeleteLotIdx !== null)
+      onChange({ ...group, lots: group.lots.filter((_, i) => i !== pendingDeleteLotIdx) });
     setPendingDeleteLotIdx(null);
   };
-  const pendingDeleteIsLastLot = pendingDeleteLotIdx !== null && group.lots.length === 1;
 
   const allTotals = group.lots.map(l => calcLotTotals(l, cs, vehicleBhadaRate, totalBagsInVehicle));
   const totalBags = allTotals.reduce((s, t) => s + t.bags, 0);
@@ -956,12 +951,8 @@ function CropGroupSection({ group, onChange, onRemove, vehicleBhadaRate, totalBa
 
       <ConfirmDeleteDialog
         open={pendingDeleteLotIdx !== null}
-        title={pendingDeleteIsLastLot ? `Delete entire "${group.crop}" group?` : "Delete this lot?"}
-        description={
-          pendingDeleteIsLastLot
-            ? `This is the only lot in the group. Deleting it will remove the entire "${group.crop}" group and all its data.`
-            : "This lot has data that will be permanently lost. This action cannot be undone."
-        }
+        title="Delete this lot?"
+        description={`Lot #${(pendingDeleteLotIdx ?? 0) + 1} of ${farmerLabel}'s ${group.crop} has data that will be permanently lost. This action cannot be undone.`}
         onConfirm={confirmDeleteLot}
         onCancel={() => setPendingDeleteLotIdx(null)}
       />
@@ -1138,6 +1129,7 @@ function FarmerCardComp({ card, onChange, onRemove, cs }: {
                 totalBagsInVehicle={totalBagsInVehicle}
                 cs={cs}
                 farmerDate={card.date}
+                farmerName={card.farmerName}
               />
             ))}
             {availableCrops.length > 0 && (
@@ -1175,8 +1167,8 @@ function FarmerCardComp({ card, onChange, onRemove, cs }: {
 
       <ConfirmDeleteDialog
         open={pendingDeleteGroupIdx !== null}
-        title={`Delete "${pendingGroupName}" group?`}
-        description={`All lots and data in the "${pendingGroupName}" group will be permanently lost. This action cannot be undone.`}
+        title={`Delete ${card.farmerName.trim() || "this farmer"}'s "${pendingGroupName}" group?`}
+        description={`All lots and data for ${card.farmerName.trim() || "this farmer"}'s "${pendingGroupName}" crop will be permanently lost. This action cannot be undone.`}
         onConfirm={confirmDeleteGroup}
         onCancel={() => setPendingDeleteGroupIdx(null)}
       />
