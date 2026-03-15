@@ -192,6 +192,31 @@ function ArchiveDialog({ open, title, description, onConfirm, onCancel }: {
   );
 }
 
+function ReinstateDialog({ open, title, description, onConfirm, onCancel }: {
+  open: boolean; title: string; description: string; onConfirm: () => void; onCancel: () => void;
+}) {
+  return (
+    <AlertDialog open={open} onOpenChange={v => { if (!v) onCancel(); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2 text-green-700 dark:text-green-400">
+            <Archive className="w-5 h-5 shrink-0" /> {title}
+          </AlertDialogTitle>
+          <AlertDialogDescription className="text-sm text-muted-foreground">{description}</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={onCancel} className="border-border text-foreground hover:bg-muted">
+            Cancel
+          </AlertDialogCancel>
+          <AlertDialogAction autoFocus onClick={onConfirm} className="bg-green-600 hover:bg-green-700 text-white">
+            Yes, Reinstate
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 // ─── Edit history dialog ───────────────────────────────────────────────────────
 
 function ChangeRecordLine({ c }: { c: ChangeRecord }) {
@@ -1263,6 +1288,7 @@ function CropGroupSection({ group, onChange, onArchive, vehicleBhadaRate, totalB
 }) {
   const [pendingDeleteLotIdx, setPendingDeleteLotIdx] = useState<number | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  const [showReinstateConfirm, setShowReinstateConfirm] = useState(false);
 
   const headerCls = CROP_HEADER[group.crop] || "bg-muted border-border";
   const badgeCls = CROP_COLORS[group.crop] || "bg-muted border-border text-foreground";
@@ -1323,22 +1349,31 @@ function CropGroupSection({ group, onChange, onArchive, vehicleBhadaRate, totalB
 
   if (group.archived) {
     return (
-      <div className="rounded-xl border-2 border-amber-200 dark:border-amber-800 overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-2 bg-amber-50 dark:bg-amber-950/30">
-          <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 font-medium opacity-60">
-            <Archive className="w-3.5 h-3.5 shrink-0" />
-            <Wheat className="w-3.5 h-3.5 shrink-0" />
-            <span>SR# {group.srNumber} {group.crop}</span>
-            <span className="italic font-normal">— Archived</span>
+      <>
+        <div className="rounded-xl border-2 border-amber-200 dark:border-amber-800 overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-2 bg-amber-50 dark:bg-amber-950/30">
+            <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 font-medium opacity-60">
+              <Archive className="w-3.5 h-3.5 shrink-0" />
+              <Wheat className="w-3.5 h-3.5 shrink-0" />
+              <span>SR# {group.srNumber} {group.crop}</span>
+              <span className="italic font-normal">— Archived</span>
+            </div>
+            <Button type="button" variant="outline" size="sm"
+              onClick={() => setShowReinstateConfirm(true)}
+              className="h-6 px-2 text-[11px] border-amber-400 text-amber-700 hover:bg-amber-100 dark:border-amber-600 dark:text-amber-400 dark:hover:bg-amber-950/60"
+              data-testid={`button-reinstate-${group.crop.toLowerCase()}`}>
+              Reinstate
+            </Button>
           </div>
-          <Button type="button" variant="outline" size="sm"
-            onClick={() => onChange({ ...group, archived: false, groupOpen: true })}
-            className="h-6 px-2 text-[11px] border-amber-400 text-amber-700 hover:bg-amber-100 dark:border-amber-600 dark:text-amber-400 dark:hover:bg-amber-950/60"
-            data-testid={`button-reinstate-${group.crop.toLowerCase()}`}>
-            Reinstate
-          </Button>
         </div>
-      </div>
+        <ReinstateDialog
+          open={showReinstateConfirm}
+          title={`Reinstate ${group.crop} (SR# ${group.srNumber})?`}
+          description="All lots, bids, and payment details for this crop group will be included in calculations again, including dues and payments."
+          onConfirm={() => { setShowReinstateConfirm(false); onChange({ ...group, archived: false, groupOpen: true }); }}
+          onCancel={() => setShowReinstateConfirm(false)}
+        />
+      </>
     );
   }
 
@@ -1445,6 +1480,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
 }) {
   const [pendingArchiveGroupIdx, setPendingArchiveGroupIdx] = useState<number | null>(null);
   const [showArchiveFarmer, setShowArchiveFarmer] = useState(false);
+  const [showReinstateConfirm, setShowReinstateConfirm] = useState(false);
   const [showUnsaved, setShowUnsaved] = useState(false);
 
   const set = (f: keyof FarmerCard, v: any) => onChange({ ...card, [f]: v });
@@ -1505,7 +1541,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
             Archived — excluded from all calculations
           </div>
           <Button type="button" variant="outline" size="sm"
-            onClick={() => onChange({ ...card, archived: false, cardOpen: true })}
+            onClick={() => setShowReinstateConfirm(true)}
             className="h-6 px-2 text-[11px] border-amber-400 text-amber-700 hover:bg-amber-100 dark:border-amber-600 dark:text-amber-400 dark:hover:bg-amber-950/60"
             data-testid="button-reinstate-farmer">
             Reinstate
@@ -1741,6 +1777,15 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
         onSave={() => { setShowUnsaved(false); onSaveAndClose(); }}
         onDiscard={() => { setShowUnsaved(false); onCancel(); }}
         onKeep={() => setShowUnsaved(false)}
+      />
+
+      {/* Reinstate confirmation */}
+      <ReinstateDialog
+        open={showReinstateConfirm}
+        title={`Reinstate ${card.farmerName.trim() || "this farmer"}?`}
+        description="This farmer entry and all its crop groups, lots, and bids will be included in all calculations again, including dues and payments."
+        onConfirm={() => { setShowReinstateConfirm(false); onChange({ ...card, archived: false, cardOpen: true }); }}
+        onCancel={() => setShowReinstateConfirm(false)}
       />
     </Card>
   );
