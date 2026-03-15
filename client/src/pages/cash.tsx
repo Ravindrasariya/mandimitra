@@ -1075,7 +1075,7 @@ export default function CashPage() {
                                     const remaining = Math.max(0, total - alreadyAllocated);
                                     const due = parseFloat(pt.due);
                                     const autoAmt = total > 0 ? Math.min(remaining, due) : due;
-                                    const autoPetty = Math.max(0, due - autoAmt);
+                                    const autoPetty = Math.min(1000, Math.max(0, due - autoAmt));
                                     return [...prev, {
                                       txnId: pt.id === 0 ? null : pt.id,
                                       txnLabel: pt.transactionId === "PY_OPENING" ? "PY Opening Balance" : `SR #${pt.serialNumber}`,
@@ -1143,14 +1143,14 @@ export default function CashPage() {
                                   const raw = e.target.value;
                                   const discAmt = (parseFloat(alloc.discountPercent || "0") / 100) * alloc.due;
                                   const parsed = parseFloat(raw || "0");
-                                  const newPetty = Math.max(0, alloc.due - parsed - discAmt);
+                                  const newPetty = Math.min(1000, Math.max(0, alloc.due - parsed - discAmt));
                                   setInwardAllocations(prev => prev.map((a, i) => i === idx ? { ...a, amount: raw, pettyAdj: newPetty > 0.005 ? newPetty.toFixed(2) : "0" } : a));
                                 }}
                                 onBlur={e => {
                                   const raw = parseFloat(e.target.value || "0");
                                   const capped = Math.min(Math.max(0, raw), alloc.due);
                                   const discAmt = (parseFloat(alloc.discountPercent || "0") / 100) * alloc.due;
-                                  const newPetty = Math.max(0, alloc.due - capped - discAmt);
+                                  const newPetty = Math.min(1000, Math.max(0, alloc.due - capped - discAmt));
                                   setInwardAllocations(prev => prev.map((a, i) => i === idx ? { ...a, amount: capped.toFixed(2), pettyAdj: newPetty > 0.005 ? newPetty.toFixed(2) : "0" } : a));
                                 }}
                                 onFocus={e => e.target.select()}
@@ -1173,7 +1173,7 @@ export default function CashPage() {
                                 onChange={e => {
                                   const newDiscPct = e.target.value;
                                   const discAmt = (parseFloat(newDiscPct || "0") / 100) * alloc.due;
-                                  const newPetty = Math.max(0, alloc.due - parseFloat(alloc.amount || "0") - discAmt);
+                                  const newPetty = Math.min(1000, Math.max(0, alloc.due - parseFloat(alloc.amount || "0") - discAmt));
                                   setInwardAllocations(prev => prev.map((a, i) => i === idx ? { ...a, discountPercent: newDiscPct, pettyAdj: newPetty > 0.005 ? newPetty.toFixed(2) : "0" } : a));
                                 }}
                                 onFocus={e => e.target.select()}
@@ -1187,8 +1187,9 @@ export default function CashPage() {
                               <Input
                                 type="number" inputMode="decimal"
                                 value={alloc.pettyAdj}
-                                readOnly
-                                className={`h-7 text-xs px-1.5 bg-muted cursor-not-allowed font-medium ${parseFloat(alloc.pettyAdj || "0") > 1000 ? "text-red-600" : parseFloat(alloc.pettyAdj || "0") > 100 ? "text-orange-500" : ""}`}
+                                onChange={e => setInwardAllocations(prev => prev.map((a, i) => i === idx ? { ...a, pettyAdj: e.target.value } : a))}
+                                onFocus={e => e.target.select()}
+                                className={`h-7 text-xs px-1.5 font-medium ${parseFloat(alloc.pettyAdj || "0") > 500 ? "text-red-600" : parseFloat(alloc.pettyAdj || "0") > 100 ? "text-orange-500" : ""}`}
                                 data-testid={`allocation-petty-${idx}`}
                               />
                             </div>
