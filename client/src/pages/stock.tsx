@@ -2004,6 +2004,12 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
             <span className="font-bold text-sm truncate">
               {card.farmerName.trim() || <span className="text-muted-foreground italic">New Farmer Entry</span>}
             </span>
+            {card.farmerPhone && (
+              <span className="hidden sm:inline text-xs text-muted-foreground font-normal shrink-0">· {card.farmerPhone}</span>
+            )}
+            {card.village && (
+              <span className="hidden sm:inline text-xs text-muted-foreground font-normal shrink-0">· {card.village}</span>
+            )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <input
@@ -2028,8 +2034,8 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
         {/* Second row: phone, village, advance, unsaved badge */}
         {(card.farmerPhone || card.village || parseFloat(card.advanceAmount || "0") > 0 || (isDirty && card.savedAt !== null)) && (
           <div className="flex items-center gap-2 pl-6 flex-wrap">
-            {card.farmerPhone && <span className="text-xs text-muted-foreground">· {card.farmerPhone}</span>}
-            {card.village && <span className="text-xs text-muted-foreground">· {card.village}</span>}
+            {card.farmerPhone && <span className="sm:hidden text-xs text-muted-foreground">· {card.farmerPhone}</span>}
+            {card.village && <span className="sm:hidden text-xs text-muted-foreground">· {card.village}</span>}
             {parseFloat(card.advanceAmount || "0") > 0 && (
               <span className="text-[10px] font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded px-1.5 py-0.5" data-testid="badge-farmer-advance">
                 Advance ₹{parseFloat(card.advanceAmount).toLocaleString("en-IN")}{card.advanceMode ? ` · ${card.advanceMode}` : ""}
