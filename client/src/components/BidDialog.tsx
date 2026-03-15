@@ -290,8 +290,8 @@ export default function BidDialog({ open, onOpenChange, lot: initialLot, serialN
             <div className="bg-muted rounded-md p-3 text-sm grid grid-cols-2 gap-x-4 gap-y-1">
               <p>{t("bidding.remainingBags")}: <strong>{selectedLot.remainingBags}</strong></p>
               <p>Crop: <strong>{selectedLot.crop}</strong></p>
-              {selectedLot.size && <p>{t("stockRegister.size")}: <strong>{selectedLot.size}</strong></p>}
-              {selectedLot.variety && <p>{t("stockRegister.variety")}: <strong>{selectedLot.variety}</strong></p>}
+              {selectedLot.size && <p>{t("common.size")}: <strong>{selectedLot.size}</strong></p>}
+              {selectedLot.variety && <p>{t("common.variety")}: <strong>{selectedLot.variety}</strong></p>}
             </div>
 
             {lotBids.length > 0 && (

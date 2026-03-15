@@ -134,16 +134,16 @@ export default function BiddingPage() {
   };
 
   const monthLabel = selectedMonths.length === 0
-    ? t("stockRegister.allMonths")
+    ? t("common.allMonths")
     : selectedMonths.length === 1
       ? MONTH_LABELS[parseInt(selectedMonths[0]) - 1]
-      : `${selectedMonths.length} ${t("stockRegister.nMonths")}`;
+      : `${selectedMonths.length} ${t("common.nMonths")}`;
 
   const dayLabel = selectedDays.length === 0
-    ? t("stockRegister.allDays")
+    ? t("common.allDays")
     : selectedDays.length === 1
       ? selectedDays[0]
-      : `${selectedDays.length} ${t("stockRegister.nDays")}`;
+      : `${selectedDays.length} ${t("common.nDays")}`;
 
   const toggleStatus = (status: string) => {
     setSelectedStatuses(prev => prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]);
@@ -507,7 +507,7 @@ export default function BiddingPage() {
               data-testid="button-all-months"
             >
               <Checkbox checked={selectedMonths.length === 0} />
-              <span>{t("stockRegister.allMonths")}</span>
+              <span>{t("common.allMonths")}</span>
             </div>
             <div className="grid grid-cols-4 gap-1 mt-1">
               {MONTH_LABELS.map((m, i) => {
@@ -541,7 +541,7 @@ export default function BiddingPage() {
               data-testid="button-all-days"
             >
               <Checkbox checked={selectedDays.length === 0} />
-              <span>{t("stockRegister.allDays")}</span>
+              <span>{t("common.allDays")}</span>
             </div>
             <div className="grid grid-cols-7 gap-1 mt-1">
               {Array.from({ length: daysInMonths }, (_, i) => String(i + 1)).map(d => (
@@ -689,7 +689,7 @@ export default function BiddingPage() {
                                 {t("common.remaining")}: <strong className="text-foreground">{lot.remainingBags}</strong> / {lot.actualNumberOfBags ?? lot.numberOfBags} {t("common.bags")}
                               </span>
                               {lot.bagMarka && (
-                                <span>{t("stockRegister.marka")}: {lot.bagMarka}</span>
+                                <span>{t("common.marka")}: {lot.bagMarka}</span>
                               )}
                             </div>
                           </div>
@@ -738,8 +738,8 @@ export default function BiddingPage() {
               <div className="bg-muted rounded-md p-3 text-sm grid grid-cols-2 gap-x-4 gap-y-1">
                 <p>{t("bidding.remainingBags")}: <strong>{selectedLot.remainingBags}</strong></p>
                 <p>Crop: <strong>{selectedLot.crop}</strong></p>
-                {selectedLot.size && <p>{t("stockRegister.size")}: <strong>{selectedLot.size}</strong></p>}
-                {selectedLot.variety && <p>{t("stockRegister.variety")}: <strong>{selectedLot.variety}</strong></p>}
+                {selectedLot.size && <p>{t("common.size")}: <strong>{selectedLot.size}</strong></p>}
+                {selectedLot.variety && <p>{t("common.variety")}: <strong>{selectedLot.variety}</strong></p>}
               </div>
 
               {lotBids.length > 0 && (

@@ -139,16 +139,16 @@ export default function DashboardPage() {
       : `${selectedYears.length} ${t("dash.nYears")}`;
 
   const monthLabel = selectedMonths.length === 0
-    ? t("stockRegister.allMonths")
+    ? t("common.allMonths")
     : selectedMonths.length === 1
       ? MONTH_LABELS[parseInt(selectedMonths[0]) - 1]
-      : `${selectedMonths.length} ${t("stockRegister.nMonths")}`;
+      : `${selectedMonths.length} ${t("common.nMonths")}`;
 
   const dayLabel = selectedDays.length === 0
-    ? t("stockRegister.allDays")
+    ? t("common.allDays")
     : selectedDays.length === 1
       ? selectedDays[0]
-      : `${selectedDays.length} ${t("stockRegister.nDays")}`;
+      : `${selectedDays.length} ${t("common.nDays")}`;
 
   const matchesDateFilter = (dateStr: string) => {
     const d = new Date(dateStr + "T00:00:00");
@@ -367,7 +367,7 @@ export default function DashboardPage() {
               onClick={() => { setSelectedMonths([]); setSelectedDays([]); setMonthPopoverOpen(false); }}
             >
               <Checkbox checked={selectedMonths.length === 0} />
-              <span>{t("stockRegister.allMonths")}</span>
+              <span>{t("common.allMonths")}</span>
             </div>
             <div className="grid grid-cols-4 gap-0.5">
               {MONTH_LABELS.map((m, i) => {
@@ -402,7 +402,7 @@ export default function DashboardPage() {
               onClick={() => { setSelectedDays([]); setDayPopoverOpen(false); }}
             >
               <Checkbox checked={selectedDays.length === 0} />
-              <span>{t("stockRegister.allDays")}</span>
+              <span>{t("common.allDays")}</span>
             </div>
             <div className="grid grid-cols-7 gap-0.5">
               {Array.from({ length: daysInMonths }, (_, i) => String(i + 1)).map(d => (

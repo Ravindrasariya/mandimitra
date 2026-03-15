@@ -3741,7 +3741,7 @@ export default function StockPage() {
   return (
     <div className="flex flex-col h-full">
       <div className="px-4 py-3 border-b border-border bg-background sticky top-0 z-10">
-        <h1 className="text-lg font-bold">Stock Entry</h1>
+        <h1 className="text-lg font-bold">Mandi Stock</h1>
         <p className="text-xs text-muted-foreground">Add farmers, lots, bids and weights in one place</p>
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
