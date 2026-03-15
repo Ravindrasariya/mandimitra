@@ -3369,7 +3369,7 @@ export default function StockPage() {
               const extraF = parseFloat(bid.txn.extraChargesFarmer) || 0;
               const extraB = parseFloat(bid.txn.extraChargesBuyer) || 0;
               const aadhatFPct = parseFloat(cs.aadhatCommissionFarmerPercent) || 0;
-              const bidBuyerData = buyersData.find((b: any) => b.id === bid.buyerId);
+              const bidBuyerData = pageBuyersData.find((b: any) => b.id === bid.buyerId);
               const aadhatBPct = bidBuyerData?.aadhatCommissionPercent != null && bidBuyerData.aadhatCommissionPercent !== ""
                 ? parseFloat(bidBuyerData.aadhatCommissionPercent) || 0
                 : parseFloat(cs.aadhatCommissionBuyerPercent) || 0;
