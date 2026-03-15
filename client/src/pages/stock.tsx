@@ -380,12 +380,14 @@ function aggregatePaymentStatus(statuses: string[]): "Due" | "Paid" | "Partial P
   return "Due";
 }
 
-function CollapsedSummary({ totalBags, remainingBags, farmerPayable, buyerReceivable, hasData, farmerPaymentStatus, buyerPaymentStatus }: {
+function CollapsedSummary({ totalBags, remainingBags, farmerPayable, buyerReceivable, hasData, farmerPaymentStatus, buyerPaymentStatus, advancePaid }: {
   totalBags: number; remainingBags: number;
   farmerPayable: number; buyerReceivable: number; hasData: boolean;
   farmerPaymentStatus?: "Due" | "Paid" | "Partial Paid";
   buyerPaymentStatus?: "Due" | "Paid" | "Partial Paid";
+  advancePaid?: number;
 }) {
+  const netFarmerPayable = advancePaid && advancePaid > 0 ? Math.max(0, farmerPayable - advancePaid) : farmerPayable;
   return (
     <div className="flex items-center gap-2 text-xs flex-wrap">
       <span className="text-foreground font-bold">Total Bags: {totalBags}</span>
@@ -394,7 +396,10 @@ function CollapsedSummary({ totalBags, remainingBags, farmerPayable, buyerReceiv
       </span>
       {hasData && (
         <>
-          <span className="text-green-700 dark:text-green-400 font-bold">Farmer: ₹{farmerPayable.toFixed(0)}</span>
+          <span className="text-green-700 dark:text-green-400 font-bold">Farmer: ₹{netFarmerPayable.toFixed(0)}</span>
+          {advancePaid && advancePaid > 0 ? (
+            <span className="text-[10px] text-blue-600 dark:text-blue-400">(Adv: -₹{advancePaid.toFixed(0)})</span>
+          ) : null}
           <PaymentBadge status={farmerPaymentStatus || "Due"} />
           <span className="text-blue-700 dark:text-blue-400 font-bold">Buyer: ₹{buyerReceivable.toFixed(0)}</span>
           <PaymentBadge status={buyerPaymentStatus || "Due"} />
@@ -1219,7 +1224,7 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
 
 // ─── Lot card ─────────────────────────────────────────────────────────────────
 
-function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate, buyersList, onReturnLot }: {
+function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate, buyersList, onReturnLot, lotAdvanceShare }: {
   lot: LotRow; index: number;
   onChange: (l: LotRow) => void; onRemove: () => void;
   onRemoveBid?: (lotIndex: number, bidIndex: number) => void;
@@ -1227,6 +1232,7 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
   cs: ChargeSettings; farmerDate: string;
   buyersList: { id: number; name: string; phone?: string; aadhatCommissionPercent?: string | null }[];
   onReturnLot?: () => void;
+  lotAdvanceShare?: number;
 }) {
   const [pendingDeleteBidIdx, setPendingDeleteBidIdx] = useState<number | null>(null);
 
@@ -1281,6 +1287,7 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
               totalBags={totals.lotBags} remainingBags={totals.lotBags - totals.bidBags}
               farmerPayable={totals.farmerPayable} buyerReceivable={totals.buyerReceivable}
               hasData={totals.hasData}
+              advancePaid={lotAdvanceShare || 0}
               farmerPaymentStatus={aggregatePaymentStatus(lot.bids.filter(b => b.txnDbId).map(b => b.farmerPaymentStatus || "due"))}
               buyerPaymentStatus={aggregatePaymentStatus(lot.bids.filter(b => b.txnDbId).map(b => b.paymentStatus || "due"))}
             />
@@ -1411,7 +1418,7 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
 
 // ─── Crop group ───────────────────────────────────────────────────────────────
 
-function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate, farmerName, currentUsername, onSyncSaved, buyersList, onReturnLot, farmerCard }: {
+function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate, farmerName, currentUsername, onSyncSaved, buyersList, onReturnLot, farmerCard, lotAdvanceMap }: {
   group: CropGroup;
   onChange: (g: CropGroup) => void; onArchive: () => void; onDelete: () => void;
   isPersisted: boolean;
@@ -1422,6 +1429,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
   buyersList: { id: number; name: string; phone?: string; aadhatCommissionPercent?: string | null }[];
   onReturnLot?: (lotIdx: number) => void;
   farmerCard?: FarmerCard;
+  lotAdvanceMap?: Map<string, number>;
 }) {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -1493,6 +1501,10 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
   const totalFarmerPayable = allTotals.reduce((s, t) => s + t.farmerPayable, 0);
   const totalBuyerReceivable = allTotals.reduce((s, t) => s + t.buyerReceivable, 0);
   const hasAnyData = allTotals.some(t => t.hasData);
+
+  const cropGroupAdvance = lotAdvanceMap
+    ? group.lots.reduce((sum, lot) => sum + (lotAdvanceMap.get(lot.id) || 0), 0)
+    : 0;
 
   const uniqueBuyers = (() => {
     if (!hasTransactions) return [];
@@ -1754,6 +1766,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
               totalBags={totalBags} remainingBags={remainingBags}
               farmerPayable={totalFarmerPayable} buyerReceivable={totalBuyerReceivable}
               hasData={hasAnyData}
+              advancePaid={cropGroupAdvance}
               farmerPaymentStatus={aggregatePaymentStatus(group.lots.flatMap(l => l.bids.filter(b => b.txnDbId).map(b => b.farmerPaymentStatus || "due")))}
               buyerPaymentStatus={aggregatePaymentStatus(group.lots.flatMap(l => l.bids.filter(b => b.txnDbId).map(b => b.paymentStatus || "due")))}
             />
@@ -1775,8 +1788,21 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
               farmerDate={farmerDate}
               buyersList={buyersList}
               onReturnLot={onReturnLot ? () => onReturnLot(idx) : undefined}
+              lotAdvanceShare={lotAdvanceMap?.get(lot.id) || 0}
             />
           ))}
+          {hasAnyData && cropGroupAdvance > 0 && (
+            <div className="rounded-md border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20 px-3 py-2 flex items-center justify-between text-xs" data-testid="crop-group-advance-summary">
+              <span className="text-blue-700 dark:text-blue-400 font-medium">Advance Paid:</span>
+              <span className="text-blue-700 dark:text-blue-400 font-bold">-₹{Math.round(cropGroupAdvance).toLocaleString("en-IN")}</span>
+            </div>
+          )}
+          {hasAnyData && cropGroupAdvance > 0 && (
+            <div className="rounded-md border border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20 px-3 py-2 flex items-center justify-between text-xs" data-testid="crop-group-net-payable">
+              <span className="text-green-700 dark:text-green-400 font-medium">Net Farmer Payable:</span>
+              <span className="text-green-700 dark:text-green-400 font-bold">₹{Math.max(0, Math.round(totalFarmerPayable - cropGroupAdvance)).toLocaleString("en-IN")}</span>
+            </div>
+          )}
           <Button type="button" variant="outline" size="sm" onClick={addLot} className="w-full h-8 text-xs gap-1.5 border-dashed">
             <Plus className="w-3.5 h-3.5" /> Add Lot under {group.crop}
           </Button>
@@ -2021,6 +2047,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
               totalBags={grandTotalBags} remainingBags={grandRemainingBags}
               farmerPayable={grandFarmerPayable} buyerReceivable={grandBuyerReceivable}
               hasData={grandHasData}
+              advancePaid={parseFloat(card.advanceAmount || "0")}
               farmerPaymentStatus={aggregatePaymentStatus(card.cropGroups.flatMap(g => g.lots.flatMap(l => l.bids.filter(b => b.txnDbId).map(b => b.farmerPaymentStatus || "due"))))}
               buyerPaymentStatus={aggregatePaymentStatus(card.cropGroups.flatMap(g => g.lots.flatMap(l => l.bids.filter(b => b.txnDbId).map(b => b.paymentStatus || "due"))))}
             />
@@ -2247,14 +2274,36 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
 
           {/* Crop groups — sorted ascending by SR# (unsaved/sentinel last) */}
           <div className="space-y-3 pt-1">
-            {[...card.cropGroups.entries()]
-              .sort(([, a], [, b]) => {
-                const srA = parseInt(a.srNumber); const srB = parseInt(b.srNumber);
+            {(() => {
+              const cardAdvance = parseFloat(card.advanceAmount || "0");
+              const lotAdvanceMap = new Map<string, number>();
+              if (cardAdvance > 0) {
+                const allLots: { lotId: string; payable: number }[] = [];
+                for (const g of card.cropGroups) {
+                  if (g.archived) continue;
+                  for (const lot of g.lots) {
+                    const lt = calcLotTotals(lot, cs, vehicleBhadaRate, totalBagsInVehicle, buyersList);
+                    allLots.push({ lotId: lot.id, payable: lt.farmerPayable });
+                  }
+                }
+                let remaining = cardAdvance;
+                for (const entry of allLots) {
+                  if (remaining <= 0) break;
+                  const alloc = Math.min(remaining, entry.payable);
+                  if (alloc > 0) {
+                    lotAdvanceMap.set(entry.lotId, alloc);
+                    remaining -= alloc;
+                  }
+                }
+              }
+              return card.cropGroups.map((group, idx) => ({ group, idx }))
+              .sort((a, b) => {
+                const srA = parseInt(a.group.srNumber); const srB = parseInt(b.group.srNumber);
                 const nA = isNaN(srA) ? Infinity : srA;
                 const nB = isNaN(srB) ? Infinity : srB;
                 return nA - nB;
               })
-              .map(([idx, group]) => (
+              .map(({ group, idx }) => (
               <CropGroupSection
                 key={group.id} group={group}
                 onChange={g => updateGroup(idx, g)}
@@ -2268,6 +2317,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                 farmerName={card.farmerName}
                 currentUsername={currentUsername}
                 farmerCard={card}
+                lotAdvanceMap={lotAdvanceMap}
                 onSyncSaved={(updatedGroup) => {
                   const updatedCard = { ...card, cropGroups: card.cropGroups.map((g, i) => i === idx ? updatedGroup : g) };
                   onSyncSaved(updatedCard);
@@ -2278,10 +2328,10 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                   if (!lot?.dbId) return;
                   try {
                     await apiRequest("POST", `/api/lots/${lot.dbId}/return`);
-                    const updatedLots = group.lots.map((l, i) => i === lotIdx ? { ...l, isReturned: true } : l);
+                    const updatedLots = group.lots.map((lt: LotRow, li: number) => li === lotIdx ? { ...lt, isReturned: true } : lt);
                     const updatedGroup = { ...group, lots: updatedLots };
                     updateGroup(idx, updatedGroup);
-                    onSyncSaved({ ...card, cropGroups: card.cropGroups.map((g, i) => i === idx ? updatedGroup : g) });
+                    onSyncSaved({ ...card, cropGroups: card.cropGroups.map((cg: CropGroup, ci: number) => ci === idx ? updatedGroup : cg) });
                     queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
                     queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
                     queryClient.invalidateQueries({ queryKey: ["/api/bids"] });
@@ -2308,7 +2358,8 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                   }
                 }}
               />
-            ))}
+            ));
+            })()}
             {availableCrops.length > 0 && (
               <div className="flex flex-wrap gap-2 pt-1">
                 {availableCrops.map(crop => (
@@ -2905,11 +2956,15 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
   let farmerPayableTotal = 0, farmerDue = 0;
   let buyerReceivableTotal = 0, buyerDue = 0;
   let aadhatTotal = 0;
+  let totalAdvancePaid = 0;
 
   for (const card of cards) {
     if (card.archived || !savedCardMap.has(card.id)) continue;
     const vbr = parseFloat(card.vehicleBhadaRate) || 0;
     const tbi = parseInt(card.totalBagsInVehicle) || 0;
+    const cardAdvance = parseFloat(card.advanceAmount || "0");
+    totalAdvancePaid += cardAdvance;
+    let cardFarmerDue = 0;
     for (const g of card.cropGroups) {
       if (g.archived) continue;
       for (const lot of g.lots) {
@@ -2924,11 +2979,12 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
           const buyerAadhat = buyerData?.aadhatCommissionPercent != null && buyerData.aadhatCommissionPercent !== ""
             ? parseFloat(buyerData.aadhatCommissionPercent) || 0 : null;
           const bt = calcBidTotals(bid, cs, vbr, tbi, buyerAadhat);
-          if (bid.farmerPaymentStatus !== "paid") farmerDue += bt.farmerPayable;
+          if (bid.farmerPaymentStatus !== "paid") cardFarmerDue += bt.farmerPayable;
           if (bid.paymentStatus !== "paid") buyerDue += bt.buyerReceivable;
         }
       }
     }
+    farmerDue += Math.max(0, cardFarmerDue - cardAdvance);
   }
 
   return (

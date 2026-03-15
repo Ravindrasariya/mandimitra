@@ -19,7 +19,7 @@ import { Users, Search, Pencil, RefreshCw, Printer, Archive, AlertTriangle, Arro
 import { format } from "date-fns";
 import { printReceipt } from "@/lib/receiptUtils";
 
-type FarmerWithDues = Farmer & { totalPayable: string; totalDue: string; salesCount: number; bidDates?: string[] };
+type FarmerWithDues = Farmer & { totalPayable: string; totalDue: string; totalAdvance: string; advanceEntries?: { date: string; amount: string }[]; salesCount: number; bidDates?: string[] };
 type SortField = "farmerId" | "totalPayable" | "totalDue";
 type SortDir = "asc" | "desc";
 
@@ -270,6 +270,17 @@ export default function FarmerLedgerPage() {
           payable += p;
           due += Math.max(0, p - paid);
         }
+        let filteredAdvance = 0;
+        if (f.advanceEntries) {
+          for (const ae of f.advanceEntries) {
+            const [y, m, day] = ae.date.split("-");
+            if (yearFilter !== "all" && y !== yearFilter) continue;
+            if (selectedMonths.length > 0 && !selectedMonths.includes(String(parseInt(m)))) continue;
+            if (selectedDays.length > 0 && !selectedDays.includes(String(parseInt(day)))) continue;
+            filteredAdvance += parseFloat(ae.amount || "0");
+          }
+        }
+        due = Math.max(0, due - filteredAdvance);
         map.set(f.id, { payable, due });
       }
     }
