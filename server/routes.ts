@@ -8,7 +8,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { db } from "./db";
-import { transactions, insertAssetSchema, insertLiabilitySchema } from "@shared/schema";
+import { transactions, insertAssetSchema, insertLiabilitySchema, type Farmer } from "@shared/schema";
 import { eq, and } from "drizzle-orm";
 
 const uploadsDir = path.join(process.cwd(), "uploads");
@@ -510,8 +510,21 @@ export async function registerRoutes(
       const businessId = req.user!.businessId;
       const allLots = await storage.getLots(businessId);
 
+      interface StockCardLot {
+        dbId: number;
+        lotId: string;
+        crop: string;
+        variety: string | null;
+        numberOfBags: number;
+        size: string | null;
+        bagMarka: string | null;
+        initialTotalWeight: string | null;
+        remainingBags: number;
+        isArchived: boolean;
+      }
+
       const cardMap = new Map<string, {
-        farmer: any;
+        farmer: Farmer;
         date: string;
         vehicleNumber: string | null;
         driverName: string | null;
@@ -522,7 +535,7 @@ export async function registerRoutes(
         farmerAdvanceAmount: string | null;
         farmerAdvanceMode: string | null;
         latestCreatedAt: Date;
-        cropMap: Map<string, { lots: any[]; srNumber: string }>;
+        cropMap: Map<string, { lots: StockCardLot[]; srNumber: string }>;
       }>();
 
       for (const lotRow of allLots) {
@@ -577,7 +590,7 @@ export async function registerRoutes(
         const cropGroups = Array.from(card.cropMap.entries()).map(([crop, group]) => ({
           crop,
           srNumber: group.srNumber,
-          isArchived: group.lots.every((l: any) => l.isArchived),
+          isArchived: group.lots.every((l) => l.isArchived),
           lots: group.lots,
         }));
 
@@ -593,19 +606,19 @@ export async function registerRoutes(
           totalBagsInVehicle: card.totalBagsInVehicle,
           farmerAdvanceAmount: card.farmerAdvanceAmount,
           farmerAdvanceMode: card.farmerAdvanceMode,
-          latestCreatedAt: card.latestCreatedAt,
+          _sortTs: card.latestCreatedAt.getTime(),
           cropGroups,
         };
       });
 
       cards.sort((a, b) => {
         const da = new Date(a.date).getTime();
-        const db = new Date(b.date).getTime();
-        if (db !== da) return db - da;
-        return b.latestCreatedAt.getTime() - a.latestCreatedAt.getTime();
+        const dateB = new Date(b.date).getTime();
+        if (dateB !== da) return dateB - da;
+        return b._sortTs - a._sortTs;
       });
 
-      res.json(cards);
+      res.json(cards.map(({ _sortTs, ...rest }) => rest));
     } catch (e: any) {
       res.status(500).json({ message: e.message });
     }
