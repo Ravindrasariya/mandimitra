@@ -172,9 +172,9 @@ function CollapsedSummary({ totalBags, remainingBags, farmerPayable, buyerReceiv
 }) {
   return (
     <div className="flex items-center gap-2 text-xs flex-wrap">
-      <span className="text-muted-foreground font-medium">Total: {totalBags}</span>
+      <span className="text-muted-foreground font-medium">Total Bags: {totalBags}</span>
       <span className={`font-medium ${remainingBags > 0 ? "text-orange-600 dark:text-orange-400" : "text-green-600 dark:text-green-400"}`}>
-        Rem: {remainingBags}
+        Remaining: {remainingBags}
       </span>
       {hasData && (
         <>
