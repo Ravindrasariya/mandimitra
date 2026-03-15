@@ -338,9 +338,30 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
         )}
       </div>
 
-      {/* ── Farmer + Buyer charges ── */}
-      <div className="grid grid-cols-2 gap-2 text-xs" data-testid="charge-rates-display">
-        {/* Farmer */}
+      {nw > 0 && pricePerKg > 0 && (
+        <div className="bg-muted/40 rounded-md px-3 py-2 text-xs space-y-1" data-testid="txn-bid-rate-header">
+          <div className="flex justify-between">
+            <span>Bid Rate:</span>
+            <span className="font-medium">₹{pricePerKg.toFixed(2)}/kg</span>
+          </div>
+          {epkFarmer > 0 && (
+            <div className="flex justify-between text-green-600">
+              <span>Farmer Rate ({pricePerKg.toFixed(2)} + {epkFarmer.toFixed(2)}):</span>
+              <span className="font-medium">₹{(pricePerKg + epkFarmer).toFixed(2)}/kg</span>
+            </div>
+          )}
+          {epkBuyer > 0 && (
+            <div className="flex justify-between text-blue-600">
+              <span>Buyer Rate ({pricePerKg.toFixed(2)} + {epkBuyer.toFixed(2)}):</span>
+              <span className="font-medium">₹{(pricePerKg + epkBuyer).toFixed(2)}/kg</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Farmer + Buyer: charges & summary side-by-side ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs" data-testid="charge-rates-display">
+        {/* ── Farmer column ── */}
         <div className="bg-background rounded border border-border p-2 space-y-1">
           <p className="font-semibold text-muted-foreground">Farmer Charges</p>
           <div className="flex justify-between"><span>Aadhat:</span><span>{aadhatFarmerPct}%</span></div>
@@ -403,9 +424,54 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
               className="w-16 h-6 text-xs text-right p-1"
             />
           </div>
+
+          {nw > 0 && pricePerKg > 0 && (
+            <div className="border-t pt-1.5 mt-1.5 space-y-0.5">
+              <div className="flex justify-between">
+                <span>Gross ({nw.toFixed(0)} × ₹{(pricePerKg + epkFarmer).toFixed(2)}):</span>
+                <span className="font-medium">₹{farmerGross.toFixed(2)}</span>
+              </div>
+              <p className="text-muted-foreground font-semibold mt-0.5">Deductions:</p>
+              {hammaliFarmerRate > 0 && (
+                <div className="flex justify-between text-muted-foreground pl-2">
+                  <span>Hammali ({bags}×₹{hammaliFarmerRate}):</span>
+                  <span>-₹{hammaliFarmerTotal.toFixed(2)}</span>
+                </div>
+              )}
+              {extraFarmer > 0 && (
+                <div className="flex justify-between text-muted-foreground pl-2">
+                  <span>Extra:</span>
+                  <span>-₹{extraFarmer.toFixed(2)}</span>
+                </div>
+              )}
+              {aadhatFarmerPct > 0 && (
+                <div className="flex justify-between text-muted-foreground pl-2">
+                  <span>Aadhat ({aadhatFarmerPct}%):</span>
+                  <span>-₹{aadhatFarmer.toFixed(2)}</span>
+                </div>
+              )}
+              {mandiFarmerPct > 0 && (
+                <div className="flex justify-between text-muted-foreground pl-2">
+                  <span>Mandi ({mandiFarmerPct}%):</span>
+                  <span>-₹{mandiFarmer.toFixed(2)}</span>
+                </div>
+              )}
+              {freightFarmerTotal > 0 && (
+                <div className="flex justify-between text-muted-foreground pl-2">
+                  <span>Freight:</span>
+                  <span>-₹{freightFarmerTotal.toFixed(2)}</span>
+                </div>
+              )}
+              {farmerDeductions === 0 && <div className="text-muted-foreground italic pl-2">No deductions</div>}
+              <div className="flex justify-between font-bold text-green-700 border-t pt-1 mt-0.5">
+                <span>Farmer Payable:</span>
+                <span>₹{farmerPayable.toFixed(2)}</span>
+              </div>
+            </div>
+          )}
         </div>
 
-        {/* Buyer */}
+        {/* ── Buyer column ── */}
         <div className="bg-background rounded border border-border p-2 space-y-1">
           <p className="font-semibold text-muted-foreground">Buyer Charges</p>
           <div className="flex justify-between"><span>Aadhat:</span><span>{aadhatBuyerPct}%</span></div>
@@ -433,112 +499,47 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
               className="w-16 h-6 text-xs text-right p-1"
             />
           </div>
+
+          {nw > 0 && pricePerKg > 0 && (
+            <div className="border-t pt-1.5 mt-1.5 space-y-0.5">
+              <div className="flex justify-between">
+                <span>Gross ({nw.toFixed(0)} × ₹{(pricePerKg + epkBuyer).toFixed(2)}):</span>
+                <span className="font-medium">₹{buyerGross.toFixed(2)}</span>
+              </div>
+              <p className="text-muted-foreground font-semibold mt-0.5">Additions:</p>
+              {hammaliBuyerRate > 0 && (
+                <div className="flex justify-between text-muted-foreground pl-2">
+                  <span>Hammali ({bags}×₹{hammaliBuyerRate}):</span>
+                  <span>+₹{hammaliBuyerTotal.toFixed(2)}</span>
+                </div>
+              )}
+              {extraBuyer > 0 && (
+                <div className="flex justify-between text-muted-foreground pl-2">
+                  <span>Extra:</span>
+                  <span>+₹{extraBuyer.toFixed(2)}</span>
+                </div>
+              )}
+              {aadhatBuyerPct > 0 && (
+                <div className="flex justify-between text-muted-foreground pl-2">
+                  <span>Aadhat ({aadhatBuyerPct}%):</span>
+                  <span>+₹{aadhatBuyer.toFixed(2)}</span>
+                </div>
+              )}
+              {mandiBuyerPct > 0 && (
+                <div className="flex justify-between text-muted-foreground pl-2">
+                  <span>Mandi ({mandiBuyerPct}%):</span>
+                  <span>+₹{mandiBuyer.toFixed(2)}</span>
+                </div>
+              )}
+              {buyerAdditions === 0 && <div className="text-muted-foreground italic pl-2">No additions</div>}
+              <div className="flex justify-between font-bold text-blue-700 border-t pt-1 mt-0.5">
+                <span>Buyer Receivable:</span>
+                <span>₹{buyerReceivable.toFixed(2)}</span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
-
-      {/* ── Calculation summary ── */}
-      {nw > 0 && pricePerKg > 0 && (
-        <div className="bg-muted rounded-md p-3 space-y-1.5 text-xs" data-testid="txn-calculation-summary">
-          <div className="flex justify-between">
-            <span>Bid Rate:</span>
-            <span className="font-medium">₹{pricePerKg.toFixed(2)}/kg</span>
-          </div>
-          {epkFarmer > 0 && (
-            <div className="flex justify-between text-green-600">
-              <span>Farmer Rate ({pricePerKg.toFixed(2)} + {epkFarmer.toFixed(2)}):</span>
-              <span className="font-medium">₹{(pricePerKg + epkFarmer).toFixed(2)}/kg</span>
-            </div>
-          )}
-          {epkBuyer > 0 && (
-            <div className="flex justify-between text-blue-600">
-              <span>Buyer Rate ({pricePerKg.toFixed(2)} + {epkBuyer.toFixed(2)}):</span>
-              <span className="font-medium">₹{(pricePerKg + epkBuyer).toFixed(2)}/kg</span>
-            </div>
-          )}
-
-          {/* Farmer side */}
-          <div className="border-t pt-1.5 space-y-0.5">
-            <div className="flex justify-between">
-              <span>Farmer Gross ({nw.toFixed(2)} × ₹{(pricePerKg + epkFarmer).toFixed(2)}):</span>
-              <span className="font-medium">₹{farmerGross.toFixed(2)}</span>
-            </div>
-            <p className="text-muted-foreground font-semibold mt-0.5">Farmer Deductions:</p>
-            {hammaliFarmerRate > 0 && (
-              <div className="flex justify-between text-muted-foreground pl-2">
-                <span>Hammali ({bags} × ₹{hammaliFarmerRate}):</span>
-                <span>-₹{hammaliFarmerTotal.toFixed(2)}</span>
-              </div>
-            )}
-            {extraFarmer > 0 && (
-              <div className="flex justify-between text-muted-foreground pl-2">
-                <span>Extra Charges:</span>
-                <span>-₹{extraFarmer.toFixed(2)}</span>
-              </div>
-            )}
-            {aadhatFarmerPct > 0 && (
-              <div className="flex justify-between text-muted-foreground pl-2">
-                <span>Aadhat ({aadhatFarmerPct}%):</span>
-                <span>-₹{aadhatFarmer.toFixed(2)}</span>
-              </div>
-            )}
-            {mandiFarmerPct > 0 && (
-              <div className="flex justify-between text-muted-foreground pl-2">
-                <span>Mandi ({mandiFarmerPct}%):</span>
-                <span>-₹{mandiFarmer.toFixed(2)}</span>
-              </div>
-            )}
-            {freightFarmerTotal > 0 && (
-              <div className="flex justify-between text-muted-foreground pl-2">
-                <span>Freight:</span>
-                <span>-₹{freightFarmerTotal.toFixed(2)}</span>
-              </div>
-            )}
-            {farmerDeductions === 0 && <div className="text-muted-foreground italic pl-2">No deductions</div>}
-            <div className="flex justify-between font-bold text-green-700 border-t pt-1 mt-0.5">
-              <span>Farmer Payable:</span>
-              <span>₹{farmerPayable.toFixed(2)}</span>
-            </div>
-          </div>
-
-          {/* Buyer side */}
-          <div className="border-t pt-1.5 space-y-0.5">
-            <div className="flex justify-between">
-              <span>Buyer Gross ({nw.toFixed(2)} × ₹{(pricePerKg + epkBuyer).toFixed(2)}):</span>
-              <span className="font-medium">₹{buyerGross.toFixed(2)}</span>
-            </div>
-            <p className="text-muted-foreground font-semibold mt-0.5">Buyer Additions:</p>
-            {hammaliBuyerRate > 0 && (
-              <div className="flex justify-between text-muted-foreground pl-2">
-                <span>Hammali ({bags} × ₹{hammaliBuyerRate}):</span>
-                <span>+₹{hammaliBuyerTotal.toFixed(2)}</span>
-              </div>
-            )}
-            {extraBuyer > 0 && (
-              <div className="flex justify-between text-muted-foreground pl-2">
-                <span>Extra Charges:</span>
-                <span>+₹{extraBuyer.toFixed(2)}</span>
-              </div>
-            )}
-            {aadhatBuyerPct > 0 && (
-              <div className="flex justify-between text-muted-foreground pl-2">
-                <span>Aadhat ({aadhatBuyerPct}%):</span>
-                <span>+₹{aadhatBuyer.toFixed(2)}</span>
-              </div>
-            )}
-            {mandiBuyerPct > 0 && (
-              <div className="flex justify-between text-muted-foreground pl-2">
-                <span>Mandi ({mandiBuyerPct}%):</span>
-                <span>+₹{mandiBuyer.toFixed(2)}</span>
-              </div>
-            )}
-            {buyerAdditions === 0 && <div className="text-muted-foreground italic pl-2">No additions</div>}
-            <div className="flex justify-between font-bold text-blue-700 border-t pt-1 mt-0.5">
-              <span>Buyer Receivable:</span>
-              <span>₹{buyerReceivable.toFixed(2)}</span>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
