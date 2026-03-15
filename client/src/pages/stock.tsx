@@ -456,7 +456,7 @@ const emptyCard = (): FarmerCard => ({
 });
 
 const emptyCropGroup = (crop: string, date?: string): CropGroup => ({
-  id: uid(), crop, srNumber: "XX", groupOpen: true,
+  id: uid(), crop, srNumber: "—", groupOpen: true,
   lots: [emptyLot(date)], archived: false, persisted: false, editHistory: [],
 });
 
@@ -611,8 +611,8 @@ function calcLotTotals(lot: LotRow, cs: ChargeSettings, vehicleBhadaRate: number
 
 // ─── Section toggle ───────────────────────────────────────────────────────────
 
-function SectionToggle({ open, onToggle, icon, label, count }: {
-  open: boolean; onToggle: () => void; icon: React.ReactNode; label: string; count?: string;
+function SectionToggle({ open, onToggle, icon, label, count, summary }: {
+  open: boolean; onToggle: () => void; icon: React.ReactNode; label: string; count?: string; summary?: string[];
 }) {
   return (
     <button
@@ -623,6 +623,13 @@ function SectionToggle({ open, onToggle, icon, label, count }: {
       {open ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
       {icon}
       <span>{label}</span>
+      {!open && summary && summary.length > 0 && (
+        <span className="flex items-center gap-1.5 flex-wrap ml-1">
+          {summary.map((s, i) => (
+            <Badge key={i} variant="secondary" className="text-[10px] font-normal px-1.5 py-0">{s}</Badge>
+          ))}
+        </span>
+      )}
       {count && <Badge variant="secondary" className="ml-auto text-xs">{count}</Badge>}
     </button>
   );
@@ -1083,7 +1090,7 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
                   placeholder="Select buyer…"
                   value={bid.buyerName}
                   onChange={e => {
-                    onChange({ ...bid, buyerName: e.target.value, buyerId: undefined });
+                    onChange({ ...bid, buyerName: e.target.value.toUpperCase(), buyerId: undefined });
                     setShowBuyerSuggestions(true);
                   }}
                   onFocus={() => setShowBuyerSuggestions(true)}
@@ -1107,7 +1114,6 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
                       }}
                     >
                       <div className="font-medium">{b.name}</div>
-                      {b.phone && <div className="text-xs text-muted-foreground">{b.phone}</div>}
                     </button>
                   ))}
                 </div>
@@ -2134,7 +2140,13 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
           {/* Vehicle info */}
           <SectionToggle open={card.vehicleOpen} onToggle={() => set("vehicleOpen", !card.vehicleOpen)}
             icon={<Truck className="w-3.5 h-3.5" />} label="Vehicle Info"
-            count={card.vehicleNumber || undefined} />
+            summary={[
+              card.vehicleNumber && `# ${card.vehicleNumber}`,
+              card.driverName && card.driverName,
+              card.vehicleBhadaRate && `₹${card.vehicleBhadaRate}`,
+              card.freightType && card.freightType,
+              card.totalBagsInVehicle && `${card.totalBagsInVehicle} bags`,
+            ].filter(Boolean) as string[]} />
           {card.vehicleOpen && (
             <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 pl-2">
               <div>
@@ -2362,7 +2374,7 @@ function stockCardsToFarmerCards(apiCards: any[]): FarmerCard[] {
       cropGroups: (c.cropGroups || []).map((cg: any) => ({
         id: uid(),
         crop: cg.crop,
-        srNumber: cg.srNumber || "XX",
+        srNumber: cg.srNumber || "—",
         groupOpen: false,
         lots: (cg.lots || []).map((lot: any) => ({
           id: uid(),
@@ -2421,6 +2433,44 @@ function stockCardsToFarmerCards(apiCards: any[]): FarmerCard[] {
   });
 }
 
+// ─── Draft persistence helpers ────────────────────────────────────────────────
+
+const DRAFT_KEY_PREFIX = "mandi_draft_";
+const getDraftKey = (businessId: number) => `${DRAFT_KEY_PREFIX}${businessId}`;
+
+function saveDraftsToStorage(cards: FarmerCard[], savedCardMap: Map<string, FarmerCard>, businessId: number) {
+  const drafts = cards.filter(c => {
+    if (c.archived) return false;
+    const saved = savedCardMap.get(c.id);
+    if (saved) {
+      return getDataFingerprint(c) !== getDataFingerprint(saved);
+    }
+    return !!(c.farmerName.trim() || c.farmerPhone || c.village || c.vehicleNumber || c.advanceAmount || c.cropGroups.some(g => g.lots.some(hasLotUserData)));
+  });
+  try {
+    if (drafts.length > 0) {
+      localStorage.setItem(getDraftKey(businessId), JSON.stringify(drafts));
+    } else {
+      localStorage.removeItem(getDraftKey(businessId));
+    }
+  } catch (_) {}
+}
+
+function loadDraftsFromStorage(businessId: number): FarmerCard[] {
+  try {
+    const raw = localStorage.getItem(getDraftKey(businessId));
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as FarmerCard[];
+    return parsed.map(c => ({ ...c, cardOpen: true, farmerOpen: true, vehicleOpen: false }));
+  } catch (_) {
+    return [];
+  }
+}
+
+function clearDraftsFromStorage(businessId: number) {
+  try { localStorage.removeItem(getDraftKey(businessId)); } catch (_) {}
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function StockPage() {
@@ -2431,6 +2481,7 @@ export default function StockPage() {
   const { user } = useAuth();
   const { toast } = useToast();
   const currentUsername = user?.name || user?.username || "Unknown";
+  const businessId = user?.businessId || 0;
 
   const { data: stockCardsData, isLoading: loadingCards } = useQuery<any[]>({
     queryKey: ["/api/stock-cards"],
@@ -2443,14 +2494,28 @@ export default function StockPage() {
   const cs = chargeSettings || DEFAULT_CS;
 
   useEffect(() => {
-    if (!stockCardsData || dbLoaded.current) return;
+    if (!stockCardsData || !businessId || dbLoaded.current) return;
     dbLoaded.current = true;
     const loaded = stockCardsToFarmerCards(stockCardsData);
     const map = new Map<string, FarmerCard>();
     loaded.forEach(c => map.set(c.id, JSON.parse(JSON.stringify(c))));
-    setCards(loaded.length > 0 ? loaded : [emptyCard()]);
+    const drafts = loadDraftsFromStorage(businessId);
+    const loadedIds = new Set(loaded.map(c => c.id));
+    const newDrafts = drafts.filter(d => !loadedIds.has(d.id));
+    const dirtyDrafts = drafts.filter(d => loadedIds.has(d.id));
+    const mergedLoaded = loaded.map(c => {
+      const dirty = dirtyDrafts.find(d => d.id === c.id);
+      return dirty ? { ...dirty, cardOpen: true, farmerOpen: true, vehicleOpen: false } : c;
+    });
+    const allCards = [...newDrafts, ...mergedLoaded];
+    setCards(allCards.length > 0 ? allCards : [emptyCard()]);
     setSavedCardMap(map);
-  }, [stockCardsData]);
+  }, [stockCardsData, businessId]);
+
+  useEffect(() => {
+    if (!dbLoaded.current || !businessId) return;
+    saveDraftsToStorage(cards, savedCardMap, businessId);
+  }, [cards, savedCardMap, businessId]);
 
   const anyDirty = cards.some(c => {
     if (c.archived) return false;
@@ -2607,7 +2672,7 @@ export default function StockPage() {
             const update = groupUpdates.find(u => u.lotIdx === lIdx);
             return update ? { ...lot, dbId: update.dbId } : lot;
           });
-          if (updatedSrNumber === "XX" && groupUpdates[0]?.srNumber) {
+          if ((updatedSrNumber === "—" || updatedSrNumber === "XX") && groupUpdates[0]?.srNumber) {
             updatedSrNumber = groupUpdates[0].srNumber;
           }
         }
@@ -2867,7 +2932,13 @@ export default function StockPage() {
         i === idx ? { ...saved, cardOpen: false, farmerOpen: c.farmerOpen, vehicleOpen: c.vehicleOpen } : c
       ));
     } else {
-      setCards(prev => prev.filter((_, i) => i !== idx));
+      setCards(prev => {
+        const next = prev.filter((_, i) => i !== idx);
+        if (businessId) {
+          saveDraftsToStorage(next, savedCardMap, businessId);
+        }
+        return next;
+      });
     }
   };
 

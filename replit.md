@@ -29,6 +29,8 @@ The system employs a modern web stack:
         -   **Profit & Loss**: FY-based income/expense reporting with CSV export.
     -   **Reporting**: Generation and sharing of Farmer Receipts (Hindi), Buyer Receipts (English), and Buyer Paana (outstanding dues) with WhatsApp sharing capability (PDF export). Supports custom HTML receipt templates per business (uploaded via the Admin Panel), with `{{PLACEHOLDER}}` substitution for both farmer and per-crop buyer receipts. Receipt HTML generators and template appliers are extracted into `client/src/lib/receiptGenerators.ts` (shared lib used by stock.tsx; transactions.tsx retains its own local copies pending future removal). Print/share utilities live in `client/src/lib/receiptUtils.ts`.
     -   **Stock Tab Receipt Printing**: Each persisted SR# crop-group card in the Stock tab shows a Printer icon button (when it has transaction-linked bids) with a dropdown for printing or WhatsApp-sharing farmer and per-buyer receipts.
+    -   **Stock Tab Draft Persistence**: Unsaved farmer card data is auto-persisted to localStorage (`mandi_draft_{businessId}`) and restored on page reload. Drafts are cleared only on explicit Cancel or after successful save.
+    -   **Stock Tab UX**: Vehicle Info shows all filled fields as badges when collapsed. SR# displays "—" before save (actual number assigned on save). Buyer name input auto-uppercases. Buyer dropdown shows name only (no phone).
 
 ## External Dependencies
 -   **PostgreSQL**: Relational database for all persistent data.
