@@ -1700,7 +1700,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
             icon={<Truck className="w-3.5 h-3.5" />} label="Vehicle Info"
             count={card.vehicleNumber || undefined} />
           {card.vehicleOpen && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pl-2">
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 pl-2">
               <div>
                 <Label className="text-xs text-muted-foreground">Vehicle #</Label>
                 <Input data-testid="input-vehicle-number" placeholder="E.G. MP09AB1234" value={card.vehicleNumber} onChange={e => set("vehicleNumber", e.target.value.toUpperCase())} className="h-8 text-sm" />
