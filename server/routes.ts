@@ -677,6 +677,8 @@ export async function registerRoutes(
               totalReceivableFromBuyer: txn.totalReceivableFromBuyer,
               date: txn.date,
               isReversed: txn.isReversed,
+              paymentStatus: txn.paymentStatus,
+              farmerPaymentStatus: txn.farmerPaymentStatus,
             } : null,
           });
         }

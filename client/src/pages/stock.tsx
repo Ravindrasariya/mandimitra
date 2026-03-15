@@ -92,6 +92,8 @@ type BidRow = {
   advanceAmount: string;
   txnDate: string;
   txn: TxnState;
+  paymentStatus?: "due" | "paid" | "partial";
+  farmerPaymentStatus?: "due" | "paid" | "partial";
 };
 
 type LotRow = {
@@ -357,9 +359,19 @@ function PaymentBadge({ status = "Due" }: { status?: "Due" | "Paid" | "Partial P
 
 // ─── Summary line (shared across lot, crop, farmer) ──────────────────────────
 
-function CollapsedSummary({ totalBags, remainingBags, farmerPayable, buyerReceivable, hasData }: {
+function aggregatePaymentStatus(statuses: string[]): "Due" | "Paid" | "Partial Paid" {
+  const set = new Set(statuses.filter(Boolean));
+  if (set.size === 0) return "Due";
+  if (set.size === 1 && set.has("paid")) return "Paid";
+  if (set.has("paid") || set.has("partial")) return "Partial Paid";
+  return "Due";
+}
+
+function CollapsedSummary({ totalBags, remainingBags, farmerPayable, buyerReceivable, hasData, farmerPaymentStatus, buyerPaymentStatus }: {
   totalBags: number; remainingBags: number;
   farmerPayable: number; buyerReceivable: number; hasData: boolean;
+  farmerPaymentStatus?: "Due" | "Paid" | "Partial Paid";
+  buyerPaymentStatus?: "Due" | "Paid" | "Partial Paid";
 }) {
   return (
     <div className="flex items-center gap-2 text-xs flex-wrap">
@@ -370,9 +382,9 @@ function CollapsedSummary({ totalBags, remainingBags, farmerPayable, buyerReceiv
       {hasData && (
         <>
           <span className="text-green-700 dark:text-green-400 font-medium">Farmer: ₹{farmerPayable.toFixed(0)}</span>
-          <PaymentBadge status="Due" />
+          <PaymentBadge status={farmerPaymentStatus || "Due"} />
           <span className="text-blue-700 dark:text-blue-400 font-medium">Buyer: ₹{buyerReceivable.toFixed(0)}</span>
-          <PaymentBadge status="Due" />
+          <PaymentBadge status={buyerPaymentStatus || "Due"} />
         </>
       )}
     </div>
@@ -1230,6 +1242,8 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
               totalBags={totals.lotBags} remainingBags={totals.lotBags - totals.bidBags}
               farmerPayable={totals.farmerPayable} buyerReceivable={totals.buyerReceivable}
               hasData={totals.hasData}
+              farmerPaymentStatus={aggregatePaymentStatus(lot.bids.filter(b => b.txnDbId).map(b => b.farmerPaymentStatus || "due"))}
+              buyerPaymentStatus={aggregatePaymentStatus(lot.bids.filter(b => b.txnDbId).map(b => b.paymentStatus || "due"))}
             />
           )}
         </button>
@@ -1503,6 +1517,8 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
               totalBags={totalBags} remainingBags={remainingBags}
               farmerPayable={totalFarmerPayable} buyerReceivable={totalBuyerReceivable}
               hasData={hasAnyData}
+              farmerPaymentStatus={aggregatePaymentStatus(group.lots.flatMap(l => l.bids.filter(b => b.txnDbId).map(b => b.farmerPaymentStatus || "due")))}
+              buyerPaymentStatus={aggregatePaymentStatus(group.lots.flatMap(l => l.bids.filter(b => b.txnDbId).map(b => b.paymentStatus || "due")))}
             />
           )}
         </div>
@@ -1769,6 +1785,8 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
               totalBags={grandTotalBags} remainingBags={grandRemainingBags}
               farmerPayable={grandFarmerPayable} buyerReceivable={grandBuyerReceivable}
               hasData={grandHasData}
+              farmerPaymentStatus={aggregatePaymentStatus(card.cropGroups.flatMap(g => g.lots.flatMap(l => l.bids.filter(b => b.txnDbId).map(b => b.farmerPaymentStatus || "due"))))}
+              buyerPaymentStatus={aggregatePaymentStatus(card.cropGroups.flatMap(g => g.lots.flatMap(l => l.bids.filter(b => b.txnDbId).map(b => b.paymentStatus || "due"))))}
             />
           )}
         </div>
@@ -2208,6 +2226,8 @@ function stockCardsToFarmerCards(apiCards: any[]): FarmerCard[] {
                 extraThelaBhada: txn.extraThelaBhadaFarmer?.toString() || "0",
                 extraOthers: txn.extraOthersFarmer?.toString() || "0",
               } : emptyTxn(),
+              paymentStatus: txn?.paymentStatus || "due",
+              farmerPaymentStatus: txn?.farmerPaymentStatus || "due",
             } as BidRow;
           }),
         })),
