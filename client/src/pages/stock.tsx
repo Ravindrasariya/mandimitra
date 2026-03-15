@@ -2031,9 +2031,9 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
             )}
           </div>
         </div>
-        {/* Second row: phone, village, advance, unsaved badge */}
+        {/* Second row: phone, village (mobile only), advance, unsaved badge */}
         {(card.farmerPhone || card.village || parseFloat(card.advanceAmount || "0") > 0 || (isDirty && card.savedAt !== null)) && (
-          <div className="flex items-center gap-2 pl-6 flex-wrap">
+          <div className={`flex items-center gap-2 pl-6 flex-wrap ${!(parseFloat(card.advanceAmount || "0") > 0) && !(isDirty && card.savedAt !== null) ? "sm:hidden" : ""}`}>
             {card.farmerPhone && <span className="sm:hidden text-xs text-muted-foreground">· {card.farmerPhone}</span>}
             {card.village && <span className="sm:hidden text-xs text-muted-foreground">· {card.village}</span>}
             {parseFloat(card.advanceAmount || "0") > 0 && (
