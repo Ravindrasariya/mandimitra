@@ -420,6 +420,100 @@ ${totalMandi > 0 ? `<div class="summary-row"><span>Mandi (${mandiPct}%):</span><
 </body></html>`;
 }
 
+export function generateAllBuyerReceiptHtml(entries: BuyerLotEntry[], businessName?: string, businessAddress?: string, receiptSerialNumber?: number, hideAadhat?: boolean, businessPhone?: string): string {
+  if (entries.length === 0) return "";
+  const firstTx = entries[0].tx;
+  const buyer = firstTx.buyer;
+  const aadhatPct = parseFloat(firstTx.aadhatBuyerPercent || "0");
+  const mandiPct = parseFloat(firstTx.mandiBuyerPercent || "0");
+
+  const rows = entries.map(({ lot, tx }) => {
+    const nw = parseFloat(tx.netWeight || "0");
+    const ppk = parseFloat(tx.pricePerKg || "0");
+    const epk = parseFloat((tx as any).extraPerKgBuyer || "0");
+    const rate = ppk + epk;
+    const gross = nw * rate;
+    const bags = tx.numberOfBags || 0;
+    return { srNo: (lot as any).serialNumber, crop: lot.crop, bags, nw, rate, gross, hammaliBuyerPerBag: parseFloat(tx.hammaliBuyerPerBag || "0"), extra: parseFloat(tx.extraChargesBuyer || "0") };
+  });
+
+  const totalBags = rows.reduce((s, r) => s + r.bags, 0);
+  const totalNw = rows.reduce((s, r) => s + r.nw, 0);
+  const totalGross = rows.reduce((s, r) => s + r.gross, 0);
+  const totalHammali = rows.reduce((s, r) => s + r.hammaliBuyerPerBag * r.bags, 0);
+  const totalExtra = rows.reduce((s, r) => s + r.extra, 0);
+  const totalAadhat = totalGross * aadhatPct / 100;
+  const totalMandi = totalGross * mandiPct / 100;
+  const grandTotal = totalGross + totalHammali + totalExtra + totalAadhat + totalMandi;
+
+  const rowsHtml = rows.map(r => `
+<tr>
+  <td style="padding:6px;border:1px solid #ccc">${r.srNo}</td>
+  <td style="padding:6px;border:1px solid #ccc">${r.crop}</td>
+  <td style="padding:6px;border:1px solid #ccc;text-align:right">${r.bags}</td>
+  <td style="padding:6px;border:1px solid #ccc;text-align:right">${r.nw.toFixed(2)}</td>
+  <td style="padding:6px;border:1px solid #ccc;text-align:right">${r.rate.toFixed(2)}</td>
+  <td style="padding:6px;border:1px solid #ccc;text-align:right">${r.gross.toFixed(2)}</td>
+</tr>`).join("");
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Buyer Receipt</title>
+<style>body{font-family:Arial,sans-serif;margin:8px 14px;color:#333}
+table{width:100%;border-collapse:collapse;margin:6px 0}
+.header{text-align:center;margin-bottom:4px}
+.info-table td{padding:2px 6px}
+.summary{margin-top:8px;border-top:2px solid #333;padding-top:6px}
+.summary-row{display:flex;justify-content:space-between;padding:2px 0}
+.total{font-weight:bold;font-size:1.1em;color:#dc2626;border-top:2px solid #333;padding-top:6px;margin-top:6px}
+th{padding:6px;border:1px solid #ccc;background:#f5f5f5;text-align:right}
+th:first-child{text-align:left}
+.totals-row td{font-weight:bold;background:#f0f0f0;padding:5px;border:1px solid #ccc}
+@media print{body{margin:6mm}.no-print{display:none!important}}
+</style></head><body>
+<div style="display:flex;justify-content:flex-end;font-size:12px;margin-bottom:1px">${businessPhone ? `&#9742; ${businessPhone}` : ""}</div>
+<div class="header">
+${businessName ? `<div style="font-weight:bold;font-size:1.05em;margin-bottom:1px">${businessName}</div>` : ""}
+${businessAddress ? `<p style="font-size:0.82em;color:#555;margin:1px 0">${businessAddress}</p>` : ""}
+<h3 style="margin:2px 0 3px 0;font-size:1.05em">Buyer Receipt</h3>
+</div>
+<table class="info-table" style="margin-bottom:6px">
+<tr><td>${receiptSerialNumber ? `<strong>Bill no.:</strong> ${receiptSerialNumber}` : ""}</td><td style="text-align:right"><strong>Licence No:</strong> ${buyer.licenceNo || "-"}</td></tr>
+<tr><td><strong>Buyer:</strong> ${buyer.name}</td><td style="text-align:right"><strong>Date:</strong> ${format(new Date(), "dd/MM/yyyy")}</td></tr>
+</table>
+<table>
+<thead>
+<tr>
+  <th style="text-align:left">SR #</th>
+  <th style="text-align:left">Crop</th>
+  <th style="text-align:right">Bags</th>
+  <th style="text-align:right">Net Wt (kg)</th>
+  <th style="text-align:right">Rate (₹/kg)</th>
+  <th style="text-align:right">Gross (₹)</th>
+</tr>
+</thead>
+<tbody>
+${rowsHtml}
+<tr class="totals-row">
+  <td colspan="2">Total</td>
+  <td style="text-align:right">${totalBags}</td>
+  <td style="text-align:right">${totalNw.toFixed(2)}</td>
+  <td style="text-align:right">-</td>
+  <td style="text-align:right">${totalGross.toFixed(2)}</td>
+</tr>
+</tbody>
+</table>
+<div class="summary">
+${totalHammali > 0 ? `<div class="summary-row"><span>Hammali (${totalBags} bags):</span><span>Rs.${totalHammali.toFixed(2)}</span></div>` : ""}
+${totalExtra > 0 ? `<div class="summary-row"><span>Extra Charges:</span><span>Rs.${totalExtra.toFixed(2)}</span></div>` : ""}
+${!hideAadhat && totalAadhat > 0 ? `<div class="summary-row"><span>Aadhat (${aadhatPct}%):</span><span>Rs.${totalAadhat.toFixed(2)}</span></div>` : ""}
+${!hideAadhat && totalMandi > 0 ? `<div class="summary-row"><span>Mandi (${mandiPct}%):</span><span>Rs.${totalMandi.toFixed(2)}</span></div>` : ""}
+${!hideAadhat ? `<div class="summary-row total"><span>Total Receivable from Buyer:</span><span>Rs.${grandTotal.toFixed(2)}</span></div>` : ""}
+</div>
+<div style="text-align:right;margin-top:32px;font-size:13px;color:#333">
+  <div style="display:inline-block;border-top:1px solid #555;padding-top:4px;min-width:150px;text-align:center">Signature</div>
+</div>
+</body></html>`;
+}
+
 export function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[], serialNumber: number, date: string, businessName?: string, businessAddress?: string, businessInitials?: string, businessPhone?: string, businessLicenceNo?: string, businessShopNo?: string, receiptSerialNumber?: number): string {
   const firstTx = entries[0].tx;
   const firstLot = entries[0].lot;

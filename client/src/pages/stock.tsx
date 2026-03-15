@@ -26,12 +26,14 @@ import { format } from "date-fns";
 import { CROPS, SIZES, DISTRICTS } from "@shared/schema";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem, CommandGroup } from "@/components/ui/command";
-import { printReceipt, shareReceiptAsPdf } from "@/lib/receiptUtils";
+import { printReceipt, shareReceiptAsPdf, wrapWithDuplicate } from "@/lib/receiptUtils";
 import {
   generateFarmerReceiptHtml, generateBuyerReceiptHtml, generateCombinedBuyerReceiptHtml,
+  generateAllBuyerReceiptHtml,
   applyFarmerTemplate, applyBuyerTemplate, applyCombinedBuyerTemplate,
   type UnifiedSerialGroup, type UnifiedLotGroup, type BuyerLotEntry, type TransactionWithDetails,
 } from "@/lib/receiptGenerators";
+import { usePersistedState } from "@/hooks/use-persisted-state";
 import type { Lot, Farmer, Transaction, Bid, Buyer, ReceiptTemplate } from "@shared/schema";
 
 const capFirst = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
@@ -2524,6 +2526,7 @@ function StockFilterBar({
   cropFilter, setCropFilter,
   buyersList,
   onExportStockCsv, onExportTxnCsv,
+  canPrintOverallBill, onPrintAllBuyerReceipt,
 }: {
   cards: FarmerCard[];
   dateMode: "stock" | "txn";
@@ -2543,6 +2546,8 @@ function StockFilterBar({
   buyersList: { id: number; name: string; phone?: string; aadhatCommissionPercent?: string | null }[];
   onExportStockCsv: () => void;
   onExportTxnCsv: () => void;
+  canPrintOverallBill: boolean;
+  onPrintAllBuyerReceipt: () => void;
 }) {
   const [monthPopoverOpen, setMonthPopoverOpen] = useState(false);
   const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
@@ -2828,6 +2833,19 @@ function StockFilterBar({
         </Button>
       )}
 
+      {canPrintOverallBill && (
+        <Button
+          variant="outline"
+          size="icon"
+          className="h-8 w-8"
+          data-testid="button-print-all-buyer-receipt"
+          title={`Print overall buyer bill for ${buyerFilter.trim()} (${cropFilter})`}
+          onClick={onPrintAllBuyerReceipt}
+        >
+          <Printer className="w-4 h-4" />
+        </Button>
+      )}
+
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm" className="h-8 gap-1 px-2" data-testid="button-csv-download">
@@ -2958,7 +2976,13 @@ export default function StockPage() {
   const { data: pageBuyersData = [] } = useQuery<any[]>({
     queryKey: ["/api/buyers"],
   });
-  const pageBuyersList = pageBuyersData.map((b: any) => ({ id: b.id, name: b.name, phone: b.phone || "", aadhatCommissionPercent: b.aadhatCommissionPercent || null }));
+  const pageBuyersList = pageBuyersData.map((b: any) => ({ id: b.id, name: b.name, phone: b.phone || "", aadhatCommissionPercent: b.aadhatCommissionPercent || null, licenceNo: b.licenceNo || "" }));
+
+  const { data: stockPageReceiptTemplates = [] } = useQuery<ReceiptTemplate[]>({
+    queryKey: ["/api/receipt-templates"],
+  });
+
+  const [printBillMode] = usePersistedState<"show-all" | "hide-aadhat">("txn-printBillMode", "show-all");
 
   const cs = chargeSettings || DEFAULT_CS;
 
@@ -3517,6 +3541,100 @@ export default function StockPage() {
     setCards(prev => prev.map((c, i) => (i === idx ? { ...c, archived: true, cardOpen: false } : c)));
   };
 
+  const isSingleDateFilter = selectedMonths.length === 1 && selectedDays.length === 1;
+  const canPrintOverallBill = isSingleDateFilter && buyerFilter.trim() !== "" && cropFilter !== "all";
+
+  const handlePrintAllBuyerReceipt = async () => {
+    if (!canPrintOverallBill) {
+      toast({ title: "Select a single date, buyer, and crop to print overall buyer bill", variant: "destructive" });
+      return;
+    }
+    const buyerNameStr = buyerFilter.trim().toLowerCase();
+
+    const entries: BuyerLotEntry[] = [];
+    for (const card of filteredCards) {
+      if (card.archived || !savedCardMap.has(card.id)) continue;
+      const vbr = parseFloat(card.vehicleBhadaRate) || 0;
+      const tbi = parseInt(card.totalBagsInVehicle) || 0;
+      for (const g of card.cropGroups) {
+        if (g.archived) continue;
+        if (cropFilter !== "all" && g.crop !== cropFilter) continue;
+        for (const lot of g.lots) {
+          for (const bid of lot.bids) {
+            if (!bid.txnDbId) continue;
+            if (!bid.buyerName.toLowerCase().includes(buyerNameStr)) continue;
+            const buyerData = pageBuyersList.find(b => b.id === bid.buyerId);
+            const buyerAadhat = buyerData?.aadhatCommissionPercent != null && buyerData.aadhatCommissionPercent !== ""
+              ? parseFloat(buyerData.aadhatCommissionPercent) || 0 : null;
+            const bt = calcBidTotals(bid, cs, vbr, tbi, buyerAadhat);
+            const bidBags = parseInt(bid.numberOfBags) || 0;
+            const aadhatBPct = buyerAadhat != null ? buyerAadhat : parseFloat(cs.aadhatCommissionBuyerPercent) || 0;
+            const fakeLot = {
+              crop: g.crop,
+              serialNumber: parseInt(g.srNumber) || 0,
+              size: lot.size || "",
+              variety: lot.variety || "",
+            } as any;
+            const fakeBuyer = {
+              name: bid.buyerName,
+              licenceNo: buyerData?.licenceNo || "",
+            } as any;
+            const fakeTx = {
+              netWeight: bid.txn.netWeightInput || "0",
+              pricePerKg: bid.pricePerKg,
+              extraPerKgBuyer: bid.txn.extraPerKgBuyer || "0",
+              numberOfBags: bidBags,
+              hammaliBuyerPerBag: cs.hammaliBuyerPerBag || "0",
+              extraChargesBuyer: bid.txn.extraChargesBuyer || "0",
+              aadhatBuyerPercent: String(aadhatBPct),
+              mandiBuyerPercent: cs.mandiCommissionBuyerPercent || "0",
+              totalReceivableFromBuyer: bt.buyerReceivable.toFixed(2),
+              buyer: fakeBuyer,
+            } as any;
+            entries.push({ lot: fakeLot, tx: fakeTx });
+          }
+        }
+      }
+    }
+
+    if (entries.length === 0) {
+      toast({ title: "No transactions found for this buyer and crop on this date", variant: "destructive" });
+      return;
+    }
+
+    const buyerId = pageBuyersList.find(b => b.name.toLowerCase().includes(buyerNameStr))?.id;
+    const mm = String(selectedMonths[0]).padStart(2, "0");
+    const dd = String(selectedDays[0]).padStart(2, "0");
+    const receiptDate = `${yearFilter}-${mm}-${dd}`;
+
+    let receiptSerialNumber: number | undefined;
+    if (buyerId) {
+      try {
+        const res = await apiRequest("POST", "/api/buyer-receipt-serial", { buyerId, date: receiptDate, crop: cropFilter });
+        if (!res.ok) throw new Error("Failed");
+        const data = await res.json();
+        receiptSerialNumber = data.serialNumber;
+      } catch {
+        toast({ title: "Could not assign receipt serial number. Please try again.", variant: "destructive" });
+        return;
+      }
+    }
+
+    const overallTmpl = stockPageReceiptTemplates.find(t => t.templateType === "buyer-overall");
+    if (overallTmpl) {
+      const fullHtml = applyCombinedBuyerTemplate(overallTmpl.templateHtml, entries, 0, receiptDate, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo, receiptSerialNumber);
+      printReceipt(wrapWithDuplicate(fullHtml));
+    } else {
+      const fullHtml = generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress, receiptSerialNumber, false, user?.businessPhone);
+      if (printBillMode === "hide-aadhat") {
+        const cleanHtml = generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress, receiptSerialNumber, true, user?.businessPhone);
+        printReceipt(wrapWithDuplicate(fullHtml, cleanHtml));
+      } else {
+        printReceipt(wrapWithDuplicate(fullHtml));
+      }
+    }
+  };
+
   const escCSV = (val: any) => {
     let s = String(val ?? "");
     if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
@@ -3646,6 +3764,8 @@ export default function StockPage() {
             buyersList={pageBuyersList}
             onExportStockCsv={exportStockCsv}
             onExportTxnCsv={exportTxnCsv}
+            canPrintOverallBill={canPrintOverallBill}
+            onPrintAllBuyerReceipt={handlePrintAllBuyerReceipt}
           />
         )}
         {!loadingCards && <StockSummaryBar cards={filteredCards} savedCardMap={savedCardMap} cs={cs} buyersList={pageBuyersList} />}
