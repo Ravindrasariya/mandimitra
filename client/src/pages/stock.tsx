@@ -1162,7 +1162,7 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
                 data-testid={`input-price-per-kg-${bidIndex}`}
                 type="number" placeholder="0.00"
                 value={bid.pricePerKg}
-                onChange={e => onChange({ ...bid, pricePerKg: e.target.value })}
+                onChange={e => onChange({ ...bid, pricePerKg: toNum(e.target.value) })}
                 className="h-8 text-sm"
               />
             </div>
@@ -1172,7 +1172,7 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
                 data-testid={`input-bid-bags-${bidIndex}`}
                 type="number" placeholder="0"
                 value={bid.numberOfBags}
-                onChange={e => onChange({ ...bid, numberOfBags: e.target.value })}
+                onChange={e => onChange({ ...bid, numberOfBags: e.target.value.replace(/\D/g, "") })}
                 className={`h-8 text-sm ${overBag ? "border-red-400 focus-visible:ring-red-400" : ""}`}
               />
               {overBag && (
@@ -1203,7 +1203,7 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
                 data-testid={`input-advance-amount-${bidIndex}`}
                 type="number"
                 value={bid.advanceAmount}
-                onChange={e => onChange({ ...bid, advanceAmount: e.target.value })}
+                onChange={e => onChange({ ...bid, advanceAmount: toNum(e.target.value) })}
                 className="h-7 w-24 text-sm"
               />
             </div>
