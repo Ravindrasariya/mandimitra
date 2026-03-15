@@ -2240,9 +2240,16 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
             </div>
           )}
 
-          {/* Crop groups */}
+          {/* Crop groups — sorted ascending by SR# (unsaved/sentinel last) */}
           <div className="space-y-3 pt-1">
-            {card.cropGroups.map((group, idx) => (
+            {[...card.cropGroups.entries()]
+              .sort(([, a], [, b]) => {
+                const srA = parseInt(a.srNumber); const srB = parseInt(b.srNumber);
+                const nA = isNaN(srA) ? Infinity : srA;
+                const nB = isNaN(srB) ? Infinity : srB;
+                return nA - nB;
+              })
+              .map(([idx, group]) => (
               <CropGroupSection
                 key={group.id} group={group}
                 onChange={g => updateGroup(idx, g)}
@@ -3073,12 +3080,14 @@ export default function StockPage() {
       return { ...card, cropGroups: card.cropGroups.filter(g => g.archived || g.crop === cropFilter) };
     };
 
-    return cards
-      .filter(dateMatchesCard)
-      .filter(farmerMatchesCard)
-      .filter(buyerMatchesCard)
-      .filter(cropMatchesCard)
-      .map(applyCropFilter);
+    return sortCardsByMaxSr(
+      cards
+        .filter(dateMatchesCard)
+        .filter(farmerMatchesCard)
+        .filter(buyerMatchesCard)
+        .filter(cropMatchesCard)
+        .map(applyCropFilter)
+    );
   }, [cards, dateMode, yearFilter, selectedMonths, selectedDays, farmerFilter, buyerFilter, cropFilter, pageBuyersList]);
 
   useEffect(() => {
