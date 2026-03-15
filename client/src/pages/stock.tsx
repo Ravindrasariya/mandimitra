@@ -18,7 +18,7 @@ import {
   Plus, Trash2, ChevronDown, ChevronRight, Truck, User,
   AlertTriangle, Scale, Wheat, ChevronsUpDown, X, Calculator,
   Archive, History, Save, Check, Printer, Share2,
-  Layers, Landmark, ShoppingBag, Calendar, Search, Filter, RotateCcw,
+  Layers, Landmark, ShoppingBag, Calendar, Search, Filter, RotateCcw, Download,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -109,6 +109,7 @@ type BidRow = {
 type LotRow = {
   id: string;
   dbId?: number;
+  lotId?: string;
   lotOpen: boolean;
   numberOfBags: string;
   size: string;
@@ -2414,6 +2415,7 @@ function stockCardsToFarmerCards(apiCards: any[]): FarmerCard[] {
         lots: (cg.lots || []).map((lot: any) => ({
           id: uid(),
           dbId: lot.dbId,
+          lotId: lot.lotId || "",
           lotOpen: false,
           numberOfBags: lot.numberOfBags?.toString() || "",
           size: lot.size || "None",
@@ -2521,6 +2523,7 @@ function StockFilterBar({
   buyerFilter, setBuyerFilter,
   cropFilter, setCropFilter,
   buyersList,
+  onExportStockCsv, onExportTxnCsv,
 }: {
   cards: FarmerCard[];
   dateMode: "stock" | "txn";
@@ -2538,6 +2541,8 @@ function StockFilterBar({
   cropFilter: string;
   setCropFilter: (v: string) => void;
   buyersList: { id: number; name: string; phone?: string; aadhatCommissionPercent?: string | null }[];
+  onExportStockCsv: () => void;
+  onExportTxnCsv: () => void;
 }) {
   const [monthPopoverOpen, setMonthPopoverOpen] = useState(false);
   const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
@@ -2630,13 +2635,19 @@ function StockFilterBar({
     : buyerSuggestions;
 
   const currentYear = String(new Date().getFullYear());
-  const anyActive = dateMode !== "stock" || yearFilter !== currentYear || selectedMonths.length > 0 || selectedDays.length > 0 || farmerFilter !== "" || buyerFilter !== "" || cropFilter !== "all";
+  const defaultMonth = String(new Date().getMonth() + 1);
+  const defaultDay = String(new Date().getDate());
+  const anyActive = dateMode !== "stock"
+    || yearFilter !== currentYear
+    || !(selectedMonths.length === 1 && selectedMonths[0] === defaultMonth)
+    || !(selectedDays.length === 1 && selectedDays[0] === defaultDay)
+    || farmerFilter !== "" || buyerFilter !== "" || cropFilter !== "all";
 
   const clearAll = () => {
     setDateMode("stock");
     setYearFilter(currentYear);
-    setSelectedMonths([]);
-    setSelectedDays([]);
+    setSelectedMonths([defaultMonth]);
+    setSelectedDays([defaultDay]);
     setFarmerFilter("");
     setBuyerFilter("");
     setCropFilter("all");
@@ -2816,6 +2827,23 @@ function StockFilterBar({
           <RotateCcw className="w-3 h-3" /> Clear
         </Button>
       )}
+
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="outline" size="sm" className="h-8 text-xs gap-1.5" data-testid="button-csv-download">
+            <Download className="w-3.5 h-3.5" /> Download
+            <ChevronDown className="w-3 h-3 opacity-50" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={onExportStockCsv} data-testid="menu-stock-csv">
+            Stock CSV
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={onExportTxnCsv} data-testid="menu-txn-csv">
+            Txn CSV
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }
@@ -2936,8 +2964,8 @@ export default function StockPage() {
 
   const [dateMode, setDateMode] = useState<"stock" | "txn">("stock");
   const [yearFilter, setYearFilter] = useState(String(new Date().getFullYear()));
-  const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
-  const [selectedDays, setSelectedDays] = useState<string[]>([]);
+  const [selectedMonths, setSelectedMonths] = useState<string[]>([String(new Date().getMonth() + 1)]);
+  const [selectedDays, setSelectedDays] = useState<string[]>([String(new Date().getDate())]);
   const [farmerFilter, setFarmerFilter] = useState("");
   const [buyerFilter, setBuyerFilter] = useState("");
   const [cropFilter, setCropFilter] = useState("all");
@@ -3489,16 +3517,115 @@ export default function StockPage() {
     setCards(prev => prev.map((c, i) => (i === idx ? { ...c, archived: true, cardOpen: false } : c)));
   };
 
+  const escCSV = (val: any) => {
+    let s = String(val ?? "");
+    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+    return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+
+  const exportStockCsv = () => {
+    const headers = [
+      "SR#", "Lot ID", "Date", "Crop", "Variety", "Size", "Bag Marka",
+      "Farmer Name", "Farmer Phone", "Farmer Village", "Farmer Tehsil", "Farmer District",
+      "Vehicle Number", "Driver Name", "Driver Contact", "Freight Type", "Total Bags In Vehicle",
+      "Lot Bags", "Proportionate Freight",
+      "Farmer Advance Amount", "Farmer Advance Mode",
+    ];
+    const rows: string[] = [];
+    for (const card of filteredCards) {
+      if (card.archived || !savedCardMap.has(card.id)) continue;
+      const vbr = parseFloat(card.vehicleBhadaRate) || 0;
+      const tbi = parseInt(card.totalBagsInVehicle) || 0;
+      for (const g of card.cropGroups) {
+        if (g.archived) continue;
+        for (const lot of g.lots) {
+          if (!lot.dbId) continue;
+          const lotBags = parseInt(lot.numberOfBags) || 0;
+          const freight = tbi > 0 ? ((vbr * lotBags) / tbi).toFixed(2) : "0";
+          rows.push([
+            g.srNumber, lot.lotId || lot.dbId?.toString() || "", card.date, g.crop, lot.variety || "", lot.size || "None", lot.bagMarka || "",
+            card.farmerName, card.farmerPhone, card.village, card.tehsil, card.district,
+            card.vehicleNumber, card.driverName, card.driverContact, card.freightType || "", card.totalBagsInVehicle || "",
+            lot.numberOfBags, freight,
+            card.advanceAmount || "", card.advanceMode || "",
+          ].map(escCSV).join(","));
+        }
+      }
+    }
+    if (rows.length === 0) { toast({ title: "No data to export", variant: "destructive" }); return; }
+    const csv = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `stock_${format(new Date(), "yyyy-MM-dd")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportTxnCsv = () => {
+    const headers = [
+      "Transaction ID", "Date", "Lot ID", "SR#", "Crop", "Variety",
+      "Farmer Name", "Farmer Phone", "Farmer Village",
+      "Buyer Name",
+      "Vehicle #", "Driver Name", "Driver Contact", "Freight Type",
+      "No. of Bags", "Rate/Kg", "Net Weight",
+      "Extra Charges Farmer", "Extra Charges Buyer",
+      "Extra/Kg Farmer", "Extra/Kg Buyer",
+      "Proportionate Freight",
+      "Payable to Farmer", "Receivable from Buyer",
+      "Farmer Payment Status", "Buyer Payment Status",
+    ];
+    const rows: string[] = [];
+    for (const card of filteredCards) {
+      if (card.archived || !savedCardMap.has(card.id)) continue;
+      const vbr = parseFloat(card.vehicleBhadaRate) || 0;
+      const tbi = parseInt(card.totalBagsInVehicle) || 0;
+      for (const g of card.cropGroups) {
+        if (g.archived) continue;
+        for (const lot of g.lots) {
+          for (const bid of lot.bids) {
+            if (!bid.txnDbId) continue;
+            const buyerData = pageBuyersList.find(b => b.id === bid.buyerId);
+            const buyerAadhat = buyerData?.aadhatCommissionPercent != null && buyerData.aadhatCommissionPercent !== ""
+              ? parseFloat(buyerData.aadhatCommissionPercent) || 0 : null;
+            const bt = calcBidTotals(bid, cs, vbr, tbi, buyerAadhat);
+            const bidBags = parseInt(bid.numberOfBags) || 0;
+            const freight = tbi > 0 ? ((vbr * bidBags) / tbi).toFixed(2) : "0";
+            const fStat = bid.farmerPaymentStatus === "paid" ? "Paid" : bid.farmerPaymentStatus === "partial" ? "Partial" : "Due";
+            const bStat = bid.paymentStatus === "paid" ? "Paid" : bid.paymentStatus === "partial" ? "Partial" : "Due";
+            rows.push([
+              bid.txnDbId, bid.txnDate, lot.lotId || lot.dbId?.toString() || "", g.srNumber, g.crop, lot.variety || "",
+              card.farmerName, card.farmerPhone, card.village,
+              bid.buyerName,
+              card.vehicleNumber, card.driverName, card.driverContact, card.freightType || "",
+              bid.numberOfBags, bid.pricePerKg, bid.txn.netWeightInput || "0",
+              bid.txn.extraChargesFarmer || "0", bid.txn.extraChargesBuyer || "0",
+              bid.txn.extraPerKgFarmer || "0", bid.txn.extraPerKgBuyer || "0",
+              freight,
+              bt.farmerPayable.toFixed(2), bt.buyerReceivable.toFixed(2),
+              fStat, bStat,
+            ].map(escCSV).join(","));
+          }
+        }
+      }
+    }
+    if (rows.length === 0) { toast({ title: "No data to export", variant: "destructive" }); return; }
+    const csv = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `transactions_${format(new Date(), "yyyy-MM-dd")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background sticky top-0 z-10">
-        <div>
-          <h1 className="text-lg font-bold">Stock Entry</h1>
-          <p className="text-xs text-muted-foreground">Add farmers, lots, bids and weights in one place</p>
-        </div>
-        <Button type="button" onClick={addCard} data-testid="button-add-farmer-entry" className="gap-2">
-          <Plus className="w-4 h-4" /> New Farmer Entry
-        </Button>
+      <div className="px-4 py-3 border-b border-border bg-background sticky top-0 z-10">
+        <h1 className="text-lg font-bold">Stock Entry</h1>
+        <p className="text-xs text-muted-foreground">Add farmers, lots, bids and weights in one place</p>
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {loadingCards && (
@@ -3517,9 +3644,18 @@ export default function StockPage() {
             buyerFilter={buyerFilter} setBuyerFilter={setBuyerFilter}
             cropFilter={cropFilter} setCropFilter={setCropFilter}
             buyersList={pageBuyersList}
+            onExportStockCsv={exportStockCsv}
+            onExportTxnCsv={exportTxnCsv}
           />
         )}
         {!loadingCards && <StockSummaryBar cards={filteredCards} savedCardMap={savedCardMap} cs={cs} buyersList={pageBuyersList} />}
+        {!loadingCards && (
+          <div className="flex justify-end">
+            <Button type="button" onClick={addCard} data-testid="button-add-farmer-entry" className="gap-2">
+              <Plus className="w-4 h-4" /> New Farmer Entry
+            </Button>
+          </div>
+        )}
         {filteredCards.map((card) => {
           const idx = cards.findIndex(c => c.id === card.id);
           const mergeBack = (edited: FarmerCard) => {
