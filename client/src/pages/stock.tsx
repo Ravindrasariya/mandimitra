@@ -388,15 +388,15 @@ function CollapsedSummary({ totalBags, remainingBags, farmerPayable, buyerReceiv
 }) {
   return (
     <div className="flex items-center gap-2 text-xs flex-wrap">
-      <span className="text-muted-foreground font-medium">Total Bags: {totalBags}</span>
-      <span className={`font-medium ${remainingBags > 0 ? "text-orange-600 dark:text-orange-400" : "text-green-600 dark:text-green-400"}`}>
+      <span className="text-foreground font-bold">Total Bags: {totalBags}</span>
+      <span className={`font-bold ${remainingBags > 0 ? "text-orange-600 dark:text-orange-400" : "text-green-600 dark:text-green-400"}`}>
         Remaining: {remainingBags}
       </span>
       {hasData && (
         <>
-          <span className="text-green-700 dark:text-green-400 font-medium">Farmer: ₹{farmerPayable.toFixed(0)}</span>
+          <span className="text-green-700 dark:text-green-400 font-bold">Farmer: ₹{farmerPayable.toFixed(0)}</span>
           <PaymentBadge status={farmerPaymentStatus || "Due"} />
-          <span className="text-blue-700 dark:text-blue-400 font-medium">Buyer: ₹{buyerReceivable.toFixed(0)}</span>
+          <span className="text-blue-700 dark:text-blue-400 font-bold">Buyer: ₹{buyerReceivable.toFixed(0)}</span>
           <PaymentBadge status={buyerPaymentStatus || "Due"} />
         </>
       )}
@@ -1055,13 +1055,13 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
           {bid.bidOpen
             ? <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
             : <ChevronRight className="w-3.5 h-3.5 text-blue-500" />}
-          <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">
+          <span className="text-xs font-bold text-blue-600 uppercase tracking-wide">
             {buyerLabel} {bags > 0 && `· ${bags} bags`}
           </span>
           {!bid.bidOpen && totals.hasData && (
             <span className="flex items-center gap-2 text-xs">
-              <span className="text-green-700 dark:text-green-400 font-medium">Farmer: ₹{totals.farmerPayable.toFixed(0)}</span>
-              <span className="text-blue-700 dark:text-blue-400 font-medium">Buyer: ₹{totals.buyerReceivable.toFixed(0)}</span>
+              <span className="text-green-700 dark:text-green-400 font-bold">Farmer: ₹{totals.farmerPayable.toFixed(0)}</span>
+              <span className="text-blue-700 dark:text-blue-400 font-bold">Buyer: ₹{totals.buyerReceivable.toFixed(0)}</span>
             </span>
           )}
         </button>
@@ -1270,7 +1270,7 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
           data-testid={`button-toggle-lot-${index}`}
         >
           {lot.lotOpen ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />}
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Lot #{index + 1}</span>
+          <span className="text-xs font-bold text-foreground uppercase tracking-wide">Lot #{index + 1}</span>
           {lot.isReturned && (
             <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-orange-300 text-orange-600 dark:border-orange-700 dark:text-orange-400">
               Returned
@@ -1667,7 +1667,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
         <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
           {group.groupOpen ? <ChevronDown className="w-4 h-4 shrink-0" /> : <ChevronRight className="w-4 h-4 shrink-0" />}
           <Wheat className="w-4 h-4 shrink-0" />
-          <span className="font-semibold text-sm">SR# {group.srNumber} {group.crop}</span>
+          <span className="font-bold text-sm">SR# {group.srNumber} {group.crop}</span>
           <Badge variant="outline" className={`text-xs ${badgeCls} shrink-0`}>
             {group.lots.length} lot{group.lots.length !== 1 ? "s" : ""}
           </Badge>
@@ -1964,7 +1964,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
         <div className="flex items-center gap-3 min-w-0 flex-wrap">
           {card.cardOpen ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
           <User className="w-4 h-4 text-primary shrink-0" />
-          <span className="font-semibold text-sm">
+          <span className="font-bold text-sm">
             {card.farmerName.trim() || <span className="text-muted-foreground italic">New Farmer Entry</span>}
           </span>
           {card.farmerPhone && <span className="text-xs text-muted-foreground">· {card.farmerPhone}</span>}
