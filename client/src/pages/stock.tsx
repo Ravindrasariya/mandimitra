@@ -743,6 +743,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
           </Button>
         </div>
         {bags > 0 && <p className="text-xs text-muted-foreground">Total — {bags} bags</p>}
+        {bags > 0 && nw > 0 && <p data-testid="text-net-wt-avg" className="text-xs font-medium text-orange-500 dark:text-orange-400">Net wt/bag: {(nw / bags).toFixed(2)} kg</p>}
 
         {/* ── Weight calculator ── */}
         {txn.showWeightCalc && (
@@ -1619,7 +1620,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
               const updatedGroup = { ...group, archived: false, groupOpen: true };
               onChange(updatedGroup);
               onSyncSaved?.(updatedGroup);
-              toast({ title: "Crop group reinstated" });
+              toast({ title: "Crop group reinstated", variant: "success" });
             } catch (err: any) {
               toast({ title: "Failed to reinstate crop group", description: err?.message || "Please try again", variant: "destructive" });
             }
@@ -1892,7 +1893,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
         const updatedCard = { ...card, cropGroups: card.cropGroups.map((g, i) => i === pendingArchiveGroupIdx ? { ...g, archived: true } : g) };
         onChange(updatedCard);
         onSyncSaved(updatedCard);
-        toast({ title: "Crop group archived" });
+        toast({ title: "Crop group archived", variant: "success" });
       } catch (err: any) {
         toast({ title: "Failed to archive crop group", description: err?.message || "Please try again", variant: "destructive" });
       }
@@ -2036,6 +2037,9 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                 <div>
                   <Label className="text-xs text-muted-foreground">Phone</Label>
                   <Input data-testid="input-farmer-phone" type="tel" inputMode="numeric" placeholder="10-digit mobile" value={card.farmerPhone} onChange={e => set("farmerPhone", e.target.value.replace(/\D/g, "").slice(0, 10))} className="h-8 text-sm" />
+                  {card.farmerPhone.length > 0 && card.farmerPhone.length < 10 && (
+                    <p data-testid="text-phone-warning" className="text-[11px] mt-0.5 text-destructive font-medium">Please provide a valid 10-digit number</p>
+                  )}
                 </div>
                 <div className="relative">
                   <Label className="text-xs text-muted-foreground">Village</Label>
@@ -2244,7 +2248,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                       const key = query.queryKey[0];
                       return typeof key === "string" && key.startsWith("/api/cash-entries");
                     }});
-                    toast({ title: "Lot returned", description: `Lot #${lotIdx + 1} has been returned to farmer` });
+                    toast({ title: "Lot returned", description: `Lot #${lotIdx + 1} has been returned to farmer`, variant: "success" });
                   } catch (err: any) {
                     toast({ title: "Failed to return lot", description: err?.message || "Please try again", variant: "destructive" });
                   }
@@ -2344,7 +2348,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
               const updatedCard = { ...card, archived: false, cardOpen: true };
               onChange(updatedCard);
               onSyncSaved(updatedCard);
-              toast({ title: "Farmer reinstated" });
+              toast({ title: "Farmer reinstated", variant: "success" });
             } catch (err: any) {
               toast({ title: "Failed to reinstate farmer", description: err?.message || "Please try again", variant: "destructive" });
             }
@@ -2477,6 +2481,13 @@ function loadDraftsFromStorage(businessId: number): FarmerCard[] {
   }
 }
 
+function sortCardsByMaxSr(cards: FarmerCard[]): FarmerCard[] {
+  return [...cards].sort((a, b) => {
+    const maxSr = (c: FarmerCard) => Math.max(0, ...c.cropGroups.map(g => parseInt(g.srNumber) || 0));
+    return maxSr(b) - maxSr(a);
+  });
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function StockPage() {
@@ -2513,7 +2524,7 @@ export default function StockPage() {
       const dirty = dirtyDrafts.find(d => d.id === c.id);
       return dirty ? { ...dirty, cardOpen: true, farmerOpen: true, vehicleOpen: false } : c;
     });
-    const allCards = [...newDrafts, ...mergedLoaded];
+    const allCards = sortCardsByMaxSr([...newDrafts, ...mergedLoaded]);
     setCards(allCards.length > 0 ? allCards : [emptyCard()]);
     setSavedCardMap(map);
   }, [stockCardsData, businessId]);
@@ -2929,7 +2940,8 @@ export default function StockPage() {
         return typeof key === "string" && key.startsWith("/api/cash-entries");
       }});
 
-      toast({ title: "Saved", description: `${card.farmerName.trim()} entry saved successfully` });
+      setCards(prev => sortCardsByMaxSr([...prev]));
+      toast({ title: "Saved", description: `${card.farmerName.trim()} entry saved successfully`, variant: "success" });
     } catch (err: any) {
       toast({ title: "Save Failed", description: err.message || "An error occurred while saving", variant: "destructive" });
     } finally {
