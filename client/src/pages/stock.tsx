@@ -765,13 +765,14 @@ function LotCard({ lot, index, onChange, onRemove, vehicleBhadaRate, totalBagsIn
 
   return (
     <div className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
-      <button
-        type="button"
-        className="w-full flex items-center justify-between px-3 py-2 bg-muted/30 hover:bg-muted/50 transition-colors border-b border-border"
-        onClick={() => onChange({ ...lot, lotOpen: !lot.lotOpen })}
-        data-testid={`button-toggle-lot-${index}`}
-      >
-        <div className="flex items-center gap-2">
+      {/* Lot header — toggle area and trash are siblings, not nested */}
+      <div className="flex items-center bg-muted/30 border-b border-border">
+        <button
+          type="button"
+          className="flex-1 flex items-center gap-2 px-3 py-2 hover:bg-muted/50 transition-colors text-left"
+          onClick={() => onChange({ ...lot, lotOpen: !lot.lotOpen })}
+          data-testid={`button-toggle-lot-${index}`}
+        >
           {lot.lotOpen ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />}
           <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Lot #{index + 1}</span>
           {!lot.lotOpen && (
@@ -785,15 +786,16 @@ function LotCard({ lot, index, onChange, onRemove, vehicleBhadaRate, totalBagsIn
               )}
             </div>
           )}
-        </div>
-        <Button
-          type="button" variant="ghost" size="sm"
-          onClick={e => { e.stopPropagation(); onRemove(); }}
-          className="h-6 w-6 p-0 text-red-400 hover:text-red-600"
+        </button>
+        <button
+          type="button"
+          data-testid={`button-remove-lot-${index}`}
+          onClick={onRemove}
+          className="h-8 w-8 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors shrink-0 mr-1 rounded"
         >
           <Trash2 className="w-3.5 h-3.5" />
-        </Button>
-      </button>
+        </button>
+      </div>
 
       {lot.lotOpen && (
         <div className="p-3 space-y-3">
