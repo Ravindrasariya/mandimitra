@@ -2562,7 +2562,7 @@ export default function StockPage() {
                 lotId: lot.dbId,
                 bidId: bidDbId,
                 buyerId: bid.buyerId,
-                farmerId: currentFarmerId,
+                farmerId: currentFarmerId!,
                 netWeight: nw.toFixed(2),
                 totalWeight: nw.toFixed(2),
                 numberOfBags: bidBags,

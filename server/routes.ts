@@ -542,6 +542,8 @@ export async function registerRoutes(
           totalReceivableFromBuyer: string | null;
           date: string | null;
           isReversed: boolean;
+          paymentStatus: string;
+          farmerPaymentStatus: string;
         } | null;
       }
 
