@@ -7,6 +7,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent, AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Plus, Trash2, ChevronDown, ChevronRight, Truck, User,
   AlertTriangle, Scale, Wheat, ChevronsUpDown, X, Calculator,
 } from "lucide-react";
@@ -107,6 +112,41 @@ type FarmerCard = {
   farmerOpen: boolean;
   vehicleOpen: boolean;
 };
+
+// ─── Confirm delete dialog ────────────────────────────────────────────────────
+
+function ConfirmDeleteDialog({ open, title, description, onConfirm, onCancel }: {
+  open: boolean;
+  title: string;
+  description: string;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <AlertDialog open={open} onOpenChange={v => { if (!v) onCancel(); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+            <AlertTriangle className="w-5 h-5 shrink-0" />
+            {title}
+          </AlertDialogTitle>
+          <AlertDialogDescription className="text-sm text-muted-foreground">
+            {description}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel autoFocus onClick={onCancel}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={onConfirm}
+            className="bg-red-600 hover:bg-red-700 focus:ring-red-600 text-white"
+          >
+            Yes, Delete
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -826,6 +866,8 @@ function CropGroupSection({ group, onChange, onRemove, vehicleBhadaRate, totalBa
   vehicleBhadaRate: number; totalBagsInVehicle: number;
   cs: ChargeSettings; farmerDate: string;
 }) {
+  const [pendingDeleteLotIdx, setPendingDeleteLotIdx] = useState<number | null>(null);
+
   const headerCls = CROP_HEADER[group.crop] || "bg-muted border-border";
   const badgeCls = CROP_COLORS[group.crop] || "bg-muted border-border text-foreground";
 
@@ -835,8 +877,13 @@ function CropGroupSection({ group, onChange, onRemove, vehicleBhadaRate, totalBa
   const removeLot = (idx: number) => {
     if (group.lots.length === 1) return;
     const lot = group.lots[idx];
-    if (hasLotUserData(lot) && !window.confirm("This lot has data. Remove it anyway?")) return;
+    if (hasLotUserData(lot)) { setPendingDeleteLotIdx(idx); return; }
     onChange({ ...group, lots: group.lots.filter((_, i) => i !== idx) });
+  };
+  const confirmDeleteLot = () => {
+    if (pendingDeleteLotIdx !== null)
+      onChange({ ...group, lots: group.lots.filter((_, i) => i !== pendingDeleteLotIdx) });
+    setPendingDeleteLotIdx(null);
   };
 
   const allTotals = group.lots.map(l => calcLotTotals(l, cs, vehicleBhadaRate, totalBagsInVehicle));
@@ -900,6 +947,14 @@ function CropGroupSection({ group, onChange, onRemove, vehicleBhadaRate, totalBa
           </Button>
         </div>
       )}
+
+      <ConfirmDeleteDialog
+        open={pendingDeleteLotIdx !== null}
+        title="Delete this lot?"
+        description="This lot has data that will be permanently lost. This action cannot be undone."
+        onConfirm={confirmDeleteLot}
+        onCancel={() => setPendingDeleteLotIdx(null)}
+      />
     </div>
   );
 }
@@ -911,6 +966,8 @@ function FarmerCardComp({ card, onChange, onRemove, cs }: {
   onChange: (c: FarmerCard) => void; onRemove: () => void;
   cs: ChargeSettings;
 }) {
+  const [pendingDeleteGroupIdx, setPendingDeleteGroupIdx] = useState<number | null>(null);
+
   const set = (f: keyof FarmerCard, v: any) => onChange({ ...card, [f]: v });
   const usedCrops = card.cropGroups.map(g => g.crop);
   const availableCrops = CROPS.filter(c => !usedCrops.includes(c));
@@ -926,9 +983,15 @@ function FarmerCardComp({ card, onChange, onRemove, cs }: {
   const removeGroup = (idx: number) => {
     const group = card.cropGroups[idx];
     const hasData = group.lots.some(hasLotUserData);
-    if (hasData && !window.confirm(`"${group.crop}" has data. Remove entire group anyway?`)) return;
+    if (hasData) { setPendingDeleteGroupIdx(idx); return; }
     onChange({ ...card, cropGroups: card.cropGroups.filter((_, i) => i !== idx) });
   };
+  const confirmDeleteGroup = () => {
+    if (pendingDeleteGroupIdx !== null)
+      onChange({ ...card, cropGroups: card.cropGroups.filter((_, i) => i !== pendingDeleteGroupIdx) });
+    setPendingDeleteGroupIdx(null);
+  };
+  const pendingGroupName = pendingDeleteGroupIdx !== null ? card.cropGroups[pendingDeleteGroupIdx]?.crop : "";
 
   return (
     <Card className="border-2 border-border shadow-md overflow-hidden">
@@ -1099,6 +1162,14 @@ function FarmerCardComp({ card, onChange, onRemove, cs }: {
           </div>
         </CardContent>
       )}
+
+      <ConfirmDeleteDialog
+        open={pendingDeleteGroupIdx !== null}
+        title={`Delete "${pendingGroupName}" group?`}
+        description={`All lots and data in the "${pendingGroupName}" group will be permanently lost. This action cannot be undone.`}
+        onConfirm={confirmDeleteGroup}
+        onCancel={() => setPendingDeleteGroupIdx(null)}
+      />
     </Card>
   );
 }
