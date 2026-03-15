@@ -71,6 +71,8 @@ const emptyTxn = (): TxnState => ({
 });
 
 type BidRow = {
+  id: string;
+  bidOpen: boolean;
   buyerName: string;
   pricePerKg: string;
   numberOfBags: string;
@@ -87,7 +89,7 @@ type LotRow = {
   size: string;
   variety: string;
   bagMarka: string;
-  bid: BidRow;
+  bids: BidRow[];
 };
 
 type CropGroup = { id: string; crop: string; srNumber: string; groupOpen: boolean; lots: LotRow[] };
@@ -193,6 +195,8 @@ function CollapsedSummary({ totalBags, remainingBags, farmerPayable, buyerReceiv
 const uid = () => Math.random().toString(36).slice(2, 8);
 
 const emptyBid = (date?: string): BidRow => ({
+  id: uid(),
+  bidOpen: true,
   buyerName: "",
   pricePerKg: "",
   numberOfBags: "",
@@ -209,13 +213,12 @@ const emptyLot = (date?: string): LotRow => ({
   size: "None",
   variety: "",
   bagMarka: "",
-  bid: emptyBid(date),
+  bids: [emptyBid(date)],
 });
 
 const hasLotUserData = (lot: LotRow): boolean =>
   [lot.numberOfBags, lot.variety, lot.bagMarka,
-    lot.bid.buyerName, lot.bid.pricePerKg, lot.bid.numberOfBags,
-    lot.bid.txn.netWeightInput,
+    ...lot.bids.flatMap(b => [b.buyerName, b.pricePerKg, b.numberOfBags, b.txn.netWeightInput]),
   ].some(v => (v ?? "").trim() !== "" && (v ?? "").trim() !== "0");
 
 const emptyCard = (): FarmerCard => ({
@@ -252,13 +255,12 @@ const CROP_COLORS: Record<string, string> = {
   Garlic: "bg-amber-50 border-amber-300 text-amber-700",
 };
 
-// ─── Lot totals calculator ─────────────────────────────────────────────────────
+// ─── Bid & lot totals calculators ─────────────────────────────────────────────
 
-function calcLotTotals(lot: LotRow, cs: ChargeSettings, vehicleBhadaRate: number, totalBagsInVehicle: number) {
-  const bidBags = parseInt(lot.bid.numberOfBags) || 0;
-  const lotBags = parseInt(lot.numberOfBags) || 0;
-  const pricePerKg = parseFloat(lot.bid.pricePerKg) || 0;
-  const txn = lot.bid.txn;
+function calcBidTotals(bid: BidRow, cs: ChargeSettings, vehicleBhadaRate: number, totalBagsInVehicle: number) {
+  const bidBags = parseInt(bid.numberOfBags) || 0;
+  const pricePerKg = parseFloat(bid.pricePerKg) || 0;
+  const txn = bid.txn;
   const nw = parseFloat(txn.netWeightInput) || 0;
   const epkFarmer = parseFloat(txn.extraPerKgFarmer) || 0;
   const epkBuyer = parseFloat(txn.extraPerKgBuyer) || 0;
@@ -276,11 +278,22 @@ function calcLotTotals(lot: LotRow, cs: ChargeSettings, vehicleBhadaRate: number
   const farmerDed = hfRate * bidBags + extraFarmer + (farmerGross * aadhatFPct) / 100 + (farmerGross * mandiFPct) / 100 + freight;
   const buyerAdd = hbRate * bidBags + extraBuyer + (buyerGross * aadhatBPct) / 100 + (buyerGross * mandiBPct) / 100;
   return {
-    lotBags,
     bidBags,
     farmerPayable: farmerGross - farmerDed,
     buyerReceivable: buyerGross + buyerAdd,
     hasData: nw > 0 && pricePerKg > 0,
+  };
+}
+
+function calcLotTotals(lot: LotRow, cs: ChargeSettings, vehicleBhadaRate: number, totalBagsInVehicle: number) {
+  const lotBags = parseInt(lot.numberOfBags) || 0;
+  const bidTotals = lot.bids.map(b => calcBidTotals(b, cs, vehicleBhadaRate, totalBagsInVehicle));
+  return {
+    lotBags,
+    bidBags: bidTotals.reduce((s, t) => s + t.bidBags, 0),
+    farmerPayable: bidTotals.reduce((s, t) => s + t.farmerPayable, 0),
+    buyerReceivable: bidTotals.reduce((s, t) => s + t.buyerReceivable, 0),
+    hasData: bidTotals.some(t => t.hasData),
   };
 }
 
@@ -664,128 +677,173 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
 
 // ─── Bid section (row 2) ──────────────────────────────────────────────────────
 
-function BidSection({ bid, onChange, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate }: {
+function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate, overBag }: {
   bid: BidRow;
+  bidIndex: number;
   onChange: (b: BidRow) => void;
+  onRemove?: () => void;
+  canRemove: boolean;
   vehicleBhadaRate: number;
   totalBagsInVehicle: number;
   cs: ChargeSettings;
   farmerDate: string;
+  overBag: boolean;
 }) {
   const isNewBuyer = bid.buyerName.trim().length > 0 && !MOCK_BUYERS.includes(bid.buyerName.trim());
   const bags = parseInt(bid.numberOfBags) || 0;
   const pricePerKg = parseFloat(bid.pricePerKg) || 0;
+  const totals = calcBidTotals(bid, cs, vehicleBhadaRate, totalBagsInVehicle);
+  const buyerLabel = bid.buyerName.trim() || "Bid";
 
   return (
-    <div className="ml-4 mt-2 rounded-lg border border-blue-200 bg-blue-50/40 p-3 space-y-3">
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 uppercase tracking-wide">
-          <span className="w-1.5 h-1.5 rounded-full bg-blue-400 inline-block" />
-          Bid & Transaction Details
-        </div>
-        <div className="flex items-center gap-1.5">
-          <label className="text-xs text-muted-foreground whitespace-nowrap">Txn Date:</label>
-          <input
-            type="date"
-            data-testid="input-txn-date"
-            value={bid.txnDate || farmerDate}
-            onChange={e => onChange({ ...bid, txnDate: e.target.value })}
-            className="text-xs border border-border rounded px-2 py-1 bg-background h-7"
-          />
-          {bid.txnDate && bid.txnDate !== farmerDate && (
-            <button
-              type="button"
-              onClick={() => onChange({ ...bid, txnDate: farmerDate })}
-              className="text-xs text-muted-foreground hover:text-foreground underline whitespace-nowrap"
-            >
-              Reset
-            </button>
+    <div className="mt-2 rounded-lg border border-blue-200 bg-blue-50/40 overflow-hidden">
+      <div className="flex items-center bg-blue-100/60 border-b border-blue-200">
+        <button
+          type="button"
+          className="flex-1 flex items-center gap-2 px-3 py-1.5 hover:bg-blue-100 transition-colors text-left"
+          onClick={() => onChange({ ...bid, bidOpen: !bid.bidOpen })}
+          data-testid={`button-toggle-bid-${bidIndex}`}
+        >
+          {bid.bidOpen
+            ? <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
+            : <ChevronRight className="w-3.5 h-3.5 text-blue-500" />}
+          <span className="text-xs font-semibold text-blue-600 uppercase tracking-wide">
+            {buyerLabel} {bags > 0 && `· ${bags} bags`}
+          </span>
+          {!bid.bidOpen && totals.hasData && (
+            <span className="flex items-center gap-2 text-xs">
+              <span className="text-green-700 dark:text-green-400 font-medium">Farmer: ₹{totals.farmerPayable.toFixed(0)}</span>
+              <span className="text-blue-700 dark:text-blue-400 font-medium">Buyer: ₹{totals.buyerReceivable.toFixed(0)}</span>
+            </span>
           )}
-        </div>
+        </button>
+        {canRemove && onRemove && (
+          <button
+            type="button"
+            data-testid={`button-remove-bid-${bidIndex}`}
+            onClick={onRemove}
+            className="h-7 w-7 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 transition-colors shrink-0 mr-1 rounded"
+          >
+            <Trash2 className="w-3 h-3" />
+          </button>
+        )}
       </div>
 
-      {/* Buyer + Price + Bags + Payment */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        <div className="col-span-2 sm:col-span-1">
-          <Label className="text-xs text-muted-foreground">Buyer</Label>
-          <div className="relative">
-            <Input
-              data-testid="input-buyer-name"
-              list="buyer-list"
-              placeholder="Select or type buyer…"
-              value={bid.buyerName}
-              onChange={e => onChange({ ...bid, buyerName: e.target.value })}
-              className="h-8 text-sm pr-7"
-            />
-            <datalist id="buyer-list">
-              {MOCK_BUYERS.map(b => <option key={b} value={b} />)}
-            </datalist>
-            <ChevronsUpDown className="w-3.5 h-3.5 absolute right-2 top-2 text-muted-foreground pointer-events-none" />
+      {bid.bidOpen && (
+        <div className="p-3 space-y-3">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 uppercase tracking-wide">
+              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 inline-block" />
+              Bid & Transaction Details
+            </div>
+            <div className="flex items-center gap-1.5">
+              <label className="text-xs text-muted-foreground whitespace-nowrap">Txn Date:</label>
+              <input
+                type="date"
+                data-testid={`input-txn-date-${bidIndex}`}
+                value={bid.txnDate || farmerDate}
+                onChange={e => onChange({ ...bid, txnDate: e.target.value })}
+                className="text-xs border border-border rounded px-2 py-1 bg-background h-7"
+              />
+              {bid.txnDate && bid.txnDate !== farmerDate && (
+                <button
+                  type="button"
+                  onClick={() => onChange({ ...bid, txnDate: farmerDate })}
+                  className="text-xs text-muted-foreground hover:text-foreground underline whitespace-nowrap"
+                >
+                  Reset
+                </button>
+              )}
+            </div>
           </div>
-          {isNewBuyer && (
-            <div className="flex items-center gap-1 mt-1 text-orange-600 text-xs">
-              <AlertTriangle className="w-3 h-3" /> New buyer will be added
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <div className="col-span-2 sm:col-span-1">
+              <Label className="text-xs text-muted-foreground">Buyer</Label>
+              <div className="relative">
+                <Input
+                  data-testid={`input-buyer-name-${bidIndex}`}
+                  list={`buyer-list-${bid.id}`}
+                  placeholder="Select or type buyer…"
+                  value={bid.buyerName}
+                  onChange={e => onChange({ ...bid, buyerName: e.target.value })}
+                  className="h-8 text-sm pr-7"
+                />
+                <datalist id={`buyer-list-${bid.id}`}>
+                  {MOCK_BUYERS.map(b => <option key={b} value={b} />)}
+                </datalist>
+                <ChevronsUpDown className="w-3.5 h-3.5 absolute right-2 top-2 text-muted-foreground pointer-events-none" />
+              </div>
+              {isNewBuyer && (
+                <div className="flex items-center gap-1 mt-1 text-orange-600 text-xs">
+                  <AlertTriangle className="w-3 h-3" /> New buyer will be added
+                </div>
+              )}
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Price / kg (₹)</Label>
+              <Input
+                data-testid={`input-price-per-kg-${bidIndex}`}
+                type="number" placeholder="0.00"
+                value={bid.pricePerKg}
+                onChange={e => onChange({ ...bid, pricePerKg: e.target.value })}
+                className="h-8 text-sm"
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground"># Bags</Label>
+              <Input
+                data-testid={`input-bid-bags-${bidIndex}`}
+                type="number" placeholder="0"
+                value={bid.numberOfBags}
+                onChange={e => onChange({ ...bid, numberOfBags: e.target.value })}
+                className={`h-8 text-sm ${overBag ? "border-red-400 focus-visible:ring-red-400" : ""}`}
+              />
+              {overBag && (
+                <p className="text-xs text-red-500 font-medium mt-0.5 flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" /> Exceeds lot bags
+                </p>
+              )}
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Payment</Label>
+              <Select value={bid.paymentType} onValueChange={v => onChange({ ...bid, paymentType: v })}>
+                <SelectTrigger data-testid={`select-payment-type-${bidIndex}`} className="h-8 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Credit">Credit</SelectItem>
+                  <SelectItem value="Cash">Cash</SelectItem>
+                  <SelectItem value="UPI">UPI</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {bid.paymentType === "Cash" && (
+            <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-200 rounded-md px-3 py-1.5">
+              <span className="text-xs text-yellow-700 font-medium">Cash advance ₹</span>
+              <Input
+                data-testid={`input-advance-amount-${bidIndex}`}
+                type="number"
+                value={bid.advanceAmount}
+                onChange={e => onChange({ ...bid, advanceAmount: e.target.value })}
+                className="h-7 w-24 text-sm"
+              />
             </div>
           )}
-        </div>
-        <div>
-          <Label className="text-xs text-muted-foreground">Price / kg (₹)</Label>
-          <Input
-            data-testid="input-price-per-kg"
-            type="number" placeholder="0.00"
-            value={bid.pricePerKg}
-            onChange={e => onChange({ ...bid, pricePerKg: e.target.value })}
-            className="h-8 text-sm"
-          />
-        </div>
-        <div>
-          <Label className="text-xs text-muted-foreground"># Bags</Label>
-          <Input
-            data-testid="input-bid-bags"
-            type="number" placeholder="0"
-            value={bid.numberOfBags}
-            onChange={e => onChange({ ...bid, numberOfBags: e.target.value })}
-            className="h-8 text-sm"
-          />
-        </div>
-        <div>
-          <Label className="text-xs text-muted-foreground">Payment</Label>
-          <Select value={bid.paymentType} onValueChange={v => onChange({ ...bid, paymentType: v })}>
-            <SelectTrigger data-testid="select-payment-type" className="h-8 text-sm">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="Credit">Credit</SelectItem>
-              <SelectItem value="Cash">Cash</SelectItem>
-              <SelectItem value="UPI">UPI</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
 
-      {bid.paymentType === "Cash" && (
-        <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-200 rounded-md px-3 py-1.5">
-          <span className="text-xs text-yellow-700 font-medium">Cash advance ₹</span>
-          <Input
-            data-testid="input-advance-amount"
-            type="number"
-            value={bid.advanceAmount}
-            onChange={e => onChange({ ...bid, advanceAmount: e.target.value })}
-            className="h-7 w-24 text-sm"
+          <TxnSection
+            txn={bid.txn}
+            onChange={txn => onChange({ ...bid, txn })}
+            bags={bags}
+            pricePerKg={pricePerKg}
+            vehicleBhadaRate={vehicleBhadaRate}
+            totalBagsInVehicle={totalBagsInVehicle}
+            cs={cs}
           />
         </div>
       )}
-
-      {/* Row 3 — Weight + Charges + Calculations */}
-      <TxnSection
-        txn={bid.txn}
-        onChange={txn => onChange({ ...bid, txn })}
-        bags={bags}
-        pricePerKg={pricePerKg}
-        vehicleBhadaRate={vehicleBhadaRate}
-        totalBagsInVehicle={totalBagsInVehicle}
-        cs={cs}
-      />
     </div>
   );
 }
@@ -798,12 +856,25 @@ function LotCard({ lot, index, onChange, onRemove, vehicleBhadaRate, totalBagsIn
   vehicleBhadaRate: number; totalBagsInVehicle: number;
   cs: ChargeSettings; farmerDate: string;
 }) {
-  const setField = (f: keyof Omit<LotRow, "id" | "bid" | "lotOpen">, v: string) => onChange({ ...lot, [f]: v });
+  const setField = (f: keyof Omit<LotRow, "id" | "bids" | "lotOpen">, v: string) => onChange({ ...lot, [f]: v });
   const totals = calcLotTotals(lot, cs, vehicleBhadaRate, totalBagsInVehicle);
+  const lotBags = parseInt(lot.numberOfBags) || 0;
+
+  const updateBid = (idx: number, bid: BidRow) =>
+    onChange({ ...lot, bids: lot.bids.map((b, i) => (i === idx ? bid : b)) });
+  const removeBid = (idx: number) =>
+    onChange({ ...lot, bids: lot.bids.filter((_, i) => i !== idx) });
+  const addBid = () =>
+    onChange({ ...lot, bids: [...lot.bids, emptyBid(farmerDate)] });
+
+  let runningBags = 0;
+  const bidOverFlags = lot.bids.map(b => {
+    runningBags += parseInt(b.numberOfBags) || 0;
+    return lotBags > 0 && runningBags > lotBags;
+  });
 
   return (
     <div className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
-      {/* Lot header — toggle area and trash are siblings, not nested */}
       <div className="flex items-center bg-muted/30 border-b border-border">
         <button
           type="button"
@@ -833,7 +904,6 @@ function LotCard({ lot, index, onChange, onRemove, vehicleBhadaRate, totalBagsIn
 
       {lot.lotOpen && (
         <div className="p-3 space-y-3">
-          {/* Row 1 — Lot info */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <div>
               <Label className="text-xs text-muted-foreground"># Bags *</Label>
@@ -879,15 +949,31 @@ function LotCard({ lot, index, onChange, onRemove, vehicleBhadaRate, totalBagsIn
             </div>
           </div>
 
-          {/* Row 2+3 — Bid + Txn */}
-          <BidSection
-            bid={lot.bid}
-            onChange={bid => onChange({ ...lot, bid })}
-            vehicleBhadaRate={vehicleBhadaRate}
-            totalBagsInVehicle={totalBagsInVehicle}
-            cs={cs}
-            farmerDate={farmerDate}
-          />
+          <div className="ml-4 space-y-1">
+            {lot.bids.map((bid, bidIdx) => (
+              <BidSection
+                key={bid.id}
+                bid={bid}
+                bidIndex={bidIdx}
+                onChange={b => updateBid(bidIdx, b)}
+                onRemove={() => removeBid(bidIdx)}
+                canRemove={lot.bids.length > 1}
+                vehicleBhadaRate={vehicleBhadaRate}
+                totalBagsInVehicle={totalBagsInVehicle}
+                cs={cs}
+                farmerDate={farmerDate}
+                overBag={bidOverFlags[bidIdx]}
+              />
+            ))}
+            <Button
+              type="button" variant="outline" size="sm"
+              onClick={addBid}
+              className="w-full h-7 text-xs gap-1.5 border-dashed mt-2"
+              data-testid="button-add-bid"
+            >
+              <Plus className="w-3 h-3" /> Add Bid
+            </Button>
+          </div>
         </div>
       )}
     </div>
