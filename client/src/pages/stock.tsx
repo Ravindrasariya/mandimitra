@@ -2010,6 +2010,16 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
             {card.village && (
               <span className="hidden sm:inline text-xs text-muted-foreground font-normal shrink-0">· {card.village}</span>
             )}
+            {parseFloat(card.advanceAmount || "0") > 0 && (
+              <span className="hidden sm:inline-flex text-[10px] font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded px-1.5 py-0.5 shrink-0">
+                Advance ₹{parseFloat(card.advanceAmount).toLocaleString("en-IN")}{card.advanceMode ? ` · ${card.advanceMode}` : ""}
+              </span>
+            )}
+            {isDirty && card.savedAt !== null && (
+              <span className="hidden sm:inline-flex text-[10px] font-medium text-orange-500 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-800 rounded px-1.5 py-0.5 shrink-0">
+                Unsaved changes
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <input
@@ -2048,9 +2058,9 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
             )}
           </div>
         )}
-        {/* Second row on desktop / third row on mobile: collapsed summary + badges */}
+        {/* Row 2: collapsed summary */}
         {!card.cardOpen && !card.archived && (
-          <div className="pl-6 flex items-center gap-2 flex-wrap">
+          <div className="pl-6">
             <CollapsedSummary
               totalBags={grandTotalBags} remainingBags={grandRemainingBags}
               farmerPayable={grandFarmerPayable} buyerReceivable={grandBuyerReceivable}
@@ -2059,16 +2069,6 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
               farmerPaymentStatus={aggregatePaymentStatus(card.cropGroups.flatMap(g => g.lots.flatMap(l => l.bids.filter(b => b.txnDbId).map(b => b.farmerPaymentStatus || "due"))))}
               buyerPaymentStatus={aggregatePaymentStatus(card.cropGroups.flatMap(g => g.lots.flatMap(l => l.bids.filter(b => b.txnDbId).map(b => b.paymentStatus || "due"))))}
             />
-            {parseFloat(card.advanceAmount || "0") > 0 && (
-              <span className="hidden sm:inline-flex text-[10px] font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded px-1.5 py-0.5">
-                Advance ₹{parseFloat(card.advanceAmount).toLocaleString("en-IN")}{card.advanceMode ? ` · ${card.advanceMode}` : ""}
-              </span>
-            )}
-            {isDirty && card.savedAt !== null && (
-              <span className="hidden sm:inline-flex text-[10px] font-medium text-orange-500 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-800 rounded px-1.5 py-0.5">
-                Unsaved changes
-              </span>
-            )}
           </div>
         )}
       </button>
