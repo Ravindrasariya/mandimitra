@@ -17,6 +17,7 @@ import { ASSET_CATEGORIES, ASSET_DEPRECIATION_RATES } from "@shared/schema";
 import { Wallet, Settings, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Download, RotateCcw, Trash2, Plus, Filter, X, Search, ChevronsUpDown, Pencil, Check, Save } from "lucide-react";
 import { format } from "date-fns";
 
+type CashEntryWithTxn = CashEntry & { srNumber: number | null; txnCode: string | null };
 type BuyerWithDues = Buyer & { receivableDue: string; overallDue: string };
 type FarmerWithDues = Farmer & { totalPayable: string; totalDue: string; salesCount: number };
 type TransactionAggregates = {
@@ -136,7 +137,7 @@ export default function CashPage() {
     return params.toString() ? `?${params.toString()}` : "";
   }, [filterCategory, filterMonth, filterYear]);
 
-  const { data: allEntries = [], isLoading } = useQuery<CashEntry[]>({
+  const { data: allEntries = [], isLoading } = useQuery<CashEntryWithTxn[]>({
     queryKey: [`/api/cash-entries${queryParams}`],
   });
 
@@ -710,8 +711,8 @@ export default function CashPage() {
       "Receiver/Party": e.partyName || (e.buyerId ? getBuyerName(e.buyerId) : e.farmerId ? getFarmerName(e.farmerId) : ""),
       "Buyer": e.buyerId ? getBuyerName(e.buyerId) : "",
       "Farmer": e.farmerId ? getFarmerName(e.farmerId) : "",
-      "SR#": (e as any).srNumber != null ? String((e as any).srNumber) : "",
-      "Transaction ID": (e as any).txnCode || "",
+      "SR#": e.srNumber != null ? String(e.srNumber) : "",
+      "Transaction ID": e.txnCode || "",
       "Amount": e.amount,
       "Discount": e.discount || "0",
       "Petty Adj": e.pettyAdj || "0",
