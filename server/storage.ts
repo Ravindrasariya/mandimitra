@@ -25,7 +25,7 @@ import {
   ASSET_DEPRECIATION_RATES,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, ilike, or, sql, desc, asc, gte, lte, ne, isNotNull } from "drizzle-orm";
+import { eq, and, ilike, or, sql, desc, asc, gte, lte, ne, isNotNull, getTableColumns } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -102,7 +102,7 @@ export interface IStorage {
   getCashSettings(businessId: number): Promise<CashSettings | undefined>;
   upsertCashSettings(businessId: number, cashInHandOpening: string): Promise<CashSettings>;
 
-  getCashEntries(businessId: number, filters?: { category?: string; outflowType?: string; farmerId?: number; buyerId?: number; month?: string; year?: string }): Promise<CashEntry[]>;
+  getCashEntries(businessId: number, filters?: { category?: string; outflowType?: string; farmerId?: number; buyerId?: number; month?: string; year?: string }): Promise<(CashEntry & { srNumber: number | null; txnCode: string | null })[]>;
   createCashEntry(entry: InsertCashEntry): Promise<CashEntry>;
   reverseCashEntry(id: number, businessId: number, reason?: string | null): Promise<CashEntry | undefined>;
 
@@ -1090,7 +1090,7 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async getCashEntries(businessId: number, filters?: { category?: string; outflowType?: string; farmerId?: number; buyerId?: number; month?: string; year?: string }): Promise<CashEntry[]> {
+  async getCashEntries(businessId: number, filters?: { category?: string; outflowType?: string; farmerId?: number; buyerId?: number; month?: string; year?: string }): Promise<(CashEntry & { srNumber: number | null; txnCode: string | null })[]> {
     let conditions = [eq(cashEntries.businessId, businessId)];
     if (filters?.category) conditions.push(eq(cashEntries.category, filters.category));
     if (filters?.outflowType) conditions.push(eq(cashEntries.outflowType, filters.outflowType));
@@ -1110,7 +1110,19 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    return db.select().from(cashEntries).where(and(...conditions)).orderBy(desc(cashEntries.createdAt));
+    const results = await db
+      .select({
+        ...getTableColumns(cashEntries),
+        srNumber: lots.serialNumber,
+        txnCode: transactions.transactionId,
+      })
+      .from(cashEntries)
+      .leftJoin(transactions, eq(cashEntries.transactionId, transactions.id))
+      .leftJoin(lots, eq(transactions.lotId, lots.id))
+      .where(and(...conditions))
+      .orderBy(desc(cashEntries.createdAt));
+
+    return results as (CashEntry & { srNumber: number | null; txnCode: string | null })[];
   }
 
   private async validateAllocationDues(

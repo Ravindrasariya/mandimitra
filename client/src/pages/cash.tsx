@@ -710,6 +710,8 @@ export default function CashPage() {
       "Receiver/Party": e.partyName || (e.buyerId ? getBuyerName(e.buyerId) : e.farmerId ? getFarmerName(e.farmerId) : ""),
       "Buyer": e.buyerId ? getBuyerName(e.buyerId) : "",
       "Farmer": e.farmerId ? getFarmerName(e.farmerId) : "",
+      "SR#": (e as any).srNumber != null ? String((e as any).srNumber) : "",
+      "Transaction ID": (e as any).txnCode || "",
       "Amount": e.amount,
       "Discount": e.discount || "0",
       "Petty Adj": e.pettyAdj || "0",
