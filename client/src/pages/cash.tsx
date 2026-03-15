@@ -160,7 +160,7 @@ export default function CashPage() {
   const { data: farmerPendingTransactions = [] } = useQuery<FarmerPendingTxn[]>({
     queryKey: ["/api/farmers", outwardFarmerId, "pending-transactions"],
     queryFn: () => outwardFarmerId ? fetch(`/api/farmers/${outwardFarmerId}/pending-transactions`, { credentials: "include" }).then(r => r.json()) : Promise.resolve([]),
-    enabled: outwardOutflowType === "Farmer-Harvest Sale" && !!outwardFarmerId,
+    enabled: (outwardOutflowType === "Farmer-Harvest Sale" || outwardOutflowType === "Farmer-Advance") && !!outwardFarmerId,
   });
 
   const hasBankAccounts = bankAccountsList.length > 0;
@@ -561,7 +561,7 @@ export default function CashPage() {
       return;
     }
 
-    if (outwardOutflowType === "Farmer-Harvest Sale" && outwardFarmerId && farmerAllocations.length > 0) {
+    if ((outwardOutflowType === "Farmer-Harvest Sale" || outwardOutflowType === "Farmer-Advance") && outwardFarmerId && farmerAllocations.length > 0) {
       if (!outwardAmount || parseFloat(outwardAmount) <= 0) {
         toast({ title: t("common.error"), description: "Enter the total amount paid", variant: "destructive" });
         return;
@@ -600,7 +600,7 @@ export default function CashPage() {
           pettyAdj: "0",
         })),
       }, { onSuccess: clearOutwardForm });
-    } else if (outwardOutflowType === "Farmer-Harvest Sale" && outwardFarmerId) {
+    } else if ((outwardOutflowType === "Farmer-Harvest Sale" || outwardOutflowType === "Farmer-Advance") && outwardFarmerId) {
       toast({ title: t("common.error"), description: "Select at least one transaction to allocate payment", variant: "destructive" });
       return;
     } else {
@@ -1398,7 +1398,7 @@ export default function CashPage() {
                       </div>
                     </div>
                   )}
-                  {outwardOutflowType === "Farmer-Harvest Sale" && outwardFarmerId && (
+                  {(outwardOutflowType === "Farmer-Harvest Sale" || outwardOutflowType === "Farmer-Advance") && outwardFarmerId && (
                     <>
                       <div className="space-y-1">
                         <Label className="text-xs">{t("cash.amount")}</Label>

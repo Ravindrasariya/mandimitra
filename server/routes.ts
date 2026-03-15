@@ -1210,7 +1210,7 @@ export async function registerRoutes(
             let remaining = groupAmount;
             for (let i = 0; i < txnDues.length; i++) {
               const isLast = i === txnDues.length - 1;
-              const share = isLast ? remaining : Math.round((txnDues[i].due / totalDue) * groupAmount * 100) / 100;
+              const share = isLast ? remaining : Math.min(remaining, txnDues[i].due);
               if (share > 0) {
                 expandedAllocations.push({
                   transactionId: txnDues[i].id,
