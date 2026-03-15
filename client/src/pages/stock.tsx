@@ -1,0 +1,696 @@
+import { useState } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
+import {
+  Plus, Trash2, ChevronDown, ChevronRight, Truck, User,
+  AlertTriangle, Scale, Wheat, ChevronsUpDown, X,
+} from "lucide-react";
+import { format } from "date-fns";
+import { CROPS, SIZES } from "@shared/schema";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+type WeightRow = { id: string; grossWeight: string; tare: string };
+
+type BidRow = {
+  buyerName: string;
+  pricePerKg: string;
+  numberOfBags: string;
+  paymentType: string;
+  advanceAmount: string;
+  weights: WeightRow[];
+};
+
+type LotRow = {
+  id: string;
+  numberOfBags: string;
+  size: string;
+  variety: string;
+  bagMarka: string;
+  bid: BidRow;
+};
+
+type CropGroup = { id: string; crop: string; lots: LotRow[] };
+
+type FarmerCard = {
+  id: string;
+  date: string;
+  farmerName: string;
+  farmerPhone: string;
+  village: string;
+  tehsil: string;
+  district: string;
+  vehicleNumber: string;
+  driverName: string;
+  vehicleBhadaRate: string;
+  freightType: string;
+  advanceAmount: string;
+  advanceMode: string;
+  cropGroups: CropGroup[];
+  cardOpen: boolean;
+  farmerOpen: boolean;
+  vehicleOpen: boolean;
+};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const uid = () => Math.random().toString(36).slice(2, 8);
+
+const emptyBid = (): BidRow => ({
+  buyerName: "",
+  pricePerKg: "",
+  numberOfBags: "",
+  paymentType: "Credit",
+  advanceAmount: "500",
+  weights: [{ id: uid(), grossWeight: "", tare: "" }],
+});
+
+const emptyLot = (): LotRow => ({
+  id: uid(),
+  numberOfBags: "",
+  size: "None",
+  variety: "",
+  bagMarka: "",
+  bid: emptyBid(),
+});
+
+const emptyCard = (): FarmerCard => ({
+  id: uid(),
+  date: format(new Date(), "yyyy-MM-dd"),
+  farmerName: "",
+  farmerPhone: "",
+  village: "",
+  tehsil: "",
+  district: "",
+  vehicleNumber: "",
+  driverName: "",
+  vehicleBhadaRate: "",
+  freightType: "",
+  advanceAmount: "",
+  advanceMode: "",
+  cropGroups: [],
+  cardOpen: true,
+  farmerOpen: true,
+  vehicleOpen: false,
+});
+
+const MOCK_BUYERS = ["Ramesh Traders", "Suresh & Sons", "Patel Bros", "Kishan Vyapari"];
+const CROP_COLORS: Record<string, string> = {
+  Potato: "bg-violet-50 border-violet-300 text-violet-700",
+  Onion:  "bg-rose-50 border-rose-300 text-rose-700",
+  Garlic: "bg-amber-50 border-amber-300 text-amber-700",
+};
+const CROP_HEADER: Record<string, string> = {
+  Potato: "bg-violet-100 border-violet-300",
+  Onion:  "bg-rose-100 border-rose-300",
+  Garlic: "bg-amber-100 border-amber-300",
+};
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+function SectionToggle({ open, onToggle, icon, label, count }: {
+  open: boolean; onToggle: () => void; icon: React.ReactNode; label: string; count?: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onToggle}
+      className="w-full flex items-center gap-2 px-3 py-2 rounded-md bg-muted/50 hover:bg-muted transition-colors text-sm font-medium text-left"
+    >
+      {open ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+      {icon}
+      <span>{label}</span>
+      {count && <Badge variant="secondary" className="ml-auto text-xs">{count}</Badge>}
+    </button>
+  );
+}
+
+function WeightRowComp({ row, onChange, onRemove, canRemove }: {
+  row: WeightRow;
+  onChange: (field: keyof Omit<WeightRow, "id">, val: string) => void;
+  onRemove: () => void;
+  canRemove: boolean;
+}) {
+  const gross = parseFloat(row.grossWeight) || 0;
+  const tare = parseFloat(row.tare) || 0;
+  const net = gross > 0 && tare > 0 ? (gross - tare).toFixed(2) : "";
+
+  return (
+    <div className="flex items-end gap-2 flex-wrap">
+      <div className="flex-1 min-w-[100px]">
+        <Label className="text-xs text-muted-foreground">Gross Wt (kg)</Label>
+        <Input
+          data-testid="input-gross-weight"
+          type="number"
+          placeholder="e.g. 1200"
+          value={row.grossWeight}
+          onChange={e => onChange("grossWeight", e.target.value)}
+          className="h-8 text-sm"
+        />
+      </div>
+      <div className="flex-1 min-w-[90px]">
+        <Label className="text-xs text-muted-foreground">Tare (kg)</Label>
+        <Input
+          data-testid="input-tare"
+          type="number"
+          placeholder="e.g. 200"
+          value={row.tare}
+          onChange={e => onChange("tare", e.target.value)}
+          className="h-8 text-sm"
+        />
+      </div>
+      <div className="flex-1 min-w-[90px]">
+        <Label className="text-xs text-muted-foreground">Net Wt (kg)</Label>
+        <div className={`h-8 px-3 flex items-center rounded-md border text-sm font-semibold ${net ? "bg-green-50 border-green-300 text-green-700" : "bg-muted border-border text-muted-foreground"}`}>
+          {net || "—"}
+        </div>
+      </div>
+      {canRemove && (
+        <Button type="button" variant="ghost" size="sm" onClick={onRemove} className="h-8 w-8 p-0 text-red-400 hover:text-red-600">
+          <X className="w-3.5 h-3.5" />
+        </Button>
+      )}
+    </div>
+  );
+}
+
+function BidSection({ bid, onChange }: {
+  bid: BidRow;
+  onChange: (updated: BidRow) => void;
+}) {
+  const isNewBuyer = bid.buyerName.trim().length > 0 && !MOCK_BUYERS.includes(bid.buyerName.trim());
+
+  const updateWeight = (idx: number, field: keyof Omit<WeightRow, "id">, val: string) => {
+    const weights = bid.weights.map((w, i) => i === idx ? { ...w, [field]: val } : w);
+    onChange({ ...bid, weights });
+  };
+  const addWeight = () => onChange({ ...bid, weights: [...bid.weights, { id: uid(), grossWeight: "", tare: "" }] });
+  const removeWeight = (idx: number) => onChange({ ...bid, weights: bid.weights.filter((_, i) => i !== idx) });
+
+  return (
+    <div className="ml-5 mt-2 rounded-lg border border-blue-200 bg-blue-50/40 p-3 space-y-3">
+      {/* Bid header */}
+      <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 uppercase tracking-wide">
+        <span className="w-1.5 h-1.5 rounded-full bg-blue-400 inline-block" />
+        Bid Details
+      </div>
+
+      {/* Buyer + Price + Bags + Payment */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div className="col-span-2 sm:col-span-1">
+          <Label className="text-xs text-muted-foreground">Buyer</Label>
+          <div className="relative">
+            <Input
+              data-testid="input-buyer-name"
+              list="buyer-list"
+              placeholder="Select or type buyer…"
+              value={bid.buyerName}
+              onChange={e => onChange({ ...bid, buyerName: e.target.value })}
+              className="h-8 text-sm pr-7"
+            />
+            <datalist id="buyer-list">
+              {MOCK_BUYERS.map(b => <option key={b} value={b} />)}
+            </datalist>
+            <ChevronsUpDown className="w-3.5 h-3.5 absolute right-2 top-2 text-muted-foreground pointer-events-none" />
+          </div>
+          {isNewBuyer && (
+            <div className="flex items-center gap-1 mt-1 text-orange-600 text-xs">
+              <AlertTriangle className="w-3 h-3" />
+              New buyer will be added
+            </div>
+          )}
+        </div>
+        <div>
+          <Label className="text-xs text-muted-foreground">Price / kg (₹)</Label>
+          <Input
+            data-testid="input-price-per-kg"
+            type="number"
+            placeholder="0.00"
+            value={bid.pricePerKg}
+            onChange={e => onChange({ ...bid, pricePerKg: e.target.value })}
+            className="h-8 text-sm"
+          />
+        </div>
+        <div>
+          <Label className="text-xs text-muted-foreground"># Bags</Label>
+          <Input
+            data-testid="input-bid-bags"
+            type="number"
+            placeholder="0"
+            value={bid.numberOfBags}
+            onChange={e => onChange({ ...bid, numberOfBags: e.target.value })}
+            className="h-8 text-sm"
+          />
+        </div>
+        <div>
+          <Label className="text-xs text-muted-foreground">Payment</Label>
+          <Select value={bid.paymentType} onValueChange={v => onChange({ ...bid, paymentType: v })}>
+            <SelectTrigger data-testid="select-payment-type" className="h-8 text-sm">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="Credit">Credit</SelectItem>
+              <SelectItem value="Cash">Cash</SelectItem>
+              <SelectItem value="UPI">UPI</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
+      {/* Advance if Cash */}
+      {bid.paymentType === "Cash" && (
+        <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-200 rounded-md px-3 py-1.5">
+          <span className="text-xs text-yellow-700 font-medium">Cash advance ₹</span>
+          <Input
+            data-testid="input-advance-amount"
+            type="number"
+            value={bid.advanceAmount}
+            onChange={e => onChange({ ...bid, advanceAmount: e.target.value })}
+            className="h-7 w-24 text-sm"
+          />
+        </div>
+      )}
+
+      {/* Weight rows */}
+      <div className="ml-4 mt-1 rounded-lg border border-green-200 bg-green-50/40 p-3 space-y-2">
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-green-600 uppercase tracking-wide">
+          <span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block" />
+          <Scale className="w-3.5 h-3.5" />
+          Weight Entry
+        </div>
+        {bid.weights.map((w, idx) => (
+          <WeightRowComp
+            key={w.id}
+            row={w}
+            onChange={(f, v) => updateWeight(idx, f, v)}
+            onRemove={() => removeWeight(idx)}
+            canRemove={bid.weights.length > 1}
+          />
+        ))}
+        <Button type="button" variant="outline" size="sm" onClick={addWeight} className="h-7 text-xs gap-1 border-dashed border-green-400 text-green-600 hover:bg-green-50">
+          <Plus className="w-3 h-3" /> Add Weight Row
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function LotCard({ lot, index, onChange, onRemove }: {
+  lot: LotRow;
+  index: number;
+  onChange: (updated: LotRow) => void;
+  onRemove: () => void;
+}) {
+  const setField = (field: keyof Omit<LotRow, "id" | "bid">, val: string) =>
+    onChange({ ...lot, [field]: val });
+
+  return (
+    <div className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
+      {/* Lot header */}
+      <div className="flex items-center justify-between px-3 py-2 bg-muted/30 border-b border-border">
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Lot #{index + 1}</span>
+        <Button type="button" variant="ghost" size="sm" onClick={onRemove} className="h-6 w-6 p-0 text-red-400 hover:text-red-600">
+          <Trash2 className="w-3.5 h-3.5" />
+        </Button>
+      </div>
+
+      <div className="p-3 space-y-3">
+        {/* Row 1 — Lot info */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div>
+            <Label className="text-xs text-muted-foreground"># Bags *</Label>
+            <Input
+              data-testid={`input-lot-bags-${index}`}
+              type="number"
+              placeholder="0"
+              value={lot.numberOfBags}
+              onChange={e => setField("numberOfBags", e.target.value.replace(/\D/g, ""))}
+              className="h-8 text-sm"
+            />
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">Size</Label>
+            <Select value={lot.size} onValueChange={v => setField("size", v)}>
+              <SelectTrigger data-testid={`select-size-${index}`} className="h-8 text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="None">None</SelectItem>
+                {SIZES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">Variety</Label>
+            <Input
+              data-testid={`input-variety-${index}`}
+              placeholder="e.g. Lal Pyaaz"
+              value={lot.variety}
+              onChange={e => setField("variety", e.target.value)}
+              className="h-8 text-sm"
+            />
+          </div>
+          <div>
+            <Label className="text-xs text-muted-foreground">Bag Marka</Label>
+            <Input
+              data-testid={`input-bag-marka-${index}`}
+              placeholder="e.g. ABC"
+              value={lot.bagMarka}
+              onChange={e => setField("bagMarka", e.target.value)}
+              className="h-8 text-sm"
+            />
+          </div>
+        </div>
+
+        {/* Row 2+3 — Bid + Weights */}
+        <BidSection
+          bid={lot.bid}
+          onChange={bid => onChange({ ...lot, bid })}
+        />
+      </div>
+    </div>
+  );
+}
+
+function CropGroupSection({ group, onChange, onRemove }: {
+  group: CropGroup;
+  onChange: (updated: CropGroup) => void;
+  onRemove: () => void;
+}) {
+  const headerCls = CROP_HEADER[group.crop] || "bg-muted border-border";
+  const badgeCls = CROP_COLORS[group.crop] || "bg-muted border-border text-foreground";
+
+  const addLot = () => onChange({ ...group, lots: [...group.lots, emptyLot()] });
+  const updateLot = (idx: number, lot: LotRow) =>
+    onChange({ ...group, lots: group.lots.map((l, i) => (i === idx ? lot : l)) });
+  const removeLot = (idx: number) => {
+    if (group.lots.length === 1) return;
+    onChange({ ...group, lots: group.lots.filter((_, i) => i !== idx) });
+  };
+
+  return (
+    <div className={`rounded-xl border-2 ${headerCls} overflow-hidden`}>
+      {/* Crop header */}
+      <div className={`flex items-center justify-between px-4 py-2 ${headerCls} border-b`}>
+        <div className="flex items-center gap-2">
+          <Wheat className="w-4 h-4" />
+          <span className="font-semibold text-sm">{group.crop}</span>
+          <Badge variant="outline" className={`text-xs ${badgeCls}`}>
+            {group.lots.length} lot{group.lots.length !== 1 ? "s" : ""}
+          </Badge>
+        </div>
+        <Button type="button" variant="ghost" size="sm" onClick={onRemove} className="h-7 w-7 p-0 text-red-400 hover:text-red-600" title="Remove crop">
+          <X className="w-3.5 h-3.5" />
+        </Button>
+      </div>
+
+      {/* Lots */}
+      <div className="p-3 space-y-3 bg-background/60">
+        {group.lots.map((lot, idx) => (
+          <LotCard
+            key={lot.id}
+            lot={lot}
+            index={idx}
+            onChange={lot => updateLot(idx, lot)}
+            onRemove={() => removeLot(idx)}
+          />
+        ))}
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={addLot}
+          className="w-full h-8 text-xs gap-1.5 border-dashed"
+        >
+          <Plus className="w-3.5 h-3.5" /> Add Lot under {group.crop}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function FarmerCardComp({ card, onChange, onRemove }: {
+  card: FarmerCard;
+  onChange: (updated: FarmerCard) => void;
+  onRemove: () => void;
+}) {
+  const set = (field: keyof FarmerCard, val: any) => onChange({ ...card, [field]: val });
+
+  const usedCrops = card.cropGroups.map(g => g.crop);
+  const availableCrops = CROPS.filter(c => !usedCrops.includes(c));
+
+  const addCrop = (crop: string) => {
+    onChange({
+      ...card,
+      cropGroups: [...card.cropGroups, { id: uid(), crop, lots: [emptyLot()] }],
+    });
+  };
+
+  const updateGroup = (idx: number, group: CropGroup) =>
+    onChange({ ...card, cropGroups: card.cropGroups.map((g, i) => (i === idx ? group : g)) });
+
+  const removeGroup = (idx: number) =>
+    onChange({ ...card, cropGroups: card.cropGroups.filter((_, i) => i !== idx) });
+
+  return (
+    <Card className="border-2 border-border shadow-md overflow-hidden">
+      {/* ── Card header ─────────────────────────────── */}
+      <button
+        type="button"
+        className="w-full flex items-center justify-between px-4 py-3 bg-muted/40 hover:bg-muted/60 transition-colors border-b border-border"
+        onClick={() => set("cardOpen", !card.cardOpen)}
+        data-testid="button-toggle-farmer-card"
+      >
+        <div className="flex items-center gap-3">
+          {card.cardOpen ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+          <User className="w-4 h-4 text-primary" />
+          <span className="font-semibold text-sm">
+            {card.farmerName.trim() || <span className="text-muted-foreground italic">New Farmer Entry</span>}
+          </span>
+          {card.farmerPhone && <span className="text-xs text-muted-foreground">· {card.farmerPhone}</span>}
+          {card.village && <span className="text-xs text-muted-foreground">· {card.village}</span>}
+        </div>
+        <div className="flex items-center gap-2">
+          <input
+            type="date"
+            value={card.date}
+            onChange={e => { e.stopPropagation(); set("date", e.target.value); }}
+            onClick={e => e.stopPropagation()}
+            className="text-xs border border-border rounded px-2 py-1 bg-background"
+            data-testid="input-farmer-date"
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={e => { e.stopPropagation(); onRemove(); }}
+            className="h-7 w-7 p-0 text-red-400 hover:text-red-600"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </Button>
+        </div>
+      </button>
+
+      {/* ── Card body ───────────────────────────────── */}
+      {card.cardOpen && (
+        <CardContent className="p-4 space-y-3">
+
+          {/* ── Farmer Details ──────────────────────── */}
+          <SectionToggle
+            open={card.farmerOpen}
+            onToggle={() => set("farmerOpen", !card.farmerOpen)}
+            icon={<User className="w-3.5 h-3.5" />}
+            label="Farmer Details"
+          />
+          {card.farmerOpen && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pl-2">
+              <div>
+                <Label className="text-xs text-muted-foreground">Name *</Label>
+                <Input data-testid="input-farmer-name" placeholder="Farmer name" value={card.farmerName} onChange={e => set("farmerName", e.target.value)} className="h-8 text-sm" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Phone</Label>
+                <Input data-testid="input-farmer-phone" placeholder="10-digit mobile" value={card.farmerPhone} onChange={e => set("farmerPhone", e.target.value.replace(/\D/g, "").slice(0, 10))} className="h-8 text-sm" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Village</Label>
+                <Input data-testid="input-village" placeholder="Village" value={card.village} onChange={e => set("village", e.target.value)} className="h-8 text-sm" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Tehsil</Label>
+                <Input data-testid="input-tehsil" placeholder="Tehsil" value={card.tehsil} onChange={e => set("tehsil", e.target.value)} className="h-8 text-sm" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">District</Label>
+                <Input data-testid="input-district" placeholder="District" value={card.district} onChange={e => set("district", e.target.value)} className="h-8 text-sm" />
+              </div>
+            </div>
+          )}
+
+          {/* Advance at farmer level */}
+          <div className="flex items-center gap-3 pl-2">
+            <div>
+              <Label className="text-xs text-muted-foreground">Farmer Advance ₹</Label>
+              <Input
+                data-testid="input-farmer-advance"
+                type="number"
+                placeholder="0"
+                value={card.advanceAmount}
+                onChange={e => set("advanceAmount", e.target.value)}
+                className="h-8 w-32 text-sm"
+              />
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Mode</Label>
+              <Select value={card.advanceMode} onValueChange={v => set("advanceMode", v)}>
+                <SelectTrigger data-testid="select-advance-mode" className="h-8 w-28 text-sm">
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Cash">Cash</SelectItem>
+                  <SelectItem value="UPI">UPI</SelectItem>
+                  <SelectItem value="Bank">Bank</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          {/* ── Vehicle Info ────────────────────────── */}
+          <SectionToggle
+            open={card.vehicleOpen}
+            onToggle={() => set("vehicleOpen", !card.vehicleOpen)}
+            icon={<Truck className="w-3.5 h-3.5" />}
+            label="Vehicle Info"
+            count={card.vehicleNumber || undefined}
+          />
+          {card.vehicleOpen && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pl-2">
+              <div>
+                <Label className="text-xs text-muted-foreground">Vehicle #</Label>
+                <Input data-testid="input-vehicle-number" placeholder="MP09XX0000" value={card.vehicleNumber} onChange={e => set("vehicleNumber", e.target.value.toUpperCase())} className="h-8 text-sm" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Driver Name</Label>
+                <Input data-testid="input-driver-name" placeholder="Driver name" value={card.driverName} onChange={e => set("driverName", e.target.value)} className="h-8 text-sm" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Bhada Rate</Label>
+                <Input data-testid="input-bhada-rate" type="number" placeholder="₹/bag or flat" value={card.vehicleBhadaRate} onChange={e => set("vehicleBhadaRate", e.target.value)} className="h-8 text-sm" />
+              </div>
+              <div>
+                <Label className="text-xs text-muted-foreground">Freight Type</Label>
+                <Select value={card.freightType} onValueChange={v => set("freightType", v)}>
+                  <SelectTrigger data-testid="select-freight-type" className="h-8 text-sm">
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Per Bag">Per Bag</SelectItem>
+                    <SelectItem value="Fixed">Fixed Amount</SelectItem>
+                    <SelectItem value="None">None</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          {/* ── Crop Groups ─────────────────────────── */}
+          <div className="space-y-3 pt-1">
+            {card.cropGroups.map((group, idx) => (
+              <CropGroupSection
+                key={group.id}
+                group={group}
+                onChange={g => updateGroup(idx, g)}
+                onRemove={() => removeGroup(idx)}
+              />
+            ))}
+
+            {/* Add crop button(s) */}
+            {availableCrops.length > 0 && (
+              <div className="flex flex-wrap gap-2 pt-1">
+                {availableCrops.map(crop => (
+                  <Button
+                    key={crop}
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => addCrop(crop)}
+                    className={`h-8 gap-1.5 text-sm border-dashed font-medium ${
+                      crop === "Potato" ? "border-violet-400 text-violet-600 hover:bg-violet-50" :
+                      crop === "Onion"  ? "border-rose-400 text-rose-600 hover:bg-rose-50" :
+                      "border-amber-400 text-amber-600 hover:bg-amber-50"
+                    }`}
+                    data-testid={`button-add-crop-${crop.toLowerCase()}`}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    {card.cropGroups.length === 0 ? `Start with ${crop}` : `+ ${crop}`}
+                  </Button>
+                ))}
+              </div>
+            )}
+
+            {card.cropGroups.length === 0 && (
+              <p className="text-xs text-muted-foreground italic text-center py-2">
+                Select a crop above to begin adding lots
+              </p>
+            )}
+          </div>
+
+          {/* ── Save row ────────────────────────────── */}
+          <div className="flex justify-end pt-2 border-t border-border">
+            <Button type="button" disabled className="gap-2 opacity-50" title="Wiring coming soon">
+              Save Entry
+            </Button>
+          </div>
+        </CardContent>
+      )}
+    </Card>
+  );
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
+
+export default function StockPage() {
+  const [cards, setCards] = useState<FarmerCard[]>([emptyCard()]);
+
+  const addCard = () => setCards(prev => [emptyCard(), ...prev]);
+  const updateCard = (idx: number, card: FarmerCard) =>
+    setCards(prev => prev.map((c, i) => (i === idx ? card : c)));
+  const removeCard = (idx: number) =>
+    setCards(prev => prev.filter((_, i) => i !== idx));
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* ── Page header ── */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-background sticky top-0 z-10">
+        <div>
+          <h1 className="text-lg font-bold">Stock Entry</h1>
+          <p className="text-xs text-muted-foreground">Add farmers, lots, bids and weights in one place</p>
+        </div>
+        <Button
+          type="button"
+          onClick={addCard}
+          data-testid="button-add-farmer-entry"
+          className="gap-2"
+        >
+          <Plus className="w-4 h-4" /> New Farmer Entry
+        </Button>
+      </div>
+
+      {/* ── Cards list ── */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {cards.map((card, idx) => (
+          <FarmerCardComp
+            key={card.id}
+            card={card}
+            onChange={c => updateCard(idx, c)}
+            onRemove={() => removeCard(idx)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}

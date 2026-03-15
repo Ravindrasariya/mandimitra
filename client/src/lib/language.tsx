@@ -65,6 +65,7 @@ const translations: Record<string, Record<Language, string>> = {
   "nav.profitLoss": { en: "Profit & Loss", hi: "लाभ और हानि" },
   "nav.demoVideos": { en: "Demo Videos", hi: "डेमो वीडियो" },
   "nav.demos": { en: "Demos", hi: "डेमो" },
+  "nav.stock": { en: "Stock", hi: "स्टॉक" },
   "nav.more": { en: "More", hi: "और" },
   "nav.logout": { en: "Logout", hi: "लॉगआउट" },
   "nav.profile": { en: "Profile", hi: "प्रोफ़ाइल" },
