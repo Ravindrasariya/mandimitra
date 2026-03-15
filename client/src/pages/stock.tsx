@@ -2467,10 +2467,6 @@ function loadDraftsFromStorage(businessId: number): FarmerCard[] {
   }
 }
 
-function clearDraftsFromStorage(businessId: number) {
-  try { localStorage.removeItem(getDraftKey(businessId)); } catch (_) {}
-}
-
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function StockPage() {
