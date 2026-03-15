@@ -1254,11 +1254,12 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
 
 // ─── Crop group ───────────────────────────────────────────────────────────────
 
-function CropGroupSection({ group, onChange, onArchive, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate, farmerName }: {
+function CropGroupSection({ group, onChange, onArchive, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate, farmerName, currentUsername }: {
   group: CropGroup;
   onChange: (g: CropGroup) => void; onArchive: () => void;
   vehicleBhadaRate: number; totalBagsInVehicle: number;
   cs: ChargeSettings; farmerDate: string; farmerName: string;
+  currentUsername: string;
 }) {
   const [pendingDeleteLotIdx, setPendingDeleteLotIdx] = useState<number | null>(null);
   const [showHistory, setShowHistory] = useState(false);
@@ -1278,17 +1279,35 @@ function CropGroupSection({ group, onChange, onArchive, vehicleBhadaRate, totalB
     onChange({ ...group, lots: group.lots.filter((_, i) => i !== idx) });
   };
   const handleRemoveBid = (lotIndex: number, bidIndex: number) => {
+    const lot = group.lots[lotIndex];
+    if (!lot) return;
+    const deletedBid = lot.bids[bidIndex];
+    const buyerName = deletedBid?.buyerName?.trim() || "";
+    const now = format(new Date(), "dd/MM/yyyy HH:mm");
+    const entry: EditEntry = {
+      timestamp: now,
+      username: currentUsername,
+      changes: [{ kind: "deleted", path: `Lot ${lotIndex + 1} > Bid ${bidIndex + 1}`, detail: buyerName || undefined }],
+    };
     onChange({
       ...group,
       lots: group.lots.map((l, i) => i === lotIndex ? { ...l, bids: l.bids.filter((_, j) => j !== bidIndex) } : l),
+      editHistory: [...group.editHistory, entry],
     });
   };
 
   const confirmDeleteLot = () => {
     if (pendingDeleteLotIdx !== null) {
+      const now = format(new Date(), "dd/MM/yyyy HH:mm");
+      const entry: EditEntry = {
+        timestamp: now,
+        username: currentUsername,
+        changes: [{ kind: "deleted", path: `Lot ${pendingDeleteLotIdx + 1}` }],
+      };
       onChange({
         ...group,
         lots: group.lots.filter((_, i) => i !== pendingDeleteLotIdx),
+        editHistory: [...group.editHistory, entry],
       });
     }
     setPendingDeleteLotIdx(null);
@@ -1413,7 +1432,7 @@ function CropGroupSection({ group, onChange, onArchive, vehicleBhadaRate, totalB
 
 // ─── Farmer card ──────────────────────────────────────────────────────────────
 
-function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onCancel, onArchive, cs }: {
+function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onCancel, onArchive, cs, currentUsername }: {
   card: FarmerCard;
   savedCard: FarmerCard | null;
   onChange: (c: FarmerCard) => void;
@@ -1422,6 +1441,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
   onCancel: () => void;
   onArchive: () => void;
   cs: ChargeSettings;
+  currentUsername: string;
 }) {
   const [pendingArchiveGroupIdx, setPendingArchiveGroupIdx] = useState<number | null>(null);
   const [showArchiveFarmer, setShowArchiveFarmer] = useState(false);
@@ -1644,6 +1664,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                 cs={cs}
                 farmerDate={card.date}
                 farmerName={card.farmerName}
+                currentUsername={currentUsername}
               />
             ))}
             {availableCrops.length > 0 && (
@@ -1770,7 +1791,13 @@ export default function StockPage() {
         if (isFirstSave) return g;
         const savedGroup = savedCard.cropGroups.find(sg => sg.id === g.id);
         if (!savedGroup) return g;
-        const changes = diffCropGroup(savedGroup, g);
+        const allDiffChanges = diffCropGroup(savedGroup, g);
+        const alreadyLogged = new Set(
+          g.editHistory
+            .slice(savedGroup.editHistory.length)
+            .flatMap(e => e.changes?.filter(c => c.kind === "deleted").map(c => c.path) ?? [])
+        );
+        const changes = allDiffChanges.filter(c => !(c.kind === "deleted" && alreadyLogged.has(c.path)));
         if (changes.length === 0) return g;
         return { ...g, editHistory: [...g.editHistory, { timestamp: now, username: currentUsername, changes }] };
       }),
@@ -1816,6 +1843,7 @@ export default function StockPage() {
             onCancel={() => cancelCard(idx)}
             onArchive={() => archiveCard(idx)}
             cs={cs}
+            currentUsername={currentUsername}
           />
         ))}
       </div>
