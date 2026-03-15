@@ -725,7 +725,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
   };
 
   return (
-    <div className="ml-8 mt-2 rounded-lg border border-green-200 bg-green-50/30 p-3 space-y-3">
+    <div className="ml-0 sm:ml-8 mt-2 rounded-lg border border-green-200 bg-green-50/30 p-3 space-y-3">
       <div className="flex items-center gap-1.5 text-xs font-semibold text-green-700 uppercase tracking-wide">
         <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
         <Scale className="w-3.5 h-3.5" />
@@ -815,15 +815,15 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
       {nw > 0 && pricePerKg > 0 && (epkFarmer > 0 || epkBuyer > 0) && (
         <div className="bg-muted/40 rounded-md px-3 py-2 text-xs space-y-1" data-testid="txn-bid-rate-header">
           {epkFarmer > 0 && (
-            <div className="flex justify-between text-green-600">
-              <span>Farmer Rate ({pricePerKg.toFixed(2)} + {epkFarmer.toFixed(2)}):</span>
-              <span className="font-medium">₹{(pricePerKg + epkFarmer).toFixed(2)}/kg</span>
+            <div className="flex justify-between gap-1 text-green-600">
+              <span className="min-w-0 flex-1">Farmer Rate ({pricePerKg.toFixed(2)} + {epkFarmer.toFixed(2)}):</span>
+              <span className="shrink-0 font-medium">₹{(pricePerKg + epkFarmer).toFixed(2)}/kg</span>
             </div>
           )}
           {epkBuyer > 0 && (
-            <div className="flex justify-between text-blue-600">
-              <span>Buyer Rate ({pricePerKg.toFixed(2)} + {epkBuyer.toFixed(2)}):</span>
-              <span className="font-medium">₹{(pricePerKg + epkBuyer).toFixed(2)}/kg</span>
+            <div className="flex justify-between gap-1 text-blue-600">
+              <span className="min-w-0 flex-1">Buyer Rate ({pricePerKg.toFixed(2)} + {epkBuyer.toFixed(2)}):</span>
+              <span className="shrink-0 font-medium">₹{(pricePerKg + epkBuyer).toFixed(2)}/kg</span>
             </div>
           )}
         </div>
@@ -897,45 +897,45 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
 
           {nw > 0 && pricePerKg > 0 && (
             <div className="border-t pt-1.5 mt-1.5 bg-green-50 dark:bg-green-950/30 rounded-md p-2 -mx-0.5 space-y-0.5">
-              <div className="flex justify-between">
-                <span>Gross ({nw.toFixed(0)} × ₹{(pricePerKg + epkFarmer).toFixed(2)}):</span>
-                <span className="font-medium">₹{farmerGross.toFixed(2)}</span>
+              <div className="flex justify-between gap-1">
+                <span className="min-w-0 flex-1">Gross ({nw.toFixed(0)} × ₹{(pricePerKg + epkFarmer).toFixed(2)}):</span>
+                <span className="shrink-0 font-medium">₹{farmerGross.toFixed(2)}</span>
               </div>
               <p className="text-muted-foreground font-semibold mt-0.5">Deductions:</p>
               {hammaliFarmerRate > 0 && (
-                <div className="flex justify-between text-muted-foreground pl-2">
-                  <span>Hammali ({bags}×₹{hammaliFarmerRate}):</span>
-                  <span>-₹{hammaliFarmerTotal.toFixed(2)}</span>
+                <div className="flex justify-between gap-1 text-muted-foreground pl-2">
+                  <span className="min-w-0 flex-1">Hammali ({bags}×₹{hammaliFarmerRate}):</span>
+                  <span className="shrink-0">-₹{hammaliFarmerTotal.toFixed(2)}</span>
                 </div>
               )}
               {extraFarmer > 0 && (
-                <div className="flex justify-between text-muted-foreground pl-2">
-                  <span>Extra:</span>
-                  <span>-₹{extraFarmer.toFixed(2)}</span>
+                <div className="flex justify-between gap-1 text-muted-foreground pl-2">
+                  <span className="min-w-0 flex-1">Extra:</span>
+                  <span className="shrink-0">-₹{extraFarmer.toFixed(2)}</span>
                 </div>
               )}
               {aadhatFarmerPct > 0 && (
-                <div className="flex justify-between text-muted-foreground pl-2">
-                  <span>Aadhat ({aadhatFarmerPct}%):</span>
-                  <span>-₹{aadhatFarmer.toFixed(2)}</span>
+                <div className="flex justify-between gap-1 text-muted-foreground pl-2">
+                  <span className="min-w-0 flex-1">Aadhat ({aadhatFarmerPct}%):</span>
+                  <span className="shrink-0">-₹{aadhatFarmer.toFixed(2)}</span>
                 </div>
               )}
               {mandiFarmerPct > 0 && (
-                <div className="flex justify-between text-muted-foreground pl-2">
-                  <span>Mandi ({mandiFarmerPct}%):</span>
-                  <span>-₹{mandiFarmer.toFixed(2)}</span>
+                <div className="flex justify-between gap-1 text-muted-foreground pl-2">
+                  <span className="min-w-0 flex-1">Mandi ({mandiFarmerPct}%):</span>
+                  <span className="shrink-0">-₹{mandiFarmer.toFixed(2)}</span>
                 </div>
               )}
               {freightFarmerTotal > 0 && (
-                <div className="flex justify-between text-muted-foreground pl-2">
-                  <span>Freight:</span>
-                  <span>-₹{freightFarmerTotal.toFixed(2)}</span>
+                <div className="flex justify-between gap-1 text-muted-foreground pl-2">
+                  <span className="min-w-0 flex-1">Freight:</span>
+                  <span className="shrink-0">-₹{freightFarmerTotal.toFixed(2)}</span>
                 </div>
               )}
               {farmerDeductions === 0 && <div className="text-muted-foreground italic pl-2">No deductions</div>}
-              <div className="flex justify-between font-bold text-green-700 border-t pt-1 mt-0.5">
-                <span>Farmer Payable:</span>
-                <span>₹{farmerPayable.toFixed(2)}</span>
+              <div className="flex justify-between gap-1 font-bold text-green-700 border-t pt-1 mt-0.5">
+                <span className="min-w-0 flex-1">Farmer Payable:</span>
+                <span className="shrink-0">₹{farmerPayable.toFixed(2)}</span>
               </div>
             </div>
           )}
@@ -972,39 +972,39 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
 
           {nw > 0 && pricePerKg > 0 && (
             <div className="border-t pt-1.5 mt-1.5 bg-blue-50 dark:bg-blue-950/30 rounded-md p-2 -mx-0.5 space-y-0.5">
-              <div className="flex justify-between">
-                <span>Gross ({nw.toFixed(0)} × ₹{(pricePerKg + epkBuyer).toFixed(2)}):</span>
-                <span className="font-medium">₹{buyerGross.toFixed(2)}</span>
+              <div className="flex justify-between gap-1">
+                <span className="min-w-0 flex-1">Gross ({nw.toFixed(0)} × ₹{(pricePerKg + epkBuyer).toFixed(2)}):</span>
+                <span className="shrink-0 font-medium">₹{buyerGross.toFixed(2)}</span>
               </div>
               <p className="text-muted-foreground font-semibold mt-0.5">Additions:</p>
               {hammaliBuyerRate > 0 && (
-                <div className="flex justify-between text-muted-foreground pl-2">
-                  <span>Hammali ({bags}×₹{hammaliBuyerRate}):</span>
-                  <span>+₹{hammaliBuyerTotal.toFixed(2)}</span>
+                <div className="flex justify-between gap-1 text-muted-foreground pl-2">
+                  <span className="min-w-0 flex-1">Hammali ({bags}×₹{hammaliBuyerRate}):</span>
+                  <span className="shrink-0">+₹{hammaliBuyerTotal.toFixed(2)}</span>
                 </div>
               )}
               {extraBuyer > 0 && (
-                <div className="flex justify-between text-muted-foreground pl-2">
-                  <span>Extra:</span>
-                  <span>+₹{extraBuyer.toFixed(2)}</span>
+                <div className="flex justify-between gap-1 text-muted-foreground pl-2">
+                  <span className="min-w-0 flex-1">Extra:</span>
+                  <span className="shrink-0">+₹{extraBuyer.toFixed(2)}</span>
                 </div>
               )}
               {aadhatBuyerPct > 0 && (
-                <div className="flex justify-between text-muted-foreground pl-2">
-                  <span>Aadhat ({aadhatBuyerPct}%):</span>
-                  <span>+₹{aadhatBuyer.toFixed(2)}</span>
+                <div className="flex justify-between gap-1 text-muted-foreground pl-2">
+                  <span className="min-w-0 flex-1">Aadhat ({aadhatBuyerPct}%):</span>
+                  <span className="shrink-0">+₹{aadhatBuyer.toFixed(2)}</span>
                 </div>
               )}
               {mandiBuyerPct > 0 && (
-                <div className="flex justify-between text-muted-foreground pl-2">
-                  <span>Mandi ({mandiBuyerPct}%):</span>
-                  <span>+₹{mandiBuyer.toFixed(2)}</span>
+                <div className="flex justify-between gap-1 text-muted-foreground pl-2">
+                  <span className="min-w-0 flex-1">Mandi ({mandiBuyerPct}%):</span>
+                  <span className="shrink-0">+₹{mandiBuyer.toFixed(2)}</span>
                 </div>
               )}
               {buyerAdditions === 0 && <div className="text-muted-foreground italic pl-2">No additions</div>}
-              <div className="flex justify-between font-bold text-blue-700 border-t pt-1 mt-0.5">
-                <span>Buyer Receivable:</span>
-                <span>₹{buyerReceivable.toFixed(2)}</span>
+              <div className="flex justify-between gap-1 font-bold text-blue-700 border-t pt-1 mt-0.5">
+                <span className="min-w-0 flex-1">Buyer Receivable:</span>
+                <span className="shrink-0">₹{buyerReceivable.toFixed(2)}</span>
               </div>
             </div>
           )}
