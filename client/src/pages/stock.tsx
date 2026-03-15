@@ -1154,11 +1154,13 @@ function CropGroupSection({ group, onChange, onArchive, vehicleBhadaRate, totalB
   };
   const confirmDeleteLot = () => {
     if (pendingDeleteLotIdx !== null) {
-      if (isLastLot) {
-        onArchive();
-      } else {
-        onChange({ ...group, lots: group.lots.filter((_, i) => i !== pendingDeleteLotIdx) });
-      }
+      const now = format(new Date(), "dd/MM/yyyy HH:mm");
+      const lotLabel = `Lot #${pendingDeleteLotIdx + 1}`;
+      onChange({
+        ...group,
+        lots: group.lots.filter((_, i) => i !== pendingDeleteLotIdx),
+        editHistory: [...group.editHistory, { timestamp: now, label: `${lotLabel} deleted` }],
+      });
     }
     setPendingDeleteLotIdx(null);
   };
@@ -1262,7 +1264,7 @@ function CropGroupSection({ group, onChange, onArchive, vehicleBhadaRate, totalB
         title="Delete this lot?"
         description={
           isLastLot
-            ? `This is the only lot for ${farmerLabel}'s ${group.crop}. Deleting it will archive the entire ${group.crop} group (crop groups cannot be permanently removed).`
+            ? `This is the only lot for ${farmerLabel}'s ${group.crop}. Deleting it will permanently remove this lot. The ${group.crop} group will remain.`
             : `Lot #${(pendingDeleteLotIdx ?? 0) + 1} of ${farmerLabel}'s ${group.crop} has data that will be permanently lost. This action cannot be undone.`
         }
         onConfirm={confirmDeleteLot}
