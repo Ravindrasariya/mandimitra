@@ -2830,8 +2830,9 @@ function StockFilterBar({
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="icon" className="h-8 w-8" data-testid="button-csv-download">
+          <Button variant="outline" size="sm" className="h-8 gap-1 px-2" data-testid="button-csv-download">
             <Download className="w-3.5 h-3.5" />
+            <ChevronDown className="w-3 h-3 opacity-50" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
