@@ -22,6 +22,9 @@ import { CROPS, SIZES, DISTRICTS } from "@shared/schema";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem, CommandGroup } from "@/components/ui/command";
 
+const capFirst = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+const toNum = (v: string) => v.replace(/[^0-9.]/g, "");
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type ChargeSettings = {
@@ -684,7 +687,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
             inputMode="decimal"
             placeholder="0.00"
             value={txn.netWeightInput}
-            onChange={e => set("netWeightInput", e.target.value)}
+            onChange={e => set("netWeightInput", toNum(e.target.value))}
             onFocus={e => e.currentTarget.select()}
             className="h-8 text-sm flex-1"
           />
@@ -715,7 +718,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
                       type="text"
                       inputMode="decimal"
                       value={w}
-                      onChange={e => updateSample(idx, e.target.value)}
+                      onChange={e => updateSample(idx, toNum(e.target.value))}
                       onFocus={e => e.currentTarget.select()}
                       placeholder="0.00"
                       className="h-7 text-xs flex-1"
@@ -792,7 +795,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
               data-testid="input-extra-charges-farmer"
               type="text" inputMode="decimal"
               value={txn.extraChargesFarmer}
-              onChange={e => set("extraChargesFarmer", e.target.value)}
+              onChange={e => set("extraChargesFarmer", toNum(e.target.value))}
               onFocus={e => e.currentTarget.select()}
               className="w-16 h-6 text-xs text-right p-1"
             />
@@ -812,7 +815,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
                     data-testid={`input-${field}`}
                     type="text" inputMode="decimal"
                     value={val}
-                    onChange={e => updateExtraBreakdown(field, e.target.value)}
+                    onChange={e => updateExtraBreakdown(field, toNum(e.target.value))}
                     onFocus={e => e.currentTarget.select()}
                     className="w-16 h-6 text-xs text-right p-1"
                   />
@@ -826,7 +829,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
               data-testid="input-extra-per-kg-farmer"
               type="text" inputMode="decimal"
               value={txn.extraPerKgFarmer}
-              onChange={e => set("extraPerKgFarmer", e.target.value)}
+              onChange={e => set("extraPerKgFarmer", toNum(e.target.value))}
               onFocus={e => e.currentTarget.select()}
               className="w-16 h-6 text-xs text-right p-1"
             />
@@ -890,7 +893,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
               data-testid="input-extra-charges-buyer"
               type="text" inputMode="decimal"
               value={txn.extraChargesBuyer}
-              onChange={e => set("extraChargesBuyer", e.target.value)}
+              onChange={e => set("extraChargesBuyer", toNum(e.target.value))}
               onFocus={e => e.currentTarget.select()}
               className="w-16 h-6 text-xs text-right p-1"
             />
@@ -901,7 +904,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
               data-testid="input-extra-per-kg-buyer"
               type="text" inputMode="decimal"
               value={txn.extraPerKgBuyer}
-              onChange={e => set("extraPerKgBuyer", e.target.value)}
+              onChange={e => set("extraPerKgBuyer", toNum(e.target.value))}
               onFocus={e => e.currentTarget.select()}
               className="w-16 h-6 text-xs text-right p-1"
             />
@@ -1614,19 +1617,19 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div>
                   <Label className="text-xs text-muted-foreground">Name *</Label>
-                  <Input data-testid="input-farmer-name" placeholder="Farmer name" value={card.farmerName} onChange={e => set("farmerName", e.target.value)} className="h-8 text-sm" />
+                  <Input data-testid="input-farmer-name" placeholder="Farmer name" value={card.farmerName} onChange={e => set("farmerName", capFirst(e.target.value))} className="h-8 text-sm" />
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Phone</Label>
-                  <Input data-testid="input-farmer-phone" placeholder="10-digit mobile" value={card.farmerPhone} onChange={e => set("farmerPhone", e.target.value.replace(/\D/g, "").slice(0, 10))} className="h-8 text-sm" />
+                  <Input data-testid="input-farmer-phone" type="tel" inputMode="numeric" placeholder="10-digit mobile" value={card.farmerPhone} onChange={e => set("farmerPhone", e.target.value.replace(/\D/g, "").slice(0, 10))} className="h-8 text-sm" />
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Village</Label>
-                  <Input data-testid="input-village" placeholder="Village" value={card.village} onChange={e => set("village", e.target.value)} className="h-8 text-sm" />
+                  <Input data-testid="input-village" placeholder="Village" value={card.village} onChange={e => set("village", capFirst(e.target.value))} className="h-8 text-sm" />
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Tehsil</Label>
-                  <Input data-testid="input-tehsil" placeholder="Tehsil" value={card.tehsil} onChange={e => set("tehsil", e.target.value)} className="h-8 text-sm" />
+                  <Input data-testid="input-tehsil" placeholder="Tehsil" value={card.tehsil} onChange={e => set("tehsil", capFirst(e.target.value))} className="h-8 text-sm" />
                 </div>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -1702,7 +1705,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
               </div>
               <div>
                 <Label className="text-xs text-muted-foreground">Driver Name</Label>
-                <Input data-testid="input-driver-name" placeholder="Driver name" value={card.driverName} onChange={e => set("driverName", e.target.value)} className="h-8 text-sm" />
+                <Input data-testid="input-driver-name" placeholder="Driver name" value={card.driverName} onChange={e => set("driverName", capFirst(e.target.value))} className="h-8 text-sm" />
               </div>
               <div>
                 <Label className="text-xs text-muted-foreground">Bhada Rate (₹)</Label>

@@ -14,6 +14,9 @@ import type { Farmer } from "@shared/schema";
 import { Plus, Trash2, Search, Wheat, AlertTriangle, Truck, Banknote } from "lucide-react";
 import { format } from "date-fns";
 
+const capFirst = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+const toNum = (v: string) => v.replace(/[^0-9.]/g, "");
+
 type LotEntry = {
   crop: string;
   variety: string;
@@ -383,9 +386,10 @@ export default function StockEntryPage() {
                     data-testid="input-farmer-name"
                     value={farmerName}
                     onChange={(e) => {
-                      setFarmerName(e.target.value);
-                      if (!selectedFarmer && e.target.value.length >= 2) {
-                        setFarmerSearch(e.target.value);
+                      const val = capFirst(e.target.value);
+                      setFarmerName(val);
+                      if (!selectedFarmer && val.length >= 2) {
+                        setFarmerSearch(val);
                         setShowSuggestions(true);
                       } else {
                         setShowSuggestions(false);
@@ -439,7 +443,7 @@ export default function StockEntryPage() {
                   <Input
                     data-testid="input-village"
                     value={village}
-                    onChange={(e) => { setVillage(e.target.value); setShowVillageSuggestions(true); }}
+                    onChange={(e) => { setVillage(capFirst(e.target.value)); setShowVillageSuggestions(true); }}
                     onFocus={() => setShowVillageSuggestions(true)}
                     onBlur={() => setTimeout(() => setShowVillageSuggestions(false), 150)}
                     placeholder={t("common.village")}
@@ -467,7 +471,7 @@ export default function StockEntryPage() {
                   <Input
                     data-testid="input-tehsil"
                     value={tehsil}
-                    onChange={(e) => { setTehsil(e.target.value); setShowTehsilSuggestions(true); }}
+                    onChange={(e) => { setTehsil(capFirst(e.target.value)); setShowTehsilSuggestions(true); }}
                     onFocus={() => setShowTehsilSuggestions(true)}
                     onBlur={() => setTimeout(() => setShowTehsilSuggestions(false), 150)}
                     placeholder={t("common.tehsil")}
@@ -548,7 +552,7 @@ export default function StockEntryPage() {
                 inputMode="decimal"
                 placeholder="0.00"
                 value={farmerAdvanceAmount}
-                onChange={(e) => setFarmerAdvanceAmount(e.target.value)}
+                onChange={(e) => setFarmerAdvanceAmount(toNum(e.target.value))}
               />
             </div>
             <div className="space-y-1">
@@ -598,7 +602,7 @@ export default function StockEntryPage() {
               <Input
                 data-testid="input-driver-name"
                 value={driverName}
-                onChange={(e) => setDriverName(e.target.value)}
+                onChange={(e) => setDriverName(capFirst(e.target.value))}
                 placeholder="Optional"
                 className="mobile-touch-target text-sm capitalize"
               />
@@ -645,7 +649,7 @@ export default function StockEntryPage() {
                 type="text"
                 inputMode="decimal"
                 value={vehicleBhadaRate}
-                onChange={(e) => setVehicleBhadaRate(e.target.value)}
+                onChange={(e) => setVehicleBhadaRate(toNum(e.target.value))}
                 onFocus={(e) => e.target.select()}
                 placeholder="0.00"
                 className="mobile-touch-target text-sm"
@@ -774,7 +778,7 @@ export default function StockEntryPage() {
                     type="text"
                     inputMode="decimal"
                     value={lot.initialTotalWeight}
-                    onChange={(e) => updateLot(index, "initialTotalWeight", e.target.value)}
+                    onChange={(e) => updateLot(index, "initialTotalWeight", toNum(e.target.value))}
                     onFocus={(e) => e.target.select()}
                     placeholder="0.00"
                     className="mobile-touch-target text-sm"

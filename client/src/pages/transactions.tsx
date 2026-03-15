@@ -18,9 +18,12 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Receipt, Pencil, Printer, ChevronDown, ChevronRight, Calendar, Package, Users, Landmark, HandCoins, Download, History, Share2, Calculator, Plus, X, AlertTriangle, Search } from "lucide-react";
+
 import { format } from "date-fns";
 import { useAuth } from "@/lib/auth";
 import { printReceipt, shareReceiptAsPdf, wrapWithDuplicate } from "@/lib/receiptUtils";
+
+const toNum = (v: string) => v.replace(/[^0-9.]/g, "");
 
 type BidWithDetails = Bid & { buyer: Buyer; lot: Lot; farmer: Farmer };
 type TransactionWithDetails = Transaction & { farmer: Farmer; buyer: Buyer; lot: Lot; bid: Bid };
@@ -1904,7 +1907,7 @@ export default function TransactionsPage() {
                     type="text"
                     inputMode="decimal"
                     value={netWeightInput}
-                    onChange={(e) => setNetWeightInput(e.target.value)}
+                    onChange={(e) => setNetWeightInput(toNum(e.target.value))}
                     onFocus={(e) => e.target.select()}
                     placeholder="0.00"
                     className="mobile-touch-target flex-1"
@@ -1977,7 +1980,7 @@ export default function TransactionsPage() {
                                 type="text"
                                 inputMode="decimal"
                                 value={w}
-                                onChange={(e) => updateSample(idx, e.target.value)}
+                                onChange={(e) => updateSample(idx, toNum(e.target.value))}
                                 onFocus={(e) => e.target.select()}
                                 placeholder="0.00"
                                 className="h-7 text-xs flex-1"
@@ -2045,7 +2048,7 @@ export default function TransactionsPage() {
                       type="text"
                       inputMode="decimal"
                       value={extraChargesFarmer}
-                      onChange={(e) => setExtraChargesFarmer(e.target.value)}
+                      onChange={(e) => setExtraChargesFarmer(toNum(e.target.value))}
                       onFocus={(e) => e.target.select()}
                       className="w-20 h-6 text-xs text-right p-1"
                     />
@@ -2067,13 +2070,14 @@ export default function TransactionsPage() {
                             inputMode="decimal"
                             value={val}
                             onChange={(e) => {
-                              setter(e.target.value);
+                              const v = toNum(e.target.value);
+                              setter(v);
                               const vals = [
-                                label === "Tulai" ? e.target.value : extraTulai,
-                                label === "Bharai" ? e.target.value : extraBharai,
-                                label === "Khadi Karai" ? e.target.value : extraKhadiKarai,
-                                label === "Thela Bhada" ? e.target.value : extraThelaBhada,
-                                label === "Others" ? e.target.value : extraOthers,
+                                label === "Tulai" ? v : extraTulai,
+                                label === "Bharai" ? v : extraBharai,
+                                label === "Khadi Karai" ? v : extraKhadiKarai,
+                                label === "Thela Bhada" ? v : extraThelaBhada,
+                                label === "Others" ? v : extraOthers,
                               ];
                               const sum = vals.reduce((acc, v) => acc + (parseFloat(v) || 0), 0);
                               setExtraChargesFarmer(sum.toFixed(2));
@@ -2095,7 +2099,7 @@ export default function TransactionsPage() {
                       type="text"
                       inputMode="decimal"
                       value={extraPerKgFarmer}
-                      onChange={(e) => setExtraPerKgFarmer(e.target.value)}
+                      onChange={(e) => setExtraPerKgFarmer(toNum(e.target.value))}
                       onFocus={(e) => e.target.select()}
                       className="w-20 h-6 text-xs text-right p-1"
                     />
@@ -2113,7 +2117,7 @@ export default function TransactionsPage() {
                       type="text"
                       inputMode="decimal"
                       value={extraChargesBuyer}
-                      onChange={(e) => setExtraChargesBuyer(e.target.value)}
+                      onChange={(e) => setExtraChargesBuyer(toNum(e.target.value))}
                       onFocus={(e) => e.target.select()}
                       className="w-20 h-6 text-xs text-right p-1"
                     />
@@ -2125,7 +2129,7 @@ export default function TransactionsPage() {
                       type="text"
                       inputMode="decimal"
                       value={extraPerKgBuyer}
-                      onChange={(e) => setExtraPerKgBuyer(e.target.value)}
+                      onChange={(e) => setExtraPerKgBuyer(toNum(e.target.value))}
                       onFocus={(e) => e.target.select()}
                       className="w-20 h-6 text-xs text-right p-1"
                     />
