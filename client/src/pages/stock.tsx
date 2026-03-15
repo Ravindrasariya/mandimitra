@@ -71,6 +71,7 @@ type BidRow = {
   numberOfBags: string;
   paymentType: string;
   advanceAmount: string;
+  txnDate: string;
   txn: TxnState;
 };
 
@@ -111,23 +112,24 @@ type FarmerCard = {
 
 const uid = () => Math.random().toString(36).slice(2, 8);
 
-const emptyBid = (): BidRow => ({
+const emptyBid = (date?: string): BidRow => ({
   buyerName: "",
   pricePerKg: "",
   numberOfBags: "",
   paymentType: "Credit",
   advanceAmount: "500",
+  txnDate: date || format(new Date(), "yyyy-MM-dd"),
   txn: emptyTxn(),
 });
 
-const emptyLot = (): LotRow => ({
+const emptyLot = (date?: string): LotRow => ({
   id: uid(),
   lotOpen: true,
   numberOfBags: "",
   size: "None",
   variety: "",
   bagMarka: "",
-  bid: emptyBid(),
+  bid: emptyBid(date),
 });
 
 const emptyCard = (): FarmerCard => ({
@@ -578,12 +580,13 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
 
 // ─── Bid section (row 2) ──────────────────────────────────────────────────────
 
-function BidSection({ bid, onChange, vehicleBhadaRate, totalBagsInVehicle, cs }: {
+function BidSection({ bid, onChange, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate }: {
   bid: BidRow;
   onChange: (b: BidRow) => void;
   vehicleBhadaRate: number;
   totalBagsInVehicle: number;
   cs: ChargeSettings;
+  farmerDate: string;
 }) {
   const isNewBuyer = bid.buyerName.trim().length > 0 && !MOCK_BUYERS.includes(bid.buyerName.trim());
   const bags = parseInt(bid.numberOfBags) || 0;
@@ -591,9 +594,30 @@ function BidSection({ bid, onChange, vehicleBhadaRate, totalBagsInVehicle, cs }:
 
   return (
     <div className="ml-4 mt-2 rounded-lg border border-blue-200 bg-blue-50/40 p-3 space-y-3">
-      <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 uppercase tracking-wide">
-        <span className="w-1.5 h-1.5 rounded-full bg-blue-400 inline-block" />
-        Bid & Transaction Details
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 uppercase tracking-wide">
+          <span className="w-1.5 h-1.5 rounded-full bg-blue-400 inline-block" />
+          Bid & Transaction Details
+        </div>
+        <div className="flex items-center gap-1.5">
+          <label className="text-xs text-muted-foreground whitespace-nowrap">Txn Date:</label>
+          <input
+            type="date"
+            data-testid="input-txn-date"
+            value={bid.txnDate || farmerDate}
+            onChange={e => onChange({ ...bid, txnDate: e.target.value })}
+            className="text-xs border border-border rounded px-2 py-1 bg-background h-7"
+          />
+          {bid.txnDate && bid.txnDate !== farmerDate && (
+            <button
+              type="button"
+              onClick={() => onChange({ ...bid, txnDate: farmerDate })}
+              className="text-xs text-muted-foreground hover:text-foreground underline whitespace-nowrap"
+            >
+              Reset
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Buyer + Price + Bags + Payment */}
@@ -684,11 +708,11 @@ function BidSection({ bid, onChange, vehicleBhadaRate, totalBagsInVehicle, cs }:
 
 // ─── Lot card ─────────────────────────────────────────────────────────────────
 
-function LotCard({ lot, index, onChange, onRemove, vehicleBhadaRate, totalBagsInVehicle, cs }: {
+function LotCard({ lot, index, onChange, onRemove, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate }: {
   lot: LotRow; index: number;
   onChange: (l: LotRow) => void; onRemove: () => void;
   vehicleBhadaRate: number; totalBagsInVehicle: number;
-  cs: ChargeSettings;
+  cs: ChargeSettings; farmerDate: string;
 }) {
   const setField = (f: keyof Omit<LotRow, "id" | "bid" | "lotOpen">, v: string) => onChange({ ...lot, [f]: v });
   const totals = calcLotTotals(lot, cs, vehicleBhadaRate, totalBagsInVehicle);
@@ -780,6 +804,7 @@ function LotCard({ lot, index, onChange, onRemove, vehicleBhadaRate, totalBagsIn
             vehicleBhadaRate={vehicleBhadaRate}
             totalBagsInVehicle={totalBagsInVehicle}
             cs={cs}
+            farmerDate={farmerDate}
           />
         </div>
       )}
@@ -789,16 +814,16 @@ function LotCard({ lot, index, onChange, onRemove, vehicleBhadaRate, totalBagsIn
 
 // ─── Crop group ───────────────────────────────────────────────────────────────
 
-function CropGroupSection({ group, onChange, onRemove, vehicleBhadaRate, totalBagsInVehicle, cs }: {
+function CropGroupSection({ group, onChange, onRemove, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate }: {
   group: CropGroup;
   onChange: (g: CropGroup) => void; onRemove: () => void;
   vehicleBhadaRate: number; totalBagsInVehicle: number;
-  cs: ChargeSettings;
+  cs: ChargeSettings; farmerDate: string;
 }) {
   const headerCls = CROP_HEADER[group.crop] || "bg-muted border-border";
   const badgeCls = CROP_COLORS[group.crop] || "bg-muted border-border text-foreground";
 
-  const addLot = () => onChange({ ...group, lots: [...group.lots, emptyLot()] });
+  const addLot = () => onChange({ ...group, lots: [...group.lots, emptyLot(farmerDate)] });
   const updateLot = (idx: number, lot: LotRow) =>
     onChange({ ...group, lots: group.lots.map((l, i) => (i === idx ? lot : l)) });
   const removeLot = (idx: number) => {
@@ -859,6 +884,7 @@ function CropGroupSection({ group, onChange, onRemove, vehicleBhadaRate, totalBa
               vehicleBhadaRate={vehicleBhadaRate}
               totalBagsInVehicle={totalBagsInVehicle}
               cs={cs}
+              farmerDate={farmerDate}
             />
           ))}
           <Button type="button" variant="outline" size="sm" onClick={addLot} className="w-full h-8 text-xs gap-1.5 border-dashed">
@@ -885,7 +911,7 @@ function FarmerCardComp({ card, onChange, onRemove, cs }: {
   const totalBagsInVehicle = parseInt(card.totalBagsInVehicle) || 0;
 
   const addCrop = (crop: string) => onChange({
-    ...card, cropGroups: [...card.cropGroups, { id: uid(), crop, srNumber: "XX", groupOpen: true, lots: [emptyLot()] }],
+    ...card, cropGroups: [...card.cropGroups, { id: uid(), crop, srNumber: "XX", groupOpen: true, lots: [emptyLot(card.date)] }],
   });
   const updateGroup = (idx: number, g: CropGroup) =>
     onChange({ ...card, cropGroups: card.cropGroups.map((gg, i) => (i === idx ? g : gg)) });
@@ -1026,6 +1052,7 @@ function FarmerCardComp({ card, onChange, onRemove, cs }: {
                 vehicleBhadaRate={vehicleBhadaRate}
                 totalBagsInVehicle={totalBagsInVehicle}
                 cs={cs}
+                farmerDate={card.date}
               />
             ))}
             {availableCrops.length > 0 && (
