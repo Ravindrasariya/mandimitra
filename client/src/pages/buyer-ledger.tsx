@@ -184,9 +184,9 @@ export default function BuyerLedgerPage() {
   const [newLicenceNo, setNewLicenceNo] = useState("");
   const [newOpeningBalance, setNewOpeningBalance] = useState("");
   const [newAadhatCommission, setNewAadhatCommission] = useState("");
-  const [yearFilter, setYearFilter] = usePersistedState("bl-yearFilter", _defaultYear);
-  const [selectedMonths, setSelectedMonths] = usePersistedState<string[]>("bl-selectedMonths", [_defaultMonth]);
-  const [selectedDays, setSelectedDays] = usePersistedState<string[]>("bl-selectedDays", [_defaultDay]);
+  const [yearFilter, setYearFilter] = useState(String(new Date().getFullYear()));
+  const [selectedMonths, setSelectedMonths] = useState<string[]>([String(new Date().getMonth() + 1)]);
+  const [selectedDays, setSelectedDays] = useState<string[]>([]);
   const [monthPopoverOpen, setMonthPopoverOpen] = useState(false);
   const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
 
@@ -310,13 +310,13 @@ export default function BuyerLedgerPage() {
   const now = new Date();
   const years = useMemo(() => {
     const yearSet = new Set<string>();
-    buyers.forEach(b => {
-      (b.bidDates || []).forEach(d => {
-        yearSet.add(d.substring(0, 4));
-      });
+    allTransactions.forEach(t => {
+      if (!t.isReversed) yearSet.add(t.date.substring(0, 4));
     });
-    return Array.from(yearSet).sort().reverse();
-  }, [buyers]);
+    const fromData = Array.from(yearSet).sort().reverse();
+    if (fromData.length === 0) return [String(new Date().getFullYear())];
+    return fromData;
+  }, [allTransactions]);
 
   const MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -360,10 +360,11 @@ export default function BuyerLedgerPage() {
 
   const filteredBuyers = useMemo(() => {
     return buyers.filter(b => {
-      const dates = b.bidDates || [];
       if (yearFilter !== "all" || selectedMonths.length > 0 || selectedDays.length > 0) {
-        const hasMatchingDate = dates.some(d => {
-          const [y, m, day] = d.split("-");
+        const buyerTxns = allTransactions.filter(t => t.buyerId === b.id && !t.isReversed);
+        if (buyerTxns.length === 0) return false;
+        const hasMatchingDate = buyerTxns.some(t => {
+          const [y, m, day] = t.date.split("-");
           if (yearFilter !== "all" && y !== yearFilter) return false;
           if (selectedMonths.length > 0 && !selectedMonths.includes(String(parseInt(m)))) return false;
           if (selectedDays.length > 0 && !selectedDays.includes(String(parseInt(day)))) return false;

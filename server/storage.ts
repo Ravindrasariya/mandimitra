@@ -371,7 +371,7 @@ export class DatabaseStorage implements IStorage {
         openingDue = Math.max(0, openingBal - parseFloat(openingPaidSum[0]?.total || "0"));
       }
 
-      const totalDue = Math.max(0, txnDue + openingDue - totalAdvance);
+      const totalDue = Math.max(0, txnDue + openingDue);
 
       const farmerLotDates = lotDateMap.get(farmer.id);
       results.push({

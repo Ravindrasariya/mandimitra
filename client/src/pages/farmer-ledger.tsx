@@ -31,18 +31,23 @@ function formatIndianCurrency(value: string | number): string {
   return `₹${formatted}`;
 }
 
-function generateFarmerListPrintHtml(farmers: FarmerWithDues[], summary: { total: number; withDues: number; totalPayable: number; totalDue: number }) {
-  const rows = farmers.map(f => `
+function generateFarmerListPrintHtml(farmers: FarmerWithDues[], summary: { total: number; withDues: number; totalPayable: number; totalDue: number }, duesMap: Map<number, { payable: number; due: number }>) {
+  const rows = farmers.map(f => {
+    const d = duesMap.get(f.id);
+    const payable = d?.payable ?? parseFloat(f.totalPayable);
+    const due = d?.due ?? parseFloat(f.totalDue);
+    return `
     <tr>
       <td style="padding:6px;border:1px solid #ddd">${f.farmerId}</td>
       <td style="padding:6px;border:1px solid #ddd">${f.name}</td>
       <td style="padding:6px;border:1px solid #ddd">${f.village || "-"}</td>
       <td style="padding:6px;border:1px solid #ddd">${f.phone}</td>
-      <td style="padding:6px;border:1px solid #ddd;text-align:right">${formatIndianCurrency(f.totalPayable)}</td>
-      <td style="padding:6px;border:1px solid #ddd;text-align:right;color:${parseFloat(f.totalDue) > 0 ? '#dc2626' : '#16a34a'}">${formatIndianCurrency(f.totalDue)}</td>
+      <td style="padding:6px;border:1px solid #ddd;text-align:right">${formatIndianCurrency(payable)}</td>
+      <td style="padding:6px;border:1px solid #ddd;text-align:right;color:${due > 0 ? '#dc2626' : '#16a34a'}">${formatIndianCurrency(due)}</td>
       <td style="padding:6px;border:1px solid #ddd;text-align:center">${f.redFlag ? "FLAG" : "-"}</td>
     </tr>
-  `).join("");
+  `;
+  }).join("");
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Farmer Ledger</title>
 <style>body{font-family:Arial,sans-serif;margin:20px;color:#333}table{width:100%;border-collapse:collapse}
@@ -69,9 +74,7 @@ export default function FarmerLedgerPage() {
   const { t } = useLanguage();
   const [searchName, setSearchName] = usePersistedState("fl-searchName", "");
   const [searchVillage, setSearchVillage] = usePersistedState("fl-searchVillage", "");
-  const _fyNow = new Date();
-  const _fyDefault = String(_fyNow.getMonth() < 3 ? _fyNow.getFullYear() - 1 : _fyNow.getFullYear());
-  const [yearFilter, setYearFilter] = usePersistedState("fl-yearFilter", _fyDefault);
+  const [yearFilter, setYearFilter] = useState(String(new Date().getFullYear()));
   const [showArchived, setShowArchived] = usePersistedState("fl-showArchived", false);
 
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -92,8 +95,8 @@ export default function FarmerLedgerPage() {
 
   const [historyFarmerId, setHistoryFarmerId] = useState<number | null>(null);
 
-  const [selectedMonths, setSelectedMonths] = usePersistedState<string[]>("fl-selectedMonths", []);
-  const [selectedDays, setSelectedDays] = usePersistedState<string[]>("fl-selectedDays", []);
+  const [selectedMonths, setSelectedMonths] = useState<string[]>([String(new Date().getMonth() + 1)]);
+  const [selectedDays, setSelectedDays] = useState<string[]>([]);
   const [monthPopoverOpen, setMonthPopoverOpen] = useState(false);
   const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
 
@@ -102,6 +105,10 @@ export default function FarmerLedgerPage() {
 
   const { data: farmersWithDues = [], isLoading } = useQuery<FarmerWithDues[]>({
     queryKey: ["/api/farmers-with-dues"],
+  });
+
+  const { data: allTransactions = [] } = useQuery<{ id: number; date: string; farmerId: number; totalPayableToFarmer: string; farmerPaidAmount: string; farmerPaymentStatus: string; isReversed: boolean }[]>({
+    queryKey: ["/api/transactions"],
   });
 
   const { data: editHistory = [] } = useQuery<FarmerEditHistory[]>({
@@ -169,15 +176,13 @@ export default function FarmerLedgerPage() {
   const now = new Date();
   const years = useMemo(() => {
     const yearSet = new Set<string>();
-    farmersWithDues.forEach(f => {
-      (f.bidDates || []).forEach(d => {
-        yearSet.add(d.substring(0, 4));
-      });
+    allTransactions.forEach(t => {
+      if (!t.isReversed) yearSet.add(t.date.substring(0, 4));
     });
     const fromData = Array.from(yearSet).sort().reverse();
     if (fromData.length === 0) return [String(now.getFullYear())];
     return fromData;
-  }, [farmersWithDues]);
+  }, [allTransactions]);
 
   const MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
 
@@ -219,26 +224,57 @@ export default function FarmerLedgerPage() {
       ? selectedDays[0]
       : `${selectedDays.length} ${t("common.nDays")}`;
 
+  const anyFilterActive = yearFilter !== "all" || selectedMonths.length > 0 || selectedDays.length > 0;
+
   const filteredFarmers = useMemo(() => {
     return farmersWithDues.filter(f => {
       if (!showArchived && f.isArchived) return false;
       if (showArchived && !f.isArchived) return false;
       if (searchName && !f.name.toLowerCase().includes(searchName.toLowerCase())) return false;
       if (searchVillage && !(f.village || "").toLowerCase().includes(searchVillage.toLowerCase())) return false;
-      const dates = f.bidDates || [];
-      if (dates.length > 0 && (yearFilter !== "all" || selectedMonths.length > 0 || selectedDays.length > 0)) {
-        const hasMatchingDate = dates.some(d => {
-          const [y, m, day] = d.split("-");
+      if (anyFilterActive) {
+        const farmerTxns = allTransactions.filter(t => t.farmerId === f.id && !t.isReversed);
+        if (farmerTxns.length === 0) return false;
+        const hasMatch = farmerTxns.some(t => {
+          const [y, m, day] = t.date.split("-");
           if (yearFilter !== "all" && y !== yearFilter) return false;
           if (selectedMonths.length > 0 && !selectedMonths.includes(String(parseInt(m)))) return false;
           if (selectedDays.length > 0 && !selectedDays.includes(String(parseInt(day)))) return false;
           return true;
         });
-        if (!hasMatchingDate) return false;
+        if (!hasMatch) return false;
       }
       return true;
     });
-  }, [farmersWithDues, showArchived, searchName, searchVillage, yearFilter, selectedMonths, selectedDays]);
+  }, [farmersWithDues, showArchived, searchName, searchVillage, yearFilter, selectedMonths, selectedDays, allTransactions, anyFilterActive]);
+
+  const filteredDuesByFarmer = useMemo(() => {
+    const map = new Map<number, { payable: number; due: number }>();
+    for (const f of filteredFarmers) {
+      if (!anyFilterActive) {
+        map.set(f.id, {
+          payable: parseFloat(f.totalPayable),
+          due: parseFloat(f.totalDue),
+        });
+      } else {
+        const txns = allTransactions.filter(t => t.farmerId === f.id && !t.isReversed);
+        let payable = 0;
+        let due = 0;
+        for (const t of txns) {
+          const [y, m, day] = t.date.split("-");
+          if (yearFilter !== "all" && y !== yearFilter) continue;
+          if (selectedMonths.length > 0 && !selectedMonths.includes(String(parseInt(m)))) continue;
+          if (selectedDays.length > 0 && !selectedDays.includes(String(parseInt(day)))) continue;
+          const p = parseFloat(t.totalPayableToFarmer || "0");
+          const paid = parseFloat(t.farmerPaidAmount || "0");
+          payable += p;
+          due += Math.max(0, p - paid);
+        }
+        map.set(f.id, { payable, due });
+      }
+    }
+    return map;
+  }, [filteredFarmers, allTransactions, yearFilter, selectedMonths, selectedDays, anyFilterActive]);
 
   const sortedFarmers = useMemo(() => {
     const sorted = [...filteredFarmers];
@@ -247,22 +283,26 @@ export default function FarmerLedgerPage() {
       if (sortField === "farmerId") {
         cmp = a.farmerId.localeCompare(b.farmerId);
       } else if (sortField === "totalPayable") {
-        cmp = parseFloat(a.totalPayable) - parseFloat(b.totalPayable);
+        const aVal = filteredDuesByFarmer.get(a.id)?.payable ?? parseFloat(a.totalPayable);
+        const bVal = filteredDuesByFarmer.get(b.id)?.payable ?? parseFloat(b.totalPayable);
+        cmp = aVal - bVal;
       } else if (sortField === "totalDue") {
-        cmp = parseFloat(a.totalDue) - parseFloat(b.totalDue);
+        const aVal = filteredDuesByFarmer.get(a.id)?.due ?? parseFloat(a.totalDue);
+        const bVal = filteredDuesByFarmer.get(b.id)?.due ?? parseFloat(b.totalDue);
+        cmp = aVal - bVal;
       }
       return sortDir === "asc" ? cmp : -cmp;
     });
     return sorted;
-  }, [filteredFarmers, sortField, sortDir]);
+  }, [filteredFarmers, filteredDuesByFarmer, sortField, sortDir]);
 
   const summary = useMemo(() => {
     const total = filteredFarmers.length;
-    const withDues = filteredFarmers.filter(f => parseFloat(f.totalDue) > 0).length;
-    const totalPayable = filteredFarmers.reduce((s, f) => s + parseFloat(f.totalPayable), 0);
-    const totalDue = filteredFarmers.reduce((s, f) => s + parseFloat(f.totalDue), 0);
+    const withDues = filteredFarmers.filter(f => (filteredDuesByFarmer.get(f.id)?.due ?? 0) > 0).length;
+    const totalPayable = filteredFarmers.reduce((s, f) => s + (filteredDuesByFarmer.get(f.id)?.payable ?? 0), 0);
+    const totalDue = filteredFarmers.reduce((s, f) => s + (filteredDuesByFarmer.get(f.id)?.due ?? 0), 0);
     return { total, withDues, totalPayable, totalDue };
-  }, [filteredFarmers]);
+  }, [filteredFarmers, filteredDuesByFarmer]);
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) {
@@ -342,12 +382,13 @@ export default function FarmerLedgerPage() {
 
   const handleSync = () => {
     queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
     queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
     toast({ title: "Data Synced", variant: "success" });
   };
 
   const handlePrint = () => {
-    const html = generateFarmerListPrintHtml(sortedFarmers, summary);
+    const html = generateFarmerListPrintHtml(sortedFarmers, summary, filteredDuesByFarmer);
     printReceipt(html);
   };
 
@@ -357,17 +398,22 @@ export default function FarmerLedgerPage() {
       if (v.includes(",") || v.includes('"') || v.includes("\n")) return `"${v.replace(/"/g, '""')}"`;
       return v;
     };
-    const rows = sortedFarmers.map(f => [
-      f.farmerId,
-      f.name,
-      f.phone || "",
-      f.village || "",
-      f.bankName || "",
-      f.bankAccountNumber || "",
-      f.ifscCode || "",
-      f.totalPayable || "0",
-      f.totalDue || "0",
-    ].map(escCsv).join(","));
+    const rows = sortedFarmers.map(f => {
+      const d = filteredDuesByFarmer.get(f.id);
+      const payable = d?.payable ?? parseFloat(f.totalPayable);
+      const due = d?.due ?? parseFloat(f.totalDue);
+      return [
+        f.farmerId,
+        f.name,
+        f.phone || "",
+        f.village || "",
+        f.bankName || "",
+        f.bankAccountNumber || "",
+        f.ifscCode || "",
+        String(Math.round(payable)),
+        String(Math.round(due)),
+      ].map(escCsv).join(",");
+    });
     const csv = [headers.join(","), ...rows].join("\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -568,7 +614,9 @@ export default function FarmerLedgerPage() {
             </thead>
             <tbody>
               {sortedFarmers.map((farmer) => {
-                const due = parseFloat(farmer.totalDue);
+                const fDues = filteredDuesByFarmer.get(farmer.id);
+                const displayPayable = fDues?.payable ?? parseFloat(farmer.totalPayable);
+                const due = fDues?.due ?? parseFloat(farmer.totalDue);
                 return (
                   <tr key={farmer.id} className="border-b hover:bg-muted/30 transition-colors" data-testid={`row-farmer-${farmer.id}`}>
                     <td className="p-2">
@@ -586,9 +634,9 @@ export default function FarmerLedgerPage() {
                     <td className="p-2 font-medium">{farmer.name}</td>
                     <td className="p-2 text-muted-foreground">{farmer.village || "-"}</td>
                     <td className="p-2 text-muted-foreground">{farmer.phone}</td>
-                    <td className="p-2 text-right font-medium text-green-600">{formatIndianCurrency(farmer.totalPayable)}</td>
+                    <td className="p-2 text-right font-medium text-green-600">{formatIndianCurrency(String(displayPayable))}</td>
                     <td className={`p-2 text-right font-bold ${due > 0 ? "text-red-600" : due < 0 ? "text-green-600" : "text-muted-foreground"}`}>
-                      {formatIndianCurrency(farmer.totalDue)}
+                      {formatIndianCurrency(String(due))}
                     </td>
                     <td className="p-2 text-center">
                       {farmer.redFlag && (
