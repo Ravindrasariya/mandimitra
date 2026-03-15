@@ -1780,7 +1780,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
           <div className="flex items-center justify-between pt-2 border-t border-border">
             <Button type="button" variant="outline" size="sm"
               onClick={onCancel}
-              className="h-8 text-sm gap-1.5 text-muted-foreground"
+              className="h-8 text-sm gap-1.5 border-amber-500 text-amber-600 hover:bg-amber-50 hover:text-amber-700 dark:hover:bg-amber-950"
               data-testid="button-cancel-entry">
               <X className="w-3.5 h-3.5" /> Cancel
             </Button>
