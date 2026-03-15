@@ -2808,7 +2808,6 @@ function StockFilterBar({
                 onClick={() => { setBuyerFilter(b.name); setBuyerDropOpen(false); }}
               >
                 <span className="font-medium">{b.name}</span>
-                {b.phone && <span className="text-muted-foreground"> · {b.phone}</span>}
               </button>
             ))}
           </div>
