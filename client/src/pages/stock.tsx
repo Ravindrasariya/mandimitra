@@ -136,7 +136,7 @@ const hasLotUserData = (lot: LotRow): boolean =>
   [lot.numberOfBags, lot.variety, lot.bagMarka,
     lot.bid.buyerName, lot.bid.pricePerKg, lot.bid.numberOfBags,
     lot.bid.txn.netWeight, lot.bid.txn.calcWeight,
-  ].some(v => v.trim() !== "" && v.trim() !== "0");
+  ].some(v => (v ?? "").trim() !== "" && (v ?? "").trim() !== "0");
 
 const emptyCard = (): FarmerCard => ({
   id: uid(),
