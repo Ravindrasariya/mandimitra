@@ -1805,7 +1805,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
 
 // ─── Farmer card ──────────────────────────────────────────────────────────────
 
-function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onCancel, onArchive, onSyncSaved, cs, currentUsername, visibleCropGroupIds }: {
+function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onCancel, onArchive, onSyncSaved, cs, currentUsername }: {
   card: FarmerCard;
   savedCard: FarmerCard | null;
   onChange: (c: FarmerCard) => void;
@@ -1816,7 +1816,6 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
   onSyncSaved: (c: FarmerCard) => void;
   cs: ChargeSettings;
   currentUsername: string;
-  visibleCropGroupIds: Set<string> | null;
 }) {
   const { toast } = useToast();
   const [pendingArchiveGroupIdx, setPendingArchiveGroupIdx] = useState<number | null>(null);
@@ -2222,9 +2221,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
 
           {/* Crop groups */}
           <div className="space-y-3 pt-1">
-            {card.cropGroups.map((group, idx) => {
-              if (visibleCropGroupIds && !visibleCropGroupIds.has(group.id) && !group.archived) return null;
-              return (
+            {card.cropGroups.map((group, idx) => (
               <CropGroupSection
                 key={group.id} group={group}
                 onChange={g => updateGroup(idx, g)}
@@ -2278,8 +2275,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                   }
                 }}
               />
-              );
-            })}
+            ))}
             {availableCrops.length > 0 && (
               <div className="flex flex-wrap gap-2 pt-1">
                 {availableCrops.map(crop => (
@@ -2609,11 +2605,11 @@ function StockFilterBar({
       : `${selectedDays.length} Days`;
 
   const farmerSuggestions = useMemo(() => {
-    const seen = new Set<string>();
+    const seen = new Set<number | string>();
     const list: { name: string; phone: string; village: string }[] = [];
     for (const card of cards) {
       if (card.archived || !card.farmerName.trim()) continue;
-      const key = card.farmerName.toLowerCase();
+      const key = card.farmerId ?? card.farmerName.toLowerCase();
       if (seen.has(key)) continue;
       seen.add(key);
       list.push({ name: card.farmerName, phone: card.farmerPhone || "", village: card.village || "" });
@@ -2824,12 +2820,11 @@ function StockFilterBar({
   );
 }
 
-function StockSummaryBar({ cards, savedCardMap, cs, buyersList, visibleCropGroupIds }: {
+function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
   cards: FarmerCard[];
   savedCardMap: Map<string, FarmerCard>;
   cs: ChargeSettings;
   buyersList: { id: number; name: string; phone?: string; aadhatCommissionPercent?: string | null }[];
-  visibleCropGroupIds: Set<string> | null;
 }) {
   let totalLots = 0, totalTxns = 0;
   let farmerPayableTotal = 0, farmerDue = 0;
@@ -2842,7 +2837,6 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList, visibleCropGroup
     const tbi = parseInt(card.totalBagsInVehicle) || 0;
     for (const g of card.cropGroups) {
       if (g.archived) continue;
-      if (visibleCropGroupIds && !visibleCropGroupIds.has(g.id)) continue;
       for (const lot of g.lots) {
         totalLots++;
         const lt = calcLotTotals(lot, cs, vbr, tbi, buyersList);
@@ -2985,11 +2979,15 @@ export default function StockPage() {
     const buyerMatchesCard = (card: FarmerCard) => {
       if (!buyerFilter.trim()) return true;
       const q = buyerFilter.toLowerCase();
+      const matchingBuyerIds = new Set(
+        pageBuyersList.filter(b => b.name.toLowerCase().includes(q)).map(b => b.id)
+      );
       for (const g of card.cropGroups) {
         if (g.archived) continue;
         for (const lot of g.lots) {
           for (const bid of lot.bids) {
             if (bid.buyerName.toLowerCase().includes(q)) return true;
+            if (bid.buyerId && matchingBuyerIds.has(bid.buyerId)) return true;
           }
         }
       }
@@ -3001,23 +2999,18 @@ export default function StockPage() {
       return card.cropGroups.some(g => !g.archived && g.crop === cropFilter);
     };
 
+    const applyCropFilter = (card: FarmerCard): FarmerCard => {
+      if (cropFilter === "all") return card;
+      return { ...card, cropGroups: card.cropGroups.filter(g => g.archived || g.crop === cropFilter) };
+    };
+
     return cards
       .filter(dateMatchesCard)
       .filter(farmerMatchesCard)
       .filter(buyerMatchesCard)
-      .filter(cropMatchesCard);
-  }, [cards, dateMode, yearFilter, selectedMonths, selectedDays, farmerFilter, buyerFilter, cropFilter]);
-
-  const visibleCropGroups = useMemo(() => {
-    if (cropFilter === "all") return null;
-    const set = new Set<string>();
-    for (const card of filteredCards) {
-      for (const g of card.cropGroups) {
-        if (!g.archived && g.crop === cropFilter) set.add(g.id);
-      }
-    }
-    return set;
-  }, [filteredCards, cropFilter]);
+      .filter(cropMatchesCard)
+      .map(applyCropFilter);
+  }, [cards, dateMode, yearFilter, selectedMonths, selectedDays, farmerFilter, buyerFilter, cropFilter, pageBuyersList]);
 
   useEffect(() => {
     if (!stockCardsData || !businessId || dbLoaded.current) return;
@@ -3526,14 +3519,20 @@ export default function StockPage() {
             buyersList={pageBuyersList}
           />
         )}
-        {!loadingCards && <StockSummaryBar cards={filteredCards} savedCardMap={savedCardMap} cs={cs} buyersList={pageBuyersList} visibleCropGroupIds={visibleCropGroups} />}
+        {!loadingCards && <StockSummaryBar cards={filteredCards} savedCardMap={savedCardMap} cs={cs} buyersList={pageBuyersList} />}
         {filteredCards.map((card) => {
           const idx = cards.findIndex(c => c.id === card.id);
+          const mergeBack = (edited: FarmerCard) => {
+            if (cropFilter === "all") return updateCard(idx, edited);
+            const original = cards[idx];
+            const hiddenGroups = original.cropGroups.filter(g => !g.archived && g.crop !== cropFilter);
+            updateCard(idx, { ...edited, cropGroups: [...edited.cropGroups, ...hiddenGroups] });
+          };
           return (
             <FarmerCardComp
               key={card.id} card={card}
               savedCard={savedCardMap.get(card.id) ?? null}
-              onChange={c => updateCard(idx, c)}
+              onChange={mergeBack}
               onSave={() => saveCard(idx)}
               onSaveAndClose={() => saveCard(idx, true)}
               onCancel={() => cancelCard(idx)}
@@ -3541,7 +3540,6 @@ export default function StockPage() {
               onSyncSaved={c => setSavedCardMap(prev => new Map(prev).set(c.id, JSON.parse(JSON.stringify(c))))}
               cs={cs}
               currentUsername={currentUsername}
-              visibleCropGroupIds={visibleCropGroups}
             />
           );
         })}
