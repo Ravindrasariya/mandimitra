@@ -291,6 +291,7 @@ export default function CashPage() {
     queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/transaction-aggregates"] });
     queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/bank-accounts"] });
     queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/dashboard"] });
+    queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/stock-cards"] });
   };
 
   const createMutation = useMutation({
