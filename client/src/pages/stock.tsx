@@ -391,6 +391,13 @@ function CollapsedSummary({ totalBags, remainingBags, farmerPayable, buyerReceiv
   showAdvanceLabel?: boolean;
 }) {
   const netFarmerPayable = advancePaid && advancePaid > 0 ? Math.max(0, farmerPayable - advancePaid) : farmerPayable;
+  const effectiveFarmerStatus: "Due" | "Paid" | "Partial Paid" = (() => {
+    const dbStatus = farmerPaymentStatus || "Due";
+    if (!advancePaid || advancePaid <= 0) return dbStatus;
+    if (advancePaid >= farmerPayable) return "Paid";
+    if (dbStatus === "Paid") return "Paid";
+    return "Partial Paid";
+  })();
   return (
     <div className="flex items-center gap-2 text-xs flex-wrap">
       <span className="text-foreground font-bold">Total Bags: {totalBags}</span>
@@ -403,7 +410,7 @@ function CollapsedSummary({ totalBags, remainingBags, farmerPayable, buyerReceiv
           {showAdvanceLabel && advancePaid && advancePaid > 0 ? (
             <span className="text-[10px] text-blue-600 dark:text-blue-400">(Adv: -₹{advancePaid.toFixed(0)})</span>
           ) : null}
-          <PaymentBadge status={farmerPaymentStatus || "Due"} />
+          <PaymentBadge status={effectiveFarmerStatus} />
           <span className="text-blue-700 dark:text-blue-400 font-bold">Buyer: ₹{buyerReceivable.toFixed(0)}</span>
           <PaymentBadge status={buyerPaymentStatus || "Due"} />
         </>
