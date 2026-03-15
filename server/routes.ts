@@ -607,6 +607,7 @@ export async function registerRoutes(
           farmerAdvanceAmount: card.farmerAdvanceAmount,
           farmerAdvanceMode: card.farmerAdvanceMode,
           _sortTs: card.latestCreatedAt.getTime(),
+          latestCreatedAt: card.latestCreatedAt.toISOString(),
           cropGroups,
         };
       });

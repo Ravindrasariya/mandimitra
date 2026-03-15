@@ -1521,6 +1521,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
   cs: ChargeSettings;
   currentUsername: string;
 }) {
+  const { toast } = useToast();
   const [pendingArchiveGroupIdx, setPendingArchiveGroupIdx] = useState<number | null>(null);
   const [showArchiveFarmer, setShowArchiveFarmer] = useState(false);
   const [showReinstateConfirm, setShowReinstateConfirm] = useState(false);
@@ -1564,16 +1565,18 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
     if (pendingArchiveGroupIdx !== null) {
       const group = card.cropGroups[pendingArchiveGroupIdx];
       const dbLots = group.lots.filter(l => l.dbId);
-      for (const lot of dbLots) {
-        try {
+      try {
+        for (const lot of dbLots) {
           await apiRequest("PATCH", `/api/lots/${lot.dbId}`, { isArchived: true });
-        } catch {}
+        }
+        if (dbLots.length > 0) {
+          queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
+        }
+        onChange({ ...card, cropGroups: card.cropGroups.map((g, i) => i === pendingArchiveGroupIdx ? { ...g, archived: true } : g) });
+      } catch (err: any) {
+        toast({ title: "Failed to archive crop group", description: err?.message || "Please try again", variant: "destructive" });
       }
-      if (dbLots.length > 0) {
-        queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
-        queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
-      }
-      onChange({ ...card, cropGroups: card.cropGroups.map((g, i) => i === pendingArchiveGroupIdx ? { ...g, archived: true } : g) });
     }
     setPendingArchiveGroupIdx(null);
   };
@@ -1936,7 +1939,7 @@ function stockCardsToFarmerCards(apiCards: any[]): FarmerCard[] {
       farmerOpen: false,
       vehicleOpen: false,
       archived: farmer.isArchived || false,
-      savedAt: "loaded",
+      savedAt: c.latestCreatedAt ? format(new Date(c.latestCreatedAt), "dd/MM/yyyy HH:mm") : "loaded",
     };
     return card;
   });
@@ -2062,10 +2065,8 @@ export default function StockPage() {
 
           if (lot.dbId) {
             existingLots.push({ dbId: lot.dbId, lotData: lotPayload });
-          } else {
-            if (parseInt(lot.numberOfBags) > 0) {
-              newLots.push({ groupIdx: gIdx, lotIdx: lIdx, lotData: lotPayload });
-            }
+          } else if (!group.archived && parseInt(lot.numberOfBags) > 0) {
+            newLots.push({ groupIdx: gIdx, lotIdx: lIdx, lotData: lotPayload });
           }
         }
       }
