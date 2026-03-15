@@ -11,10 +11,7 @@ import LoginPage from "@/pages/login";
 import ChangePasswordPage from "@/pages/change-password";
 import AdminPage from "@/pages/admin";
 import DashboardPage from "@/pages/dashboard";
-import StockEntryPage from "@/pages/stock-entry";
 import StockPage from "@/pages/stock";
-import StockRegisterPage from "@/pages/stock-register";
-import TransactionsPage from "@/pages/transactions";
 import CashPage from "@/pages/cash";
 import FarmerLedgerPage from "@/pages/farmer-ledger";
 import BuyerLedgerPage from "@/pages/buyer-ledger";
@@ -24,7 +21,7 @@ import LiabilityRegisterPage from "@/pages/liability-register";
 import BalanceSheetPage from "@/pages/balance-sheet";
 import ProfitLossPage from "@/pages/profit-loss";
 import {
-  LayoutDashboard, Package, ClipboardList, Receipt, Wallet, Users, ShoppingBag, LogOut, Wheat, Menu, ChevronLeft, ChevronRight, Globe, Phone, UserCircle, PlayCircle, BookOpen, ChevronDown, ChevronUp, Landmark, Scale, PieChart, TrendingUp, Building2, CheckCircle2, Loader2, Layers,
+  LayoutDashboard, Wallet, Users, ShoppingBag, LogOut, Wheat, Menu, ChevronLeft, ChevronRight, Globe, Phone, UserCircle, PlayCircle, BookOpen, ChevronDown, ChevronUp, Landmark, Scale, PieChart, TrendingUp, Building2, CheckCircle2, Loader2, Layers,
 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -35,9 +32,6 @@ import { Badge } from "@/components/ui/badge";
 const navItems = [
   { path: "/", labelKey: "nav.dashboard", icon: LayoutDashboard, shortLabelKey: "nav.dash", testId: "dashboard" },
   { path: "/stock", labelKey: "nav.stock", icon: Layers, shortLabelKey: "nav.stock", testId: "stock" },
-  { path: "/stock-entry", labelKey: "nav.stockEntry", icon: Package, shortLabelKey: "nav.entry", testId: "entry" },
-  { path: "/register", labelKey: "nav.stockRegister", icon: ClipboardList, shortLabelKey: "nav.register", testId: "register" },
-  { path: "/transactions", labelKey: "nav.transactions", icon: Receipt, shortLabelKey: "nav.txns", testId: "txns" },
   { path: "/cash", labelKey: "nav.cash", icon: Wallet, shortLabelKey: "nav.cash", testId: "cash" },
   { path: "/farmer-ledger", labelKey: "nav.farmerLedger", icon: Users, shortLabelKey: "nav.farmers", testId: "farmers" },
   { path: "/buyer-ledger", labelKey: "nav.buyerLedger", icon: ShoppingBag, shortLabelKey: "nav.buyers", testId: "buyers" },
@@ -479,9 +473,6 @@ function AppLayout() {
           <Switch>
             <Route path="/" component={DashboardPage} />
             <Route path="/stock" component={StockPage} />
-            <Route path="/stock-entry" component={StockEntryPage} />
-            <Route path="/register" component={StockRegisterPage} />
-            <Route path="/transactions" component={TransactionsPage} />
             <Route path="/cash" component={CashPage} />
             <Route path="/farmer-ledger" component={FarmerLedgerPage} />
             <Route path="/buyer-ledger" component={BuyerLedgerPage} />
