@@ -99,7 +99,6 @@ type LotRow = {
   size: string;
   variety: string;
   bagMarka: string;
-  initialTotalWeight: string;
   bids: BidRow[];
 };
 
@@ -399,7 +398,6 @@ const emptyLot = (date?: string): LotRow => ({
   size: "None",
   variety: "",
   bagMarka: "",
-  initialTotalWeight: "",
   bids: [emptyBid(date)],
 });
 
@@ -462,7 +460,6 @@ function diffCropGroup(saved: CropGroup, current: CropGroup): ChangeRecord[] {
     { key: "size", label: "Size" },
     { key: "variety", label: "Variety" },
     { key: "bagMarka", label: "Bag Marka" },
-    { key: "initialTotalWeight", label: "Initial Weight" },
   ];
   const bidFields: { key: keyof Omit<BidRow, "id" | "bidOpen" | "txn" | "txnDate">; label: string }[] = [
     { key: "buyerName", label: "Buyer Name" },
@@ -1296,14 +1293,16 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
 
 // ─── Crop group ───────────────────────────────────────────────────────────────
 
-function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate, farmerName, currentUsername }: {
+function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate, farmerName, currentUsername, onSyncSaved }: {
   group: CropGroup;
   onChange: (g: CropGroup) => void; onArchive: () => void; onDelete: () => void;
   isPersisted: boolean;
   vehicleBhadaRate: number; totalBagsInVehicle: number;
   cs: ChargeSettings; farmerDate: string; farmerName: string;
   currentUsername: string;
+  onSyncSaved?: () => void;
 }) {
+  const { toast } = useToast();
   const [pendingDeleteLotIdx, setPendingDeleteLotIdx] = useState<number | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showReinstateConfirm, setShowReinstateConfirm] = useState(false);
@@ -1389,7 +1388,26 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
           open={showReinstateConfirm}
           title={`Reinstate ${group.crop} (SR# ${group.srNumber})?`}
           description="All lots, bids, and payment details for this crop group will be included in calculations again, including dues and payments."
-          onConfirm={() => { setShowReinstateConfirm(false); onChange({ ...group, archived: false, groupOpen: true }); }}
+          onConfirm={async () => {
+            setShowReinstateConfirm(false);
+            const dbLots = group.lots.filter(l => l.dbId);
+            try {
+              for (const lot of dbLots) {
+                await apiRequest("PATCH", `/api/lots/${lot.dbId}`, { isArchived: false });
+              }
+              if (dbLots.length > 0) {
+                queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
+                queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
+                queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+                queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
+              }
+              onChange({ ...group, archived: false, groupOpen: true });
+              onSyncSaved?.();
+              toast({ title: "Crop group reinstated" });
+            } catch (err: any) {
+              toast({ title: "Failed to reinstate crop group", description: err?.message || "Please try again", variant: "destructive" });
+            }
+          }}
           onCancel={() => setShowReinstateConfirm(false)}
         />
       </>
@@ -1528,6 +1546,41 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
   const [showReinstateConfirm, setShowReinstateConfirm] = useState(false);
   const [showUnsaved, setShowUnsaved] = useState(false);
   const [districtOpen, setDistrictOpen] = useState(false);
+  const [showFarmerSuggestions, setShowFarmerSuggestions] = useState(false);
+  const [farmerSearchText, setFarmerSearchText] = useState("");
+  const [showVillageSuggestions, setShowVillageSuggestions] = useState(false);
+  const [showTehsilSuggestions, setShowTehsilSuggestions] = useState(false);
+
+  const { data: farmerSuggestions = [] } = useQuery<any[]>({
+    queryKey: ["/api/farmers", `?search=${farmerSearchText}`],
+    enabled: farmerSearchText.length >= 1 && !card.farmerId,
+  });
+
+  const { data: locationData } = useQuery<{ villages: string[]; tehsils: string[] }>({
+    queryKey: ["/api/farmers/locations"],
+  });
+
+  const filteredVillages = (locationData?.villages || []).filter(
+    (v) => card.village.length >= 1 && v.toLowerCase().includes(card.village.toLowerCase()) && v.toLowerCase() !== card.village.toLowerCase()
+  );
+  const filteredTehsils = (locationData?.tehsils || []).filter(
+    (t) => card.tehsil.length >= 1 && t.toLowerCase().includes(card.tehsil.toLowerCase()) && t.toLowerCase() !== card.tehsil.toLowerCase()
+  );
+
+  const selectFarmer = (f: any) => {
+    onChange({
+      ...card,
+      farmerId: f.id,
+      farmerName: f.name || "",
+      farmerPhone: f.phone || "",
+      village: f.village || "",
+      tehsil: f.tehsil || "",
+      district: f.district || "",
+      state: f.state || "Madhya Pradesh",
+    });
+    setShowFarmerSuggestions(false);
+    setFarmerSearchText("");
+  };
 
   const set = (f: keyof FarmerCard, v: any) => onChange({ ...card, [f]: v });
   const usedCrops = card.cropGroups.filter(g => !g.archived).map(g => g.crop);
@@ -1573,6 +1626,8 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
         if (dbLots.length > 0) {
           queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
           queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
         }
         const updatedCard = { ...card, cropGroups: card.cropGroups.map((g, i) => i === pendingArchiveGroupIdx ? { ...g, archived: true } : g) };
         onChange(updatedCard);
@@ -1672,21 +1727,91 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
           {card.farmerOpen && (
             <div className="space-y-3 pl-2">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div>
+                <div className="relative">
                   <Label className="text-xs text-muted-foreground">Name *</Label>
-                  <Input data-testid="input-farmer-name" placeholder="Farmer name" value={card.farmerName} onChange={e => set("farmerName", capFirst(e.target.value))} className="h-8 text-sm" />
+                  <Input data-testid="input-farmer-name" placeholder="Farmer name" value={card.farmerName}
+                    onChange={e => {
+                      const val = capFirst(e.target.value);
+                      set("farmerName", val);
+                      if (card.farmerId) {
+                        set("farmerId", undefined);
+                      }
+                      if (val.length >= 1) {
+                        setFarmerSearchText(val);
+                        setShowFarmerSuggestions(true);
+                      } else {
+                        setShowFarmerSuggestions(false);
+                      }
+                    }}
+                    onFocus={() => {
+                      if (card.farmerName.length >= 1 && !card.farmerId) {
+                        setFarmerSearchText(card.farmerName);
+                        setShowFarmerSuggestions(true);
+                      }
+                    }}
+                    onBlur={() => setTimeout(() => setShowFarmerSuggestions(false), 150)}
+                    className="h-8 text-sm" autoComplete="off" />
+                  {showFarmerSuggestions && farmerSuggestions.length > 0 && !card.farmerId && (
+                    <div className="absolute z-50 w-full bg-popover border rounded-md shadow-lg max-h-48 overflow-y-auto top-full mt-1">
+                      {farmerSuggestions.map((f: any) => (
+                        <button
+                          key={f.id}
+                          data-testid={`suggestion-farmer-${f.id}`}
+                          type="button"
+                          className="w-full text-left px-3 py-2 hover:bg-muted text-sm border-b last:border-b-0"
+                          onMouseDown={() => selectFarmer(f)}
+                        >
+                          <div className="font-medium">{f.name}</div>
+                          <div className="text-xs text-muted-foreground">
+                            {f.phone && <span>{f.phone}</span>}
+                            {f.village && <span> · {f.village}</span>}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">Phone</Label>
                   <Input data-testid="input-farmer-phone" type="tel" inputMode="numeric" placeholder="10-digit mobile" value={card.farmerPhone} onChange={e => set("farmerPhone", e.target.value.replace(/\D/g, "").slice(0, 10))} className="h-8 text-sm" />
                 </div>
-                <div>
+                <div className="relative">
                   <Label className="text-xs text-muted-foreground">Village</Label>
-                  <Input data-testid="input-village" placeholder="Village" value={card.village} onChange={e => set("village", capFirst(e.target.value))} className="h-8 text-sm" />
+                  <Input data-testid="input-village" placeholder="Village" value={card.village}
+                    onChange={e => { set("village", capFirst(e.target.value)); setShowVillageSuggestions(true); }}
+                    onFocus={() => setShowVillageSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowVillageSuggestions(false), 150)}
+                    className="h-8 text-sm" autoComplete="off" />
+                  {showVillageSuggestions && filteredVillages.length > 0 && (
+                    <div className="absolute z-50 w-full bg-popover border rounded-md shadow-lg mt-1 max-h-40 overflow-y-auto top-full">
+                      {filteredVillages.map((v) => (
+                        <button key={v} type="button" data-testid={`suggestion-village-${v}`}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-muted border-b last:border-b-0"
+                          onMouseDown={() => { set("village", v); setShowVillageSuggestions(false); }}>
+                          {v}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <div>
+                <div className="relative">
                   <Label className="text-xs text-muted-foreground">Tehsil</Label>
-                  <Input data-testid="input-tehsil" placeholder="Tehsil" value={card.tehsil} onChange={e => set("tehsil", capFirst(e.target.value))} className="h-8 text-sm" />
+                  <Input data-testid="input-tehsil" placeholder="Tehsil" value={card.tehsil}
+                    onChange={e => { set("tehsil", capFirst(e.target.value)); setShowTehsilSuggestions(true); }}
+                    onFocus={() => setShowTehsilSuggestions(true)}
+                    onBlur={() => setTimeout(() => setShowTehsilSuggestions(false), 150)}
+                    className="h-8 text-sm" autoComplete="off" />
+                  {showTehsilSuggestions && filteredTehsils.length > 0 && (
+                    <div className="absolute z-50 w-full bg-popover border rounded-md shadow-lg mt-1 max-h-40 overflow-y-auto top-full">
+                      {filteredTehsils.map((t) => (
+                        <button key={t} type="button" data-testid={`suggestion-tehsil-${t}`}
+                          className="w-full text-left px-3 py-2 text-sm hover:bg-muted border-b last:border-b-0"
+                          onMouseDown={() => { set("tehsil", t); setShowTehsilSuggestions(false); }}>
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -1806,6 +1931,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                 farmerDate={card.date}
                 farmerName={card.farmerName}
                 currentUsername={currentUsername}
+                onSyncSaved={() => onSyncSaved(card)}
               />
             ))}
             {availableCrops.length > 0 && (
@@ -1889,7 +2015,26 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
         open={showReinstateConfirm}
         title={`Reinstate ${card.farmerName.trim() || "this farmer"}?`}
         description="This farmer entry and all its crop groups, lots, and bids will be included in all calculations again, including dues and payments."
-        onConfirm={() => { setShowReinstateConfirm(false); onChange({ ...card, archived: false, cardOpen: true }); }}
+        onConfirm={async () => {
+          setShowReinstateConfirm(false);
+          if (card.farmerId) {
+            try {
+              await apiRequest("PATCH", `/api/farmers/${card.farmerId}`, { isArchived: false });
+              queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
+              queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
+              queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
+              queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+              const updatedCard = { ...card, archived: false, cardOpen: true };
+              onChange(updatedCard);
+              onSyncSaved(updatedCard);
+              toast({ title: "Farmer reinstated" });
+            } catch (err: any) {
+              toast({ title: "Failed to reinstate farmer", description: err?.message || "Please try again", variant: "destructive" });
+            }
+          } else {
+            onChange({ ...card, archived: false, cardOpen: true });
+          }
+        }}
         onCancel={() => setShowReinstateConfirm(false)}
       />
     </Card>
@@ -1932,7 +2077,6 @@ function stockCardsToFarmerCards(apiCards: any[]): FarmerCard[] {
           size: lot.size || "None",
           variety: lot.variety || "",
           bagMarka: lot.bagMarka || "",
-          initialTotalWeight: lot.initialTotalWeight || "",
           bids: [],
         })),
         archived: cg.isArchived || false,
@@ -2055,7 +2199,6 @@ export default function StockPage() {
             numberOfBags: parseInt(lot.numberOfBags) || 0,
             size: lot.size === "None" ? null : lot.size || null,
             bagMarka: lot.bagMarka || null,
-            initialTotalWeight: lot.initialTotalWeight || null,
             vehicleNumber: card.vehicleNumber ? card.vehicleNumber.toUpperCase() : null,
             vehicleBhadaRate: card.vehicleBhadaRate || null,
             driverName: card.driverName || null,
@@ -2097,7 +2240,6 @@ export default function StockPage() {
             numberOfBags: nl.lotData.numberOfBags,
             size: nl.lotData.size,
             bagMarka: nl.lotData.bagMarka,
-            initialTotalWeight: nl.lotData.initialTotalWeight,
           })),
         });
         const createdLots = await batchRes.json();
@@ -2163,6 +2305,7 @@ export default function StockPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/farmers/locations"] });
 
       toast({ title: "Saved", description: `${card.farmerName.trim()} entry saved successfully` });
     } catch (err: any) {
@@ -2192,6 +2335,7 @@ export default function StockPage() {
         queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
         queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
         queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       } catch (err: any) {
         toast({ title: "Archive Failed", description: err.message, variant: "destructive" });
         return;

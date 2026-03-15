@@ -518,7 +518,7 @@ export async function registerRoutes(
         numberOfBags: number;
         size: string | null;
         bagMarka: string | null;
-        initialTotalWeight: string | null;
+        
         remainingBags: number;
         isArchived: boolean;
       }
@@ -580,7 +580,6 @@ export async function registerRoutes(
           numberOfBags: lot.numberOfBags,
           size: lot.size,
           bagMarka: lot.bagMarka,
-          initialTotalWeight: lot.initialTotalWeight,
           remainingBags: lot.remainingBags,
           isArchived: lot.isArchived,
         });
@@ -663,7 +662,6 @@ export async function registerRoutes(
         driverContact: req.body.driverContact || null,
         freightType: req.body.freightType || null,
         totalBagsInVehicle: req.body.totalBagsInVehicle ? parseInt(req.body.totalBagsInVehicle) : null,
-        initialTotalWeight: req.body.initialTotalWeight || null,
       };
 
       const lot = await storage.createLot(data);
@@ -728,7 +726,6 @@ export async function registerRoutes(
           driverContact: driverContact || null,
           freightType: freightType || null,
           totalBagsInVehicle: totalBagsInVehicle ? parseInt(totalBagsInVehicle) : null,
-          initialTotalWeight: item.initialTotalWeight || null,
           farmerAdvanceAmount: farmerAdvanceAmount || null,
           farmerAdvanceMode: farmerAdvanceMode || null,
         };
@@ -777,7 +774,7 @@ export async function registerRoutes(
       data.remainingBags = data.actualNumberOfBags - soldBags;
     }
 
-    const trackFields = ["numberOfBags", "actualNumberOfBags", "crop", "variety", "size", "bagMarka", "vehicleNumber", "vehicleBhadaRate", "initialTotalWeight", "farmerAdvanceAmount", "farmerAdvanceMode"];
+    const trackFields = ["numberOfBags", "actualNumberOfBags", "crop", "variety", "size", "bagMarka", "vehicleNumber", "vehicleBhadaRate", "farmerAdvanceAmount", "farmerAdvanceMode"];
     const changedBy = req.user!.username;
     for (const field of trackFields) {
       if (data[field] !== undefined) {
@@ -1239,7 +1236,6 @@ export async function registerRoutes(
           id: l.id, lotId: l.lotId, crop: l.crop, date: l.date,
           numberOfBags: l.numberOfBags, actualNumberOfBags: l.actualNumberOfBags, remainingBags: l.remainingBags,
           farmerId: l.farmerId, farmerName: l.farmer.name,
-          initialTotalWeight: l.initialTotalWeight,
         })),
         transactions: allTxns.map(t => ({
           id: t.id, transactionId: t.transactionId, date: t.date,

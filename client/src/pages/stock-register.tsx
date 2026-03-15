@@ -33,7 +33,6 @@ type LotEditState = {
   variety: string;
   size: string;
   bagMarka: string;
-  initialTotalWeight: string;
   actualNumberOfBags: string;
   numberOfBags: string;
 };
@@ -294,7 +293,6 @@ export default function StockRegisterPage() {
             variety: lotState.variety || orig.variety || null,
             size: lotState.size || orig.size || null,
             bagMarka: lotState.bagMarka || orig.bagMarka || null,
-            initialTotalWeight: lotState.initialTotalWeight || orig.initialTotalWeight || null,
             numberOfBags: origBags,
             actualNumberOfBags: Math.min(actualBags, origBags),
           });
@@ -381,7 +379,6 @@ export default function StockRegisterPage() {
         variety: lot.variety || "",
         size: lot.size || "",
         bagMarka: lot.bagMarka || "",
-        initialTotalWeight: lot.initialTotalWeight || "",
         actualNumberOfBags: String(lot.actualNumberOfBags ?? lot.numberOfBags),
         numberOfBags: String(lot.numberOfBags),
       };
@@ -389,7 +386,6 @@ export default function StockRegisterPage() {
         variety: "",
         size: "",
         bagMarka: "",
-        initialTotalWeight: "",
         actualNumberOfBags: "",
         numberOfBags: String(lot.numberOfBags),
       };
@@ -480,7 +476,7 @@ export default function StockRegisterPage() {
     const headers = [
       "SR #", "Lot ID", "Date", "Crop", "Variety", "Size",
       "Farmer ID", "Farmer Name", "Farmer Phone", "Farmer Village", "Farmer Tehsil", "Farmer District",
-      "No. of Bags", "Remaining Bags", "Bag Marka", "Initial Total Weight",
+      "No. of Bags", "Remaining Bags", "Bag Marka",
       "Vehicle Number", "Vehicle Bhada Rate", "Driver Name", "Driver Contact", "Freight Type", "Total Bags In Vehicle",
       "Farmer Advance Amount", "Farmer Advance Mode",
       "Status"
@@ -494,7 +490,7 @@ export default function StockRegisterPage() {
     const rows = filtered.map(lot => [
       lot.serialNumber, lot.lotId, lot.date, lot.crop, lot.variety || "", lot.size || "",
       lot.farmer.farmerId, lot.farmer.name, lot.farmer.phone, lot.farmer.village || "", lot.farmer.tehsil || "", lot.farmer.district || "",
-      lot.numberOfBags, lot.remainingBags, lot.bagMarka || "", lot.initialTotalWeight || "",
+      lot.numberOfBags, lot.remainingBags, lot.bagMarka || "",
       lot.vehicleNumber || "", (() => { const lb = lot.actualNumberOfBags ?? lot.numberOfBags; const tvb = lot.totalBagsInVehicle; return (tvb && tvb > 0 && lot.vehicleBhadaRate) ? ((parseFloat(lot.vehicleBhadaRate) * lb) / tvb).toFixed(2) : lot.vehicleBhadaRate || ""; })(), lot.driverName || "", lot.driverContact || "", lot.freightType || "", lot.actualNumberOfBags ?? lot.numberOfBags,
       lot.farmerAdvanceAmount || "", lot.farmerAdvanceMode || "",
       getLotStatus(lot)
@@ -1051,18 +1047,6 @@ export default function StockRegisterPage() {
                               value={lotState.bagMarka}
                               onChange={(e) => updateLotField(lot.id, "bagMarka", e.target.value)}
                               placeholder={origLotFields[lot.id]?.bagMarka || t("common.optional")}
-                              className="h-8 text-sm"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs">{t("stockRegister.initialWeight")}</Label>
-                            <Input
-                              data-testid={`input-edit-initial-weight-${lot.id}`}
-                              type="text"
-                              inputMode="decimal"
-                              value={lotState.initialTotalWeight}
-                              onChange={(e) => updateLotField(lot.id, "initialTotalWeight", e.target.value)}
-                              placeholder={origLotFields[lot.id]?.initialTotalWeight || "0.00"}
                               className="h-8 text-sm"
                             />
                           </div>

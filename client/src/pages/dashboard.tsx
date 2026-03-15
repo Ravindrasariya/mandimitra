@@ -21,7 +21,7 @@ import {
 
 type DashboardData = {
   businessName: string;
-  lots: { id: number; lotId: string; crop: string; date: string; numberOfBags: number; remainingBags: number; farmerId: number; farmerName: string; initialTotalWeight: string | null }[];
+  lots: { id: number; lotId: string; crop: string; date: string; numberOfBags: number; remainingBags: number; farmerId: number; farmerName: string }[];
   transactions: { id: number; transactionId: string; date: string; crop: string; lotId: string; farmerId: number; farmerName: string; buyerId: number; buyerName: string; totalPayableToFarmer: string; totalReceivableFromBuyer: string; paidAmount: string; farmerPaidAmount: string; mandiCharges: string; aadhatCharges: string; hammaliCharges: string; extraChargesFarmer: string; extraChargesBuyer: string; netWeight: string; numberOfBags: number; isReversed: boolean }[];
   farmersWithDues: { id: number; name: string; totalPayable: string; totalDue: string }[];
   buyersWithDues: { id: number; name: string; receivableDue: string; overallDue: string; openingBalance: string }[];

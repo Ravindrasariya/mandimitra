@@ -23,7 +23,6 @@ type LotEntry = {
   numberOfBags: string;
   size: string;
   bagMarka: string;
-  initialTotalWeight: string;
 };
 
 const emptyLot: LotEntry = {
@@ -32,7 +31,6 @@ const emptyLot: LotEntry = {
   numberOfBags: "",
   size: "",
   bagMarka: "",
-  initialTotalWeight: "",
 };
 
 export default function StockEntryPage() {
@@ -277,7 +275,6 @@ export default function StockEntryPage() {
           numberOfBags: parseInt(lot.numberOfBags),
           size: lot.size || null,
           bagMarka: lot.bagMarka || null,
-          initialTotalWeight: lot.initialTotalWeight || null,
         })),
       });
 
@@ -776,19 +773,6 @@ export default function StockEntryPage() {
                     value={lot.bagMarka}
                     onChange={(e) => updateLot(index, "bagMarka", e.target.value)}
                     placeholder={t("common.optional")}
-                    className="mobile-touch-target text-sm"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label>{t("stockEntry.initialWeight")}</Label>
-                  <Input
-                    data-testid={`input-initial-weight-${index}`}
-                    type="text"
-                    inputMode="decimal"
-                    value={lot.initialTotalWeight}
-                    onChange={(e) => updateLot(index, "initialTotalWeight", toNum(e.target.value))}
-                    onFocus={(e) => e.target.select()}
-                    placeholder="0.00"
                     className="mobile-touch-target text-sm"
                   />
                 </div>

@@ -688,9 +688,6 @@ export default function BiddingPage() {
                               <span>
                                 {t("common.remaining")}: <strong className="text-foreground">{lot.remainingBags}</strong> / {lot.actualNumberOfBags ?? lot.numberOfBags} {t("common.bags")}
                               </span>
-                              {lot.initialTotalWeight && (
-                                <span>{t("stockRegister.initWt")}: {lot.initialTotalWeight} kg</span>
-                              )}
                               {lot.bagMarka && (
                                 <span>{t("stockRegister.marka")}: {lot.bagMarka}</span>
                               )}
