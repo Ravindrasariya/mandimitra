@@ -462,10 +462,6 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
 
       {nw > 0 && pricePerKg > 0 && (
         <div className="bg-muted/40 rounded-md px-3 py-2 text-xs space-y-1" data-testid="txn-bid-rate-header">
-          <div className="flex justify-between">
-            <span>Bid Rate:</span>
-            <span className="font-medium">₹{pricePerKg.toFixed(2)}/kg</span>
-          </div>
           {epkFarmer > 0 && (
             <div className="flex justify-between text-green-600">
               <span>Farmer Rate ({pricePerKg.toFixed(2)} + {epkFarmer.toFixed(2)}):</span>
