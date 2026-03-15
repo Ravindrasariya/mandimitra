@@ -17,12 +17,20 @@ import {
 import {
   Plus, Trash2, ChevronDown, ChevronRight, Truck, User,
   AlertTriangle, Scale, Wheat, ChevronsUpDown, X, Calculator,
-  Archive, History, Save, Check,
+  Archive, History, Save, Check, Printer, Share2,
 } from "lucide-react";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
 import { CROPS, SIZES, DISTRICTS } from "@shared/schema";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem, CommandGroup } from "@/components/ui/command";
+import { printReceipt, shareReceiptAsPdf } from "@/lib/receiptUtils";
+import {
+  generateFarmerReceiptHtml, generateBuyerReceiptHtml, generateCombinedBuyerReceiptHtml,
+  applyFarmerTemplate, applyBuyerTemplate, applyCombinedBuyerTemplate,
+  type UnifiedSerialGroup, type UnifiedLotGroup, type BuyerLotEntry, type TransactionWithDetails,
+} from "@/lib/receiptGenerators";
+import type { Lot, Farmer, Transaction, Bid, Buyer, ReceiptTemplate } from "@shared/schema";
 
 const capFirst = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 const toNum = (v: string) => v.replace(/[^0-9.]/g, "");
@@ -1372,7 +1380,7 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
 
 // ─── Crop group ───────────────────────────────────────────────────────────────
 
-function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate, farmerName, currentUsername, onSyncSaved, buyersList, onReturnLot }: {
+function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate, farmerName, currentUsername, onSyncSaved, buyersList, onReturnLot, farmerCard }: {
   group: CropGroup;
   onChange: (g: CropGroup) => void; onArchive: () => void; onDelete: () => void;
   isPersisted: boolean;
@@ -1382,12 +1390,21 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
   onSyncSaved?: (updatedGroup: CropGroup) => void;
   buyersList: { id: number; name: string; phone?: string }[];
   onReturnLot?: (lotIdx: number) => void;
+  farmerCard?: FarmerCard;
 }) {
   const { toast } = useToast();
+  const { user } = useAuth();
   const [pendingDeleteLotIdx, setPendingDeleteLotIdx] = useState<number | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showReinstateConfirm, setShowReinstateConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [receiptLoading, setReceiptLoading] = useState(false);
+
+  const { data: receiptTemplates = [] } = useQuery<ReceiptTemplate[]>({
+    queryKey: ["/api/receipt-templates"],
+  });
+
+  const hasTransactions = isPersisted && group.lots.some(l => l.bids.some(b => b.txnDbId));
 
   const headerCls = CROP_HEADER[group.crop] || "bg-muted border-border";
   const badgeCls = CROP_COLORS[group.crop] || "bg-muted border-border text-foreground";
@@ -1445,6 +1462,128 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
   const totalFarmerPayable = allTotals.reduce((s, t) => s + t.farmerPayable, 0);
   const totalBuyerReceivable = allTotals.reduce((s, t) => s + t.buyerReceivable, 0);
   const hasAnyData = allTotals.some(t => t.hasData);
+
+  const uniqueBuyers = (() => {
+    if (!hasTransactions) return [];
+    const map = new Map<number, string>();
+    for (const lot of group.lots) {
+      for (const bid of lot.bids) {
+        if (bid.txnDbId && bid.buyerId) map.set(bid.buyerId, bid.buyerName);
+      }
+    }
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  })();
+
+  const fetchReceiptData = async (): Promise<{ sg: UnifiedSerialGroup; txnsByBuyerId: Map<number, BuyerLotEntry[]> } | null> => {
+    if (!farmerCard) return null;
+    const lotDbIds = group.lots.filter(l => l.dbId).map(l => l.dbId!);
+    if (lotDbIds.length === 0) return null;
+    try {
+      const res = await apiRequest("GET", `/api/transactions?dateFrom=${farmerCard.date}&dateTo=${farmerCard.date}`);
+      const allTxns: (Transaction & { farmer: Farmer; buyer: Buyer; lot: Lot; bid: Bid })[] = await res.json();
+      const groupTxns = allTxns.filter(t => lotDbIds.includes(t.lotId) && !t.isReversed);
+      if (groupTxns.length === 0) return null;
+
+      const farmer: Farmer = {
+        id: farmerCard.farmerId || 0,
+        businessId: user?.businessId || 0,
+        name: farmerCard.farmerName,
+        phone: farmerCard.farmerPhone || null,
+        village: farmerCard.village || null,
+        tehsil: farmerCard.tehsil || null,
+        district: farmerCard.district || null,
+        state: farmerCard.state || null,
+        isActive: true,
+        isArchived: false,
+      };
+
+      const lotGroups: UnifiedLotGroup[] = [];
+      const lotMap = new Map<number, UnifiedLotGroup>();
+      for (const tx of groupTxns) {
+        const key = tx.lotId;
+        if (!lotMap.has(key)) {
+          lotMap.set(key, { lotId: tx.lot.lotId, lot: tx.lot, farmer, pendingBids: [], completedTxns: [] });
+        }
+        lotMap.get(key)!.completedTxns.push(tx);
+      }
+      lotGroups.push(...lotMap.values());
+
+      const sg: UnifiedSerialGroup = {
+        serialNumber: parseInt(group.srNumber) || 0,
+        date: farmerCard.date,
+        farmer,
+        lotGroups,
+        allPendingBids: [],
+        allCompletedTxns: groupTxns,
+        totalBags: group.lots.reduce((s, l) => s + (parseInt(l.numberOfBags) || 0), 0),
+      };
+
+      const txnsByBuyerId = new Map<number, BuyerLotEntry[]>();
+      for (const tx of groupTxns) {
+        const buyerId = tx.buyerId;
+        if (!txnsByBuyerId.has(buyerId)) txnsByBuyerId.set(buyerId, []);
+        txnsByBuyerId.get(buyerId)!.push({ lot: tx.lot, tx });
+      }
+
+      return { sg, txnsByBuyerId };
+    } catch (err: any) {
+      toast({ title: "Failed to load receipt data", description: err?.message || "Please try again", variant: "destructive" });
+      return null;
+    }
+  };
+
+  const handleFarmerReceipt = async (action: "print" | "share") => {
+    setReceiptLoading(true);
+    try {
+      const data = await fetchReceiptData();
+      if (!data) { toast({ title: "No transaction data found", variant: "destructive" }); return; }
+      const crop = data.sg.lotGroups[0]?.lot?.crop || "";
+      const customTmpl = receiptTemplates.find(t => t.templateType === "farmer" && t.crop === crop)
+        || receiptTemplates.find(t => t.templateType === "farmer" && t.crop === "");
+      const html = customTmpl
+        ? applyFarmerTemplate(customTmpl.templateHtml, data.sg, user?.businessName, user?.businessAddress, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo)
+        : generateFarmerReceiptHtml(data.sg, user?.businessName, user?.businessAddress);
+      if (action === "print") {
+        await printReceipt(html);
+      } else {
+        const shortName = farmerName.trim().split(/\s+/).slice(0, 2).join("");
+        await shareReceiptAsPdf(html, `Farmer_Receipt_${shortName}_${farmerDate}.pdf`);
+      }
+    } catch (err: any) {
+      toast({ title: "Receipt error", description: err?.message || "Failed to generate receipt", variant: "destructive" });
+    } finally { setReceiptLoading(false); }
+  };
+
+  const handleBuyerReceipt = async (buyerId: number, buyerName: string, action: "print" | "share") => {
+    setReceiptLoading(true);
+    try {
+      const data = await fetchReceiptData();
+      if (!data) { toast({ title: "No transaction data found", variant: "destructive" }); return; }
+      const entries = data.txnsByBuyerId.get(buyerId);
+      if (!entries || entries.length === 0) { toast({ title: "No transactions found for this buyer", variant: "destructive" }); return; }
+      const crop = entries[0].lot.crop;
+      const customTmpl = receiptTemplates.find(t => t.templateType === "buyer" && t.crop === crop)
+        || receiptTemplates.find(t => t.templateType === "buyer" && t.crop === "");
+      let html: string;
+      if (entries.length === 1) {
+        html = customTmpl
+          ? applyBuyerTemplate(customTmpl.templateHtml, entries[0].lot, data.sg.farmer, entries[0].tx, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo)
+          : generateBuyerReceiptHtml(entries[0].lot, data.sg.farmer, entries[0].tx, user?.businessName, user?.businessAddress);
+      } else {
+        html = customTmpl
+          ? applyCombinedBuyerTemplate(customTmpl.templateHtml, entries, data.sg.serialNumber, data.sg.date, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo)
+          : generateCombinedBuyerReceiptHtml(entries, data.sg.serialNumber, data.sg.date, user?.businessName, user?.businessAddress, user?.businessPhone);
+      }
+      if (action === "print") {
+        await printReceipt(html);
+      } else {
+        const safeName = buyerName.replace(/[^a-zA-Z0-9]/g, "_");
+        await shareReceiptAsPdf(html, `Buyer_Receipt_${safeName}_${crop}_${farmerDate}.pdf`);
+      }
+    } catch (err: any) {
+      toast({ title: "Receipt error", description: err?.message || "Failed to generate receipt", variant: "destructive" });
+    } finally { setReceiptLoading(false); }
+  };
 
   if (group.archived) {
     return (
@@ -1523,6 +1662,41 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
           )}
         </div>
         <div className="flex items-center gap-1 shrink-0">
+          {hasTransactions && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  type="button" variant="ghost" size="sm"
+                  onClick={e => e.stopPropagation()}
+                  disabled={receiptLoading}
+                  className="h-7 w-7 p-0 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950/40 shrink-0"
+                  title="Print / Share Receipt"
+                  data-testid={`button-receipt-${group.crop.toLowerCase()}`}
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
+                <DropdownMenuItem onClick={() => handleFarmerReceipt("print")} data-testid="receipt-print-farmer">
+                  <Printer className="w-3.5 h-3.5 mr-2" /> Print किसान रसीद
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleFarmerReceipt("share")} data-testid="receipt-share-farmer">
+                  <Share2 className="w-3.5 h-3.5 mr-2" /> Share किसान रसीद
+                </DropdownMenuItem>
+                {uniqueBuyers.length > 0 && <DropdownMenuSeparator />}
+                {uniqueBuyers.map(b => (
+                  <div key={b.id}>
+                    <DropdownMenuItem onClick={() => handleBuyerReceipt(b.id, b.name, "print")} data-testid={`receipt-print-buyer-${b.id}`}>
+                      <Printer className="w-3.5 h-3.5 mr-2" /> Print {b.name} Receipt
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleBuyerReceipt(b.id, b.name, "share")} data-testid={`receipt-share-buyer-${b.id}`}>
+                      <Share2 className="w-3.5 h-3.5 mr-2" /> Share {b.name} Receipt
+                    </DropdownMenuItem>
+                  </div>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
           <Button
             type="button" variant="ghost" size="sm"
             onClick={e => { e.stopPropagation(); setShowHistory(true); }}
@@ -2024,6 +2198,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                 farmerDate={card.date}
                 farmerName={card.farmerName}
                 currentUsername={currentUsername}
+                farmerCard={card}
                 onSyncSaved={(updatedGroup) => {
                   const updatedCard = { ...card, cropGroups: card.cropGroups.map((g, i) => i === idx ? updatedGroup : g) };
                   onSyncSaved(updatedCard);
@@ -2044,8 +2219,20 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                     queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
                     queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
                     queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
-                    queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
-                    queryClient.invalidateQueries({ queryKey: ["/api/cash-entries"] });
+                    queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"] });
+                    queryClient.invalidateQueries({ queryKey: ["/api/transaction-edit-history"] });
+                    queryClient.invalidateQueries({ predicate: (query) => {
+                      const key = query.queryKey[0];
+                      return typeof key === "string" && key.startsWith("/api/buyers");
+                    }});
+                    queryClient.invalidateQueries({ predicate: (query) => {
+                      const key = query.queryKey[0];
+                      return typeof key === "string" && key.startsWith("/api/farmers");
+                    }});
+                    queryClient.invalidateQueries({ predicate: (query) => {
+                      const key = query.queryKey[0];
+                      return typeof key === "string" && key.startsWith("/api/cash-entries");
+                    }});
                     toast({ title: "Lot returned", description: `Lot #${lotIdx + 1} has been returned to farmer` });
                   } catch (err: any) {
                     toast({ title: "Failed to return lot", description: err?.message || "Please try again", variant: "destructive" });
@@ -2658,11 +2845,22 @@ export default function StockPage() {
       queryClient.invalidateQueries({ queryKey: ["/api/bids"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
       queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
       queryClient.invalidateQueries({ queryKey: ["/api/farmers/locations"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/buyers"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/cash-entries"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/transaction-edit-history"] });
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === "string" && key.startsWith("/api/farmers");
+      }});
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === "string" && key.startsWith("/api/buyers");
+      }});
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === "string" && key.startsWith("/api/cash-entries");
+      }});
 
       toast({ title: "Saved", description: `${card.farmerName.trim()} entry saved successfully` });
     } catch (err: any) {
