@@ -1300,7 +1300,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
   vehicleBhadaRate: number; totalBagsInVehicle: number;
   cs: ChargeSettings; farmerDate: string; farmerName: string;
   currentUsername: string;
-  onSyncSaved?: () => void;
+  onSyncSaved?: (updatedGroup: CropGroup) => void;
 }) {
   const { toast } = useToast();
   const [pendingDeleteLotIdx, setPendingDeleteLotIdx] = useState<number | null>(null);
@@ -1401,8 +1401,9 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
                 queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
                 queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
               }
-              onChange({ ...group, archived: false, groupOpen: true });
-              onSyncSaved?.();
+              const updatedGroup = { ...group, archived: false, groupOpen: true };
+              onChange(updatedGroup);
+              onSyncSaved?.(updatedGroup);
               toast({ title: "Crop group reinstated" });
             } catch (err: any) {
               toast({ title: "Failed to reinstate crop group", description: err?.message || "Please try again", variant: "destructive" });
@@ -1931,7 +1932,10 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                 farmerDate={card.date}
                 farmerName={card.farmerName}
                 currentUsername={currentUsername}
-                onSyncSaved={() => onSyncSaved(card)}
+                onSyncSaved={(updatedGroup) => {
+                  const updatedCard = { ...card, cropGroups: card.cropGroups.map((g, i) => i === idx ? updatedGroup : g) };
+                  onSyncSaved(updatedCard);
+                }}
               />
             ))}
             {availableCrops.length > 0 && (
