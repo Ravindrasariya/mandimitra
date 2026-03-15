@@ -1348,7 +1348,7 @@ export default function CashPage() {
                             <span className="truncate flex-1" data-testid="text-outward-farmer-selected">
                               {(() => { const f = farmersWithDues.find(f => f.id === parseInt(outwardFarmerId)); return f ? (parseFloat(f.totalDue) > 0 ? `${f.name} - Due: ₹${parseFloat(f.totalDue).toLocaleString("en-IN")}` : f.name) : ""; })()}
                             </span>
-                            <button onClick={() => { setOutwardFarmerId(""); setOutwardFarmerSearch(""); setFarmerAllocations([]); setFarmerAllocationSearch(""); if (outwardOutflowType === "Farmer-Harvest Sale") setOutwardAmount(""); }} className="shrink-0" data-testid="button-clear-outward-farmer"><X className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => { setOutwardFarmerId(""); setOutwardFarmerSearch(""); setFarmerAllocations([]); setFarmerAllocationSearch(""); if (outwardOutflowType === "Farmer-Harvest Sale" || outwardOutflowType === "Farmer-Advance") setOutwardAmount(""); }} className="shrink-0" data-testid="button-clear-outward-farmer"><X className="w-3.5 h-3.5" /></button>
                           </div>
                         ) : (
                           <>
@@ -1401,7 +1401,7 @@ export default function CashPage() {
                   {(outwardOutflowType === "Farmer-Harvest Sale" || outwardOutflowType === "Farmer-Advance") && outwardFarmerId && (
                     <>
                       <div className="space-y-1">
-                        <Label className="text-xs">{t("cash.amount")}</Label>
+                        <Label className="text-xs">{outwardOutflowType === "Farmer-Advance" ? "Advance Amount" : t("cash.amount")}</Label>
                         <Input type="number" inputMode="decimal" value={outwardAmount} onChange={e => setOutwardAmount(e.target.value)} onFocus={e => e.target.select()} placeholder="0" className="h-9 text-sm" data-testid="outward-amount" />
                       </div>
                       <div className="space-y-2">
@@ -1544,7 +1544,7 @@ export default function CashPage() {
                       Total Mandi Commission: ₹{(txAggregates?.totalMandiCommission || 0).toLocaleString("en-IN")} | Paid: ₹{(txAggregates?.paidMandiCommission || 0).toLocaleString("en-IN")} | <span className="font-bold">Due: ₹{dueMandi.toLocaleString("en-IN")}</span>
                     </div>
                   )}
-                  {outwardOutflowType !== "Farmer-Harvest Sale" && (
+                  {outwardOutflowType !== "Farmer-Harvest Sale" && outwardOutflowType !== "Farmer-Advance" && (
                     <div className="space-y-1">
                       <Label className="text-xs">{t("cash.amount")}</Label>
                       <Input type="number" inputMode="decimal" value={outwardAmount} onChange={e => setOutwardAmount(e.target.value)} onFocus={e => e.target.select()} placeholder="0" className="h-9 text-sm" data-testid="outward-amount" />
