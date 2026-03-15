@@ -270,17 +270,6 @@ export default function FarmerLedgerPage() {
           payable += p;
           due += Math.max(0, p - paid);
         }
-        let filteredAdvance = 0;
-        if (f.advanceEntries) {
-          for (const ae of f.advanceEntries) {
-            const [y, m, day] = ae.date.split("-");
-            if (yearFilter !== "all" && y !== yearFilter) continue;
-            if (selectedMonths.length > 0 && !selectedMonths.includes(String(parseInt(m)))) continue;
-            if (selectedDays.length > 0 && !selectedDays.includes(String(parseInt(day)))) continue;
-            filteredAdvance += parseFloat(ae.amount || "0");
-          }
-        }
-        due = Math.max(0, due - filteredAdvance);
         map.set(f.id, { payable, due });
       }
     }
