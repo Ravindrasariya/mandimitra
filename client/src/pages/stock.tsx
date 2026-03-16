@@ -782,9 +782,9 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
         {txn.showWeightCalc && (
           <div className="bg-muted/50 rounded-md p-2 space-y-2 mt-1" data-testid="weight-calculator">
             <p className="text-xs font-semibold text-muted-foreground">{t("stock.sampleBagWeights")}</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2">
               {txn.sampleWeights.map((w, idx) => (
-                <div key={idx} className="space-y-0.5">
+                <div key={idx} className="space-y-0.5 min-w-0">
                   <div className="flex items-center gap-1">
                     <span className="text-xs text-muted-foreground w-4">{idx + 1}.</span>
                     <Input
@@ -811,9 +811,11 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
                 </div>
               ))}
             </div>
-            <Button type="button" variant="ghost" size="sm" className="h-7 text-xs w-full" onClick={addSample}>
-              <Plus className="h-3 w-3 mr-1" /> {t("stock.addSample")}
-            </Button>
+            {txn.sampleWeights.length < 5 && (
+              <Button type="button" variant="ghost" size="sm" className="h-7 text-xs w-full" onClick={addSample}>
+                <Plus className="h-3 w-3 mr-1" /> {t("stock.addSample")}
+              </Button>
+            )}
             <div className="border-t pt-1 flex justify-between text-xs font-medium">
               <span>{t("stock.average")} ({nonZero.length} {t("stock.samples")}):</span>
               <span>{average > 0 ? `${average.toFixed(2)} kg` : "—"}</span>
