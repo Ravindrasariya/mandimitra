@@ -78,8 +78,8 @@ export function generateFarmerReceiptHtml(sg: UnifiedSerialGroup, businessName?:
     `<tr>
       ${tdEmpty()}${tdEmpty()}${tdEmpty()}${tdEmpty()}${tdEmpty()}
       <td style="${B}vertical-align:top;text-align:center">
-        <div style="font-size:11px;color:#555">${label}</div>
-        <div style="${bold ? "font-weight:bold;text-decoration:underline" : ""}">&#8377;${amount.toFixed(2)}</div>
+        <div style="font-size:11px;color:#555;text-align:center">${label}</div>
+        <div style="text-align:center;${bold ? "font-weight:bold;text-decoration:underline" : ""}">&#8377;${amount.toFixed(2)}</div>
       </td>
     </tr>`;
 
