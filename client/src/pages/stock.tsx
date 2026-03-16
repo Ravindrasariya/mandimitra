@@ -1586,7 +1586,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
         || receiptTemplates.find(tmpl => tmpl.templateType === "farmer" && tmpl.crop === "");
       const html = customTmpl
         ? applyFarmerTemplate(customTmpl.templateHtml, data.sg, user?.businessName, user?.businessAddress, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo)
-        : generateFarmerReceiptHtml(data.sg, user?.businessName, user?.businessAddress);
+        : generateFarmerReceiptHtml(data.sg, user?.businessName, user?.businessAddress, user?.businessPhone);
       if (action === "print") {
         await printReceipt(html);
       } else {
