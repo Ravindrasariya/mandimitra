@@ -1927,7 +1927,11 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
   );
 
   const isDirty = savedCard
-    ? getDataFingerprint(card) !== getDataFingerprint(savedCard)
+    ? (() => {
+        const visibleGroupIds = new Set(card.cropGroups.map(g => g.id));
+        const comparableSaved = { ...savedCard, cropGroups: savedCard.cropGroups.filter(g => visibleGroupIds.has(g.id)) };
+        return getDataFingerprint(card) !== getDataFingerprint(comparableSaved);
+      })()
     : hasAnyInput;
 
   const handleCardToggle = () => {
