@@ -41,7 +41,13 @@ export function generateFarmerReceiptHtml(sg: UnifiedSerialGroup, businessName?:
   const hammaliAndExtras = totalHammali + totalExtra;
   const totalShownDeductions = totalFreight + hammaliAndExtras;
   const farmerAdvance = parseFloat(firstLot?.farmerAdvanceAmount || "0");
-  const netPayable = allTxns.reduce((s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0) - farmerAdvance;
+  const totalGross = allTxns.reduce((s, t) => {
+    const nw = parseFloat(t.netWeight || "0");
+    const ppk = parseFloat(t.pricePerKg || "0");
+    const epk = parseFloat((t as any).extraPerKgFarmer || "0");
+    return s + nw * (ppk + epk);
+  }, 0);
+  const netPayable = totalGross - totalShownDeductions - farmerAdvance;
 
   const B = "padding:5px 7px;border:1px solid #444;vertical-align:middle;";
   const td = (content: string, style = "") =>
@@ -62,7 +68,7 @@ export function generateFarmerReceiptHtml(sg: UnifiedSerialGroup, businessName?:
       ${td(String(t.numberOfBags || 0), "text-align:center")}
       ${td(ratePerQ, "text-align:center")}
       ${td(nw.toFixed(2), "text-align:center")}
-      ${td(gross.toFixed(2), "text-align:right")}
+      ${td(gross.toFixed(2), "text-align:center")}
       ${tdEmpty()}
     </tr>`;
   }).join("");
@@ -71,7 +77,7 @@ export function generateFarmerReceiptHtml(sg: UnifiedSerialGroup, businessName?:
   const dedRow = (label: string, amount: number, bold = false) =>
     `<tr>
       ${tdEmpty()}${tdEmpty()}${tdEmpty()}${tdEmpty()}${tdEmpty()}
-      <td style="${B}vertical-align:top">
+      <td style="${B}vertical-align:top;text-align:center">
         <div style="font-size:11px;color:#555">${label}</div>
         <div style="${bold ? "font-weight:bold;text-decoration:underline" : ""}">&#8377;${amount.toFixed(2)}</div>
       </td>
@@ -86,7 +92,7 @@ export function generateFarmerReceiptHtml(sg: UnifiedSerialGroup, businessName?:
   const netPayableRow = `<tr>
     ${tdEmpty()}${tdEmpty()}${tdEmpty()}${tdEmpty()}
     <td style="${B}text-align:right;font-weight:bold">किसान को देय</td>
-    <td style="${B}font-weight:bold;font-size:1.05em">&#8377;${netPayable.toFixed(2)}</td>
+    <td style="${B}font-weight:bold;font-size:1.05em;text-align:center">&#8377;${netPayable.toFixed(2)}</td>
   </tr>`;
 
   const th = (label: string) =>
@@ -225,7 +231,7 @@ export function applyFarmerTemplate(tmpl: string, sg: UnifiedSerialGroup, busine
   const totalDeduction = hammaliAndExtras + totalThelaBhada + totalFreight + totalAadhat + totalMandi + farmerAdvance;
   const totalGross = allTxns.reduce((s, t) => s + parseFloat(t.netWeight || "0") * (parseFloat(t.pricePerKg || "0") + parseFloat((t as any).extraPerKgFarmer || "0")), 0);
   const totalNetWeight = allTxns.reduce((s, t) => s + parseFloat(t.netWeight || "0"), 0);
-  const netPayable = allTxns.reduce((s, t) => s + parseFloat(t.totalPayableToFarmer || "0"), 0) - farmerAdvance;
+  const netPayable = totalGross - totalDeduction;
 
   const txnRowsHtml = allTxns.map(t => {
     const nw = parseFloat(t.netWeight || "0");
