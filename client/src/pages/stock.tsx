@@ -2840,13 +2840,18 @@ function StockFilterBar({
             {filteredFarmerSuggestions.map((f, i) => (
               <button
                 key={i}
-                className="w-full text-left px-3 py-2 text-xs hover:bg-accent truncate"
+                className="w-full text-left px-3 py-2 text-xs hover:bg-accent border-b last:border-b-0"
                 data-testid={`farmer-suggestion-${i}`}
                 onClick={() => { setFarmerFilter(f.name); setFarmerDropOpen(false); }}
               >
-                <span className="font-medium">{f.name}</span>
-                {f.phone && <span className="text-muted-foreground"> · {f.phone}</span>}
-                {f.village && <span className="text-muted-foreground"> · {f.village}</span>}
+                <div className="font-medium">{f.name}</div>
+                {(f.phone || f.village) && (
+                  <div className="text-muted-foreground mt-0.5">
+                    {f.phone && <span>{f.phone}</span>}
+                    {f.phone && f.village && <span> · </span>}
+                    {f.village && <span>{f.village}</span>}
+                  </div>
+                )}
               </button>
             ))}
           </div>
