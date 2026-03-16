@@ -274,7 +274,7 @@ function LiabilityCard({ liability, expanded, onToggleExpand, onEdit, onDelete, 
               <Trash2 className="w-3.5 h-3.5 text-destructive" />
             </Button>
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onToggleExpand} data-testid={`button-expand-liability-${liability.id}`}>
-              {expanded ? <ChevronUp className="w-4 h-4" strokeWidth={2.5} /> : <ChevronDown className="w-4 h-4" strokeWidth={2.5} />}
+              {expanded ? <ChevronUp className="w-5 h-5" strokeWidth={3} /> : <ChevronDown className="w-5 h-5" strokeWidth={3} />}
             </Button>
           </div>
         </div>

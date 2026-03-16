@@ -784,7 +784,7 @@ function ReceiptTemplatesDialog({ biz, onClose }: { biz: Business; onClose: () =
               <CollapsibleTrigger asChild>
                 <Button variant="ghost" size="sm" className="w-full justify-between text-muted-foreground">
                   <span className="text-xs">Available template placeholders</span>
-                  {showPlaceholders ? <ChevronDown className="w-3 h-3" strokeWidth={2.5} /> : <ChevronRight className="w-3 h-3" strokeWidth={2.5} />}
+                  {showPlaceholders ? <ChevronDown className="w-4 h-4" strokeWidth={3} /> : <ChevronRight className="w-4 h-4" strokeWidth={3} />}
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent>

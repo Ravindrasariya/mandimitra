@@ -204,7 +204,7 @@ function MobileBottomNav() {
                 <BookOpen className="w-5 h-5" />
                 <span className="flex-1 text-left">{t("nav.books")}</span>
                 <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 bg-amber-100 text-amber-700 border-amber-300">Beta</Badge>
-                {mobileBooksExpanded ? <ChevronUp className="w-4 h-4" strokeWidth={2.5} /> : <ChevronDown className="w-4 h-4" strokeWidth={2.5} />}
+                {mobileBooksExpanded ? <ChevronUp className="w-5 h-5" strokeWidth={3} /> : <ChevronDown className="w-5 h-5" strokeWidth={3} />}
               </button>
               {mobileBooksExpanded && (
                 <div className="ml-6 space-y-0.5">
@@ -293,7 +293,7 @@ function DesktopSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
           onClick={onToggle}
           data-testid="button-toggle-sidebar"
         >
-          {collapsed ? <ChevronRight className="w-4 h-4" strokeWidth={2.5} /> : <ChevronLeft className="w-4 h-4" strokeWidth={2.5} />}
+          {collapsed ? <ChevronRight className="w-5 h-5" strokeWidth={3} /> : <ChevronLeft className="w-5 h-5" strokeWidth={3} />}
         </Button>
       </div>
       <ScrollArea className="flex-1 py-2">
@@ -333,7 +333,7 @@ function DesktopSidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
                 <BookOpen className="w-4 h-4 flex-shrink-0" />
                 <span className="truncate flex-1 text-left">{t("nav.books")}</span>
                 <Badge variant="secondary" className="text-[10px] px-1.5 py-0 h-4 bg-amber-100 text-amber-700 border-amber-300">Beta</Badge>
-                {booksExpanded ? <ChevronUp className="w-3 h-3 flex-shrink-0" strokeWidth={2.5} /> : <ChevronDown className="w-3 h-3 flex-shrink-0" strokeWidth={2.5} />}
+                {booksExpanded ? <ChevronUp className="w-4 h-4 flex-shrink-0" strokeWidth={3} /> : <ChevronDown className="w-4 h-4 flex-shrink-0" strokeWidth={3} />}
               </button>
               {booksExpanded && (
                 <div className="ml-4 space-y-0.5 border-l pl-2">

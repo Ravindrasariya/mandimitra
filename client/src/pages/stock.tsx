@@ -647,7 +647,7 @@ function SectionToggle({ open, onToggle, icon, label, count, summary }: {
       onClick={onToggle}
       className="w-full flex items-start gap-2 px-3 py-2 rounded-md bg-muted/50 hover:bg-muted transition-colors text-sm font-medium text-left"
     >
-      {open ? <ChevronDown className="w-4 h-4 shrink-0 mt-0.5 text-muted-foreground" strokeWidth={2.5} /> : <ChevronRight className="w-4 h-4 shrink-0 mt-0.5 text-muted-foreground" strokeWidth={2.5} />}
+      {open ? <ChevronDown className="w-5 h-5 shrink-0 mt-0.5 text-muted-foreground" strokeWidth={3} /> : <ChevronRight className="w-5 h-5 shrink-0 mt-0.5 text-muted-foreground" strokeWidth={3} />}
       <span className="shrink-0 mt-0.5">{icon}</span>
       <span>{label}</span>
       {!open && summary && summary.length > 0 && (
@@ -862,7 +862,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
               className="flex items-center gap-0.5 text-xs hover:text-foreground text-muted-foreground"
               onClick={() => set("showExtraBreakdown", !txn.showExtraBreakdown)}
             >
-              {txn.showExtraBreakdown ? <ChevronDown className="w-3 h-3" strokeWidth={2.5} /> : <ChevronRight className="w-3 h-3" strokeWidth={2.5} />}
+              {txn.showExtraBreakdown ? <ChevronDown className="w-4 h-4" strokeWidth={3} /> : <ChevronRight className="w-4 h-4" strokeWidth={3} />}
               {t("stock.extra")}:
             </button>
             <Input
@@ -1069,8 +1069,8 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
           data-testid={`button-toggle-bid-${bidIndex}`}
         >
           {bid.bidOpen
-            ? <ChevronDown className="w-3.5 h-3.5 text-blue-500" strokeWidth={2.5} />
-            : <ChevronRight className="w-3.5 h-3.5 text-blue-500" strokeWidth={2.5} />}
+            ? <ChevronDown className="w-[18px] h-[18px] text-blue-500" strokeWidth={3} />
+            : <ChevronRight className="w-[18px] h-[18px] text-blue-500" strokeWidth={3} />}
           <span className="text-xs font-bold text-blue-600 uppercase tracking-wide">
             {buyerLabel} {bags > 0 && `· ${bags} ${t("common.bags")}`}
           </span>
@@ -1292,7 +1292,7 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
           onClick={() => onChange({ ...lot, lotOpen: !lot.lotOpen })}
           data-testid={`button-toggle-lot-${index}`}
         >
-          {lot.lotOpen ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" strokeWidth={2.5} /> : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" strokeWidth={2.5} />}
+          {lot.lotOpen ? <ChevronDown className="w-[18px] h-[18px] text-muted-foreground" strokeWidth={3} /> : <ChevronRight className="w-[18px] h-[18px] text-muted-foreground" strokeWidth={3} />}
           <span className="text-xs font-bold text-foreground uppercase tracking-wide">{t("stock.lot")} #{index + 1}</span>
           {lot.isReturned && (
             <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-orange-300 text-orange-600 dark:border-orange-700 dark:text-orange-400">
@@ -1701,7 +1701,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
         {/* Top row: title + action buttons */}
         <div className="flex items-center justify-between gap-1 w-full">
           <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
-            {group.groupOpen ? <ChevronDown className="w-4 h-4 shrink-0" strokeWidth={2.5} /> : <ChevronRight className="w-4 h-4 shrink-0" strokeWidth={2.5} />}
+            {group.groupOpen ? <ChevronDown className="w-5 h-5 shrink-0" strokeWidth={3} /> : <ChevronRight className="w-5 h-5 shrink-0" strokeWidth={3} />}
             <Wheat className="w-4 h-4 shrink-0" />
             <span className="font-bold text-sm truncate">SR# {group.srNumber} {group.crop}</span>
             <Badge variant="outline" className={`text-xs ${badgeCls} shrink-0`}>
@@ -2010,7 +2010,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
         {/* Top row: chevron + icon + name + date + archive */}
         <div className="flex items-center justify-between gap-2 w-full min-w-0">
           <div className="flex items-center gap-2 min-w-0 flex-1">
-            {card.cardOpen ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" strokeWidth={2.5} /> : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" strokeWidth={2.5} />}
+            {card.cardOpen ? <ChevronDown className="w-5 h-5 text-muted-foreground shrink-0" strokeWidth={3} /> : <ChevronRight className="w-5 h-5 text-muted-foreground shrink-0" strokeWidth={3} />}
             <User className="w-4 h-4 text-primary shrink-0" />
             <span className="font-bold text-sm truncate">
               {card.farmerName.trim() || <span className="text-muted-foreground italic">{t("stock.newFarmerEntry")}</span>}
