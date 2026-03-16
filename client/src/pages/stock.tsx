@@ -781,11 +781,11 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
         {txn.showWeightCalc && (
           <div className="bg-muted/50 rounded-md p-2 space-y-2 mt-1" data-testid="weight-calculator">
             <p className="text-xs font-semibold text-muted-foreground">{t("stock.sampleBagWeights")}</p>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {txn.sampleWeights.map((w, idx) => (
                 <div key={idx} className="space-y-0.5">
                   <div className="flex items-center gap-1">
-                    <span className="text-xs text-muted-foreground w-5">{idx + 1}.</span>
+                    <span className="text-xs text-muted-foreground w-4">{idx + 1}.</span>
                     <Input
                       data-testid={`input-sample-weight-${idx}`}
                       type="text"
