@@ -3197,7 +3197,7 @@ export default function StockPage() {
       return { ...card, cropGroups: card.cropGroups.filter(g => g.archived || g.crop === cropFilter) };
     };
 
-    return sortCardsByMaxSr(
+    const sorted = sortCardsByMaxSr(
       cards
         .filter(dateMatchesCard)
         .filter(farmerMatchesCard)
@@ -3205,7 +3205,10 @@ export default function StockPage() {
         .filter(cropMatchesCard)
         .map(applyCropFilter)
     );
-  }, [cards, dateMode, yearFilter, selectedMonths, selectedDays, farmerFilter, farmerFilterId, buyerFilter, cropFilter, pageBuyersList]);
+    const unsaved = sorted.filter(c => !savedCardMap.has(c.id));
+    const saved = sorted.filter(c => savedCardMap.has(c.id));
+    return [...unsaved, ...saved];
+  }, [cards, savedCardMap, dateMode, yearFilter, selectedMonths, selectedDays, farmerFilter, farmerFilterId, buyerFilter, cropFilter, pageBuyersList]);
 
   useEffect(() => {
     if (!stockCardsData || !businessId || dbLoaded.current) return;
