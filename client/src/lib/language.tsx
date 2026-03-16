@@ -631,6 +631,21 @@ const translations: Record<string, Record<Language, string>> = {
   "stock.failedCreateTxn": { en: "Failed to create transaction", hi: "लेनदेन बनाने में विफल" },
   "stock.failedUpdateTxn": { en: "Failed to update transaction", hi: "लेनदेन अपडेट करने में विफल" },
   "stock.selectMode": { en: "Select", hi: "चुनें" },
+  "stock.bags": { en: "Bags", hi: "बोरियां" },
+  "stock.bid": { en: "Bid", hi: "बोली" },
+  "stock.buyerName": { en: "Buyer Name", hi: "खरीदार का नाम" },
+  "stock.buyerIdLabel": { en: "Buyer ID", hi: "खरीदार आईडी" },
+  "stock.bidDbId": { en: "Bid DB ID", hi: "बोली DB आईडी" },
+  "stock.txnDbId": { en: "Txn DB ID", hi: "लेनदेन DB आईडी" },
+  "stock.paymentType": { en: "Payment Type", hi: "भुगतान प्रकार" },
+  "stock.extraChargesFarmer": { en: "Extra Charges (Farmer)", hi: "अतिरिक्त शुल्क (किसान)" },
+  "stock.extraChargesBuyer": { en: "Extra Charges (Buyer)", hi: "अतिरिक्त शुल्क (खरीदार)" },
+  "stock.extraPerKgFarmer": { en: "Extra/kg (Farmer)", hi: "अतिरिक्त/किलो (किसान)" },
+  "stock.extraPerKgBuyer": { en: "Extra/kg (Buyer)", hi: "अतिरिक्त/किलो (खरीदार)" },
+  "stock.delete": { en: "Delete", hi: "हटाएं" },
+  "stock.stateMP": { en: "Madhya Pradesh", hi: "मध्य प्रदेश" },
+  "stock.stateGJ": { en: "Gujarat", hi: "गुजरात" },
+  "stock.stateUP": { en: "Uttar Pradesh", hi: "उत्तर प्रदेश" },
 };
 
 type LanguageContextType = {

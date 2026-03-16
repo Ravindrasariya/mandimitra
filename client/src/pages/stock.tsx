@@ -493,41 +493,41 @@ function getDataFingerprint(card: FarmerCard): string {
   return JSON.stringify({ ...rest, cropGroups: cropGroups.map(stripGroup) });
 }
 
-function diffCropGroup(saved: CropGroup, current: CropGroup): ChangeRecord[] {
+function diffCropGroup(saved: CropGroup, current: CropGroup, tr: (key: string) => string): ChangeRecord[] {
   const changes: ChangeRecord[] = [];
   const savedLotMap = new Map(saved.lots.map(l => [l.id, l]));
 
   const lotFields: { key: keyof Omit<LotRow, "id" | "dbId" | "lotOpen" | "bids">; label: string }[] = [
-    { key: "numberOfBags", label: "Bags" },
-    { key: "size", label: "Size" },
-    { key: "variety", label: "Variety" },
-    { key: "bagMarka", label: "Bag Marka" },
+    { key: "numberOfBags", label: tr("stock.bags") },
+    { key: "size", label: tr("stock.size") },
+    { key: "variety", label: tr("stock.variety") },
+    { key: "bagMarka", label: tr("stock.bagMarka") },
   ];
   const bidFields: { key: keyof Omit<BidRow, "id" | "bidOpen" | "txn" | "txnDate">; label: string }[] = [
-    { key: "buyerName", label: "Buyer Name" },
-    { key: "buyerId", label: "Buyer ID" },
-    { key: "bidDbId", label: "Bid DB ID" },
-    { key: "txnDbId", label: "Txn DB ID" },
-    { key: "pricePerKg", label: "Price/kg" },
-    { key: "numberOfBags", label: "Bags" },
-    { key: "paymentType", label: "Payment Type" },
-    { key: "advanceAmount", label: "Advance" },
+    { key: "buyerName", label: tr("stock.buyerName") },
+    { key: "buyerId", label: tr("stock.buyerIdLabel") },
+    { key: "bidDbId", label: tr("stock.bidDbId") },
+    { key: "txnDbId", label: tr("stock.txnDbId") },
+    { key: "pricePerKg", label: tr("stock.pricePerKg") },
+    { key: "numberOfBags", label: tr("stock.bags") },
+    { key: "paymentType", label: tr("stock.paymentType") },
+    { key: "advanceAmount", label: tr("stock.advance") },
   ];
   const txnFields: { key: keyof TxnState; label: string }[] = [
-    { key: "netWeightInput", label: "Net Weight" },
-    { key: "extraChargesFarmer", label: "Extra Charges (Farmer)" },
-    { key: "extraChargesBuyer", label: "Extra Charges (Buyer)" },
-    { key: "extraPerKgFarmer", label: "Extra/kg (Farmer)" },
-    { key: "extraPerKgBuyer", label: "Extra/kg (Buyer)" },
-    { key: "extraTulai", label: "Tulai" },
-    { key: "extraBharai", label: "Bharai" },
-    { key: "extraKhadiKarai", label: "Khadi Karai" },
-    { key: "extraThelaBhada", label: "Thela Bhada" },
-    { key: "extraOthers", label: "Others" },
+    { key: "netWeightInput", label: tr("stock.netWeight") },
+    { key: "extraChargesFarmer", label: tr("stock.extraChargesFarmer") },
+    { key: "extraChargesBuyer", label: tr("stock.extraChargesBuyer") },
+    { key: "extraPerKgFarmer", label: tr("stock.extraPerKgFarmer") },
+    { key: "extraPerKgBuyer", label: tr("stock.extraPerKgBuyer") },
+    { key: "extraTulai", label: tr("stock.tulai") },
+    { key: "extraBharai", label: tr("stock.bharai") },
+    { key: "extraKhadiKarai", label: tr("stock.khadiKarai") },
+    { key: "extraThelaBhada", label: tr("stock.thelaBhada") },
+    { key: "extraOthers", label: tr("stock.others") },
   ];
 
   current.lots.forEach((cLot, lotIdx) => {
-    const lotLabel = `Lot ${lotIdx + 1}`;
+    const lotLabel = `${tr("stock.lot")} ${lotIdx + 1}`;
     const sLot = savedLotMap.get(cLot.id);
     if (!sLot) {
       changes.push({ kind: "added", path: lotLabel });
@@ -540,7 +540,7 @@ function diffCropGroup(saved: CropGroup, current: CropGroup): ChangeRecord[] {
     const savedBidMap = new Map(sLot.bids.map(b => [b.id, b]));
 
     cLot.bids.forEach((cBid, bidIdx) => {
-      const bidLabel = `${lotLabel} > Bid ${bidIdx + 1}`;
+      const bidLabel = `${lotLabel} > ${tr("stock.bid")} ${bidIdx + 1}`;
       const sBid = savedBidMap.get(cBid.id);
       if (!sBid) {
         changes.push({ kind: "added", path: bidLabel });
@@ -559,14 +559,14 @@ function diffCropGroup(saved: CropGroup, current: CropGroup): ChangeRecord[] {
 
     sLot.bids.forEach((sBid, bidIdx) => {
       if (!cLot.bids.some(b => b.id === sBid.id)) {
-        changes.push({ kind: "deleted", path: `${lotLabel} > Bid ${bidIdx + 1}`, detail: sBid.buyerName.trim() || undefined });
+        changes.push({ kind: "deleted", path: `${lotLabel} > ${tr("stock.bid")} ${bidIdx + 1}`, detail: sBid.buyerName.trim() || undefined });
       }
     });
   });
 
   saved.lots.forEach((sLot, lotIdx) => {
     if (!current.lots.some(l => l.id === sLot.id)) {
-      changes.push({ kind: "deleted", path: `Lot ${lotIdx + 1}` });
+      changes.push({ kind: "deleted", path: `${tr("stock.lot")} ${lotIdx + 1}` });
     }
   });
 
@@ -1415,7 +1415,7 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
 
       <ConfirmDeleteDialog
         open={pendingDeleteBidIdx !== null}
-        title={`Delete ${pendingBidLabel}?`}
+        title={`${t("stock.delete")} ${pendingBidLabel}?`}
         description={t("stock.deleteBidDesc")}
         onConfirm={confirmRemoveBid}
         onCancel={() => setPendingDeleteBidIdx(null)}
@@ -2195,9 +2195,9 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                       <SelectValue placeholder={t("stock.selectState")} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Madhya Pradesh">Madhya Pradesh</SelectItem>
-                      <SelectItem value="Gujarat">Gujarat</SelectItem>
-                      <SelectItem value="Uttar Pradesh">Uttar Pradesh</SelectItem>
+                      <SelectItem value="Madhya Pradesh">{t("stock.stateMP")}</SelectItem>
+                      <SelectItem value="Gujarat">{t("stock.stateGJ")}</SelectItem>
+                      <SelectItem value="Uttar Pradesh">{t("stock.stateUP")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -2580,7 +2580,8 @@ const fmtInr = (n: number) => {
   return `₹${Math.round(n).toLocaleString("en-IN")}`;
 };
 
-const MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const MONTH_LABELS_EN = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const MONTH_LABELS_HI = ["जन","फर","मार्च","अप्रै","मई","जून","जुल","अग","सित","अक्टू","नव","दिस"];
 
 function StockFilterBar({
   cards,
@@ -2616,7 +2617,8 @@ function StockFilterBar({
   canPrintOverallBill: boolean;
   onPrintAllBuyerReceipt: () => void;
 }) {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
+  const MONTH_LABELS = language === "hi" ? MONTH_LABELS_HI : MONTH_LABELS_EN;
   const [monthPopoverOpen, setMonthPopoverOpen] = useState(false);
   const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
   const [farmerDropOpen, setFarmerDropOpen] = useState(false);
@@ -3539,7 +3541,7 @@ export default function StockPage() {
           if (isFirstSave) return withPersisted;
           const savedGroup = savedCard!.cropGroups.find(sg => sg.id === g.id);
           if (!savedGroup) return withPersisted;
-          const allDiffChanges = diffCropGroup(savedGroup, g);
+          const allDiffChanges = diffCropGroup(savedGroup, g, t);
           const alreadyLogged = new Set(
             g.editHistory
               .slice(savedGroup.editHistory.length)
