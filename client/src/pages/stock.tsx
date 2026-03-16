@@ -3831,7 +3831,7 @@ export default function StockPage() {
         )}
         {!loadingCards && <StockSummaryBar cards={filteredCards} savedCardMap={savedCardMap} cs={cs} buyersList={pageBuyersList} />}
         {!loadingCards && (
-          <div className="flex justify-end">
+          <div className="flex justify-start">
             <Button type="button" onClick={addCard} data-testid="button-add-farmer-entry" className="gap-2">
               <Plus className="w-4 h-4" /> New Farmer Entry
             </Button>
