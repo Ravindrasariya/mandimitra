@@ -34,6 +34,7 @@ import {
   type UnifiedSerialGroup, type UnifiedLotGroup, type BuyerLotEntry, type TransactionWithDetails,
 } from "@/lib/receiptGenerators";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { useLanguage } from "@/lib/language";
 import type { Lot, Farmer, Transaction, Bid, Buyer, ReceiptTemplate } from "@shared/schema";
 
 const capFirst = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
@@ -172,6 +173,7 @@ function ConfirmDeleteDialog({ open, title, description, onConfirm, onCancel }: 
   onConfirm: () => void;
   onCancel: () => void;
 }) {
+  const { t } = useLanguage();
   return (
     <AlertDialog open={open} onOpenChange={v => { if (!v) onCancel(); }}>
       <AlertDialogContent>
@@ -185,12 +187,12 @@ function ConfirmDeleteDialog({ open, title, description, onConfirm, onCancel }: 
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel autoFocus onClick={onCancel}>Cancel</AlertDialogCancel>
+          <AlertDialogCancel autoFocus onClick={onCancel}>{t("common.cancel")}</AlertDialogCancel>
           <AlertDialogAction
             onClick={onConfirm}
             className="bg-red-600 hover:bg-red-700 focus:ring-red-600 text-white"
           >
-            Yes, Delete
+            {t("stock.yesDelete")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -203,6 +205,7 @@ function ConfirmDeleteDialog({ open, title, description, onConfirm, onCancel }: 
 function ArchiveDialog({ open, title, description, onConfirm, onCancel }: {
   open: boolean; title: string; description: string; onConfirm: () => void; onCancel: () => void;
 }) {
+  const { t } = useLanguage();
   return (
     <AlertDialog open={open} onOpenChange={v => { if (!v) onCancel(); }}>
       <AlertDialogContent>
@@ -214,10 +217,10 @@ function ArchiveDialog({ open, title, description, onConfirm, onCancel }: {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogAction autoFocus onClick={onCancel} className="bg-amber-600 hover:bg-amber-700 text-white">
-            Cancel
+            {t("common.cancel")}
           </AlertDialogAction>
           <AlertDialogCancel onClick={onConfirm} className="border-border text-foreground hover:bg-muted">
-            Yes, Archive
+            {t("stock.yesArchive")}
           </AlertDialogCancel>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -228,6 +231,7 @@ function ArchiveDialog({ open, title, description, onConfirm, onCancel }: {
 function ReinstateDialog({ open, title, description, onConfirm, onCancel }: {
   open: boolean; title: string; description: string; onConfirm: () => void; onCancel: () => void;
 }) {
+  const { t } = useLanguage();
   return (
     <AlertDialog open={open} onOpenChange={v => { if (!v) onCancel(); }}>
       <AlertDialogContent>
@@ -239,10 +243,10 @@ function ReinstateDialog({ open, title, description, onConfirm, onCancel }: {
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel onClick={onCancel} className="border-border text-foreground hover:bg-muted">
-            Cancel
+            {t("common.cancel")}
           </AlertDialogCancel>
           <AlertDialogAction autoFocus onClick={onConfirm} className="bg-green-600 hover:bg-green-700 text-white">
-            Yes, Reinstate
+            {t("stock.yesReinstate")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -253,6 +257,7 @@ function ReinstateDialog({ open, title, description, onConfirm, onCancel }: {
 // ─── Edit history dialog ───────────────────────────────────────────────────────
 
 function ChangeRecordLine({ c }: { c: ChangeRecord }) {
+  const { t } = useLanguage();
   if (c.kind === "field") {
     return (
       <div className="flex flex-wrap items-baseline gap-1 text-xs" data-testid="change-field">
@@ -268,14 +273,14 @@ function ChangeRecordLine({ c }: { c: ChangeRecord }) {
       <div className="flex items-baseline gap-1 text-xs" data-testid="change-deleted">
         <span className="text-red-500 font-medium">{c.path}</span>
         {c.detail && <span className="text-muted-foreground">({c.detail})</span>}
-        <Badge variant="outline" className="text-[10px] px-1 py-0 border-red-300 text-red-500 h-4">deleted</Badge>
+        <Badge variant="outline" className="text-[10px] px-1 py-0 border-red-300 text-red-500 h-4">{t("stock.deleted")}</Badge>
       </div>
     );
   }
   return (
     <div className="flex items-baseline gap-1 text-xs" data-testid="change-added">
       <span className="text-green-600 font-medium">{c.path}</span>
-      <Badge variant="outline" className="text-[10px] px-1 py-0 border-green-300 text-green-600 h-4">added</Badge>
+      <Badge variant="outline" className="text-[10px] px-1 py-0 border-green-300 text-green-600 h-4">{t("stock.added")}</Badge>
     </div>
   );
 }
@@ -283,31 +288,32 @@ function ChangeRecordLine({ c }: { c: ChangeRecord }) {
 function EditHistoryDialog({ open, crop, history, onClose }: {
   open: boolean; crop: string; history: EditEntry[]; onClose: () => void;
 }) {
+  const { t } = useLanguage();
   return (
     <AlertDialog open={open} onOpenChange={v => { if (!v) onClose(); }}>
       <AlertDialogContent className="max-w-lg">
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
-            <History className="w-5 h-5 text-blue-500" /> Edit History — {crop}
+            <History className="w-5 h-5 text-blue-500" /> {t("stock.editHistory")} — {crop}
           </AlertDialogTitle>
           <AlertDialogDescription asChild>
             <div className="space-y-3 mt-2 max-h-[28rem] overflow-y-auto">
               {history.length === 0 ? (
-                <p className="text-sm text-muted-foreground italic">No changes recorded yet. History is tracked after the first Save Entry.</p>
+                <p className="text-sm text-muted-foreground italic">{t("stock.noChangesYet")}</p>
               ) : (
                 [...history].reverse().map((entry, i) => (
                   <div key={i} className="rounded-lg border bg-muted/30 overflow-hidden" data-testid={`history-entry-${i}`}>
                     <div className="flex items-center gap-2 px-3 py-1.5 bg-muted/50 border-b">
                       <History className="w-3 h-3 text-muted-foreground shrink-0" />
                       <span className="text-[11px] text-muted-foreground">{entry.timestamp}</span>
-                      {entry.username && <span className="text-[11px] font-medium text-foreground">by {entry.username}</span>}
+                      {entry.username && <span className="text-[11px] font-medium text-foreground">{t("stock.by")} {entry.username}</span>}
                     </div>
                     <div className="px-3 py-2 space-y-1">
                       {Array.isArray(entry.changes) && entry.changes.length > 0
                         ? entry.changes.map((c, j) => <ChangeRecordLine key={j} c={c} />)
                         : entry.label
                           ? <span className="text-xs text-foreground">{entry.label}</span>
-                          : <span className="text-xs text-muted-foreground italic">Entry saved</span>
+                          : <span className="text-xs text-muted-foreground italic">{t("stock.entrySaved")}</span>
                       }
                     </div>
                   </div>
@@ -317,7 +323,7 @@ function EditHistoryDialog({ open, crop, history, onClose }: {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogAction onClick={onClose}>Close</AlertDialogAction>
+          <AlertDialogAction onClick={onClose}>{t("stock.close")}</AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
@@ -329,26 +335,27 @@ function EditHistoryDialog({ open, crop, history, onClose }: {
 function UnsavedChangesDialog({ open, farmerName, onSave, onDiscard, onKeep }: {
   open: boolean; farmerName: string; onSave: () => void; onDiscard: () => void; onKeep: () => void;
 }) {
+  const { t } = useLanguage();
   return (
     <AlertDialog open={open} onOpenChange={v => { if (!v) onKeep(); }}>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2">
-            <Save className="w-5 h-5 text-blue-500" /> Unsaved Changes
+            <Save className="w-5 h-5 text-blue-500" /> {t("stock.unsavedChanges")}
           </AlertDialogTitle>
           <AlertDialogDescription>
             {farmerName
-              ? `"${farmerName}" has unsaved changes.`
-              : "This entry has unsaved changes."} What would you like to do?
+              ? `"${farmerName}" ${t("stock.hasUnsavedChanges")}`
+              : t("stock.thisEntryUnsaved")} {t("stock.whatToDo")}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-          <AlertDialogCancel onClick={onKeep}>Keep Editing</AlertDialogCancel>
+          <AlertDialogCancel onClick={onKeep}>{t("stock.keepEditing")}</AlertDialogCancel>
           <AlertDialogAction autoFocus onClick={onDiscard} className="bg-muted text-foreground hover:bg-muted/80 border border-border">
-            Discard & Close
+            {t("stock.discardClose")}
           </AlertDialogAction>
           <AlertDialogAction onClick={onSave} className="bg-primary text-primary-foreground">
-            Save & Close
+            {t("stock.saveClose")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -365,9 +372,11 @@ const PAYMENT_COLORS: Record<string, string> = {
 };
 
 function PaymentBadge({ status = "Due" }: { status?: "Due" | "Paid" | "Partial Paid" }) {
+  const { t } = useLanguage();
+  const labels: Record<string, string> = { Due: t("stock.due"), Paid: t("stock.paid"), "Partial Paid": t("stock.partialPaid") };
   return (
     <Badge variant="outline" className={`text-[10px] font-semibold px-1.5 py-0 h-4 leading-none ${PAYMENT_COLORS[status] || PAYMENT_COLORS.Due}`}>
-      {status}
+      {labels[status] || labels.Due}
     </Badge>
   );
 }
@@ -388,17 +397,18 @@ function CollapsedSummary({ totalBags, remainingBags, farmerPayable, buyerReceiv
   farmerPaymentStatus?: "Due" | "Paid" | "Partial Paid";
   buyerPaymentStatus?: "Due" | "Paid" | "Partial Paid";
 }) {
+  const { t } = useLanguage();
   return (
     <div className="flex items-center gap-2 text-xs flex-wrap">
-      <span className="text-foreground font-bold">Total Bags: {totalBags}</span>
+      <span className="text-foreground font-bold">{t("stock.totalBags")}: {totalBags}</span>
       <span className={`font-bold ${remainingBags > 0 ? "text-orange-600 dark:text-orange-400" : "text-green-600 dark:text-green-400"}`}>
-        Remaining: {remainingBags}
+        {t("stock.remaining")}: {remainingBags}
       </span>
       {hasData && (
         <>
-          <span className="text-green-700 dark:text-green-400 font-bold">Farmer: ₹{farmerPayable.toFixed(0)}</span>
+          <span className="text-green-700 dark:text-green-400 font-bold">{t("stock.farmer")}: ₹{farmerPayable.toFixed(0)}</span>
           <PaymentBadge status={farmerPaymentStatus || "Due"} />
-          <span className="text-blue-700 dark:text-blue-400 font-bold">Buyer: ₹{buyerReceivable.toFixed(0)}</span>
+          <span className="text-blue-700 dark:text-blue-400 font-bold">{t("stock.buyer")}: ₹{buyerReceivable.toFixed(0)}</span>
           <PaymentBadge status={buyerPaymentStatus || "Due"} />
         </>
       )}
@@ -663,6 +673,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
   cs: ChargeSettings;
   buyerAadhatOverride?: number | null;
 }) {
+  const { t } = useLanguage();
   const set = (field: keyof TxnState, val: any) => onChange({ ...txn, [field]: val });
 
   // ── Weight calc ──
@@ -731,12 +742,12 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
       <div className="flex items-center gap-1.5 text-xs font-semibold text-green-700 uppercase tracking-wide">
         <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
         <Scale className="w-3.5 h-3.5" />
-        Weight & Charges
+        {t("stock.weightCharges")}
       </div>
 
       {/* ── Net Weight ── */}
       <div className="space-y-1">
-        <Label className="text-xs text-muted-foreground">Net Weight (kg)</Label>
+        <Label className="text-xs text-muted-foreground">{t("stock.netWeight")}</Label>
         <div className="flex gap-2">
           <Input
             data-testid="input-net-weight"
@@ -756,20 +767,20 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
             onClick={() => set("showWeightCalc", !txn.showWeightCalc)}
             data-testid="button-calc-weight"
           >
-            <Calculator className="w-3.5 h-3.5" /> Calc Wt
+            <Calculator className="w-3.5 h-3.5" /> {t("stock.calcWt")}
           </Button>
         </div>
         {bags > 0 && (
           <div className="flex items-center justify-between gap-2">
-            <p className="text-xs text-muted-foreground">Total — {bags} bags</p>
-            {nw > 0 && <p data-testid="text-net-wt-avg" className="text-xs font-medium text-orange-500 dark:text-orange-400">Avg Weight: {(nw / bags).toFixed(2)} kg</p>}
+            <p className="text-xs text-muted-foreground">{t("stock.total")} — {bags} {t("common.bags")}</p>
+            {nw > 0 && <p data-testid="text-net-wt-avg" className="text-xs font-medium text-orange-500 dark:text-orange-400">{t("stock.avgWeight")}: {(nw / bags).toFixed(2)} kg</p>}
           </div>
         )}
 
         {/* ── Weight calculator ── */}
         {txn.showWeightCalc && (
           <div className="bg-muted/50 rounded-md p-2 space-y-2 mt-1" data-testid="weight-calculator">
-            <p className="text-xs font-semibold text-muted-foreground">Sample Bag Weights (kg)</p>
+            <p className="text-xs font-semibold text-muted-foreground">{t("stock.sampleBagWeights")}</p>
             <div className="grid grid-cols-2 gap-2">
               {txn.sampleWeights.map((w, idx) => (
                 <div key={idx} className="space-y-0.5">
@@ -793,21 +804,21 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
                   </div>
                   {(parseFloat(w) || 0) > 100 && (
                     <p className="text-xs text-orange-500 font-medium ml-6 flex items-center gap-1">
-                      <AlertTriangle className="h-3 w-3" /> Over 100kg
+                      <AlertTriangle className="h-3 w-3" /> {t("stock.over100kg")}
                     </p>
                   )}
                 </div>
               ))}
             </div>
             <Button type="button" variant="ghost" size="sm" className="h-7 text-xs w-full" onClick={addSample}>
-              <Plus className="h-3 w-3 mr-1" /> Add Sample
+              <Plus className="h-3 w-3 mr-1" /> {t("stock.addSample")}
             </Button>
             <div className="border-t pt-1 flex justify-between text-xs font-medium">
-              <span>Average ({nonZero.length} samples):</span>
+              <span>{t("stock.average")} ({nonZero.length} {t("stock.samples")}):</span>
               <span>{average > 0 ? `${average.toFixed(2)} kg` : "—"}</span>
             </div>
             <div className="flex justify-between text-xs text-muted-foreground">
-              <span>Net Weight ({average.toFixed(2)} × {bags} bags):</span>
+              <span>{t("stock.netWeight")} ({average.toFixed(2)} × {bags}):</span>
               <span>{average > 0 ? `${(average * bags).toFixed(2)} kg` : "—"}</span>
             </div>
           </div>
@@ -818,13 +829,13 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
         <div className="bg-muted/40 rounded-md px-3 py-2 text-xs space-y-1" data-testid="txn-bid-rate-header">
           {epkFarmer > 0 && (
             <div className="flex justify-between gap-1 text-green-600">
-              <span className="min-w-0 flex-1">Farmer Rate ({pricePerKg.toFixed(2)} + {epkFarmer.toFixed(2)}):</span>
+              <span className="min-w-0 flex-1">{t("stock.farmerRate")} ({pricePerKg.toFixed(2)} + {epkFarmer.toFixed(2)}):</span>
               <span className="shrink-0 font-medium">₹{(pricePerKg + epkFarmer).toFixed(2)}/kg</span>
             </div>
           )}
           {epkBuyer > 0 && (
             <div className="flex justify-between gap-1 text-blue-600">
-              <span className="min-w-0 flex-1">Buyer Rate ({pricePerKg.toFixed(2)} + {epkBuyer.toFixed(2)}):</span>
+              <span className="min-w-0 flex-1">{t("stock.buyerRate")} ({pricePerKg.toFixed(2)} + {epkBuyer.toFixed(2)}):</span>
               <span className="shrink-0 font-medium">₹{(pricePerKg + epkBuyer).toFixed(2)}/kg</span>
             </div>
           )}
@@ -835,13 +846,13 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs" data-testid="charge-rates-display">
         {/* ── Farmer column ── */}
         <div className="bg-background rounded border border-border p-2 space-y-1">
-          <p className="font-semibold text-muted-foreground">Farmer Charges</p>
-          <div className="flex justify-between"><span>Aadhat:</span><span>{aadhatFarmerPct}%</span></div>
-          <div className="flex justify-between"><span>Mandi:</span><span>{mandiFarmerPct}%</span></div>
-          <div className="flex justify-between"><span>Hammali:</span><span>₹{hammaliFarmerRate}/bag</span></div>
+          <p className="font-semibold text-muted-foreground">{t("stock.farmerCharges")}</p>
+          <div className="flex justify-between"><span>{t("stock.aadhat")}:</span><span>{aadhatFarmerPct}%</span></div>
+          <div className="flex justify-between"><span>{t("stock.mandi")}:</span><span>{mandiFarmerPct}%</span></div>
+          <div className="flex justify-between"><span>{t("stock.hammali")}:</span><span>₹{hammaliFarmerRate}/bag</span></div>
           {freightFarmerTotal > 0 && (
             <div className="flex justify-between text-muted-foreground">
-              <span>Freight (auto):</span><span>₹{freightFarmerTotal.toFixed(2)}</span>
+              <span>{t("stock.freightAuto")}:</span><span>₹{freightFarmerTotal.toFixed(2)}</span>
             </div>
           )}
           <div className="flex items-center justify-between">
@@ -851,7 +862,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
               onClick={() => set("showExtraBreakdown", !txn.showExtraBreakdown)}
             >
               {txn.showExtraBreakdown ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-              Extra:
+              {t("stock.extra")}:
             </button>
             <Input
               data-testid="input-extra-charges-farmer"
@@ -865,11 +876,11 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
           {txn.showExtraBreakdown && (
             <div className="ml-2 border-l-2 border-muted pl-2 space-y-1">
               {([
-                ["Tulai", "extraTulai", txn.extraTulai],
-                ["Bharai", "extraBharai", txn.extraBharai],
-                ["Khadi Karai", "extraKhadiKarai", txn.extraKhadiKarai],
-                ["Thela Bhada", "extraThelaBhada", txn.extraThelaBhada],
-                ["Others", "extraOthers", txn.extraOthers],
+                [t("stock.tulai"), "extraTulai", txn.extraTulai],
+                [t("stock.bharai"), "extraBharai", txn.extraBharai],
+                [t("stock.khadiKarai"), "extraKhadiKarai", txn.extraKhadiKarai],
+                [t("stock.thelaBhada"), "extraThelaBhada", txn.extraThelaBhada],
+                [t("stock.others"), "extraOthers", txn.extraOthers],
               ] as [string, string, string][]).map(([label, field, val]) => (
                 <div key={field} className="flex items-center justify-between">
                   <span className="text-muted-foreground">{label}:</span>
@@ -886,7 +897,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
             </div>
           )}
           <div className="flex items-center justify-between border-t pt-1 mt-1">
-            <span className="font-semibold">Extra ₹/Kg:</span>
+            <span className="font-semibold">{t("stock.extraPerKg")}:</span>
             <Input
               data-testid="input-extra-per-kg-farmer"
               type="text" inputMode="decimal"
@@ -900,43 +911,43 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
           {nw > 0 && pricePerKg > 0 && (
             <div className="border-t pt-1.5 mt-1.5 bg-green-50 dark:bg-green-950/30 rounded-md p-2 -mx-0.5 space-y-0.5">
               <div className="flex justify-between gap-1">
-                <span className="min-w-0 flex-1">Gross ({nw.toFixed(0)} × ₹{(pricePerKg + epkFarmer).toFixed(2)}):</span>
+                <span className="min-w-0 flex-1">{t("stock.gross")} ({nw.toFixed(0)} × ₹{(pricePerKg + epkFarmer).toFixed(2)}):</span>
                 <span className="shrink-0 font-medium">₹{farmerGross.toFixed(2)}</span>
               </div>
-              <p className="text-muted-foreground font-semibold mt-0.5">Deductions:</p>
+              <p className="text-muted-foreground font-semibold mt-0.5">{t("stock.deductions")}:</p>
               {hammaliFarmerRate > 0 && (
                 <div className="flex justify-between gap-1 text-muted-foreground pl-2">
-                  <span className="min-w-0 flex-1">Hammali ({bags}×₹{hammaliFarmerRate}):</span>
+                  <span className="min-w-0 flex-1">{t("stock.hammali")} ({bags}×₹{hammaliFarmerRate}):</span>
                   <span className="shrink-0">-₹{hammaliFarmerTotal.toFixed(2)}</span>
                 </div>
               )}
               {extraFarmer > 0 && (
                 <div className="flex justify-between gap-1 text-muted-foreground pl-2">
-                  <span className="min-w-0 flex-1">Extra:</span>
+                  <span className="min-w-0 flex-1">{t("stock.extra")}:</span>
                   <span className="shrink-0">-₹{extraFarmer.toFixed(2)}</span>
                 </div>
               )}
               {aadhatFarmerPct > 0 && (
                 <div className="flex justify-between gap-1 text-muted-foreground pl-2">
-                  <span className="min-w-0 flex-1">Aadhat ({aadhatFarmerPct}%):</span>
+                  <span className="min-w-0 flex-1">{t("stock.aadhat")} ({aadhatFarmerPct}%):</span>
                   <span className="shrink-0">-₹{aadhatFarmer.toFixed(2)}</span>
                 </div>
               )}
               {mandiFarmerPct > 0 && (
                 <div className="flex justify-between gap-1 text-muted-foreground pl-2">
-                  <span className="min-w-0 flex-1">Mandi ({mandiFarmerPct}%):</span>
+                  <span className="min-w-0 flex-1">{t("stock.mandi")} ({mandiFarmerPct}%):</span>
                   <span className="shrink-0">-₹{mandiFarmer.toFixed(2)}</span>
                 </div>
               )}
               {freightFarmerTotal > 0 && (
                 <div className="flex justify-between gap-1 text-muted-foreground pl-2">
-                  <span className="min-w-0 flex-1">Freight:</span>
+                  <span className="min-w-0 flex-1">{t("stock.freight")}:</span>
                   <span className="shrink-0">-₹{freightFarmerTotal.toFixed(2)}</span>
                 </div>
               )}
-              {farmerDeductions === 0 && <div className="text-muted-foreground italic pl-2">No deductions</div>}
+              {farmerDeductions === 0 && <div className="text-muted-foreground italic pl-2">{t("stock.noDeductions")}</div>}
               <div className="flex justify-between gap-1 font-bold text-green-700 border-t pt-1 mt-0.5">
-                <span className="min-w-0 flex-1">Farmer Payable:</span>
+                <span className="min-w-0 flex-1">{t("stock.farmerPayable")}:</span>
                 <span className="shrink-0">₹{farmerPayable.toFixed(2)}</span>
               </div>
             </div>
@@ -945,12 +956,12 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
 
         {/* ── Buyer column ── */}
         <div className="bg-background rounded border border-border p-2 space-y-1">
-          <p className="font-semibold text-muted-foreground">Buyer Charges</p>
-          <div className="flex justify-between"><span>Aadhat:</span><span>{aadhatBuyerPct}%</span></div>
-          <div className="flex justify-between"><span>Mandi:</span><span>{mandiBuyerPct}%</span></div>
-          <div className="flex justify-between"><span>Hammali:</span><span>₹{hammaliBuyerRate}/bag</span></div>
+          <p className="font-semibold text-muted-foreground">{t("stock.buyerCharges")}</p>
+          <div className="flex justify-between"><span>{t("stock.aadhat")}:</span><span>{aadhatBuyerPct}%</span></div>
+          <div className="flex justify-between"><span>{t("stock.mandi")}:</span><span>{mandiBuyerPct}%</span></div>
+          <div className="flex justify-between"><span>{t("stock.hammali")}:</span><span>₹{hammaliBuyerRate}/bag</span></div>
           <div className="flex items-center justify-between">
-            <span>Extra:</span>
+            <span>{t("stock.extra")}:</span>
             <Input
               data-testid="input-extra-charges-buyer"
               type="text" inputMode="decimal"
@@ -961,7 +972,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
             />
           </div>
           <div className="flex items-center justify-between border-t pt-1 mt-1">
-            <span className="font-semibold">Extra ₹/Kg:</span>
+            <span className="font-semibold">{t("stock.extraPerKg")}:</span>
             <Input
               data-testid="input-extra-per-kg-buyer"
               type="text" inputMode="decimal"
@@ -975,37 +986,37 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
           {nw > 0 && pricePerKg > 0 && (
             <div className="border-t pt-1.5 mt-1.5 bg-blue-50 dark:bg-blue-950/30 rounded-md p-2 -mx-0.5 space-y-0.5">
               <div className="flex justify-between gap-1">
-                <span className="min-w-0 flex-1">Gross ({nw.toFixed(0)} × ₹{(pricePerKg + epkBuyer).toFixed(2)}):</span>
+                <span className="min-w-0 flex-1">{t("stock.gross")} ({nw.toFixed(0)} × ₹{(pricePerKg + epkBuyer).toFixed(2)}):</span>
                 <span className="shrink-0 font-medium">₹{buyerGross.toFixed(2)}</span>
               </div>
-              <p className="text-muted-foreground font-semibold mt-0.5">Additions:</p>
+              <p className="text-muted-foreground font-semibold mt-0.5">{t("stock.additions")}:</p>
               {hammaliBuyerRate > 0 && (
                 <div className="flex justify-between gap-1 text-muted-foreground pl-2">
-                  <span className="min-w-0 flex-1">Hammali ({bags}×₹{hammaliBuyerRate}):</span>
+                  <span className="min-w-0 flex-1">{t("stock.hammali")} ({bags}×₹{hammaliBuyerRate}):</span>
                   <span className="shrink-0">+₹{hammaliBuyerTotal.toFixed(2)}</span>
                 </div>
               )}
               {extraBuyer > 0 && (
                 <div className="flex justify-between gap-1 text-muted-foreground pl-2">
-                  <span className="min-w-0 flex-1">Extra:</span>
+                  <span className="min-w-0 flex-1">{t("stock.extra")}:</span>
                   <span className="shrink-0">+₹{extraBuyer.toFixed(2)}</span>
                 </div>
               )}
               {aadhatBuyerPct > 0 && (
                 <div className="flex justify-between gap-1 text-muted-foreground pl-2">
-                  <span className="min-w-0 flex-1">Aadhat ({aadhatBuyerPct}%):</span>
+                  <span className="min-w-0 flex-1">{t("stock.aadhat")} ({aadhatBuyerPct}%):</span>
                   <span className="shrink-0">+₹{aadhatBuyer.toFixed(2)}</span>
                 </div>
               )}
               {mandiBuyerPct > 0 && (
                 <div className="flex justify-between gap-1 text-muted-foreground pl-2">
-                  <span className="min-w-0 flex-1">Mandi ({mandiBuyerPct}%):</span>
+                  <span className="min-w-0 flex-1">{t("stock.mandi")} ({mandiBuyerPct}%):</span>
                   <span className="shrink-0">+₹{mandiBuyer.toFixed(2)}</span>
                 </div>
               )}
-              {buyerAdditions === 0 && <div className="text-muted-foreground italic pl-2">No additions</div>}
+              {buyerAdditions === 0 && <div className="text-muted-foreground italic pl-2">{t("stock.noAdditions")}</div>}
               <div className="flex justify-between gap-1 font-bold text-blue-700 border-t pt-1 mt-0.5">
-                <span className="min-w-0 flex-1">Buyer Receivable:</span>
+                <span className="min-w-0 flex-1">{t("stock.buyerReceivable")}:</span>
                 <span className="shrink-0">₹{buyerReceivable.toFixed(2)}</span>
               </div>
             </div>
@@ -1031,6 +1042,7 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
   overBag: boolean;
   buyersList: { id: number; name: string; phone?: string; aadhatCommissionPercent?: string | null }[];
 }) {
+  const { t } = useLanguage();
   const [showBuyerSuggestions, setShowBuyerSuggestions] = useState(false);
   const filteredBuyers = buyersList.filter(
     b => bid.buyerName.length >= 1 && b.name.toLowerCase().includes(bid.buyerName.toLowerCase())
@@ -1043,7 +1055,7 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
     ? parseFloat(bidBuyerData.aadhatCommissionPercent) || 0
     : null;
   const totals = calcBidTotals(bid, cs, vehicleBhadaRate, totalBagsInVehicle, bidBuyerAadhat);
-  const buyerLabel = bid.buyerName.trim() || "Bid";
+  const buyerLabel = bid.buyerName.trim() || t("stock.buyer");
 
   return (
     <div className="mt-2 rounded-lg border border-blue-200 bg-blue-50/40 overflow-hidden">
@@ -1058,12 +1070,12 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
             ? <ChevronDown className="w-3.5 h-3.5 text-blue-500" />
             : <ChevronRight className="w-3.5 h-3.5 text-blue-500" />}
           <span className="text-xs font-bold text-blue-600 uppercase tracking-wide">
-            {buyerLabel} {bags > 0 && `· ${bags} bags`}
+            {buyerLabel} {bags > 0 && `· ${bags} ${t("common.bags")}`}
           </span>
           {!bid.bidOpen && totals.hasData && (
             <span className="flex items-center gap-2 text-xs">
-              <span className="text-green-700 dark:text-green-400 font-bold">Farmer: ₹{totals.farmerPayable.toFixed(0)}</span>
-              <span className="text-blue-700 dark:text-blue-400 font-bold">Buyer: ₹{totals.buyerReceivable.toFixed(0)}</span>
+              <span className="text-green-700 dark:text-green-400 font-bold">{t("stock.farmer")}: ₹{totals.farmerPayable.toFixed(0)}</span>
+              <span className="text-blue-700 dark:text-blue-400 font-bold">{t("stock.buyer")}: ₹{totals.buyerReceivable.toFixed(0)}</span>
             </span>
           )}
         </button>
@@ -1084,10 +1096,10 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
           <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between sm:gap-2">
             <div className="flex items-center gap-1.5 text-xs font-semibold text-blue-600 uppercase tracking-wide">
               <span className="w-1.5 h-1.5 rounded-full bg-blue-400 inline-block" />
-              Bid & Transaction Details
+              {t("stock.bidTxnDetails")}
             </div>
             <div className="flex items-center gap-1.5">
-              <label className="text-xs text-muted-foreground whitespace-nowrap">Txn Date:</label>
+              <label className="text-xs text-muted-foreground whitespace-nowrap">{t("stock.txnDate")}:</label>
               <input
                 type="date"
                 data-testid={`input-txn-date-${bidIndex}`}
@@ -1101,7 +1113,7 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
                   onClick={() => onChange({ ...bid, txnDate: farmerDate })}
                   className="text-xs text-muted-foreground hover:text-foreground underline whitespace-nowrap"
                 >
-                  Reset
+                  {t("stock.reset")}
                 </button>
               )}
             </div>
@@ -1109,11 +1121,11 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <div className="col-span-2 sm:col-span-1 relative">
-              <Label className="text-xs text-muted-foreground">Buyer</Label>
+              <Label className="text-xs text-muted-foreground">{t("stock.buyer")}</Label>
               <div className="relative">
                 <Input
                   data-testid={`input-buyer-name-${bidIndex}`}
-                  placeholder="Select buyer…"
+                  placeholder={t("stock.selectBuyer")}
                   value={bid.buyerName}
                   onChange={e => {
                     onChange({ ...bid, buyerName: e.target.value.toUpperCase(), buyerId: undefined });
@@ -1146,12 +1158,12 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
               )}
               {noBuyerSelected && (
                 <div className="flex items-center gap-1 mt-1 text-orange-600 text-xs">
-                  <AlertTriangle className="w-3 h-3" /> Select a buyer from the list
+                  <AlertTriangle className="w-3 h-3" /> {t("stock.selectFromList")}
                 </div>
               )}
             </div>
             <div>
-              <Label className="text-xs text-muted-foreground">Price / kg (₹)</Label>
+              <Label className="text-xs text-muted-foreground">{t("stock.pricePerKg")}</Label>
               <Input
                 data-testid={`input-price-per-kg-${bidIndex}`}
                 type="number" placeholder="0.00"
@@ -1161,7 +1173,7 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
               />
             </div>
             <div>
-              <Label className="text-xs text-muted-foreground"># Bags</Label>
+              <Label className="text-xs text-muted-foreground">{t("stock.numBags")}</Label>
               <Input
                 data-testid={`input-bid-bags-${bidIndex}`}
                 type="number" placeholder="0"
@@ -1171,20 +1183,20 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
               />
               {overBag && (
                 <p className="text-xs text-red-500 font-medium mt-0.5 flex items-center gap-1">
-                  <AlertTriangle className="w-3 h-3" /> Exceeds lot bags
+                  <AlertTriangle className="w-3 h-3" /> {t("stock.exceedsLotBags")}
                 </p>
               )}
             </div>
             <div>
-              <Label className="text-xs text-muted-foreground">Payment</Label>
+              <Label className="text-xs text-muted-foreground">{t("stock.payment")}</Label>
               <Select value={bid.paymentType} onValueChange={v => onChange({ ...bid, paymentType: v })}>
                 <SelectTrigger data-testid={`select-payment-type-${bidIndex}`} className="h-8 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="Credit">Credit</SelectItem>
-                  <SelectItem value="Cash">Cash</SelectItem>
-                  <SelectItem value="UPI">UPI</SelectItem>
+                  <SelectItem value="Credit">{t("stock.credit")}</SelectItem>
+                  <SelectItem value="Cash">{t("stock.cash")}</SelectItem>
+                  <SelectItem value="UPI">{t("stock.upi")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1192,7 +1204,7 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
 
           {bid.paymentType === "Cash" && (
             <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-200 rounded-md px-3 py-1.5">
-              <span className="text-xs text-yellow-700 font-medium">Cash advance ₹</span>
+              <span className="text-xs text-yellow-700 font-medium">{t("stock.cashAdvance")}</span>
               <Input
                 data-testid={`input-advance-amount-${bidIndex}`}
                 type="number"
@@ -1230,6 +1242,7 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
   buyersList: { id: number; name: string; phone?: string; aadhatCommissionPercent?: string | null }[];
   onReturnLot?: () => void;
 }) {
+  const { t } = useLanguage();
   const [pendingDeleteBidIdx, setPendingDeleteBidIdx] = useState<number | null>(null);
 
   const setField = (f: keyof Omit<LotRow, "id" | "dbId" | "bids" | "lotOpen">, v: string) => onChange({ ...lot, [f]: v });
@@ -1272,10 +1285,10 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
           data-testid={`button-toggle-lot-${index}`}
         >
           {lot.lotOpen ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />}
-          <span className="text-xs font-bold text-foreground uppercase tracking-wide">Lot #{index + 1}</span>
+          <span className="text-xs font-bold text-foreground uppercase tracking-wide">{t("stock.lot")} #{index + 1}</span>
           {lot.isReturned && (
             <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-orange-300 text-orange-600 dark:border-orange-700 dark:text-orange-400">
-              Returned
+              {t("stock.returned")}
             </Badge>
           )}
           {!lot.lotOpen && (
@@ -1295,7 +1308,7 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
               data-testid={`button-return-lot-${index}`}
               onClick={() => setShowReturnConfirm(true)}
               className="h-8 w-8 flex items-center justify-center text-orange-400 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/30 transition-colors rounded"
-              title="Return lot to farmer"
+              title={t("stock.returnLotToFarmer")}
             >
               <Truck className="w-3.5 h-3.5" />
             </button>
@@ -1315,8 +1328,8 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
 
       <ConfirmDeleteDialog
         open={showReturnConfirm}
-        title="Return this lot to farmer?"
-        description={`Lot #${index + 1} will be marked as returned. Any unsold bags will be returned to the farmer. This cannot be undone.`}
+        title={t("stock.returnLotConfirm")}
+        description={`${t("stock.lot")} #${index + 1} ${t("stock.returnLotDesc")}`}
         onConfirm={() => { setShowReturnConfirm(false); onReturnLot?.(); }}
         onCancel={() => setShowReturnConfirm(false)}
       />
@@ -1325,7 +1338,7 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
         <div className="p-3 space-y-3">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <div>
-              <Label className="text-xs text-muted-foreground"># Bags *</Label>
+              <Label className="text-xs text-muted-foreground">{t("stock.numBagsReq")}</Label>
               <Input
                 data-testid={`input-lot-bags-${index}`}
                 type="number" placeholder="0"
@@ -1335,32 +1348,32 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
               />
             </div>
             <div>
-              <Label className="text-xs text-muted-foreground">Size</Label>
+              <Label className="text-xs text-muted-foreground">{t("stock.size")}</Label>
               <Select value={lot.size} onValueChange={v => setField("size", v)}>
                 <SelectTrigger data-testid={`select-size-${index}`} className="h-8 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="None">None</SelectItem>
+                  <SelectItem value="None">{t("stock.none")}</SelectItem>
                   {SIZES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label className="text-xs text-muted-foreground">Variety</Label>
+              <Label className="text-xs text-muted-foreground">{t("stock.variety")}</Label>
               <Input
                 data-testid={`input-variety-${index}`}
-                placeholder="e.g. Lal Pyaaz"
+                placeholder={t("stock.varietyPlaceholder")}
                 value={lot.variety}
                 onChange={e => setField("variety", e.target.value)}
                 className="h-8 text-sm"
               />
             </div>
             <div>
-              <Label className="text-xs text-muted-foreground">Bag Marka</Label>
+              <Label className="text-xs text-muted-foreground">{t("stock.bagMarka")}</Label>
               <Input
                 data-testid={`input-bag-marka-${index}`}
-                placeholder="e.g. ABC"
+                placeholder={t("stock.bagMarkaPlaceholder")}
                 value={lot.bagMarka}
                 onChange={e => setField("bagMarka", e.target.value)}
                 className="h-8 text-sm"
@@ -1370,7 +1383,7 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
 
           <div className="ml-4 space-y-1">
             {lot.bids.length === 0 && (
-              <p className="text-xs text-muted-foreground italic px-3 py-2">No bids. Add one below.</p>
+              <p className="text-xs text-muted-foreground italic px-3 py-2">{t("stock.noBids")}</p>
             )}
             {lot.bids.map((bid, bidIdx) => (
               <BidSection
@@ -1394,7 +1407,7 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
               className="w-full h-7 text-xs gap-1.5 border-dashed mt-2"
               data-testid="button-add-bid"
             >
-              <Plus className="w-3 h-3" /> Add Bid
+              <Plus className="w-3 h-3" /> {t("stock.addBid")}
             </Button>
           </div>
         </div>
@@ -1403,7 +1416,7 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
       <ConfirmDeleteDialog
         open={pendingDeleteBidIdx !== null}
         title={`Delete ${pendingBidLabel}?`}
-        description={`This bid will be permanently removed from Lot #${index + 1}. The lot itself will remain.`}
+        description={t("stock.deleteBidDesc")}
         onConfirm={confirmRemoveBid}
         onCancel={() => setPendingDeleteBidIdx(null)}
       />
@@ -1425,6 +1438,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
   onReturnLot?: (lotIdx: number) => void;
   farmerCard?: FarmerCard;
 }) {
+  const { t } = useLanguage();
   const { toast } = useToast();
   const { user } = useAuth();
   const [pendingDeleteLotIdx, setPendingDeleteLotIdx] = useState<number | null>(null);
@@ -1441,7 +1455,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
 
   const headerCls = CROP_HEADER[group.crop] || "bg-muted border-border";
   const badgeCls = CROP_COLORS[group.crop] || "bg-muted border-border text-foreground";
-  const farmerLabel = farmerName.trim() || "this farmer";
+  const farmerLabel = farmerName.trim() || t("stock.farmer");
 
   const addLot = () => onChange({ ...group, lots: [...group.lots, emptyLot(farmerDate)] });
   const updateLot = (idx: number, lot: LotRow) =>
@@ -1549,7 +1563,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
 
       return { sg, txnsByBuyerId };
     } catch (err: any) {
-      toast({ title: "Failed to load receipt data", description: err?.message || "Please try again", variant: "destructive" });
+      toast({ title: t("stock.receiptError"), description: err?.message, variant: "destructive" });
       return null;
     }
   };
@@ -1558,10 +1572,10 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
     setReceiptLoading(true);
     try {
       const data = await fetchReceiptData();
-      if (!data) { toast({ title: "No transaction data found", variant: "destructive" }); return; }
+      if (!data) { toast({ title: t("stock.noTxnDataFound"), variant: "destructive" }); return; }
       const crop = data.sg.lotGroups[0]?.lot?.crop || "";
-      const customTmpl = receiptTemplates.find(t => t.templateType === "farmer" && t.crop === crop)
-        || receiptTemplates.find(t => t.templateType === "farmer" && t.crop === "");
+      const customTmpl = receiptTemplates.find(tmpl => tmpl.templateType === "farmer" && tmpl.crop === crop)
+        || receiptTemplates.find(tmpl => tmpl.templateType === "farmer" && tmpl.crop === "");
       const html = customTmpl
         ? applyFarmerTemplate(customTmpl.templateHtml, data.sg, user?.businessName, user?.businessAddress, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo)
         : generateFarmerReceiptHtml(data.sg, user?.businessName, user?.businessAddress);
@@ -1572,7 +1586,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
         await shareReceiptAsPdf(html, `Farmer_Receipt_${shortName}_${farmerDate}.pdf`);
       }
     } catch (err: any) {
-      toast({ title: "Receipt error", description: err?.message || "Failed to generate receipt", variant: "destructive" });
+      toast({ title: t("stock.receiptError"), description: err?.message, variant: "destructive" });
     } finally { setReceiptLoading(false); }
   };
 
@@ -1580,12 +1594,12 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
     setReceiptLoading(true);
     try {
       const data = await fetchReceiptData();
-      if (!data) { toast({ title: "No transaction data found", variant: "destructive" }); return; }
+      if (!data) { toast({ title: t("stock.noTxnDataFound"), variant: "destructive" }); return; }
       const entries = data.txnsByBuyerId.get(buyerId);
-      if (!entries || entries.length === 0) { toast({ title: "No transactions found for this buyer", variant: "destructive" }); return; }
+      if (!entries || entries.length === 0) { toast({ title: t("stock.noTxnForBuyer"), variant: "destructive" }); return; }
       const crop = entries[0].lot.crop;
-      const customTmpl = receiptTemplates.find(t => t.templateType === "buyer" && t.crop === crop)
-        || receiptTemplates.find(t => t.templateType === "buyer" && t.crop === "");
+      const customTmpl = receiptTemplates.find(tmpl => tmpl.templateType === "buyer" && tmpl.crop === crop)
+        || receiptTemplates.find(tmpl => tmpl.templateType === "buyer" && tmpl.crop === "");
       let html: string;
       if (entries.length === 1) {
         html = customTmpl
@@ -1603,7 +1617,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
         await shareReceiptAsPdf(html, `Buyer_Receipt_${safeName}_${crop}_${farmerDate}.pdf`);
       }
     } catch (err: any) {
-      toast({ title: "Receipt error", description: err?.message || "Failed to generate receipt", variant: "destructive" });
+      toast({ title: t("stock.receiptError"), description: err?.message, variant: "destructive" });
     } finally { setReceiptLoading(false); }
   };
 
@@ -1616,20 +1630,20 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
               <Archive className="w-3.5 h-3.5 shrink-0" />
               <Wheat className="w-3.5 h-3.5 shrink-0" />
               <span>SR# {group.srNumber} {group.crop}</span>
-              <span className="italic font-normal">— Archived</span>
+              <span className="italic font-normal">— {t("stock.archived")}</span>
             </div>
             <Button type="button" variant="outline" size="sm"
               onClick={() => setShowReinstateConfirm(true)}
               className="h-6 px-2 text-[11px] border-amber-400 text-amber-700 hover:bg-amber-100 dark:border-amber-600 dark:text-amber-400 dark:hover:bg-amber-950/60"
               data-testid={`button-reinstate-${group.crop.toLowerCase()}`}>
-              Reinstate
+              {t("stock.reinstate")}
             </Button>
           </div>
         </div>
         <ReinstateDialog
           open={showReinstateConfirm}
-          title={`Reinstate ${group.crop} (SR# ${group.srNumber})?`}
-          description="All lots, bids, and payment details for this crop group will be included in calculations again, including dues and payments."
+          title={`${t("stock.reinstate")} ${group.crop} (SR# ${group.srNumber})?`}
+          description={t("stock.reinstateDesc")}
           onConfirm={async () => {
             setShowReinstateConfirm(false);
             const dbLots = group.lots.filter(l => l.dbId);
@@ -1646,9 +1660,9 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
               const updatedGroup = { ...group, archived: false, groupOpen: true };
               onChange(updatedGroup);
               onSyncSaved?.(updatedGroup);
-              toast({ title: "Crop group reinstated", variant: "success" });
+              toast({ title: t("stock.cropGroupReinstated"), variant: "success" });
             } catch (err: any) {
-              toast({ title: "Failed to reinstate crop group", description: err?.message || "Please try again", variant: "destructive" });
+              toast({ title: t("stock.reinstateFailedCrop"), description: err?.message, variant: "destructive" });
             }
           }}
           onCancel={() => setShowReinstateConfirm(false)}
@@ -1673,7 +1687,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
             <Wheat className="w-4 h-4 shrink-0" />
             <span className="font-bold text-sm truncate">SR# {group.srNumber} {group.crop}</span>
             <Badge variant="outline" className={`text-xs ${badgeCls} shrink-0`}>
-              {group.lots.length} lot{group.lots.length !== 1 ? "s" : ""}
+              {group.lots.length} {t("stock.lots")}
             </Badge>
           </div>
           {/* Action buttons */}
@@ -1686,7 +1700,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
                     onClick={e => e.stopPropagation()}
                     disabled={receiptLoading}
                     className="h-7 w-7 p-0 text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950/40 shrink-0"
-                    title="Print / Share Receipt"
+                    title={t("stock.printShareReceipt")}
                     data-testid={`button-receipt-${group.crop.toLowerCase()}`}
                   >
                     <Printer className="w-3.5 h-3.5" />
@@ -1694,19 +1708,19 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" onClick={e => e.stopPropagation()}>
                   <DropdownMenuItem onClick={() => handleFarmerReceipt("print")} data-testid="receipt-print-farmer">
-                    <Printer className="w-3.5 h-3.5 mr-2" /> Print किसान रसीद
+                    <Printer className="w-3.5 h-3.5 mr-2" /> {t("stock.printFarmerReceipt")}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => handleFarmerReceipt("share")} data-testid="receipt-share-farmer">
-                    <Share2 className="w-3.5 h-3.5 mr-2" /> Share किसान रसीद
+                    <Share2 className="w-3.5 h-3.5 mr-2" /> {t("stock.shareFarmerReceipt")}
                   </DropdownMenuItem>
                   {uniqueBuyers.length > 0 && <DropdownMenuSeparator />}
                   {uniqueBuyers.map(b => (
                     <div key={b.id}>
                       <DropdownMenuItem onClick={() => handleBuyerReceipt(b.id, b.name, "print")} data-testid={`receipt-print-buyer-${b.id}`}>
-                        <Printer className="w-3.5 h-3.5 mr-2" /> Print {b.name} Receipt
+                        <Printer className="w-3.5 h-3.5 mr-2" /> {t("stock.printReceipt")} {b.name} {t("stock.receipt")}
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => handleBuyerReceipt(b.id, b.name, "share")} data-testid={`receipt-share-buyer-${b.id}`}>
-                        <Share2 className="w-3.5 h-3.5 mr-2" /> Share {b.name} Receipt
+                        <Share2 className="w-3.5 h-3.5 mr-2" /> {t("stock.shareReceipt")} {b.name} {t("stock.receipt")}
                       </DropdownMenuItem>
                     </div>
                   ))}
@@ -1717,7 +1731,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
               type="button" variant="ghost" size="sm"
               onClick={e => { e.stopPropagation(); setShowHistory(true); }}
               className="h-7 w-7 p-0 text-blue-500 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950/40"
-              title="Edit History"
+              title={t("stock.editHistory")}
               data-testid={`button-history-${group.crop.toLowerCase()}`}
             >
               <History className="w-3.5 h-3.5" />
@@ -1727,7 +1741,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
                 type="button" variant="ghost" size="sm"
                 onClick={e => { e.stopPropagation(); onArchive(); }}
                 className="h-7 w-7 p-0 text-amber-500 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/40 shrink-0"
-                title="Archive this crop group"
+                title={t("stock.archiveCropGroup")}
                 data-testid={`button-archive-${group.crop.toLowerCase()}`}
               >
                 <Archive className="w-3.5 h-3.5" />
@@ -1741,7 +1755,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
                   onDelete();
                 }}
                 className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/40 shrink-0"
-                title="Delete this crop group"
+                title={t("stock.deleteCropGroup")}
                 data-testid={`button-delete-${group.crop.toLowerCase()}`}
               >
                 <X className="w-3.5 h-3.5" />
@@ -1780,18 +1794,18 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
             />
           ))}
           <Button type="button" variant="outline" size="sm" onClick={addLot} className="w-full h-8 text-xs gap-1.5 border-dashed">
-            <Plus className="w-3.5 h-3.5" /> Add Lot under {group.crop}
+            <Plus className="w-3.5 h-3.5" /> {t("stock.addLotUnder")} {group.crop}
           </Button>
         </div>
       )}
 
       <ConfirmDeleteDialog
         open={pendingDeleteLotIdx !== null}
-        title="Delete this lot?"
+        title={t("stock.deleteThisLot")}
         description={
           isLastLot
-            ? `This is the only lot for ${farmerLabel}'s ${group.crop}. Deleting it will permanently remove this lot. The ${group.crop} group will remain.`
-            : `Lot #${(pendingDeleteLotIdx ?? 0) + 1} of ${farmerLabel}'s ${group.crop} has data that will be permanently lost. This action cannot be undone.`
+            ? `${t("stock.deleteLotOnlyDesc")}`
+            : `${t("stock.lot")} #${(pendingDeleteLotIdx ?? 0) + 1} ${t("stock.deleteLotDataDesc")}`
         }
         onConfirm={confirmDeleteLot}
         onCancel={() => setPendingDeleteLotIdx(null)}
@@ -1806,8 +1820,8 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
 
       <ConfirmDeleteDialog
         open={showDeleteConfirm}
-        title={`Delete "${group.crop}" group?`}
-        description={`This crop group has data that will be permanently lost. This action cannot be undone.`}
+        title={`${t("stock.deleteCropGroup")} "${group.crop}"?`}
+        description={t("stock.deleteGroupConfirm")}
         onConfirm={() => { setShowDeleteConfirm(false); onDelete(); }}
         onCancel={() => setShowDeleteConfirm(false)}
       />
@@ -1829,6 +1843,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
   cs: ChargeSettings;
   currentUsername: string;
 }) {
+  const { t } = useLanguage();
   const { toast } = useToast();
   const [pendingArchiveGroupIdx, setPendingArchiveGroupIdx] = useState<number | null>(null);
   const [showArchiveFarmer, setShowArchiveFarmer] = useState(false);
@@ -1858,7 +1873,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
     (v) => card.village.length >= 1 && v.toLowerCase().includes(card.village.toLowerCase()) && v.toLowerCase() !== card.village.toLowerCase()
   );
   const filteredTehsils = (locationData?.tehsils || []).filter(
-    (t) => card.tehsil.length >= 1 && t.toLowerCase().includes(card.tehsil.toLowerCase()) && t.toLowerCase() !== card.tehsil.toLowerCase()
+    (th) => card.tehsil.length >= 1 && th.toLowerCase().includes(card.tehsil.toLowerCase()) && th.toLowerCase() !== card.tehsil.toLowerCase()
   );
 
   const selectFarmer = (f: any) => {
@@ -1926,9 +1941,9 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
         const updatedCard = { ...card, cropGroups: card.cropGroups.map((g, i) => i === pendingArchiveGroupIdx ? { ...g, archived: true } : g) };
         onChange(updatedCard);
         onSyncSaved(updatedCard);
-        toast({ title: "Crop group archived", variant: "success" });
+        toast({ title: t("stock.cropGroupArchived"), variant: "success" });
       } catch (err: any) {
-        toast({ title: "Failed to archive crop group", description: err?.message || "Please try again", variant: "destructive" });
+        toast({ title: t("stock.archiveFailedCrop"), description: err?.message, variant: "destructive" });
       }
     }
     setPendingArchiveGroupIdx(null);
@@ -1952,13 +1967,13 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
         <div className="flex items-center justify-between px-4 py-2 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-800">
           <div className="flex items-center gap-2 text-amber-700 dark:text-amber-400 text-xs font-medium">
             <Archive className="w-3.5 h-3.5 shrink-0" />
-            Archived — excluded from all calculations
+            {t("stock.archivedExcluded")}
           </div>
           <Button type="button" variant="outline" size="sm"
             onClick={() => setShowReinstateConfirm(true)}
             className="h-6 px-2 text-[11px] border-amber-400 text-amber-700 hover:bg-amber-100 dark:border-amber-600 dark:text-amber-400 dark:hover:bg-amber-950/60"
             data-testid="button-reinstate-farmer">
-            Reinstate
+            {t("stock.reinstate")}
           </Button>
         </div>
       )}
@@ -1976,7 +1991,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
             {card.cardOpen ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" /> : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />}
             <User className="w-4 h-4 text-primary shrink-0" />
             <span className="font-bold text-sm truncate">
-              {card.farmerName.trim() || <span className="text-muted-foreground italic">New Farmer Entry</span>}
+              {card.farmerName.trim() || <span className="text-muted-foreground italic">{t("stock.newFarmerEntry")}</span>}
             </span>
             {card.farmerPhone && (
               <span className="hidden sm:inline text-xs text-muted-foreground font-normal shrink-0">· {card.farmerPhone}</span>
@@ -1986,12 +2001,12 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
             )}
             {parseFloat(card.advanceAmount || "0") > 0 && (
               <span className="hidden sm:inline-flex text-[10px] font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded px-1.5 py-0.5 shrink-0">
-                Advance ₹{parseFloat(card.advanceAmount).toLocaleString("en-IN")}{card.advanceMode ? ` · ${card.advanceMode}` : ""}
+                {t("stock.advance")} ₹{parseFloat(card.advanceAmount).toLocaleString("en-IN")}{card.advanceMode ? ` · ${card.advanceMode}` : ""}
               </span>
             )}
             {isDirty && card.savedAt !== null && (
               <span className="hidden sm:inline-flex text-[10px] font-medium text-orange-500 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-800 rounded px-1.5 py-0.5 shrink-0">
-                Unsaved changes
+                {t("stock.unsavedChanges")}
               </span>
             )}
           </div>
@@ -2008,7 +2023,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
               <Button type="button" variant="ghost" size="sm"
                 onClick={e => { e.stopPropagation(); setShowArchiveFarmer(true); }}
                 className="h-7 w-7 p-0 text-amber-500 hover:text-amber-700"
-                title="Archive this farmer entry"
+                title={t("stock.archiveFarmerEntry")}
                 data-testid="button-archive-farmer">
                 <Archive className="w-3.5 h-3.5" />
               </Button>
@@ -2022,12 +2037,12 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
             {card.village && <span className="text-xs text-muted-foreground">· {card.village}</span>}
             {parseFloat(card.advanceAmount || "0") > 0 && (
               <span className="text-[10px] font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded px-1.5 py-0.5" data-testid="badge-farmer-advance">
-                Advance ₹{parseFloat(card.advanceAmount).toLocaleString("en-IN")}{card.advanceMode ? ` · ${card.advanceMode}` : ""}
+                {t("stock.advance")} ₹{parseFloat(card.advanceAmount).toLocaleString("en-IN")}{card.advanceMode ? ` · ${card.advanceMode}` : ""}
               </span>
             )}
             {isDirty && card.savedAt !== null && (
               <span className="text-[10px] font-medium text-orange-500 dark:text-orange-400 bg-orange-50 dark:bg-orange-950/40 border border-orange-200 dark:border-orange-800 rounded px-1.5 py-0.5">
-                Unsaved changes
+                {t("stock.unsavedChanges")}
               </span>
             )}
           </div>
@@ -2051,13 +2066,13 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
 
           {/* Farmer details */}
           <SectionToggle open={card.farmerOpen} onToggle={() => set("farmerOpen", !card.farmerOpen)}
-            icon={<User className="w-3.5 h-3.5" />} label="Farmer Details" />
+            icon={<User className="w-3.5 h-3.5" />} label={t("stock.farmerDetails")} />
           {card.farmerOpen && (
             <div className="space-y-3 pl-2">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="relative">
-                  <Label className="text-xs text-muted-foreground">Name *</Label>
-                  <Input data-testid="input-farmer-name" placeholder="Farmer name" value={card.farmerName}
+                  <Label className="text-xs text-muted-foreground">{t("stock.farmerName")}</Label>
+                  <Input data-testid="input-farmer-name" placeholder={t("stock.farmerNamePlaceholder")} value={card.farmerName}
                     onChange={e => {
                       const val = capFirst(e.target.value);
                       set("farmerName", val);
@@ -2100,15 +2115,15 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                   )}
                 </div>
                 <div>
-                  <Label className="text-xs text-muted-foreground">Phone</Label>
-                  <Input data-testid="input-farmer-phone" type="tel" inputMode="numeric" placeholder="10-digit mobile" value={card.farmerPhone} onChange={e => set("farmerPhone", e.target.value.replace(/\D/g, "").slice(0, 10))} className="h-8 text-sm" />
+                  <Label className="text-xs text-muted-foreground">{t("stock.phone")}</Label>
+                  <Input data-testid="input-farmer-phone" type="tel" inputMode="numeric" placeholder={t("stock.phonePlaceholder")} value={card.farmerPhone} onChange={e => set("farmerPhone", e.target.value.replace(/\D/g, "").slice(0, 10))} className="h-8 text-sm" />
                   {card.farmerPhone.length > 0 && card.farmerPhone.length < 10 && (
-                    <p data-testid="text-phone-warning" className="text-[11px] mt-0.5 text-destructive font-medium">Please provide a valid 10-digit number</p>
+                    <p data-testid="text-phone-warning" className="text-[11px] mt-0.5 text-destructive font-medium">{t("stock.phoneWarning")}</p>
                   )}
                 </div>
                 <div className="relative">
-                  <Label className="text-xs text-muted-foreground">Village</Label>
-                  <Input data-testid="input-village" placeholder="Village" value={card.village}
+                  <Label className="text-xs text-muted-foreground">{t("stock.village")}</Label>
+                  <Input data-testid="input-village" placeholder={t("stock.village")} value={card.village}
                     onChange={e => { set("village", capFirst(e.target.value)); setShowVillageSuggestions(true); }}
                     onFocus={() => setShowVillageSuggestions(true)}
                     onBlur={() => setTimeout(() => setShowVillageSuggestions(false), 150)}
@@ -2126,19 +2141,19 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                   )}
                 </div>
                 <div className="relative">
-                  <Label className="text-xs text-muted-foreground">Tehsil</Label>
-                  <Input data-testid="input-tehsil" placeholder="Tehsil" value={card.tehsil}
+                  <Label className="text-xs text-muted-foreground">{t("stock.tehsil")}</Label>
+                  <Input data-testid="input-tehsil" placeholder={t("stock.tehsil")} value={card.tehsil}
                     onChange={e => { set("tehsil", capFirst(e.target.value)); setShowTehsilSuggestions(true); }}
                     onFocus={() => setShowTehsilSuggestions(true)}
                     onBlur={() => setTimeout(() => setShowTehsilSuggestions(false), 150)}
                     className="h-8 text-sm" autoComplete="off" />
                   {showTehsilSuggestions && filteredTehsils.length > 0 && (
                     <div className="absolute z-50 w-full bg-popover border rounded-md shadow-lg mt-1 max-h-40 overflow-y-auto top-full">
-                      {filteredTehsils.map((t) => (
-                        <button key={t} type="button" data-testid={`suggestion-tehsil-${t}`}
+                      {filteredTehsils.map((th) => (
+                        <button key={th} type="button" data-testid={`suggestion-tehsil-${th}`}
                           className="w-full text-left px-3 py-2 text-sm hover:bg-muted border-b last:border-b-0"
-                          onMouseDown={() => { set("tehsil", t); setShowTehsilSuggestions(false); }}>
-                          {t}
+                          onMouseDown={() => { set("tehsil", th); setShowTehsilSuggestions(false); }}>
+                          {th}
                         </button>
                       ))}
                     </div>
@@ -2147,19 +2162,19 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div>
-                  <Label className="text-xs text-muted-foreground">District</Label>
+                  <Label className="text-xs text-muted-foreground">{t("stock.district")}</Label>
                   <Popover open={districtOpen} onOpenChange={setDistrictOpen}>
                     <PopoverTrigger asChild>
                       <Button data-testid="select-district" variant="outline" role="combobox" aria-expanded={districtOpen} className="h-8 w-full justify-between text-sm font-normal">
-                        {card.district || <span className="text-muted-foreground">Select district</span>}
+                        {card.district || <span className="text-muted-foreground">{t("stock.selectDistrict")}</span>}
                         <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-[200px] p-0" align="start">
                       <Command>
-                        <CommandInput placeholder="Search district..." className="h-9 text-sm" />
+                        <CommandInput placeholder={t("stock.searchDistrict")} className="h-9 text-sm" />
                         <CommandList>
-                          <CommandEmpty className="py-3 text-xs">No district found.</CommandEmpty>
+                          <CommandEmpty className="py-3 text-xs">{t("stock.noDistrictFound")}</CommandEmpty>
                           <CommandGroup>
                             {DISTRICTS.map(d => (
                               <CommandItem key={d} value={d} onSelect={() => { set("district", d); setDistrictOpen(false); }} className="text-sm">
@@ -2174,10 +2189,10 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                   </Popover>
                 </div>
                 <div>
-                  <Label className="text-xs text-muted-foreground">State</Label>
+                  <Label className="text-xs text-muted-foreground">{t("stock.state")}</Label>
                   <Select value={card.state} onValueChange={v => set("state", v)}>
                     <SelectTrigger data-testid="select-state" className="h-8 text-sm">
-                      <SelectValue placeholder="Select state" />
+                      <SelectValue placeholder={t("stock.selectState")} />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Madhya Pradesh">Madhya Pradesh</SelectItem>
@@ -2187,18 +2202,18 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                   </Select>
                 </div>
                 <div>
-                  <Label className="text-xs text-muted-foreground">Farmer Advance ₹</Label>
+                  <Label className="text-xs text-muted-foreground">{t("stock.farmerAdvance")}</Label>
                   <Input data-testid="input-farmer-advance" type="number" placeholder="0" value={card.advanceAmount} onChange={e => set("advanceAmount", e.target.value)} className="h-8 text-sm" />
                 </div>
                 <div>
-                  <Label className="text-xs text-muted-foreground">Mode</Label>
+                  <Label className="text-xs text-muted-foreground">{t("stock.mode")}</Label>
                   <Select value={card.advanceMode} onValueChange={v => set("advanceMode", v)}>
                     <SelectTrigger data-testid="select-advance-mode" className="h-8 text-sm">
-                      <SelectValue placeholder="Select" />
+                      <SelectValue placeholder={t("stock.selectMode")} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Cash">Cash</SelectItem>
-                      <SelectItem value="Account">Account</SelectItem>
+                      <SelectItem value="Cash">{t("stock.cash")}</SelectItem>
+                      <SelectItem value="Account">{t("stock.account")}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -2208,46 +2223,46 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
 
           {/* Vehicle info */}
           <SectionToggle open={card.vehicleOpen} onToggle={() => set("vehicleOpen", !card.vehicleOpen)}
-            icon={<Truck className="w-3.5 h-3.5" />} label="Vehicle Info"
+            icon={<Truck className="w-3.5 h-3.5" />} label={t("stock.vehicleInfo")}
             summary={[
               card.vehicleNumber && `# ${card.vehicleNumber}`,
               card.driverName && card.driverName,
               card.vehicleBhadaRate && `₹${card.vehicleBhadaRate}`,
               card.freightType && card.freightType,
-              card.totalBagsInVehicle && `${card.totalBagsInVehicle} bags`,
+              card.totalBagsInVehicle && `${card.totalBagsInVehicle} ${t("common.bags")}`,
             ].filter(Boolean) as string[]} />
           {card.vehicleOpen && (
             <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 pl-2">
               <div>
-                <Label className="text-xs text-muted-foreground">Vehicle #</Label>
-                <Input data-testid="input-vehicle-number" placeholder="E.G. MP09AB1234" value={card.vehicleNumber} onChange={e => set("vehicleNumber", e.target.value.toUpperCase())} className="h-8 text-sm" />
+                <Label className="text-xs text-muted-foreground">{t("stock.vehicleNumber")}</Label>
+                <Input data-testid="input-vehicle-number" placeholder={t("stock.vehiclePlaceholder")} value={card.vehicleNumber} onChange={e => set("vehicleNumber", e.target.value.toUpperCase())} className="h-8 text-sm" />
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground">Driver Name</Label>
-                <Input data-testid="input-driver-name" placeholder="Optional" value={card.driverName} onChange={e => set("driverName", capFirst(e.target.value))} className="h-8 text-sm" />
+                <Label className="text-xs text-muted-foreground">{t("stock.driverName")}</Label>
+                <Input data-testid="input-driver-name" placeholder={t("stock.optional")} value={card.driverName} onChange={e => set("driverName", capFirst(e.target.value))} className="h-8 text-sm" />
               </div>
               <div>
-                <Label className="text-xs text-muted-foreground">Driver Contact</Label>
-                <Input data-testid="input-driver-contact" type="tel" inputMode="numeric" placeholder="Optional" value={card.driverContact} onChange={e => set("driverContact", e.target.value.replace(/\D/g, "").slice(0, 10))} className="h-8 text-sm" />
+                <Label className="text-xs text-muted-foreground">{t("stock.driverContact")}</Label>
+                <Input data-testid="input-driver-contact" type="tel" inputMode="numeric" placeholder={t("stock.optional")} value={card.driverContact} onChange={e => set("driverContact", e.target.value.replace(/\D/g, "").slice(0, 10))} className="h-8 text-sm" />
               </div>
               <div>
-                <Label className="text-[10px] sm:text-xs text-muted-foreground">Freight/Bhada (₹) <span className="text-destructive">*</span></Label>
+                <Label className="text-[10px] sm:text-xs text-muted-foreground">{t("stock.freightBhada")} <span className="text-destructive">*</span></Label>
                 <Input data-testid="input-bhada-rate" type="text" inputMode="decimal" placeholder="0.00" value={card.vehicleBhadaRate} onChange={e => set("vehicleBhadaRate", toNum(e.target.value))} onFocus={e => e.target.select()} className="h-8 text-sm" />
               </div>
               <div>
-                <Label className="text-[10px] sm:text-xs text-muted-foreground">Advance / Credit <span className="text-destructive">*</span></Label>
+                <Label className="text-[10px] sm:text-xs text-muted-foreground">{t("stock.advanceCredit")} <span className="text-destructive">*</span></Label>
                 <Select value={card.freightType} onValueChange={v => set("freightType", v)}>
                   <SelectTrigger data-testid="select-freight-type" className="h-8 text-sm">
-                    <SelectValue placeholder="Select type" />
+                    <SelectValue placeholder={t("stock.selectType")} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="Advance">Advance</SelectItem>
-                    <SelectItem value="Credit">Credit</SelectItem>
+                    <SelectItem value="Advance">{t("stock.advance")}</SelectItem>
+                    <SelectItem value="Credit">{t("stock.credit")}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label className="text-[10px] sm:text-xs text-muted-foreground">Total # of Bags <span className="text-destructive">*</span></Label>
+                <Label className="text-[10px] sm:text-xs text-muted-foreground">{t("stock.totalBagsInVehicle")} <span className="text-destructive">*</span></Label>
                 <Input data-testid="input-total-bags-vehicle" type="text" inputMode="numeric" placeholder="0" value={card.totalBagsInVehicle} onChange={e => set("totalBagsInVehicle", e.target.value.replace(/\D/g, ""))} onFocus={e => e.target.select()} className="h-8 text-sm" />
                 {(() => {
                   const allocated = card.cropGroups.reduce((sum, g) => sum + g.lots.reduce((s, l) => s + (parseInt(l.numberOfBags) || 0), 0), 0);
@@ -2255,7 +2270,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                   const over = allocated > total;
                   return (
                     <span data-testid="text-allocated-bags" className={`text-[11px] mt-0.5 block font-medium ${over ? "text-destructive font-semibold" : "text-green-600 dark:text-green-500"}`}>
-                      Allocated {allocated} / {total || "—"} bags
+                      {t("stock.allocated")} {allocated} / {total || "—"} {t("common.bags")}
                     </span>
                   );
                 })()}
@@ -2321,9 +2336,9 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                       const key = query.queryKey[0];
                       return typeof key === "string" && key.startsWith("/api/cash-entries");
                     }});
-                    toast({ title: "Lot returned", description: `Lot #${lotIdx + 1} has been returned to farmer`, variant: "success" });
+                    toast({ title: t("stock.lotReturned"), description: `${t("stock.lot")} #${lotIdx + 1} ${t("stock.returnedToFarmer")}`, variant: "success" });
                   } catch (err: any) {
-                    toast({ title: "Failed to return lot", description: err?.message || "Please try again", variant: "destructive" });
+                    toast({ title: t("stock.returnLotFailed"), description: err?.message, variant: "destructive" });
                   }
                 }}
               />
@@ -2349,7 +2364,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
             )}
             {card.cropGroups.filter(g => !g.archived).length === 0 && (
               <p className="text-xs text-muted-foreground italic text-center py-2">
-                Select a crop above to begin adding lots
+                {t("stock.selectCropToBegin")}
               </p>
             )}
           </div>
@@ -2360,18 +2375,18 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
               onClick={onCancel}
               className="h-8 text-sm gap-1.5 border-amber-500 text-amber-600 hover:bg-amber-50 hover:text-amber-700 dark:hover:bg-amber-950"
               data-testid="button-cancel-entry">
-              <X className="w-3.5 h-3.5" /> Cancel
+              <X className="w-3.5 h-3.5" /> {t("common.cancel")}
             </Button>
             <div className="flex items-center gap-2">
               {card.savedAt && (
-                <span className="text-[10px] text-muted-foreground">Last saved: {card.savedAt}</span>
+                <span className="text-[10px] text-muted-foreground">{t("stock.lastSaved")}: {card.savedAt}</span>
               )}
               <Button type="button"
                 onClick={onSave}
                 disabled={!isDirty}
                 className={`h-8 gap-1.5 text-sm transition-all ${isDirty ? "bg-primary text-primary-foreground" : "opacity-50"}`}
                 data-testid="button-save-entry">
-                <Save className="w-3.5 h-3.5" /> Save Entry
+                <Save className="w-3.5 h-3.5" /> {t("stock.saveEntry")}
               </Button>
             </div>
           </div>
@@ -2381,8 +2396,8 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
       {/* Archive farmer dialog */}
       <ArchiveDialog
         open={showArchiveFarmer}
-        title={`Archive ${card.farmerName.trim() || "this farmer"}?`}
-        description="This farmer entry will be archived and excluded from all calculations."
+        title={`${t("stock.archive")} ${card.farmerName.trim() || t("stock.thisFarmer")}?`}
+        description={t("stock.archiveFarmerDesc")}
         onConfirm={() => { setShowArchiveFarmer(false); onArchive(); }}
         onCancel={() => setShowArchiveFarmer(false)}
       />
@@ -2390,8 +2405,8 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
       {/* Archive crop group dialog */}
       <ArchiveDialog
         open={pendingArchiveGroupIdx !== null}
-        title={`Archive "${pendingGroupName}" group?`}
-        description={`This crop group will be archived and excluded from all calculations.`}
+        title={`${t("stock.archive")} "${pendingGroupName}"?`}
+        description={t("stock.archiveCropGroupDesc")}
         onConfirm={confirmArchiveGroup}
         onCancel={() => setPendingArchiveGroupIdx(null)}
       />
@@ -2408,8 +2423,8 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
       {/* Reinstate confirmation */}
       <ReinstateDialog
         open={showReinstateConfirm}
-        title={`Reinstate ${card.farmerName.trim() || "this farmer"}?`}
-        description="This farmer entry and all its crop groups, lots, and bids will be included in all calculations again, including dues and payments."
+        title={`${t("stock.reinstate")} ${card.farmerName.trim() || t("stock.thisFarmer")}?`}
+        description={t("stock.reinstateFarmerDesc")}
         onConfirm={async () => {
           setShowReinstateConfirm(false);
           if (card.farmerId) {
@@ -2422,9 +2437,9 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
               const updatedCard = { ...card, archived: false, cardOpen: true };
               onChange(updatedCard);
               onSyncSaved(updatedCard);
-              toast({ title: "Farmer reinstated", variant: "success" });
+              toast({ title: t("stock.farmerReinstated"), variant: "success" });
             } catch (err: any) {
-              toast({ title: "Failed to reinstate farmer", description: err?.message || "Please try again", variant: "destructive" });
+              toast({ title: t("stock.reinstateFailedFarmer"), description: err?.message, variant: "destructive" });
             }
           } else {
             onChange({ ...card, archived: false, cardOpen: true });
@@ -2601,6 +2616,7 @@ function StockFilterBar({
   canPrintOverallBill: boolean;
   onPrintAllBuyerReceipt: () => void;
 }) {
+  const { t } = useLanguage();
   const [monthPopoverOpen, setMonthPopoverOpen] = useState(false);
   const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
   const [farmerDropOpen, setFarmerDropOpen] = useState(false);
@@ -2655,16 +2671,16 @@ function StockFilterBar({
   const selectAllDays = () => { setSelectedDays([]); setDayPopoverOpen(false); };
 
   const monthLabel = selectedMonths.length === 0
-    ? "All Months"
+    ? t("stock.allMonths")
     : selectedMonths.length === 1
       ? MONTH_LABELS[parseInt(selectedMonths[0]) - 1]
-      : `${selectedMonths.length} Months`;
+      : `${selectedMonths.length} ${t("stock.months")}`;
 
   const dayLabel = selectedDays.length === 0
-    ? "All Days"
+    ? t("stock.allDays")
     : selectedDays.length === 1
       ? selectedDays[0]
-      : `${selectedDays.length} Days`;
+      : `${selectedDays.length} ${t("stock.days")}`;
 
   const farmerSuggestions = useMemo(() => {
     const seen = new Set<number | string>();
@@ -2719,8 +2735,8 @@ function StockFilterBar({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="stock">Stock</SelectItem>
-          <SelectItem value="txn">Txn</SelectItem>
+          <SelectItem value="stock">{t("stock.stock")}</SelectItem>
+          <SelectItem value="txn">{t("stock.txn")}</SelectItem>
         </SelectContent>
       </Select>
 
@@ -2729,7 +2745,7 @@ function StockFilterBar({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">All Years</SelectItem>
+          <SelectItem value="all">{t("stock.allYears")}</SelectItem>
           {years.map(y => (
             <SelectItem key={y} value={y}>{y}</SelectItem>
           ))}
@@ -2750,7 +2766,7 @@ function StockFilterBar({
             onClick={selectAllMonths}
           >
             <Checkbox checked={selectedMonths.length === 0} />
-            <span>All Months</span>
+            <span>{t("stock.allMonths")}</span>
           </button>
           <div className="grid grid-cols-4 gap-0.5">
             {MONTH_LABELS.map((m, i) => {
@@ -2785,7 +2801,7 @@ function StockFilterBar({
             onClick={selectAllDays}
           >
             <Checkbox checked={selectedDays.length === 0} />
-            <span>All Days</span>
+            <span>{t("stock.allDays")}</span>
           </button>
           <div className="grid grid-cols-7 gap-0.5">
             {Array.from({ length: daysInMonths }, (_, i) => String(i + 1)).map(d => (
@@ -2809,7 +2825,7 @@ function StockFilterBar({
           value={farmerFilter}
           onChange={(e) => { setFarmerFilter(e.target.value); setFarmerDropOpen(true); }}
           onFocus={() => setFarmerDropOpen(true)}
-          placeholder="Farmer"
+          placeholder={t("stock.farmer")}
           className="pl-7 w-[140px] h-8 text-xs"
         />
         {farmerFilter && (
@@ -2842,7 +2858,7 @@ function StockFilterBar({
           value={buyerFilter}
           onChange={(e) => { setBuyerFilter(e.target.value); setBuyerDropOpen(true); }}
           onFocus={() => setBuyerDropOpen(true)}
-          placeholder="Buyer"
+          placeholder={t("stock.buyer")}
           className="pl-7 w-[140px] h-8 text-xs"
         />
         {buyerFilter && (
@@ -2871,7 +2887,7 @@ function StockFilterBar({
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="all">All Crops</SelectItem>
+          <SelectItem value="all">{t("stock.allCrops")}</SelectItem>
           {CROPS.map(c => (
             <SelectItem key={c} value={c}>{c}</SelectItem>
           ))}
@@ -2880,7 +2896,7 @@ function StockFilterBar({
 
       {anyActive && (
         <Button variant="ghost" size="sm" className="h-8 text-xs gap-1 text-muted-foreground" onClick={clearAll} data-testid="button-clear-filters">
-          <RotateCcw className="w-3 h-3" /> Clear
+          <RotateCcw className="w-3 h-3" /> {t("stock.clear")}
         </Button>
       )}
 
@@ -2890,7 +2906,7 @@ function StockFilterBar({
           size="icon"
           className="h-8 w-8"
           data-testid="button-print-all-buyer-receipt"
-          title={`Print overall buyer bill for ${buyerFilter.trim()} (${cropFilter})`}
+          title={`${t("stock.printOverallBill")} ${buyerFilter.trim()} (${cropFilter})`}
           onClick={onPrintAllBuyerReceipt}
         >
           <Printer className="w-4 h-4" />
@@ -2906,10 +2922,10 @@ function StockFilterBar({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <DropdownMenuItem onClick={onExportStockCsv} data-testid="menu-stock-csv">
-            Stock CSV
+            {t("stock.stockCsv")}
           </DropdownMenuItem>
           <DropdownMenuItem onClick={onExportTxnCsv} data-testid="menu-txn-csv">
-            Txn CSV
+            {t("stock.txnCsv")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -2923,6 +2939,7 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
   cs: ChargeSettings;
   buyersList: { id: number; name: string; phone?: string; aadhatCommissionPercent?: string | null }[];
 }) {
+  const { t } = useLanguage();
   let totalLots = 0, totalTxns = 0;
   let farmerPayableTotal = 0, farmerDue = 0;
   let buyerReceivableTotal = 0, buyerDue = 0;
@@ -2965,7 +2982,7 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-2" data-testid="stock-summary-bar">
       <div className="rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 px-4 py-3">
         <div className="flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 mb-1">
-          <Layers className="w-3.5 h-3.5" /> Lots / Txns
+          <Layers className="w-3.5 h-3.5" /> {t("stock.lotsTxns")}
         </div>
         <div className="text-sm font-bold text-blue-700 dark:text-blue-300" data-testid="text-lots-txns">
           {totalLots} / {totalTxns}
@@ -2974,32 +2991,32 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
 
       <div className="rounded-xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 px-4 py-3">
         <div className="flex items-center gap-1.5 text-xs font-medium text-green-600 dark:text-green-400 mb-1">
-          <User className="w-3.5 h-3.5" /> Farmer Payable
+          <User className="w-3.5 h-3.5" /> {t("stock.farmerPayable")}
         </div>
         <div className="text-sm font-bold text-green-700 dark:text-green-300" data-testid="text-farmer-payable">
           ₹{Math.round(farmerPayableTotal).toLocaleString("en-IN")}
         </div>
-        <div className="text-xs text-red-500 dark:text-red-400 font-medium">Due: ₹{Math.round(farmerDue).toLocaleString("en-IN")}</div>
+        <div className="text-xs text-red-500 dark:text-red-400 font-medium">{t("stock.due")}: ₹{Math.round(farmerDue).toLocaleString("en-IN")}</div>
       </div>
 
       <div className="rounded-xl border border-cyan-200 dark:border-cyan-800 bg-cyan-50 dark:bg-cyan-950/30 px-4 py-3">
         <div className="flex items-center gap-1.5 text-xs font-medium text-cyan-600 dark:text-cyan-400 mb-1">
-          <ShoppingBag className="w-3.5 h-3.5" /> Buyer Receivable
+          <ShoppingBag className="w-3.5 h-3.5" /> {t("stock.buyerReceivable")}
         </div>
         <div className="text-sm font-bold text-cyan-700 dark:text-cyan-300" data-testid="text-buyer-receivable">
           ₹{Math.round(buyerReceivableTotal).toLocaleString("en-IN")}
         </div>
-        <div className="text-xs text-red-500 dark:text-red-400 font-medium">Due: ₹{Math.round(buyerDue).toLocaleString("en-IN")}</div>
+        <div className="text-xs text-red-500 dark:text-red-400 font-medium">{t("stock.due")}: ₹{Math.round(buyerDue).toLocaleString("en-IN")}</div>
       </div>
 
       <div className="rounded-xl border border-orange-200 dark:border-orange-800 bg-orange-50 dark:bg-orange-950/30 px-4 py-3">
         <div className="flex items-center gap-1.5 text-xs font-medium text-orange-600 dark:text-orange-400 mb-1">
-          <Landmark className="w-3.5 h-3.5" /> Aadhat Comm.
+          <Landmark className="w-3.5 h-3.5" /> {t("stock.aadhatComm")}
         </div>
         <div className="text-sm font-bold text-orange-700 dark:text-orange-300" data-testid="text-aadhat-comm">
           ₹{Math.round(aadhatTotal).toLocaleString("en-IN")}
         </div>
-        <div className="text-xs text-green-600 dark:text-green-400 font-medium">Earned (via Buyer Dues)</div>
+        <div className="text-xs text-green-600 dark:text-green-400 font-medium">{t("stock.earnedViaBuyer")}</div>
       </div>
     </div>
   );
@@ -3015,6 +3032,7 @@ function sortCardsByMaxSr(cards: FarmerCard[]): FarmerCard[] {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function StockPage() {
+  const { t } = useLanguage();
   const [cards, setCards] = useState<FarmerCard[]>([]);
   const [savedCardMap, setSavedCardMap] = useState<Map<string, FarmerCard>>(new Map());
   const [saving, setSaving] = useState(false);
@@ -3170,14 +3188,14 @@ export default function StockPage() {
   const saveCard = async (idx: number, collapseAfter = false) => {
     const card = cards[idx];
     if (!card.farmerName.trim()) {
-      toast({ title: "Error", description: "Farmer name is required", variant: "destructive" });
+      toast({ title: t("stock.error"), description: t("stock.farmerNameRequired"), variant: "destructive" });
       return;
     }
 
     const vehicleBags = parseInt(card.totalBagsInVehicle) || 0;
     const allocatedBags = card.cropGroups.reduce((sum, g) => sum + g.lots.reduce((s, l) => s + (parseInt(l.numberOfBags) || 0), 0), 0);
     if (allocatedBags > vehicleBags) {
-      toast({ title: "Error", description: `Total lot bags (${allocatedBags}) exceeds vehicle capacity (${vehicleBags})`, variant: "destructive" });
+      toast({ title: t("stock.error"), description: `${t("stock.bagsExceedCapacity")} (${allocatedBags} > ${vehicleBags})`, variant: "destructive" });
       return;
     }
 
@@ -3228,7 +3246,7 @@ export default function StockPage() {
         }
       }
       if (unmatchedBuyers.length > 0) {
-        toast({ title: "Buyer not selected", description: `Please select a buyer from the dropdown for: ${unmatchedBuyers.join(", ")}. Bids without a matched buyer will not be saved.`, variant: "destructive" });
+        toast({ title: t("stock.buyerNotSelected"), description: `${t("stock.buyerNotSelectedDesc")}: ${unmatchedBuyers.join(", ")}`, variant: "destructive" });
       }
 
       const newLots: { groupIdx: number; lotIdx: number; lotData: any }[] = [];
@@ -3335,14 +3353,14 @@ export default function StockPage() {
           for (const [deletedBidDbId, deletedBid] of Array.from(savedBidMap.entries())) {
             if (!currentBidDbIds.has(deletedBidDbId)) {
               if (deletedBid.txnDbId) {
-                toast({ title: "Warning", description: `Cannot delete bid for ${deletedBid.buyerName} — it has an active transaction. Restoring bid.`, variant: "destructive" });
+                toast({ title: t("stock.warning"), description: `${t("stock.cannotDeleteBidActiveTxn")} — ${deletedBid.buyerName}`, variant: "destructive" });
                 restoredBids.push(deletedBid);
                 continue;
               }
               try {
                 await apiRequest("DELETE", `/api/bids/${deletedBidDbId}`);
               } catch (err: any) {
-                toast({ title: "Warning", description: `Failed to delete bid: ${err.message}`, variant: "destructive" });
+                toast({ title: t("stock.warning"), description: `${t("stock.failedDeleteBid")}: ${err.message}`, variant: "destructive" });
                 restoredBids.push(deletedBid);
               }
             }
@@ -3370,7 +3388,7 @@ export default function StockPage() {
                 const createdBid = await bidRes.json();
                 bidDbId = createdBid.id;
               } catch (err: any) {
-                toast({ title: "Warning", description: `Failed to create bid: ${err.message}`, variant: "destructive" });
+                toast({ title: t("stock.warning"), description: `${t("stock.failedCreateBid")}: ${err.message}`, variant: "destructive" });
                 updatedBids.push(bid);
                 continue;
               }
@@ -3392,7 +3410,7 @@ export default function StockPage() {
                     advanceAmount: bid.advanceAmount || "0",
                   });
                 } catch (err: any) {
-                  toast({ title: "Warning", description: `Failed to update bid: ${err.message}`, variant: "destructive" });
+                  toast({ title: t("stock.warning"), description: `${t("stock.failedUpdateBid")}: ${err.message}`, variant: "destructive" });
                 }
               }
             }
@@ -3404,15 +3422,15 @@ export default function StockPage() {
               const ppkCheck = parseFloat(bid.pricePerKg) || 0;
               const bagsCheck = parseInt(bid.numberOfBags) || 0;
               if (ppkCheck <= 0) {
-                toast({ title: "Save blocked", description: `Price per kg cannot be 0 for a bid with an existing transaction (buyer: ${bid.buyerName}). Please enter a valid price.`, variant: "destructive" });
+                toast({ title: t("stock.saveBlocked"), description: `${t("stock.priceCannotBeZero")} (${bid.buyerName})`, variant: "destructive" });
                 throw new Error("Price per kg cannot be 0 for a bid with an existing transaction.");
               }
               if (bagsCheck <= 0) {
-                toast({ title: "Save blocked", description: `Number of bags cannot be 0 for a bid with an existing transaction (buyer: ${bid.buyerName}). Please enter a valid bag count.`, variant: "destructive" });
+                toast({ title: t("stock.saveBlocked"), description: `${t("stock.bagsCannotBeZero")} (${bid.buyerName})`, variant: "destructive" });
                 throw new Error("Number of bags cannot be 0 for a bid with an existing transaction.");
               }
               if (nw <= 0) {
-                toast({ title: "Save blocked", description: `Net weight cannot be 0 for a bid with an existing transaction (buyer: ${bid.buyerName}). Please enter a valid weight.`, variant: "destructive" });
+                toast({ title: t("stock.saveBlocked"), description: `${t("stock.weightCannotBeZero")} (${bid.buyerName})`, variant: "destructive" });
                 throw new Error("Net weight cannot be 0 for a bid with an existing transaction.");
               }
             }
@@ -3488,13 +3506,13 @@ export default function StockPage() {
                   const createdTxn = await txnRes.json();
                   txnDbId = createdTxn.id;
                 } catch (err: any) {
-                  toast({ title: "Warning", description: `Failed to create transaction: ${err.message}`, variant: "destructive" });
+                  toast({ title: t("stock.warning"), description: `${t("stock.failedCreateTxn")}: ${err.message}`, variant: "destructive" });
                 }
               } else {
                 try {
                   await apiRequest("PATCH", `/api/transactions/${txnDbId}`, txnPayload);
                 } catch (err: any) {
-                  toast({ title: "Warning", description: `Failed to update transaction: ${err.message}`, variant: "destructive" });
+                  toast({ title: t("stock.warning"), description: `${t("stock.failedUpdateTxn")}: ${err.message}`, variant: "destructive" });
                 }
               }
             }
@@ -3559,9 +3577,9 @@ export default function StockPage() {
       }});
 
       setCards(prev => sortCardsByMaxSr([...prev]));
-      toast({ title: "Saved", description: `${card.farmerName.trim()} entry saved successfully`, variant: "success" });
+      toast({ title: t("stock.saved"), description: `${card.farmerName.trim()} ${t("stock.entrySavedSuccess")}`, variant: "success" });
     } catch (err: any) {
-      toast({ title: "Save Failed", description: err.message || "An error occurred while saving", variant: "destructive" });
+      toast({ title: t("stock.saveFailed"), description: err.message, variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -3595,7 +3613,7 @@ export default function StockPage() {
         queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
         queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       } catch (err: any) {
-        toast({ title: "Archive Failed", description: err.message, variant: "destructive" });
+        toast({ title: t("stock.archiveFailed"), description: err.message, variant: "destructive" });
         return;
       }
     }
@@ -3607,7 +3625,7 @@ export default function StockPage() {
 
   const handlePrintAllBuyerReceipt = async () => {
     if (!canPrintOverallBill) {
-      toast({ title: "Select a single date, buyer, and crop to print overall buyer bill", variant: "destructive" });
+      toast({ title: t("stock.selectSingleDateBuyerCrop"), variant: "destructive" });
       return;
     }
     const buyerNameStr = buyerFilter.trim().toLowerCase();
@@ -3659,7 +3677,7 @@ export default function StockPage() {
     }
 
     if (entries.length === 0) {
-      toast({ title: "No transactions found for this buyer and crop on this date", variant: "destructive" });
+      toast({ title: t("stock.noTxnForBuyerCropDate"), variant: "destructive" });
       return;
     }
 
@@ -3676,12 +3694,12 @@ export default function StockPage() {
         const data = await res.json();
         receiptSerialNumber = data.serialNumber;
       } catch {
-        toast({ title: "Could not assign receipt serial number. Please try again.", variant: "destructive" });
+        toast({ title: t("stock.receiptSerialFailed"), variant: "destructive" });
         return;
       }
     }
 
-    const overallTmpl = stockPageReceiptTemplates.find(t => t.templateType === "buyer-overall");
+    const overallTmpl = stockPageReceiptTemplates.find(tmpl => tmpl.templateType === "buyer-overall");
     if (overallTmpl) {
       const fullHtml = applyCombinedBuyerTemplate(overallTmpl.templateHtml, entries, 0, receiptDate, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo, receiptSerialNumber);
       printReceipt(wrapWithDuplicate(fullHtml));
@@ -3731,7 +3749,7 @@ export default function StockPage() {
         }
       }
     }
-    if (rows.length === 0) { toast({ title: "No data to export", variant: "destructive" }); return; }
+    if (rows.length === 0) { toast({ title: t("stock.noDataExport"), variant: "destructive" }); return; }
     const csv = [headers.join(","), ...rows].join("\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -3789,7 +3807,7 @@ export default function StockPage() {
         }
       }
     }
-    if (rows.length === 0) { toast({ title: "No data to export", variant: "destructive" }); return; }
+    if (rows.length === 0) { toast({ title: t("stock.noDataExport"), variant: "destructive" }); return; }
     const csv = [headers.join(","), ...rows].join("\n");
     const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -3803,13 +3821,13 @@ export default function StockPage() {
   return (
     <div className="flex flex-col h-full">
       <div className="px-4 py-3 border-b border-border bg-background sticky top-0 z-10">
-        <h1 className="text-lg font-bold">Mandi Stock</h1>
-        <p className="text-xs text-muted-foreground">Add farmers, lots, bids and weights in one place</p>
+        <h1 className="text-lg font-bold">{t("stock.mandiStock")}</h1>
+        <p className="text-xs text-muted-foreground">{t("stock.mandiStockDesc")}</p>
       </div>
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {loadingCards && (
           <div className="flex items-center justify-center py-12">
-            <div className="text-sm text-muted-foreground">Loading stock entries...</div>
+            <div className="text-sm text-muted-foreground">{t("stock.loadingStockEntries")}</div>
           </div>
         )}
         {!loadingCards && (
@@ -3833,7 +3851,7 @@ export default function StockPage() {
         {!loadingCards && (
           <div className="flex justify-start">
             <Button type="button" onClick={addCard} data-testid="button-add-farmer-entry" className="gap-2">
-              <Plus className="w-4 h-4" /> New Farmer Entry
+              <Plus className="w-4 h-4" /> {t("stock.newFarmerEntry")}
             </Button>
           </div>
         )}
