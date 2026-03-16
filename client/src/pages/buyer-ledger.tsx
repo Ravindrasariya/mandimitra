@@ -534,7 +534,7 @@ export default function BuyerLedgerPage() {
   const shareBuyerPaana = async (buyer: BuyerWithDues) => {
     try {
       const html = await getPaanaHtml(buyer);
-      const fileName = `Buyer_Paana_${buyer.name.replace(/[^a-zA-Z0-9]/g, '_')}.png`;
+      const fileName = `Buyer_Paana_${buyer.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
       await shareReceiptAsImage(html, fileName);
     } catch {
       toast({ title: t("common.error"), description: "Failed to share Buyer Paana", variant: "destructive" });
