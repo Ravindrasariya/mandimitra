@@ -3278,6 +3278,15 @@ export default function StockPage() {
       return;
     }
 
+    const unmatchedBuyer = card.cropGroups
+      .filter(g => !g.archived)
+      .flatMap(g => g.lots.flatMap(l => l.bids))
+      .find(b => b.buyerName.trim() && !b.buyerId);
+    if (unmatchedBuyer) {
+      toast({ title: t("stock.buyerNotSelected"), description: `"${unmatchedBuyer.buyerName}" — ${t("stock.buyerNotSelectedDesc")}`, variant: "destructive" });
+      return;
+    }
+
     setSaving(true);
     try {
       let currentFarmerId = card.farmerId;
