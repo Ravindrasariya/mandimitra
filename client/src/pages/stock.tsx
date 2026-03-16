@@ -2191,7 +2191,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                 <div>
                   <Label className="text-xs text-muted-foreground">{t("stock.state")}</Label>
                   <Select value={card.state} onValueChange={v => set("state", v)}>
-                    <SelectTrigger data-testid="select-state" className="h-8 text-sm">
+                    <SelectTrigger data-testid="select-state" className="h-8 text-sm pl-1">
                       <SelectValue placeholder={t("stock.selectState")} />
                     </SelectTrigger>
                     <SelectContent>
