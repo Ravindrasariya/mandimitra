@@ -27,7 +27,7 @@ import { format } from "date-fns";
 import { CROPS, SIZES, DISTRICTS } from "@shared/schema";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem, CommandGroup } from "@/components/ui/command";
-import { printReceipt, shareReceiptAsPdf, wrapWithDuplicate } from "@/lib/receiptUtils";
+import { printReceipt, shareReceiptAsImage, wrapWithDuplicate } from "@/lib/receiptUtils";
 import {
   generateFarmerReceiptHtml, generateBuyerReceiptHtml, generateCombinedBuyerReceiptHtml,
   generateAllBuyerReceiptHtml,
@@ -1591,7 +1591,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
         await printReceipt(html);
       } else {
         const shortName = farmerName.trim().split(/\s+/).slice(0, 2).join("");
-        await shareReceiptAsPdf(html, `Farmer_Receipt_${shortName}_${farmerDate}.pdf`);
+        await shareReceiptAsImage(html, `Farmer_Receipt_${shortName}_${farmerDate}.png`);
       }
     } catch (err: any) {
       toast({ title: t("stock.receiptError"), description: err?.message, variant: "destructive" });
@@ -1622,7 +1622,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
         await printReceipt(html);
       } else {
         const safeName = buyerName.replace(/[^a-zA-Z0-9]/g, "_");
-        await shareReceiptAsPdf(html, `Buyer_Receipt_${safeName}_${crop}_${farmerDate}.pdf`);
+        await shareReceiptAsImage(html, `Buyer_Receipt_${safeName}_${crop}_${farmerDate}.png`);
       }
     } catch (err: any) {
       toast({ title: t("stock.receiptError"), description: err?.message, variant: "destructive" });

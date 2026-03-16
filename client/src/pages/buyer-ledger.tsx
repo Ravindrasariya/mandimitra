@@ -18,7 +18,7 @@ import { Separator } from "@/components/ui/separator";
 import type { Buyer, BuyerEditHistory } from "@shared/schema";
 import { ShoppingBag, Search, Plus, Pencil, ArrowUpDown, ArrowUp, ArrowDown, Printer, RefreshCw, ChevronDown, Calendar, Share2, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
-import { printReceipt, shareReceiptAsPdf } from "@/lib/receiptUtils";
+import { printReceipt, shareReceiptAsImage } from "@/lib/receiptUtils";
 
 type BuyerWithDues = Buyer & { receivableDue: string; overallDue: string; bidDates?: string[] };
 type SortField = "buyerId" | "overallDue" | "receivableDue";
@@ -534,8 +534,8 @@ export default function BuyerLedgerPage() {
   const shareBuyerPaana = async (buyer: BuyerWithDues) => {
     try {
       const html = await getPaanaHtml(buyer);
-      const fileName = `Buyer_Paana_${buyer.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
-      await shareReceiptAsPdf(html, fileName);
+      const fileName = `Buyer_Paana_${buyer.name.replace(/[^a-zA-Z0-9]/g, '_')}.png`;
+      await shareReceiptAsImage(html, fileName);
     } catch {
       toast({ title: t("common.error"), description: "Failed to share Buyer Paana", variant: "destructive" });
     }
