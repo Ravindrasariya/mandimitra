@@ -143,7 +143,8 @@ table{width:100%;border-collapse:collapse}
   </tbody>
 </table>
 
-<div style="text-align:center;margin-top:36px;font-size:13px">हस्ताक्षर</div>
+<div style="text-align:right;margin-top:36px;font-size:13px">हस्ताक्षर</div>
+<div style="text-align:center;margin-top:24px;font-size:13px">हमें सेवा का अवसर देने के लिए धन्यवाद।</div>
 
 </body></html>`;
 }
