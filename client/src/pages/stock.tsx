@@ -1590,8 +1590,17 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
       if (action === "print") {
         await printReceipt(html);
       } else {
-        const shortName = farmerName.trim().split(/\s+/).slice(0, 2).join("");
-        await shareReceiptAsImage(html, `Farmer_Receipt_${shortName}_${farmerDate}.png`);
+        const firstName = farmerName.trim().split(/\s+/)[0] || farmerName.trim();
+        const [, mo, dy] = farmerDate.split("-");
+        const day = parseInt(dy, 10);
+        const ordinal = (n: number) => {
+          if (n >= 11 && n <= 13) return `${n}th`;
+          switch (n % 10) { case 1: return `${n}st`; case 2: return `${n}nd`; case 3: return `${n}rd`; default: return `${n}th`; }
+        };
+        const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+        const monthName = monthNames[parseInt(mo, 10) - 1] || mo;
+        const fileName = `${firstName} Ji - ${crop}-${ordinal(day)}${monthName}.png`;
+        await shareReceiptAsImage(html, fileName);
       }
     } catch (err: any) {
       toast({ title: t("stock.receiptError"), description: err?.message, variant: "destructive" });
