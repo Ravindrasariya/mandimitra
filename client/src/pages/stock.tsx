@@ -811,11 +811,9 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
                 </div>
               ))}
             </div>
-            {txn.sampleWeights.length < 5 && (
-              <Button type="button" variant="ghost" size="sm" className="h-7 text-xs w-full" onClick={addSample}>
-                <Plus className="h-3 w-3 mr-1" /> {t("stock.addSample")}
-              </Button>
-            )}
+            <Button type="button" variant="ghost" size="sm" className="h-7 text-xs w-full" onClick={addSample}>
+              <Plus className="h-3 w-3 mr-1" /> {t("stock.addSample")}
+            </Button>
             <div className="border-t pt-1 flex justify-between text-xs font-medium">
               <span>{t("stock.average")} ({nonZero.length} {t("stock.samples")}):</span>
               <span>{average > 0 ? `${average.toFixed(2)} kg` : "—"}</span>
