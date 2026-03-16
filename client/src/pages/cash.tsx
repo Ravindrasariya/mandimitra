@@ -292,6 +292,10 @@ export default function CashPage() {
     queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/bank-accounts"] });
     queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/dashboard"] });
     queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/stock-cards"] });
+    queryClient.invalidateQueries({ refetchType: 'all', predicate: (query) => {
+      const key = query.queryKey[0];
+      return typeof key === "string" && (key.startsWith("/api/books/balance-sheet") || key.startsWith("/api/books/profit-and-loss"));
+    }});
   };
 
   const createMutation = useMutation({
@@ -340,6 +344,10 @@ export default function CashPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/cash-settings"] });
+      queryClient.invalidateQueries({ refetchType: 'all', predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === "string" && key.startsWith("/api/books/balance-sheet");
+      }});
       toast({ title: t("common.saved"), variant: "success" });
     },
   });
@@ -351,6 +359,10 @@ export default function CashPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
+      queryClient.invalidateQueries({ refetchType: 'all', predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === "string" && key.startsWith("/api/books/balance-sheet");
+      }});
       setNewBankName("");
       setNewBankType("Current");
       setNewBankBalance("0");
@@ -364,6 +376,10 @@ export default function CashPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/bank-accounts"] });
+      queryClient.invalidateQueries({ refetchType: 'all', predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === "string" && key.startsWith("/api/books/balance-sheet");
+      }});
       setDeleteAccountId(null);
       toast({ title: "Account Deleted", variant: "success" });
     },
@@ -379,6 +395,10 @@ export default function CashPage() {
       queryClient.invalidateQueries({ predicate: (query) => {
         const key = query.queryKey[0];
         return typeof key === "string" && key.startsWith("/api/cash-entries");
+      }});
+      queryClient.invalidateQueries({ refetchType: 'all', predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === "string" && key.startsWith("/api/books/balance-sheet");
       }});
       setEditingAccountId(null);
       toast({ title: t("common.saved"), variant: "success" });

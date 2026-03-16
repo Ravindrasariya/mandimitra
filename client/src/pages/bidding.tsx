@@ -242,6 +242,10 @@ export default function BiddingPage() {
       const key = query.queryKey[0];
       return typeof key === "string" && key.startsWith("/api/buyers");
     }, refetchType: "all" });
+    queryClient.invalidateQueries({ predicate: (query) => {
+      const key = query.queryKey[0];
+      return typeof key === "string" && (key.startsWith("/api/books/balance-sheet") || key.startsWith("/api/books/profit-and-loss"));
+    }, refetchType: "all" });
   };
 
   const createBidMutation = useMutation({

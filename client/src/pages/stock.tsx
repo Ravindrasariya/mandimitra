@@ -2366,6 +2366,10 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                       const key = query.queryKey[0];
                       return typeof key === "string" && key.startsWith("/api/cash-entries");
                     }});
+                    queryClient.invalidateQueries({ predicate: (query) => {
+                      const key = query.queryKey[0];
+                      return typeof key === "string" && (key.startsWith("/api/books/balance-sheet") || key.startsWith("/api/books/profit-and-loss"));
+                    }});
                     toast({ title: t("stock.lotReturned"), description: `${t("stock.lot")} #${lotIdx + 1} ${t("stock.returnedToFarmer")}`, variant: "success" });
                   } catch (err: any) {
                     toast({ title: t("stock.returnLotFailed"), description: err?.message, variant: "destructive" });

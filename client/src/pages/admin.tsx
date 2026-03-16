@@ -412,6 +412,10 @@ function ConfirmMerchantAction({ action, onClose }: { action: { type: "toggle" |
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"] });
+      queryClient.invalidateQueries({ predicate: (query) => {
+        const key = query.queryKey[0];
+        return typeof key === "string" && (key.startsWith("/api/books/balance-sheet") || key.startsWith("/api/books/profit-and-loss"));
+      }});
       toast({ title: "Business Data Reset", variant: "success" });
       onClose();
     },
