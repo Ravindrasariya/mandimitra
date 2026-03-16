@@ -392,6 +392,7 @@ const translations: Record<string, Record<Language, string>> = {
   "balanceSheet.cashInHand": { en: "Cash in Hand", hi: "नकदी" },
   "balanceSheet.bankBalances": { en: "Bank Balances", hi: "बैंक शेष" },
   "balanceSheet.farmerReceivable": { en: "Farmer Receivables", hi: "किसान प्राप्य" },
+  "balanceSheet.farmerPayable": { en: "Farmer Payable", hi: "किसान देय" },
   "balanceSheet.buyerReceivable": { en: "Buyer Receivables", hi: "खरीदार प्राप्य" },
   "balanceSheet.totalAssets": { en: "Total Assets", hi: "कुल संपत्ति" },
   "balanceSheet.longTermLiabilities": { en: "Long-term Liabilities", hi: "दीर्घकालिक देनदारी" },

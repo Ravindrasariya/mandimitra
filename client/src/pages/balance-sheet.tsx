@@ -38,7 +38,6 @@ export default function BalanceSheetPage() {
     rows.push(["Fixed Assets", "Total", String(data.fixedAssets?.total || 0)]);
     rows.push(["Current Assets", "Cash in Hand", String(data.currentAssets?.cashInHand || 0)]);
     rows.push(["Current Assets", "Bank Balances", String(data.currentAssets?.totalBankBalance || 0)]);
-    rows.push(["Current Assets", "Farmer Receivables", String(data.currentAssets?.farmerReceivable || 0)]);
     rows.push(["Current Assets", "Buyer Receivables", String(data.currentAssets?.buyerReceivable || 0)]);
     rows.push(["Current Assets", "Total", String(data.currentAssets?.total || 0)]);
     rows.push(["Total Assets", "", String(data.totalAssets || 0)]);
@@ -46,6 +45,7 @@ export default function BalanceSheetPage() {
       data.longTermLiabilities.forEach((l: any) => rows.push(["Long-term Liabilities", l.name, String(l.outstanding)]));
     }
     rows.push(["Long-term Liabilities", "Total", String(data.totalLongTermLiabilities || 0)]);
+    rows.push(["Current Liabilities", "Farmer Payable", String(data.currentLiabilities?.farmerPayable || 0)]);
     rows.push(["Current Liabilities", "Limit A/c Outstanding", String(data.currentLiabilities?.limitOutstanding || 0)]);
     rows.push(["Total Liabilities", "", String(data.totalLiabilities || 0)]);
     rows.push(["Owner's Equity", "", String(data.ownersEquity || 0)]);
@@ -124,10 +124,6 @@ export default function BalanceSheetPage() {
                 </div>
               ))}
               <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">{t("balanceSheet.farmerReceivable")}</span>
-                <span data-testid="text-ca-farmer">{fmt(data.currentAssets.farmerReceivable)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">{t("balanceSheet.buyerReceivable")}</span>
                 <span data-testid="text-ca-buyer">{fmt(data.currentAssets.buyerReceivable)}</span>
               </div>
@@ -171,16 +167,24 @@ export default function BalanceSheetPage() {
             </CardContent>
           </Card>
 
-          {data.currentLiabilities?.limitOutstanding > 0 && (
+          {(data.currentLiabilities?.farmerPayable > 0 || data.currentLiabilities?.limitOutstanding > 0) && (
             <Card>
               <CardHeader className="py-3 px-4">
                 <CardTitle className="text-base">{t("balanceSheet.currentLiabilities")}</CardTitle>
               </CardHeader>
-              <CardContent className="pt-0 px-4 pb-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-muted-foreground">{t("balanceSheet.limitOutstanding")}</span>
-                  <span data-testid="text-cl-limit">{fmt(data.currentLiabilities.limitOutstanding)}</span>
-                </div>
+              <CardContent className="pt-0 px-4 pb-3 space-y-1">
+                {data.currentLiabilities.farmerPayable > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">{t("balanceSheet.farmerPayable")}</span>
+                    <span data-testid="text-cl-farmer">{fmt(data.currentLiabilities.farmerPayable)}</span>
+                  </div>
+                )}
+                {data.currentLiabilities.limitOutstanding > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">{t("balanceSheet.limitOutstanding")}</span>
+                    <span data-testid="text-cl-limit">{fmt(data.currentLiabilities.limitOutstanding)}</span>
+                  </div>
+                )}
               </CardContent>
             </Card>
           )}

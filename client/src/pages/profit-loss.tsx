@@ -33,7 +33,6 @@ export default function ProfitLossPage() {
     if (!data) return;
     const rows: string[][] = [["Section", "Item", "Amount"]];
     rows.push(["Income", "Aadhat Commission", String(data.income.aadhatCommission)]);
-    rows.push(["Income", "Mandi Commission", String(data.income.mandiCommission)]);
     rows.push(["Income", "Total", String(data.income.total)]);
     rows.push(["Expenses", "Depreciation", String(data.expenses.depreciation)]);
     rows.push(["Expenses", "Interest on Liabilities", String(data.expenses.interestOnLiabilities)]);
@@ -84,7 +83,6 @@ export default function ProfitLossPage() {
             </CardHeader>
             <CardContent className="pt-0 px-4 pb-3 space-y-1">
               <IncomeRow label={t("pnl.aadhatCommission")} value={data.income.aadhatCommission} testId="text-inc-aadhat" />
-              <IncomeRow label={t("pnl.mandiCommission")} value={data.income.mandiCommission} testId="text-inc-mandi" />
               <div className="flex justify-between text-sm font-semibold border-t pt-1">
                 <span>{t("pnl.totalIncome")}</span>
                 <span data-testid="text-inc-total" className="text-green-700">{fmt(data.income.total)}</span>

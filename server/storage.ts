@@ -1667,12 +1667,12 @@ export class DatabaseStorage implements IStorage {
     }
 
     const farmersWithDues = await this.getFarmersWithDues(businessId);
-    const farmerReceivable = farmersWithDues.reduce((s, f) => s + parseFloat(f.totalDue || "0"), 0);
+    const farmerPayable = farmersWithDues.reduce((s, f) => s + parseFloat(f.totalDue || "0"), 0);
 
     const buyersWithDues = await this.getBuyersWithDues(businessId);
     const buyerReceivable = buyersWithDues.reduce((s, b) => s + parseFloat(b.receivableDue || "0"), 0);
 
-    const totalCurrentAssets = cashInHand + totalBankBalance + farmerReceivable + buyerReceivable;
+    const totalCurrentAssets = cashInHand + totalBankBalance + buyerReceivable;
     const totalAssets = totalFixedAssets + totalCurrentAssets;
 
     const allLiabilities = await this.getLiabilities(businessId);
@@ -1694,7 +1694,7 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
-    const totalLiabilities = totalLongTerm + limitOutstanding;
+    const totalLiabilities = totalLongTerm + limitOutstanding + farmerPayable;
     const ownersEquity = totalAssets - totalLiabilities;
 
     return {
@@ -1704,14 +1704,13 @@ export class DatabaseStorage implements IStorage {
         cashInHand,
         bankBalances: bankDetails,
         totalBankBalance,
-        farmerReceivable,
         buyerReceivable,
         total: totalCurrentAssets,
       },
       totalAssets,
       longTermLiabilities: longTermLiabilities.map(l => ({ name: l.name, type: l.type, outstanding: parseFloat(l.outstandingAmount || "0") })),
       totalLongTermLiabilities: totalLongTerm,
-      currentLiabilities: { limitOutstanding },
+      currentLiabilities: { limitOutstanding, farmerPayable },
       totalLiabilities,
       ownersEquity,
     };
@@ -1725,7 +1724,6 @@ export class DatabaseStorage implements IStorage {
 
     const txnRows = await db.select({
       aadhat: sql<string>`coalesce(sum(cast(${transactions.aadhatCharges} as numeric)), 0)`,
-      mandi: sql<string>`coalesce(sum(cast(${transactions.mandiCharges} as numeric)), 0)`,
     }).from(transactions).where(and(
       eq(transactions.businessId, businessId),
       eq(transactions.isReversed, false),
@@ -1734,8 +1732,7 @@ export class DatabaseStorage implements IStorage {
     ));
 
     const aadhatIncome = parseFloat(txnRows[0]?.aadhat || "0");
-    const mandiIncome = parseFloat(txnRows[0]?.mandi || "0");
-    const totalIncome = aadhatIncome + mandiIncome;
+    const totalIncome = aadhatIncome;
 
     const depLogs = await db.select({
       total: sql<string>`coalesce(sum(cast(${assetDepreciationLog.depreciationAmount} as numeric)), 0)`
@@ -1783,7 +1780,6 @@ export class DatabaseStorage implements IStorage {
       fy,
       income: {
         aadhatCommission: aadhatIncome,
-        mandiCommission: mandiIncome,
         total: totalIncome,
       },
       expenses: {
