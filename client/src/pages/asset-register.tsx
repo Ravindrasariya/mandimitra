@@ -275,7 +275,7 @@ function AssetCard({ asset, expanded, onToggleExpand, onEdit, onDelete, onDispos
               <Trash2 className="w-3.5 h-3.5 text-destructive" />
             </Button>
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onToggleExpand} data-testid={`button-expand-asset-${asset.id}`}>
-              {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              {expanded ? <ChevronUp className="w-4 h-4" strokeWidth={2.5} /> : <ChevronDown className="w-4 h-4" strokeWidth={2.5} />}
             </Button>
           </div>
         </div>
