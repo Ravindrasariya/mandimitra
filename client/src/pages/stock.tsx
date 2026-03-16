@@ -2195,9 +2195,9 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                       <SelectValue placeholder={t("stock.selectState")} />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Madhya Pradesh">{t("stock.stateMP")}</SelectItem>
-                      <SelectItem value="Gujarat">{t("stock.stateGJ")}</SelectItem>
-                      <SelectItem value="Uttar Pradesh">{t("stock.stateUP")}</SelectItem>
+                      <SelectItem value="Madhya Pradesh">Madhya Pradesh</SelectItem>
+                      <SelectItem value="Gujarat">Gujarat</SelectItem>
+                      <SelectItem value="Uttar Pradesh">Uttar Pradesh</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
