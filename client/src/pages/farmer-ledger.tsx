@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -15,7 +15,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Farmer, FarmerEditHistory } from "@shared/schema";
-import { Users, Search, Pencil, RefreshCw, Printer, Archive, AlertTriangle, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, Calendar, Download } from "lucide-react";
+import { Users, Search, Pencil, RefreshCw, Printer, Archive, AlertTriangle, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, Calendar, Download, X } from "lucide-react";
+import { useKeyboardNav } from "@/hooks/use-keyboard-nav";
 import { format } from "date-fns";
 import { printReceipt } from "@/lib/receiptUtils";
 
@@ -73,6 +74,9 @@ export default function FarmerLedgerPage() {
   const { toast } = useToast();
   const { t } = useLanguage();
   const [searchName, setSearchName] = usePersistedState("fl-searchName", "");
+  const [searchNameId, setSearchNameId] = useState<number | null>(null);
+  const [searchNameOpen, setSearchNameOpen] = useState(false);
+  const searchNameRef = useRef<HTMLDivElement>(null);
   const [searchVillage, setSearchVillage] = usePersistedState("fl-searchVillage", "");
   const [yearFilter, setYearFilter] = useState(String(new Date().getFullYear()));
   const [showArchived, setShowArchived] = usePersistedState("fl-showArchived", false);
@@ -228,11 +232,23 @@ export default function FarmerLedgerPage() {
 
   const anyFilterActive = yearFilter !== "all" || selectedMonths.length > 0 || selectedDays.length > 0;
 
+  const nameSuggestions = useMemo(() => {
+    if (!searchName.trim() || searchNameId !== null) return [];
+    const q = searchName.toLowerCase();
+    return farmersWithDues
+      .filter(f => !f.isArchived && f.name.toLowerCase().includes(q))
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .slice(0, 15);
+  }, [farmersWithDues, searchName, searchNameId]);
+
+  const searchNameKb = useKeyboardNav(nameSuggestions, f => String(f.id));
+
   const filteredFarmers = useMemo(() => {
     return farmersWithDues.filter(f => {
       if (!showArchived && f.isArchived) return false;
       if (showArchived && !f.isArchived) return false;
-      if (searchName && !f.name.toLowerCase().includes(searchName.toLowerCase())) return false;
+      if (searchNameId !== null) { if (f.id !== searchNameId) return false; }
+      else if (searchName && !f.name.toLowerCase().includes(searchName.toLowerCase())) return false;
       if (searchVillage && !(f.village || "").toLowerCase().includes(searchVillage.toLowerCase())) return false;
       if (anyFilterActive) {
         const farmerTxns = allTransactions.filter(t => t.farmerId === f.id && !t.isReversed);
@@ -248,7 +264,7 @@ export default function FarmerLedgerPage() {
       }
       return true;
     });
-  }, [farmersWithDues, showArchived, searchName, searchVillage, yearFilter, selectedMonths, selectedDays, allTransactions, anyFilterActive]);
+  }, [farmersWithDues, showArchived, searchName, searchNameId, searchVillage, yearFilter, selectedMonths, selectedDays, allTransactions, anyFilterActive]);
 
   const filteredDuesByFarmer = useMemo(() => {
     const map = new Map<number, { payable: number; due: number }>();
@@ -509,15 +525,53 @@ export default function FarmerLedgerPage() {
             </div>
           </PopoverContent>
         </Popover>
-        <div className="relative">
+        <div className="relative" ref={searchNameRef}>
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
           <Input
             data-testid="input-search-name"
             value={searchName}
-            onChange={(e) => setSearchName(e.target.value)}
+            onChange={(e) => { setSearchName(e.target.value); setSearchNameId(null); setSearchNameOpen(true); }}
+            onFocus={() => setSearchNameOpen(true)}
+            onBlur={() => setTimeout(() => { setSearchNameOpen(false); searchNameKb.reset(); }, 150)}
+            onKeyDown={e => {
+              if (searchNameOpen && nameSuggestions.length > 0) {
+                searchNameKb.handleKeyDown(e, (f) => { setSearchName(f.name); setSearchNameId(f.id); setSearchNameOpen(false); searchNameKb.reset(); }, () => { setSearchNameOpen(false); searchNameKb.reset(); });
+              }
+            }}
             placeholder={t("farmerLedger.searchByName")}
-            className="pl-8 w-[160px] h-9"
+            className={`pl-8 h-9 ${searchNameId !== null ? "w-[195px] pr-6" : "w-[160px]"}`}
           />
+          {searchName && (
+            <button
+              className="absolute right-1.5 top-1/2 -translate-y-1/2"
+              data-testid="button-clear-search-name"
+              onClick={() => { setSearchName(""); setSearchNameId(null); setSearchNameOpen(false); searchNameKb.reset(); }}
+            >
+              <X className="w-3 h-3 text-muted-foreground" />
+            </button>
+          )}
+          {searchNameOpen && nameSuggestions.length > 0 && (
+            <div ref={searchNameKb.listRef} className="absolute top-full left-0 z-50 mt-1 w-[260px] max-h-52 overflow-y-auto rounded-md border bg-popover shadow-md">
+              {nameSuggestions.map((f, i) => (
+                <button
+                  key={f.id}
+                  data-testid={`name-suggestion-${f.id}`}
+                  className={`w-full text-left px-3 py-2 text-sm border-b last:border-b-0 ${i === searchNameKb.activeIndex ? "bg-accent" : "hover:bg-accent"}`}
+                  onMouseEnter={() => searchNameKb.setActiveIndex(i)}
+                  onMouseDown={() => { setSearchName(f.name); setSearchNameId(f.id); setSearchNameOpen(false); searchNameKb.reset(); }}
+                >
+                  <div className="font-medium">{f.name}</div>
+                  {(f.phone || f.village) && (
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      {f.phone && <span>{f.phone}</span>}
+                      {f.phone && f.village && <span> · </span>}
+                      {f.village && <span>{f.village}</span>}
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div className="relative">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />

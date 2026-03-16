@@ -2620,6 +2620,7 @@ function StockFilterBar({
   selectedMonths, setSelectedMonths,
   selectedDays, setSelectedDays,
   farmerFilter, setFarmerFilter,
+  farmerFilterId, setFarmerFilterId,
   buyerFilter, setBuyerFilter,
   cropFilter, setCropFilter,
   buyersList,
@@ -2637,6 +2638,8 @@ function StockFilterBar({
   setSelectedDays: (v: string[] | ((p: string[]) => string[])) => void;
   farmerFilter: string;
   setFarmerFilter: (v: string) => void;
+  farmerFilterId: number | null;
+  setFarmerFilterId: (v: number | null) => void;
   buyerFilter: string;
   setBuyerFilter: (v: string) => void;
   cropFilter: string;
@@ -2716,13 +2719,13 @@ function StockFilterBar({
 
   const farmerSuggestions = useMemo(() => {
     const seen = new Set<number | string>();
-    const list: { name: string; phone: string; village: string }[] = [];
+    const list: { id: number | undefined; name: string; phone: string; village: string }[] = [];
     for (const card of cards) {
       if (card.archived || !card.farmerName.trim()) continue;
       const key = card.farmerId ?? card.farmerName.toLowerCase();
       if (seen.has(key)) continue;
       seen.add(key);
-      list.push({ name: card.farmerName, phone: card.farmerPhone || "", village: card.village || "" });
+      list.push({ id: card.farmerId, name: card.farmerName, phone: card.farmerPhone || "", village: card.village || "" });
     }
     return list;
   }, [cards]);
@@ -2858,18 +2861,18 @@ function StockFilterBar({
         <Input
           data-testid="input-farmer-filter"
           value={farmerFilter}
-          onChange={(e) => { setFarmerFilter(e.target.value); setFarmerDropOpen(true); }}
+          onChange={(e) => { setFarmerFilter(e.target.value); setFarmerFilterId(null); setFarmerDropOpen(true); }}
           onFocus={() => setFarmerDropOpen(true)}
           onKeyDown={e => {
             if (farmerDropOpen && filteredFarmerSuggestions.length > 0) {
-              filterFarmerKb.handleKeyDown(e, (f) => { setFarmerFilter(f.name); setFarmerDropOpen(false); filterFarmerKb.reset(); }, () => { setFarmerDropOpen(false); filterFarmerKb.reset(); });
+              filterFarmerKb.handleKeyDown(e, (f) => { setFarmerFilter(f.name); setFarmerFilterId(f.id ?? null); setFarmerDropOpen(false); filterFarmerKb.reset(); }, () => { setFarmerDropOpen(false); filterFarmerKb.reset(); });
             }
           }}
           placeholder={t("stock.farmer")}
           className="pl-7 w-[140px] h-8 text-xs"
         />
         {farmerFilter && (
-          <button className="absolute right-1.5 top-1/2 -translate-y-1/2" onClick={() => { setFarmerFilter(""); setFarmerDropOpen(false); filterFarmerKb.reset(); }}>
+          <button className="absolute right-1.5 top-1/2 -translate-y-1/2" onClick={() => { setFarmerFilter(""); setFarmerFilterId(null); setFarmerDropOpen(false); filterFarmerKb.reset(); }}>
             <X className="w-3 h-3 text-muted-foreground" />
           </button>
         )}
@@ -2881,7 +2884,7 @@ function StockFilterBar({
                 className={`w-full text-left px-3 py-2 text-xs border-b last:border-b-0 ${i === filterFarmerKb.activeIndex ? "bg-accent" : "hover:bg-accent"}`}
                 data-testid={`farmer-suggestion-${i}`}
                 onMouseEnter={() => filterFarmerKb.setActiveIndex(i)}
-                onClick={() => { setFarmerFilter(f.name); setFarmerDropOpen(false); filterFarmerKb.reset(); }}
+                onClick={() => { setFarmerFilter(f.name); setFarmerFilterId(f.id ?? null); setFarmerDropOpen(false); filterFarmerKb.reset(); }}
               >
                 <div className="font-medium">{f.name}</div>
                 {(f.phone || f.village) && (
@@ -3121,6 +3124,7 @@ export default function StockPage() {
   const [selectedMonths, setSelectedMonths] = useState<string[]>([String(new Date().getMonth() + 1)]);
   const [selectedDays, setSelectedDays] = useState<string[]>([String(new Date().getDate())]);
   const [farmerFilter, setFarmerFilter] = useState("");
+  const [farmerFilterId, setFarmerFilterId] = useState<number | null>(null);
   const [buyerFilter, setBuyerFilter] = useState("");
   const [cropFilter, setCropFilter] = useState("all");
 
@@ -3154,6 +3158,7 @@ export default function StockPage() {
     };
 
     const farmerMatchesCard = (card: FarmerCard) => {
+      if (farmerFilterId !== null) return card.farmerId === farmerFilterId;
       if (!farmerFilter.trim()) return true;
       return card.farmerName.toLowerCase().includes(farmerFilter.toLowerCase());
     };
@@ -3194,7 +3199,7 @@ export default function StockPage() {
         .filter(cropMatchesCard)
         .map(applyCropFilter)
     );
-  }, [cards, dateMode, yearFilter, selectedMonths, selectedDays, farmerFilter, buyerFilter, cropFilter, pageBuyersList]);
+  }, [cards, dateMode, yearFilter, selectedMonths, selectedDays, farmerFilter, farmerFilterId, buyerFilter, cropFilter, pageBuyersList]);
 
   useEffect(() => {
     if (!stockCardsData || !businessId || dbLoaded.current) return;
@@ -3891,6 +3896,7 @@ export default function StockPage() {
             selectedMonths={selectedMonths} setSelectedMonths={setSelectedMonths}
             selectedDays={selectedDays} setSelectedDays={setSelectedDays}
             farmerFilter={farmerFilter} setFarmerFilter={setFarmerFilter}
+            farmerFilterId={farmerFilterId} setFarmerFilterId={setFarmerFilterId}
             buyerFilter={buyerFilter} setBuyerFilter={setBuyerFilter}
             cropFilter={cropFilter} setCropFilter={setCropFilter}
             buyersList={pageBuyersList}
