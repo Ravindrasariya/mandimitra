@@ -1587,20 +1587,20 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
       const html = customTmpl
         ? applyFarmerTemplate(customTmpl.templateHtml, data.sg, user?.businessName, user?.businessAddress, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo)
         : generateFarmerReceiptHtml(data.sg, user?.businessName, user?.businessAddress, user?.businessPhone);
+      const firstName = farmerName.trim().split(/\s+/)[0] || farmerName.trim();
+      const [, mo, dy] = farmerDate.split("-");
+      const day = parseInt(dy, 10);
+      const ordinal = (n: number) => {
+        if (n >= 11 && n <= 13) return `${n}th`;
+        switch (n % 10) { case 1: return `${n}st`; case 2: return `${n}nd`; case 3: return `${n}rd`; default: return `${n}th`; }
+      };
+      const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+      const monthName = monthNames[parseInt(mo, 10) - 1] || mo;
+      const farmerFileName = `${firstName} Ji - ${crop}-${ordinal(day)}${monthName}.pdf`;
       if (action === "print") {
-        await printReceipt(html);
+        await printReceipt(html, farmerFileName);
       } else {
-        const firstName = farmerName.trim().split(/\s+/)[0] || farmerName.trim();
-        const [, mo, dy] = farmerDate.split("-");
-        const day = parseInt(dy, 10);
-        const ordinal = (n: number) => {
-          if (n >= 11 && n <= 13) return `${n}th`;
-          switch (n % 10) { case 1: return `${n}st`; case 2: return `${n}nd`; case 3: return `${n}rd`; default: return `${n}th`; }
-        };
-        const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-        const monthName = monthNames[parseInt(mo, 10) - 1] || mo;
-        const fileName = `${firstName} Ji - ${crop}-${ordinal(day)}${monthName}.pdf`;
-        await shareReceiptAsImage(html, fileName);
+        await shareReceiptAsImage(html, farmerFileName);
       }
     } catch (err: any) {
       toast({ title: t("stock.receiptError"), description: err?.message, variant: "destructive" });
@@ -1627,11 +1627,12 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
           ? applyCombinedBuyerTemplate(customTmpl.templateHtml, entries, data.sg.serialNumber, data.sg.date, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo)
           : generateCombinedBuyerReceiptHtml(entries, data.sg.serialNumber, data.sg.date, user?.businessName, user?.businessAddress, user?.businessPhone);
       }
+      const safeName = buyerName.replace(/[^a-zA-Z0-9]/g, "_");
+      const buyerFileName = `Buyer_Receipt_${safeName}_${crop}_${farmerDate}.pdf`;
       if (action === "print") {
-        await printReceipt(html);
+        await printReceipt(html, buyerFileName);
       } else {
-        const safeName = buyerName.replace(/[^a-zA-Z0-9]/g, "_");
-        await shareReceiptAsImage(html, `Buyer_Receipt_${safeName}_${crop}_${farmerDate}.pdf`);
+        await shareReceiptAsImage(html, buyerFileName);
       }
     } catch (err: any) {
       toast({ title: t("stock.receiptError"), description: err?.message, variant: "destructive" });

@@ -45,7 +45,7 @@ ${headContent}
 </body></html>`;
 }
 
-export async function printReceipt(html: string) {
+export async function printReceipt(html: string, fileName?: string) {
   const bodyHtml = extractBodyHtml(html);
   const headStyles = extractHeadStyles(html);
 
@@ -65,9 +65,13 @@ export async function printReceipt(html: string) {
   `;
   document.head.appendChild(style);
 
+  const prevTitle = document.title;
+  if (fileName) document.title = fileName.replace(/\.[^.]+$/, "");
+
   const cleanup = () => {
     try { document.body.removeChild(container); } catch {}
     try { document.head.removeChild(style); } catch {}
+    document.title = prevTitle;
   };
 
   window.addEventListener("afterprint", cleanup, { once: true });
