@@ -262,7 +262,7 @@ export default function DashboardPage() {
     let cumulativeFarmerDue = 0;
     let cumulativeBuyerDue = 0;
 
-    return allDates.map(date => {
+    const result = allDates.map(date => {
       const agg = dateAggregates.get(date)!;
       cumulativeFarmerDue += agg.farmerDue;
       cumulativeBuyerDue += agg.buyerDue;
@@ -275,6 +275,21 @@ export default function DashboardPage() {
         aadhat: Math.round(agg.aadhat),
       };
     });
+
+    const todayISO = new Date().toLocaleDateString("en-CA");
+    const lastDate = allDates[allDates.length - 1] ?? "";
+    const hasDues = Math.round(cumulativeFarmerDue) !== 0 || Math.round(cumulativeBuyerDue) !== 0;
+    if (hasDues && todayISO > lastDate) {
+      result.push({
+        date: formatShortDate(todayISO),
+        farmerDue: Math.round(cumulativeFarmerDue),
+        buyerDue: Math.round(cumulativeBuyerDue),
+        totalVolume: 0,
+        aadhat: 0,
+      });
+    }
+
+    return result;
   }, [filteredTxns]);
 
   if (isLoading) {
@@ -463,18 +478,6 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card className="border-purple-200 dark:border-purple-800">
-          <CardContent className="p-3">
-            <div className="flex items-center gap-1.5 mb-1">
-              <Landmark className="w-3.5 h-3.5 text-purple-600" />
-              <span className="text-[11px] font-medium text-muted-foreground">{t("dash.mandiCommission")}</span>
-            </div>
-            <div className="text-sm font-bold text-purple-700 dark:text-purple-400" data-testid="text-mandi-commission">
-              ₹{summary.totalMandi.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
-            </div>
-          </CardContent>
-        </Card>
-
         <Card className="border-amber-200 dark:border-amber-800">
           <CardContent className="p-3">
             <div className="flex items-center gap-1.5 mb-1">
@@ -497,6 +500,18 @@ export default function DashboardPage() {
               <div className="text-sm font-bold text-teal-700 dark:text-teal-400">₹{summary.hammaliDue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
               <span className="text-muted-foreground text-xs">|</span>
               <div className="text-sm font-bold text-purple-700 dark:text-purple-400">₹{summary.extraChargesDue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-purple-200 dark:border-purple-800">
+          <CardContent className="p-3">
+            <div className="flex items-center gap-1.5 mb-1">
+              <Landmark className="w-3.5 h-3.5 text-purple-600" />
+              <span className="text-[11px] font-medium text-muted-foreground">{t("dash.mandiCommission")}</span>
+            </div>
+            <div className="text-sm font-bold text-purple-700 dark:text-purple-400" data-testid="text-mandi-commission">
+              ₹{summary.totalMandi.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
             </div>
           </CardContent>
         </Card>
