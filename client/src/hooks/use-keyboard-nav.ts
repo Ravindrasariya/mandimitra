@@ -8,7 +8,7 @@ export function useKeyboardNav<T>(items: T[], keyFn?: (item: T) => string) {
   useEffect(() => {
     const sig = keyFn
       ? items.map(keyFn).join("|")
-      : String(items.length);
+      : items.map(String).join("|");
     if (sig !== prevItemsRef.current) {
       prevItemsRef.current = sig;
       setActiveIndex(-1);
