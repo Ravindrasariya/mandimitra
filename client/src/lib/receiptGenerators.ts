@@ -47,7 +47,7 @@ export function generateFarmerReceiptHtml(sg: UnifiedSerialGroup, businessName?:
     const epk = parseFloat((t as any).extraPerKgFarmer || "0");
     return s + nw * (ppk + epk);
   }, 0);
-  const netPayable = totalGross - totalShownDeductions - farmerAdvance;
+  const netPayable = totalGross - totalShownDeductions;
 
   const B = "padding:5px 7px;border:1px solid #444;vertical-align:middle;";
   const td = (content: string, style = "") =>
@@ -228,7 +228,7 @@ export function applyFarmerTemplate(tmpl: string, sg: UnifiedSerialGroup, busine
     return s + gross * parseFloat(t.mandiFarmerPercent || "0") / 100;
   }, 0);
   const farmerAdvance = parseFloat(firstLot?.farmerAdvanceAmount || "0");
-  const totalDeduction = hammaliAndExtras + totalThelaBhada + totalFreight + totalAadhat + totalMandi + farmerAdvance;
+  const totalDeduction = hammaliAndExtras + totalThelaBhada + totalFreight + totalAadhat + totalMandi;
   const totalGross = allTxns.reduce((s, t) => s + parseFloat(t.netWeight || "0") * (parseFloat(t.pricePerKg || "0") + parseFloat((t as any).extraPerKgFarmer || "0")), 0);
   const totalNetWeight = allTxns.reduce((s, t) => s + parseFloat(t.netWeight || "0"), 0);
   const netPayable = totalGross - totalDeduction;
