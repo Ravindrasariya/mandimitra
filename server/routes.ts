@@ -1500,7 +1500,7 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Asset name, category, and valid amount are required" });
       }
 
-      const entryDate = date || new Date().toISOString().slice(0, 10);
+      const entryDate = date || format(new Date(), "yyyy-MM-dd");
 
       const cashEntry = await storage.createCashEntry({
         businessId,

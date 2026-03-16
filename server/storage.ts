@@ -1626,7 +1626,7 @@ export class DatabaseStorage implements IStorage {
   }
 
   async settleLiability(id: number, businessId: number): Promise<Liability | undefined> {
-    const today = new Date().toISOString().split("T")[0];
+    const today = new Date().toLocaleDateString("en-CA");
     const [updated] = await db.update(liabilities).set({ isSettled: true, settledDate: today, outstandingAmount: "0" }).where(and(eq(liabilities.id, id), eq(liabilities.businessId, businessId))).returning();
     return updated;
   }
