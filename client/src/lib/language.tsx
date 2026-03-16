@@ -565,6 +565,7 @@ const translations: Record<string, Record<Language, string>> = {
   "stock.stockCsv": { en: "Stock CSV", hi: "स्टॉक CSV" },
   "stock.txnCsv": { en: "Txn CSV", hi: "लेनदेन CSV" },
   "stock.lotsTxns": { en: "Lots / Txns", hi: "लॉट / लेनदेन" },
+  "stock.farmerLotsTxns": { en: "Farmers / Lots / Txns", hi: "किसान / लॉट / लेनदेन" },
   "stock.aadhatComm": { en: "Aadhat Comm.", hi: "आढ़त कमीशन" },
   "stock.earnedViaBuyerDues": { en: "Earned (via Buyer Dues)", hi: "अर्जित (खरीदार बकाया से)" },
   "stock.lotReturned": { en: "Lot returned", hi: "लॉट वापस किया" },

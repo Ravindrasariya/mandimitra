@@ -2947,13 +2947,14 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
   buyersList: { id: number; name: string; phone?: string; aadhatCommissionPercent?: string | null }[];
 }) {
   const { t } = useLanguage();
-  let totalLots = 0, totalTxns = 0;
+  let distinctFarmers = 0, totalLots = 0, totalTxns = 0;
   let farmerPayableTotal = 0, farmerDue = 0;
   let buyerReceivableTotal = 0, buyerDue = 0;
   let aadhatTotal = 0;
 
   for (const card of cards) {
     if (card.archived || !savedCardMap.has(card.id)) continue;
+    distinctFarmers++;
     const vbr = parseFloat(card.vehicleBhadaRate) || 0;
     const tbi = parseInt(card.totalBagsInVehicle) || 0;
     let cardFarmerDue = 0;
@@ -2989,10 +2990,10 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-2" data-testid="stock-summary-bar">
       <div className="rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 px-4 py-3">
         <div className="flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 mb-1">
-          <Layers className="w-3.5 h-3.5" /> {t("stock.lotsTxns")}
+          <Layers className="w-3.5 h-3.5" /> {t("stock.farmerLotsTxns")}
         </div>
         <div className="text-sm font-bold text-blue-700 dark:text-blue-300" data-testid="text-lots-txns">
-          {totalLots} / {totalTxns}
+          {distinctFarmers} / {totalLots} / {totalTxns}
         </div>
       </div>
 
