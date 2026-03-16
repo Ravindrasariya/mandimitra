@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/lib/auth";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useKeyboardNav } from "@/hooks/use-keyboard-nav";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -1047,6 +1048,7 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
   const filteredBuyers = buyersList.filter(
     b => bid.buyerName.length >= 1 && b.name.toLowerCase().includes(bid.buyerName.toLowerCase())
   ).slice(0, 10);
+  const buyerKb = useKeyboardNav(filteredBuyers, b => String(b.id));
   const noBuyerSelected = bid.buyerName.trim().length > 0 && !bid.buyerId;
   const bags = parseInt(bid.numberOfBags) || 0;
   const pricePerKg = parseFloat(bid.pricePerKg) || 0;
@@ -1132,23 +1134,29 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
                     setShowBuyerSuggestions(true);
                   }}
                   onFocus={() => setShowBuyerSuggestions(true)}
-                  onBlur={() => setTimeout(() => setShowBuyerSuggestions(false), 150)}
+                  onBlur={() => setTimeout(() => { setShowBuyerSuggestions(false); buyerKb.reset(); }, 150)}
+                  onKeyDown={e => {
+                    if (showBuyerSuggestions && filteredBuyers.length > 0 && !bid.buyerId) {
+                      buyerKb.handleKeyDown(e, (b) => { onChange({ ...bid, buyerName: b.name, buyerId: b.id }); setShowBuyerSuggestions(false); buyerKb.reset(); }, () => { setShowBuyerSuggestions(false); buyerKb.reset(); });
+                    }
+                  }}
                   className="h-8 text-sm pr-7"
                   autoComplete="off"
                 />
                 <ChevronsUpDown className="w-3.5 h-3.5 absolute right-2 top-2 text-muted-foreground pointer-events-none" />
               </div>
               {showBuyerSuggestions && filteredBuyers.length > 0 && !bid.buyerId && (
-                <div className="absolute z-50 w-full bg-popover border rounded-md shadow-lg max-h-48 overflow-y-auto top-full mt-1">
-                  {filteredBuyers.map(b => (
+                <div ref={buyerKb.listRef} className="absolute z-50 w-full bg-popover border rounded-md shadow-lg max-h-48 overflow-y-auto top-full mt-1">
+                  {filteredBuyers.map((b, i) => (
                     <button
                       key={b.id}
                       data-testid={`suggestion-buyer-${b.id}`}
                       type="button"
-                      className="w-full text-left px-3 py-2 hover:bg-muted text-sm border-b last:border-b-0"
+                      className={`w-full text-left px-3 py-2 text-sm border-b last:border-b-0 ${i === buyerKb.activeIndex ? "bg-accent" : "hover:bg-muted"}`}
+                      onMouseEnter={() => buyerKb.setActiveIndex(i)}
                       onMouseDown={() => {
                         onChange({ ...bid, buyerName: b.name, buyerId: b.id });
-                        setShowBuyerSuggestions(false);
+                        setShowBuyerSuggestions(false); buyerKb.reset();
                       }}
                     >
                       <div className="font-medium">{b.name}</div>
@@ -1875,6 +1883,9 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
   const filteredTehsils = (locationData?.tehsils || []).filter(
     (th) => card.tehsil.length >= 1 && th.toLowerCase().includes(card.tehsil.toLowerCase()) && th.toLowerCase() !== card.tehsil.toLowerCase()
   );
+  const farmerKb = useKeyboardNav(farmerSuggestions, f => String(f.id));
+  const villageKb = useKeyboardNav(filteredVillages);
+  const tehsilKb = useKeyboardNav(filteredTehsils);
 
   const selectFarmer = (f: any) => {
     onChange({
@@ -1888,6 +1899,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
       state: f.state || "Madhya Pradesh",
     });
     setShowFarmerSuggestions(false);
+    farmerKb.reset();
     setFarmerSearchText("");
   };
 
@@ -2092,16 +2104,22 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                         setShowFarmerSuggestions(true);
                       }
                     }}
-                    onBlur={() => setTimeout(() => setShowFarmerSuggestions(false), 150)}
+                    onBlur={() => setTimeout(() => { setShowFarmerSuggestions(false); farmerKb.reset(); }, 150)}
+                    onKeyDown={e => {
+                      if (showFarmerSuggestions && farmerSuggestions.length > 0 && !card.farmerId) {
+                        farmerKb.handleKeyDown(e, (f) => { selectFarmer(f); farmerKb.reset(); }, () => { setShowFarmerSuggestions(false); farmerKb.reset(); });
+                      }
+                    }}
                     className="h-8 text-sm" autoComplete="off" />
                   {showFarmerSuggestions && farmerSuggestions.length > 0 && !card.farmerId && (
-                    <div className="absolute z-50 w-full bg-popover border rounded-md shadow-lg max-h-48 overflow-y-auto top-full mt-1">
-                      {farmerSuggestions.map((f: any) => (
+                    <div ref={farmerKb.listRef} className="absolute z-50 w-full bg-popover border rounded-md shadow-lg max-h-48 overflow-y-auto top-full mt-1">
+                      {farmerSuggestions.map((f: any, i: number) => (
                         <button
                           key={f.id}
                           data-testid={`suggestion-farmer-${f.id}`}
                           type="button"
-                          className="w-full text-left px-3 py-2 hover:bg-muted text-sm border-b last:border-b-0"
+                          className={`w-full text-left px-3 py-2 text-sm border-b last:border-b-0 ${i === farmerKb.activeIndex ? "bg-accent" : "hover:bg-muted"}`}
+                          onMouseEnter={() => farmerKb.setActiveIndex(i)}
                           onMouseDown={() => selectFarmer(f)}
                         >
                           <div className="font-medium">{f.name}</div>
@@ -2126,14 +2144,20 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                   <Input data-testid="input-village" placeholder={t("stock.village")} value={card.village}
                     onChange={e => { set("village", capFirst(e.target.value)); setShowVillageSuggestions(true); }}
                     onFocus={() => setShowVillageSuggestions(true)}
-                    onBlur={() => setTimeout(() => setShowVillageSuggestions(false), 150)}
+                    onBlur={() => setTimeout(() => { setShowVillageSuggestions(false); villageKb.reset(); }, 150)}
+                    onKeyDown={e => {
+                      if (showVillageSuggestions && filteredVillages.length > 0) {
+                        villageKb.handleKeyDown(e, (v) => { set("village", v); setShowVillageSuggestions(false); villageKb.reset(); }, () => { setShowVillageSuggestions(false); villageKb.reset(); });
+                      }
+                    }}
                     className="h-8 text-sm" autoComplete="off" />
                   {showVillageSuggestions && filteredVillages.length > 0 && (
-                    <div className="absolute z-50 w-full bg-popover border rounded-md shadow-lg mt-1 max-h-40 overflow-y-auto top-full">
-                      {filteredVillages.map((v) => (
+                    <div ref={villageKb.listRef} className="absolute z-50 w-full bg-popover border rounded-md shadow-lg mt-1 max-h-40 overflow-y-auto top-full">
+                      {filteredVillages.map((v, i) => (
                         <button key={v} type="button" data-testid={`suggestion-village-${v}`}
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-muted border-b last:border-b-0"
-                          onMouseDown={() => { set("village", v); setShowVillageSuggestions(false); }}>
+                          className={`w-full text-left px-3 py-2 text-sm border-b last:border-b-0 ${i === villageKb.activeIndex ? "bg-accent" : "hover:bg-muted"}`}
+                          onMouseEnter={() => villageKb.setActiveIndex(i)}
+                          onMouseDown={() => { set("village", v); setShowVillageSuggestions(false); villageKb.reset(); }}>
                           {v}
                         </button>
                       ))}
@@ -2145,14 +2169,20 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                   <Input data-testid="input-tehsil" placeholder={t("stock.tehsil")} value={card.tehsil}
                     onChange={e => { set("tehsil", capFirst(e.target.value)); setShowTehsilSuggestions(true); }}
                     onFocus={() => setShowTehsilSuggestions(true)}
-                    onBlur={() => setTimeout(() => setShowTehsilSuggestions(false), 150)}
+                    onBlur={() => setTimeout(() => { setShowTehsilSuggestions(false); tehsilKb.reset(); }, 150)}
+                    onKeyDown={e => {
+                      if (showTehsilSuggestions && filteredTehsils.length > 0) {
+                        tehsilKb.handleKeyDown(e, (th) => { set("tehsil", th); setShowTehsilSuggestions(false); tehsilKb.reset(); }, () => { setShowTehsilSuggestions(false); tehsilKb.reset(); });
+                      }
+                    }}
                     className="h-8 text-sm" autoComplete="off" />
                   {showTehsilSuggestions && filteredTehsils.length > 0 && (
-                    <div className="absolute z-50 w-full bg-popover border rounded-md shadow-lg mt-1 max-h-40 overflow-y-auto top-full">
-                      {filteredTehsils.map((th) => (
+                    <div ref={tehsilKb.listRef} className="absolute z-50 w-full bg-popover border rounded-md shadow-lg mt-1 max-h-40 overflow-y-auto top-full">
+                      {filteredTehsils.map((th, i) => (
                         <button key={th} type="button" data-testid={`suggestion-tehsil-${th}`}
-                          className="w-full text-left px-3 py-2 text-sm hover:bg-muted border-b last:border-b-0"
-                          onMouseDown={() => { set("tehsil", th); setShowTehsilSuggestions(false); }}>
+                          className={`w-full text-left px-3 py-2 text-sm border-b last:border-b-0 ${i === tehsilKb.activeIndex ? "bg-accent" : "hover:bg-muted"}`}
+                          onMouseEnter={() => tehsilKb.setActiveIndex(i)}
+                          onMouseDown={() => { set("tehsil", th); setShowTehsilSuggestions(false); tehsilKb.reset(); }}>
                           {th}
                         </button>
                       ))}
@@ -2628,8 +2658,8 @@ function StockFilterBar({
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
-      if (farmerRef.current && !farmerRef.current.contains(e.target as Node)) setFarmerDropOpen(false);
-      if (buyerRef.current && !buyerRef.current.contains(e.target as Node)) setBuyerDropOpen(false);
+      if (farmerRef.current && !farmerRef.current.contains(e.target as Node)) { setFarmerDropOpen(false); filterFarmerKb.reset(); }
+      if (buyerRef.current && !buyerRef.current.contains(e.target as Node)) { setBuyerDropOpen(false); filterBuyerKb.reset(); }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -2708,6 +2738,9 @@ function StockFilterBar({
   const filteredBuyerSuggestions = buyerFilter.trim()
     ? buyerSuggestions.filter(b => b.name.toLowerCase().includes(buyerFilter.toLowerCase()))
     : buyerSuggestions;
+
+  const filterFarmerKb = useKeyboardNav(filteredFarmerSuggestions, f => f.name);
+  const filterBuyerKb = useKeyboardNav(filteredBuyerSuggestions, b => String(b.id));
 
   const currentYear = String(new Date().getFullYear());
   const defaultMonth = String(new Date().getMonth() + 1);
@@ -2827,22 +2860,28 @@ function StockFilterBar({
           value={farmerFilter}
           onChange={(e) => { setFarmerFilter(e.target.value); setFarmerDropOpen(true); }}
           onFocus={() => setFarmerDropOpen(true)}
+          onKeyDown={e => {
+            if (farmerDropOpen && filteredFarmerSuggestions.length > 0) {
+              filterFarmerKb.handleKeyDown(e, (f) => { setFarmerFilter(f.name); setFarmerDropOpen(false); filterFarmerKb.reset(); }, () => { setFarmerDropOpen(false); filterFarmerKb.reset(); });
+            }
+          }}
           placeholder={t("stock.farmer")}
           className="pl-7 w-[140px] h-8 text-xs"
         />
         {farmerFilter && (
-          <button className="absolute right-1.5 top-1/2 -translate-y-1/2" onClick={() => { setFarmerFilter(""); setFarmerDropOpen(false); }}>
+          <button className="absolute right-1.5 top-1/2 -translate-y-1/2" onClick={() => { setFarmerFilter(""); setFarmerDropOpen(false); filterFarmerKb.reset(); }}>
             <X className="w-3 h-3 text-muted-foreground" />
           </button>
         )}
         {farmerDropOpen && filteredFarmerSuggestions.length > 0 && (
-          <div className="absolute top-full left-0 z-50 mt-1 w-[280px] max-h-48 overflow-y-auto rounded-md border bg-popover shadow-md">
+          <div ref={filterFarmerKb.listRef} className="absolute top-full left-0 z-50 mt-1 w-[280px] max-h-48 overflow-y-auto rounded-md border bg-popover shadow-md">
             {filteredFarmerSuggestions.map((f, i) => (
               <button
                 key={i}
-                className="w-full text-left px-3 py-2 text-xs hover:bg-accent border-b last:border-b-0"
+                className={`w-full text-left px-3 py-2 text-xs border-b last:border-b-0 ${i === filterFarmerKb.activeIndex ? "bg-accent" : "hover:bg-accent"}`}
                 data-testid={`farmer-suggestion-${i}`}
-                onClick={() => { setFarmerFilter(f.name); setFarmerDropOpen(false); }}
+                onMouseEnter={() => filterFarmerKb.setActiveIndex(i)}
+                onClick={() => { setFarmerFilter(f.name); setFarmerDropOpen(false); filterFarmerKb.reset(); }}
               >
                 <div className="font-medium">{f.name}</div>
                 {(f.phone || f.village) && (
@@ -2865,22 +2904,28 @@ function StockFilterBar({
           value={buyerFilter}
           onChange={(e) => { setBuyerFilter(e.target.value); setBuyerDropOpen(true); }}
           onFocus={() => setBuyerDropOpen(true)}
+          onKeyDown={e => {
+            if (buyerDropOpen && filteredBuyerSuggestions.length > 0) {
+              filterBuyerKb.handleKeyDown(e, (b) => { setBuyerFilter(b.name); setBuyerDropOpen(false); filterBuyerKb.reset(); }, () => { setBuyerDropOpen(false); filterBuyerKb.reset(); });
+            }
+          }}
           placeholder={t("stock.buyer")}
           className="pl-7 w-[140px] h-8 text-xs"
         />
         {buyerFilter && (
-          <button className="absolute right-1.5 top-1/2 -translate-y-1/2" onClick={() => { setBuyerFilter(""); setBuyerDropOpen(false); }}>
+          <button className="absolute right-1.5 top-1/2 -translate-y-1/2" onClick={() => { setBuyerFilter(""); setBuyerDropOpen(false); filterBuyerKb.reset(); }}>
             <X className="w-3 h-3 text-muted-foreground" />
           </button>
         )}
         {buyerDropOpen && filteredBuyerSuggestions.length > 0 && (
-          <div className="absolute top-full left-0 z-50 mt-1 w-[220px] max-h-48 overflow-y-auto rounded-md border bg-popover shadow-md">
+          <div ref={filterBuyerKb.listRef} className="absolute top-full left-0 z-50 mt-1 w-[220px] max-h-48 overflow-y-auto rounded-md border bg-popover shadow-md">
             {filteredBuyerSuggestions.map((b, i) => (
               <button
                 key={i}
-                className="w-full text-left px-3 py-2 text-xs hover:bg-accent truncate"
+                className={`w-full text-left px-3 py-2 text-xs truncate ${i === filterBuyerKb.activeIndex ? "bg-accent" : "hover:bg-accent"}`}
                 data-testid={`buyer-suggestion-${i}`}
-                onClick={() => { setBuyerFilter(b.name); setBuyerDropOpen(false); }}
+                onMouseEnter={() => filterBuyerKb.setActiveIndex(i)}
+                onClick={() => { setBuyerFilter(b.name); setBuyerDropOpen(false); filterBuyerKb.reset(); }}
               >
                 <span className="font-medium">{b.name}</span>
               </button>
