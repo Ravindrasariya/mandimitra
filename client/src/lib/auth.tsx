@@ -1,6 +1,9 @@
-import { createContext, useContext, type ReactNode } from "react";
+import { createContext, useContext, useEffect, type ReactNode } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient, getQueryFn } from "./queryClient";
+
+const AUTH_CHANNEL_NAME = "mandi-mitra-auth";
+type AuthChannelMessage = { type: "business-switched"; businessId: number };
 
 export type BusinessEntry = {
   userId: string;
@@ -47,6 +50,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     queryKey: ["/api/auth/me"],
     queryFn: getQueryFn({ on401: "returnNull" }),
   });
+
+  useEffect(() => {
+    if (typeof BroadcastChannel === "undefined") return;
+    const channel = new BroadcastChannel(AUTH_CHANNEL_NAME);
+    channel.onmessage = (event: MessageEvent<AuthChannelMessage>) => {
+      if (event.data?.type === "business-switched") {
+        queryClient.invalidateQueries();
+      }
+    };
+    return () => channel.close();
+  }, []);
 
   const loginMutation = useMutation({
     mutationFn: async ({ username, password }: { username: string; password: string }) => {
@@ -109,6 +123,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(LAST_BUSINESS_KEY(data.username), String(data.businessId));
       queryClient.setQueryData(["/api/auth/me"], data);
       queryClient.invalidateQueries();
+      if (typeof BroadcastChannel !== "undefined") {
+        const channel = new BroadcastChannel(AUTH_CHANNEL_NAME);
+        const msg: AuthChannelMessage = { type: "business-switched", businessId: data.businessId };
+        channel.postMessage(msg);
+        channel.close();
+      }
     },
   });
 
