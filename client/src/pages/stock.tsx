@@ -18,7 +18,7 @@ import {
 import {
   Plus, Trash2, ChevronDown, ChevronRight, Truck, User,
   AlertTriangle, Scale, Wheat, ChevronsUpDown, X, Calculator,
-  Archive, History, Save, Check, Printer, Share2,
+  Archive, History, Save, Check, Printer, Share2, Loader2,
   Layers, Landmark, ShoppingBag, Calendar, Search, Filter, RotateCcw, Download,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -1849,12 +1849,13 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
 
 // ─── Farmer card ──────────────────────────────────────────────────────────────
 
-function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onCancel, onArchive, onSyncSaved, cs, currentUsername }: {
+function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onCancel, onArchive, onSyncSaved, cs, currentUsername, saving }: {
   card: FarmerCard;
   savedCard: FarmerCard | null;
   onChange: (c: FarmerCard) => void;
   onSave: () => void;
   onSaveAndClose: () => void;
+  saving?: boolean;
   onCancel: () => void;
   onArchive: () => void;
   onSyncSaved: (c: FarmerCard) => void;
@@ -2431,10 +2432,10 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
               )}
               <Button type="button"
                 onClick={onSave}
-                disabled={!isDirty}
-                className={`h-8 gap-1.5 text-sm transition-all ${isDirty ? "bg-primary text-primary-foreground" : "opacity-50"}`}
+                disabled={!isDirty || saving}
+                className={`h-8 gap-1.5 text-sm transition-all ${isDirty && !saving ? "bg-primary text-primary-foreground" : "opacity-50"}`}
                 data-testid="button-save-entry">
-                <Save className="w-3.5 h-3.5" /> {t("stock.saveEntry")}
+                {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} {saving ? t("stock.saving") || "Saving..." : t("stock.saveEntry")}
               </Button>
             </div>
           </div>
@@ -3109,7 +3110,8 @@ export default function StockPage() {
   const { t } = useLanguage();
   const [cards, setCards] = useState<FarmerCard[]>([]);
   const [savedCardMap, setSavedCardMap] = useState<Map<string, FarmerCard>>(new Map());
-  const [saving, setSaving] = useState(false);
+  const [savingCardId, setSavingCardId] = useState<string | null>(null);
+  const savingRef = useRef<string | null>(null);
   const dbLoaded = useRef(false);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -3287,7 +3289,9 @@ export default function StockPage() {
       return;
     }
 
-    setSaving(true);
+    if (savingRef.current) return;
+    savingRef.current = card.id;
+    setSavingCardId(card.id);
     try {
       let currentFarmerId = card.farmerId;
 
@@ -3669,7 +3673,8 @@ export default function StockPage() {
     } catch (err: any) {
       toast({ title: t("stock.saveFailed"), description: err.message, variant: "destructive" });
     } finally {
-      setSaving(false);
+      savingRef.current = null;
+      setSavingCardId(null);
     }
   };
 
@@ -3964,6 +3969,7 @@ export default function StockPage() {
               onSyncSaved={c => setSavedCardMap(prev => new Map(prev).set(c.id, JSON.parse(JSON.stringify(c))))}
               cs={cs}
               currentUsername={currentUsername}
+              saving={savingCardId === card.id}
             />
           );
         })}
