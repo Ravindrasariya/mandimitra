@@ -414,8 +414,8 @@ export default function BuyerLedgerPage() {
           const due = parseFloat(t.totalReceivableFromBuyer || "0") - parseFloat(t.paidAmount || "0");
           if (due > 0) receivable += due;
         }
-        const openingBal = parseFloat((b as any).openingBalance || "0");
-        map.set(b.id, { receivable, overall: receivable + openingBal });
+        const serverOpeningDue = parseFloat(b.overallDue) - parseFloat(b.receivableDue);
+        map.set(b.id, { receivable, overall: receivable + serverOpeningDue });
       }
     }
     return map;
