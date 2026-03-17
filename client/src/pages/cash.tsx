@@ -1077,7 +1077,11 @@ export default function CashPage() {
                     </div>
                     {allocationDropdownOpen && (() => {
                       const selectedIds = new Set(inwardAllocations.map(a => a.txnId));
-                      const available = pendingTransactions.filter(pt => !selectedIds.has(pt.id));
+                      const hasPyOpening = inwardAllocations.some(a => a.txnId === null || a.txnLabel === "PY Opening Balance");
+                      const available = pendingTransactions.filter(pt => {
+                        if (pt.transactionId === "PY_OPENING") return !hasPyOpening;
+                        return !selectedIds.has(pt.id);
+                      });
                       const filtered = available.filter(pt => {
                         if (!allocationSearch) return true;
                         const s = allocationSearch.toLowerCase();
