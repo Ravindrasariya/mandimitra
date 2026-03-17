@@ -285,8 +285,10 @@ export async function registerRoutes(
 
   app.post("/api/farmers", requireAuth, async (req, res) => {
     try {
-      const data = { ...req.body, businessId: req.user!.businessId };
+      const businessId = req.user!.businessId;
+      const data = { ...req.body, businessId };
       const farmer = await storage.createFarmer(data);
+      broadcastBusinessEvent(businessId);
       res.status(201).json(farmer);
     } catch (e: any) {
       res.status(400).json({ message: e.message });
@@ -333,6 +335,7 @@ export async function registerRoutes(
     }
 
     const updated = await storage.updateFarmer(farmerId, businessId, data);
+    broadcastBusinessEvent(businessId);
     res.json(updated);
   });
 
@@ -433,6 +436,7 @@ export async function registerRoutes(
         buyerId,
       };
       const buyer = await storage.createBuyer(data);
+      broadcastBusinessEvent(businessId);
       res.status(201).json(buyer);
     } catch (e: any) {
       res.status(400).json({ message: e.message });
@@ -477,6 +481,7 @@ export async function registerRoutes(
       }
 
       const updated = await storage.updateBuyer(buyerDbId, businessId, req.body);
+      broadcastBusinessEvent(businessId);
       res.json(updated);
     } catch (e: any) {
       res.status(400).json({ message: e.message });
@@ -796,6 +801,7 @@ export async function registerRoutes(
       };
 
       const lot = await storage.createLot(data);
+      broadcastBusinessEvent(businessId);
       res.status(201).json(lot);
     } catch (e: any) {
       res.status(400).json({ message: e.message });
@@ -1564,6 +1570,7 @@ export async function registerRoutes(
         assetType: "purchased",
       });
 
+      broadcastBusinessEvent(businessId);
       res.json({ cashEntry, asset });
     } catch (e: any) { res.status(400).json({ message: e.message }); }
   });
@@ -1578,23 +1585,29 @@ export async function registerRoutes(
 
   app.post("/api/assets", requireAuth, async (req, res) => {
     try {
-      const parsed = insertAssetSchema.parse({ ...req.body, businessId: req.user!.businessId });
+      const businessId = req.user!.businessId;
+      const parsed = insertAssetSchema.parse({ ...req.body, businessId });
       const asset = await storage.createAsset(parsed);
+      broadcastBusinessEvent(businessId);
       res.json(asset);
     } catch (e: any) { res.status(400).json({ message: e.message }); }
   });
 
   app.put("/api/assets/:id", requireAuth, async (req, res) => {
     try {
-      const updated = await storage.updateAsset(paramId(req.params.id), req.user!.businessId, req.body);
+      const businessId = req.user!.businessId;
+      const updated = await storage.updateAsset(paramId(req.params.id), businessId, req.body);
       if (!updated) return res.status(404).json({ message: "Asset not found" });
+      broadcastBusinessEvent(businessId);
       res.json(updated);
     } catch (e: any) { res.status(400).json({ message: e.message }); }
   });
 
   app.delete("/api/assets/:id", requireAuth, async (req, res) => {
     try {
-      await storage.deleteAsset(paramId(req.params.id), req.user!.businessId);
+      const businessId = req.user!.businessId;
+      await storage.deleteAsset(paramId(req.params.id), businessId);
+      broadcastBusinessEvent(businessId);
       res.json({ success: true });
     } catch (e: any) { res.status(400).json({ message: e.message }); }
   });
@@ -1608,9 +1621,11 @@ export async function registerRoutes(
 
   app.post("/api/assets/depreciation", requireAuth, async (req, res) => {
     try {
+      const businessId = req.user!.businessId;
       const { fy } = req.body;
       if (!fy) return res.status(400).json({ message: "Financial year is required" });
-      const results = await storage.runDepreciation(req.user!.businessId, fy);
+      const results = await storage.runDepreciation(businessId, fy);
+      broadcastBusinessEvent(businessId);
       res.json(results);
     } catch (e: any) { res.status(400).json({ message: e.message }); }
   });
@@ -1625,23 +1640,29 @@ export async function registerRoutes(
 
   app.post("/api/liabilities", requireAuth, async (req, res) => {
     try {
-      const parsed = insertLiabilitySchema.parse({ ...req.body, businessId: req.user!.businessId });
+      const businessId = req.user!.businessId;
+      const parsed = insertLiabilitySchema.parse({ ...req.body, businessId });
       const created = await storage.createLiability(parsed);
+      broadcastBusinessEvent(businessId);
       res.json(created);
     } catch (e: any) { res.status(400).json({ message: e.message }); }
   });
 
   app.put("/api/liabilities/:id", requireAuth, async (req, res) => {
     try {
-      const updated = await storage.updateLiability(paramId(req.params.id), req.user!.businessId, req.body);
+      const businessId = req.user!.businessId;
+      const updated = await storage.updateLiability(paramId(req.params.id), businessId, req.body);
       if (!updated) return res.status(404).json({ message: "Liability not found" });
+      broadcastBusinessEvent(businessId);
       res.json(updated);
     } catch (e: any) { res.status(400).json({ message: e.message }); }
   });
 
   app.delete("/api/liabilities/:id", requireAuth, async (req, res) => {
     try {
-      await storage.deleteLiability(paramId(req.params.id), req.user!.businessId);
+      const businessId = req.user!.businessId;
+      await storage.deleteLiability(paramId(req.params.id), businessId);
+      broadcastBusinessEvent(businessId);
       res.json({ success: true });
     } catch (e: any) { res.status(400).json({ message: e.message }); }
   });
@@ -1655,23 +1676,29 @@ export async function registerRoutes(
 
   app.post("/api/liabilities/:id/payments", requireAuth, async (req, res) => {
     try {
-      const payment = await storage.createLiabilityPayment({ ...req.body, liabilityId: paramId(req.params.id), businessId: req.user!.businessId });
+      const businessId = req.user!.businessId;
+      const payment = await storage.createLiabilityPayment({ ...req.body, liabilityId: paramId(req.params.id), businessId });
+      broadcastBusinessEvent(businessId);
       res.json(payment);
     } catch (e: any) { res.status(400).json({ message: e.message }); }
   });
 
   app.post("/api/liabilities/:id/payments/:paymentId/reverse", requireAuth, async (req, res) => {
     try {
-      const reversed = await storage.reverseLiabilityPayment(paramId(req.params.paymentId), req.user!.businessId);
+      const businessId = req.user!.businessId;
+      const reversed = await storage.reverseLiabilityPayment(paramId(req.params.paymentId), businessId);
       if (!reversed) return res.status(404).json({ message: "Payment not found" });
+      broadcastBusinessEvent(businessId);
       res.json(reversed);
     } catch (e: any) { res.status(400).json({ message: e.message }); }
   });
 
   app.post("/api/liabilities/:id/settle", requireAuth, async (req, res) => {
     try {
-      const settled = await storage.settleLiability(paramId(req.params.id), req.user!.businessId);
+      const businessId = req.user!.businessId;
+      const settled = await storage.settleLiability(paramId(req.params.id), businessId);
       if (!settled) return res.status(404).json({ message: "Liability not found" });
+      broadcastBusinessEvent(businessId);
       res.json(settled);
     } catch (e: any) { res.status(400).json({ message: e.message }); }
   });
