@@ -10,6 +10,7 @@ import fs from "fs";
 import { db } from "./db";
 import { transactions, bids, buyers, lots, insertAssetSchema, insertLiabilitySchema, type Farmer } from "@shared/schema";
 import { eq, and, inArray, sql } from "drizzle-orm";
+import { addSseClient, removeSseClient, broadcastBusinessEvent } from "./sse";
 
 const uploadsDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
@@ -38,6 +39,25 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   await setupAuth(app);
+
+  app.get("/api/events", requireAuth, (req, res) => {
+    const businessId = req.user!.businessId;
+    res.setHeader("Content-Type", "text/event-stream");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+    res.flushHeaders();
+
+    addSseClient(businessId, res);
+
+    const heartbeat = setInterval(() => {
+      try { res.write(":heartbeat\n\n"); } catch { clearInterval(heartbeat); }
+    }, 30_000);
+
+    req.on("close", () => {
+      clearInterval(heartbeat);
+      removeSseClient(businessId, res);
+    });
+  });
 
   async function seedDefaultBusiness() {
     const adminPassword = process.env.ADMIN_PASSWORD;
@@ -845,6 +865,7 @@ export async function registerRoutes(
         createdLots.push(lot);
       }
 
+      broadcastBusinessEvent(businessId);
       res.status(201).json(createdLots);
     } catch (e: any) {
       res.status(400).json({ message: e.message });
@@ -906,6 +927,7 @@ export async function registerRoutes(
 
     const updated = await storage.updateLot(lotId, businessId, data);
     if (!updated) return res.status(404).json({ message: "Lot not found" });
+    broadcastBusinessEvent(businessId);
     res.json(updated);
   });
 
@@ -938,6 +960,7 @@ export async function registerRoutes(
         } as any);
       }
 
+      broadcastBusinessEvent(businessId);
       res.json({ message: "Lot returned successfully", soldBags });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -952,8 +975,10 @@ export async function registerRoutes(
 
   app.post("/api/bids", requireAuth, async (req, res) => {
     try {
-      const data = { ...req.body, businessId: req.user!.businessId };
+      const businessId = req.user!.businessId;
+      const data = { ...req.body, businessId };
       const bid = await storage.createBid(data);
+      broadcastBusinessEvent(businessId);
       res.status(201).json(bid);
     } catch (e: any) {
       res.status(400).json({ message: e.message });
@@ -965,6 +990,7 @@ export async function registerRoutes(
     const businessId = req.user!.businessId;
     const updated = await storage.updateBid(bidId, businessId, req.body);
     if (!updated) return res.status(404).json({ message: "Bid not found" });
+    broadcastBusinessEvent(businessId);
     res.json(updated);
   });
 
@@ -976,6 +1002,7 @@ export async function registerRoutes(
       .limit(1);
     if (existingTx.length > 0) return res.status(400).json({ message: "Cannot delete a bid that has an active transaction" });
     await storage.deleteBid(bidId, businessId);
+    broadcastBusinessEvent(businessId);
     res.json({ message: "Deleted" });
   });
 
@@ -1016,6 +1043,7 @@ export async function registerRoutes(
         newValue: `Transaction ${tx.transactionId} created`,
         changedBy: req.user!.username,
       });
+      broadcastBusinessEvent(req.user!.businessId);
       res.status(201).json(tx);
     } catch (e: any) {
       res.status(400).json({ message: e.message });
@@ -1048,6 +1076,7 @@ export async function registerRoutes(
       }
     }
 
+    broadcastBusinessEvent(businessId);
     res.json(updated);
   });
 
@@ -1099,6 +1128,7 @@ export async function registerRoutes(
       const updateData: any = { remainingBags: newRemaining, actualNumberOfBags: newActual };
       await storage.updateLot(lot.id, businessId, updateData);
 
+      broadcastBusinessEvent(businessId);
       res.json({ message: "Transaction reversed successfully", bagsReturned: bagsToReturn });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
@@ -1232,9 +1262,11 @@ export async function registerRoutes(
           }
         }
         const entries = await storage.createCashEntryBatch(data, expandedAllocations);
+        broadcastBusinessEvent(req.user!.businessId);
         res.status(201).json(entries);
       } else {
         const entry = await storage.createCashEntry(data);
+        broadcastBusinessEvent(req.user!.businessId);
         res.status(201).json(entry);
       }
     } catch (e: any) {
@@ -1247,6 +1279,7 @@ export async function registerRoutes(
       const reason = req.body?.reason || null;
       const result = await storage.reverseCashEntry(paramId(req.params.id), req.user!.businessId, reason);
       if (!result) return res.status(404).json({ message: "Entry not found" });
+      broadcastBusinessEvent(req.user!.businessId);
       res.json(result);
     } catch (e: any) {
       res.status(400).json({ message: e.message });

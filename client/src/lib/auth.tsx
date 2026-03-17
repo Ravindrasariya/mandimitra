@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useRef, type ReactNode } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient, getQueryFn } from "./queryClient";
 
@@ -61,6 +61,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     return () => channel.close();
   }, []);
+
+  const sseRef = useRef<EventSource | null>(null);
+
+  useEffect(() => {
+    if (!user) {
+      if (sseRef.current) {
+        sseRef.current.close();
+        sseRef.current = null;
+      }
+      return;
+    }
+
+    const es = new EventSource("/api/events", { withCredentials: true });
+    sseRef.current = es;
+
+    es.onmessage = () => {
+      queryClient.invalidateQueries();
+    };
+
+    es.onerror = () => {
+    };
+
+    return () => {
+      es.close();
+      sseRef.current = null;
+    };
+  }, [user?.id, user?.businessId]);
 
   const loginMutation = useMutation({
     mutationFn: async ({ username, password }: { username: string; password: string }) => {
