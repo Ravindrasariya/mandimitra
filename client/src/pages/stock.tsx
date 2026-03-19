@@ -3281,17 +3281,23 @@ export default function StockPage() {
             if (!historyByLotId.has(rec.lotId)) historyByLotId.set(rec.lotId, []);
             historyByLotId.get(rec.lotId)!.push(rec);
           }
-          setCards(prev => prev.map(card => ({
-            ...card,
-            cropGroups: card.cropGroups.map(g => {
+          const applyHistory = (groups: CropGroup[]): CropGroup[] =>
+            groups.map(g => {
               const dbEntries: any[] = g.lots.flatMap(l =>
                 l.dbId ? (historyByLotId.get(l.dbId) || []) : []
               );
               if (dbEntries.length === 0) return g;
               const dbHistory = dbEntries.map(dbRecordToEditEntry);
               return { ...g, editHistory: [...dbHistory, ...g.editHistory] };
-            }),
-          })));
+            });
+          setCards(prev => prev.map(card => ({ ...card, cropGroups: applyHistory(card.cropGroups) })));
+          setSavedCardMap(prev => {
+            const next = new Map(prev);
+            for (const [id, saved] of Array.from(next.entries())) {
+              next.set(id, { ...saved, cropGroups: applyHistory(saved.cropGroups) });
+            }
+            return next;
+          });
         })
         .catch(() => {});
     }
@@ -3729,6 +3735,14 @@ export default function StockPage() {
         }
       }
 
+      const restoredBidBuyerNames = new Set<string>();
+      for (const rbids of Array.from(restoredBidsMap.values())) {
+        for (const bid of rbids) {
+          const name = bid.buyerName?.trim();
+          if (name) restoredBidBuyerNames.add(name);
+        }
+      }
+
       const savedCard = savedCardMap.get(card.id);
       const isFirstSave = !savedCard;
       const now = format(new Date(), "dd/MM/yyyy HH:mm");
@@ -3742,15 +3756,20 @@ export default function StockPage() {
           if (isFirstSave) return withPersisted;
           const savedGroup = savedCard!.cropGroups.find(sg => sg.id === g.id);
           if (!savedGroup) return withPersisted;
+          const baseHistory = restoredBidBuyerNames.size > 0
+            ? g.editHistory.filter(e =>
+                !e.changes?.some(c => c.kind === "deleted" && restoredBidBuyerNames.has(c.detail || ""))
+              )
+            : g.editHistory;
           const allDiffChanges = diffCropGroup(savedGroup, g, t);
           const alreadyLogged = new Set(
-            g.editHistory
+            baseHistory
               .slice(savedGroup.editHistory.length)
               .flatMap(e => e.changes?.filter(c => c.kind === "deleted").map(c => c.path) ?? [])
           );
           const changes = allDiffChanges.filter(c => !(c.kind === "deleted" && alreadyLogged.has(c.path)));
-          if (changes.length === 0) return withPersisted;
-          return { ...withPersisted, editHistory: [...g.editHistory, { timestamp: now, username: currentUsername, changes }] };
+          if (changes.length === 0) return { ...withPersisted, editHistory: baseHistory };
+          return { ...withPersisted, editHistory: [...baseHistory, { timestamp: now, username: currentUsername, changes }] };
         }),
       };
 
