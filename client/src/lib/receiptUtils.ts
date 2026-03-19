@@ -46,37 +46,32 @@ ${headContent}
 }
 
 export async function printReceipt(html: string, fileName?: string) {
-  const bodyHtml = extractBodyHtml(html);
-  const headStyles = extractHeadStyles(html);
-
-  const container = document.createElement("div");
-  container.id = "__receipt_print_container__";
-  container.innerHTML = bodyHtml;
-  document.body.appendChild(container);
-
-  const style = document.createElement("style");
-  style.id = "__receipt_print_style__";
-  style.textContent = `
-    ${headStyles}
-    @media print {
-      body > *:not(#__receipt_print_container__) { display: none !important; }
-      #__receipt_print_container__ { display: block !important; }
-    }
-  `;
-  document.head.appendChild(style);
-
   const prevTitle = document.title;
   if (fileName) document.title = fileName.replace(/\.[^.]+$/, "");
 
+  const iframe = document.createElement("iframe");
+  iframe.style.cssText =
+    "position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;opacity:0;border:none;";
+  document.body.appendChild(iframe);
+
+  const doc = iframe.contentDocument ?? iframe.contentWindow?.document;
+  if (doc) {
+    doc.open();
+    doc.write(html);
+    doc.close();
+  }
+
   const cleanup = () => {
-    try { document.body.removeChild(container); } catch {}
-    try { document.head.removeChild(style); } catch {}
+    try { document.body.removeChild(iframe); } catch {}
     document.title = prevTitle;
   };
-
   window.addEventListener("afterprint", cleanup, { once: true });
-  window.print();
-  setTimeout(cleanup, 3000);
+
+  await new Promise<void>(resolve => setTimeout(resolve, 300));
+  iframe.contentWindow?.focus();
+  iframe.contentWindow?.print();
+
+  setTimeout(cleanup, 5000);
 }
 
 function canvasToPdfBlob(canvas: HTMLCanvasElement): Blob {
