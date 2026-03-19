@@ -110,7 +110,7 @@ function canvasToPdfBlob(canvas: HTMLCanvasElement): Blob {
 
 export type BidCropSection = {
   crop: string;
-  groups: Array<{ serialNumber: number; farmerName: string; village: string; totalBags: number }>;
+  groups: Array<{ serialNumber: number; farmerName: string; village: string; totalBags: number; lotBags: number; cardTotalBags: number }>;
 };
 
 function escHtml(s: string): string {
@@ -141,6 +141,7 @@ export function generateBidCopyHtml(
       const firstRow = `<tr style="border-top:2.5px solid #444;">
         <td rowspan="${rowCount}" style="${tdStyle}text-align:center;font-weight:700;vertical-align:middle;">${g.serialNumber}</td>
         <td rowspan="${rowCount}" style="${tdStyle}vertical-align:middle;">${farmerLabel}</td>
+        <td rowspan="${rowCount}" style="${tdStyle}text-align:center;vertical-align:middle;">${g.cardTotalBags}/${g.lotBags}</td>
         <td rowspan="${rowCount}" style="${tdStyle}text-align:center;vertical-align:middle;">${g.totalBags}</td>
         <td style="${tdStyle}min-width:60px;"></td>
         <td style="${tdStyle}text-align:center;width:55px;"></td>
@@ -166,6 +167,7 @@ export function generateBidCopyHtml(
         <td style="${tdStyle}"></td>
         <td style="${tdStyle}"></td>
         <td style="${tdStyle}"></td>
+        <td style="${tdStyle}"></td>
       </tr>`;
       return firstRow + extraRows + blankRow;
     }).join("");
@@ -181,6 +183,7 @@ export function generateBidCopyHtml(
           <tr>
             <th style="${thStyle}text-align:center;width:38px;">SR#</th>
             <th style="${thStyle}text-align:left;min-width:95px;">Farmer Name</th>
+            <th style="${thStyle}text-align:center;width:55px;">Lot #</th>
             <th style="${thStyle}text-align:center;width:50px;">Rem. Bags</th>
             <th style="${thStyle}text-align:left;min-width:60px;">Buyer Name</th>
             <th style="${thStyle}text-align:center;width:55px;">Rate/Kg</th>

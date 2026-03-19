@@ -3848,6 +3848,7 @@ export default function StockPage() {
         if (cropFilter !== "all" && g.crop !== cropFilter) continue;
         const srNum = parseInt(g.srNumber) || 0;
         if (!srNum) continue;
+        const cardTotalBags = g.lots.filter(l => !l.isReturned).reduce((s, l) => s + (parseInt(l.numberOfBags) || 0), 0);
         for (const l of g.lots) {
           if (l.isReturned) continue;
           const lotBags = parseInt(l.numberOfBags) || 0;
@@ -3861,6 +3862,8 @@ export default function StockPage() {
             farmerName: card.farmerName,
             village: card.village || "",
             totalBags: remaining,
+            lotBags,
+            cardTotalBags,
           });
         }
       }
