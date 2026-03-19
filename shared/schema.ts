@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, decimal, boolean, date, timestamp, serial, uniqueIndex, json } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, decimal, boolean, date, timestamp, serial, uniqueIndex, json, bigint } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -69,6 +69,7 @@ export const buyers = pgTable("buyers", {
   isActive: boolean("is_active").notNull().default(true),
   openingBalance: decimal("opening_balance", { precision: 12, scale: 2 }).default("0"),
   aadhatCommissionPercent: decimal("aadhat_commission_percent", { precision: 5, scale: 2 }),
+  limitAmount: bigint("limit_amount", { mode: "number" }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   uniqueBuyerPerBusiness: uniqueIndex("buyers_business_buyer_id_unique").on(table.businessId, table.buyerId),

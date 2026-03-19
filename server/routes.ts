@@ -459,6 +459,7 @@ export async function registerRoutes(
         isActive: "Active Status",
         openingBalance: "Opening Balance",
         aadhatCommissionPercent: "Aadhat Commission %",
+        limitAmount: "Credit Limit",
       };
 
       const changedBy = req.user!.name || req.user!.username;

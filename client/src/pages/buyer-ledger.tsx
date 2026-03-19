@@ -177,6 +177,7 @@ export default function BuyerLedgerPage() {
   const [editRedFlag, setEditRedFlag] = useState(false);
   const [editOpeningBalance, setEditOpeningBalance] = useState("");
   const [editAadhatCommission, setEditAadhatCommission] = useState("");
+  const [editLimitAmount, setEditLimitAmount] = useState("");
 
   const [newName, setNewName] = useState("");
   const [newAddress, setNewAddress] = useState("");
@@ -184,6 +185,7 @@ export default function BuyerLedgerPage() {
   const [newLicenceNo, setNewLicenceNo] = useState("");
   const [newOpeningBalance, setNewOpeningBalance] = useState("");
   const [newAadhatCommission, setNewAadhatCommission] = useState("");
+  const [newLimitAmount, setNewLimitAmount] = useState("");
   const [yearFilter, setYearFilter] = useState(String(new Date().getFullYear()));
   const [selectedMonths, setSelectedMonths] = useState<string[]>([String(new Date().getMonth() + 1)]);
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
@@ -223,6 +225,7 @@ export default function BuyerLedgerPage() {
       setNewLicenceNo("");
       setNewOpeningBalance("");
       setNewAadhatCommission("");
+      setNewLimitAmount("");
       toast({ title: "Buyer Created", variant: "success" });
     },
     onError: (err: any) => {
@@ -498,6 +501,7 @@ export default function BuyerLedgerPage() {
     setEditRedFlag(buyer.redFlag);
     setEditOpeningBalance(buyer.openingBalance || "0");
     setEditAadhatCommission(buyer.aadhatCommissionPercent || "");
+    setEditLimitAmount(buyer.limitAmount != null ? String(buyer.limitAmount) : "");
   };
 
   const getPaanaHtml = async (buyer: BuyerWithDues) => {
@@ -557,6 +561,7 @@ export default function BuyerLedgerPage() {
         redFlag: editRedFlag,
         openingBalance: editOpeningBalance || "0",
         aadhatCommissionPercent: editAadhatCommission || null,
+        limitAmount: editLimitAmount ? Number(editLimitAmount) : null,
       },
     });
   };
@@ -602,6 +607,7 @@ export default function BuyerLedgerPage() {
       licenceNo: newLicenceNo || null,
       openingBalance: newOpeningBalance || "0",
       aadhatCommissionPercent: newAadhatCommission || null,
+      limitAmount: newLimitAmount ? Number(newLimitAmount) : null,
     });
   };
 
@@ -1002,6 +1008,20 @@ export default function BuyerLedgerPage() {
               />
               <p className="text-xs text-muted-foreground">{t("buyerLedger.aadhatCommissionHint") || "Leave blank to use default from Dashboard settings"}</p>
             </div>
+            <div className="space-y-1">
+              <Label>Buyer Limit (₹)</Label>
+              <Input
+                data-testid="input-edit-buyer-limit"
+                type="text"
+                inputMode="numeric"
+                value={editLimitAmount}
+                onChange={(e) => setEditLimitAmount(e.target.value.replace(/[^0-9]/g, ""))}
+                onFocus={(e) => e.target.select()}
+                placeholder="No limit"
+                className="mobile-touch-target"
+              />
+              <p className="text-xs text-muted-foreground">Optional. Shows a warning on Stock page when buyer due exceeds this limit.</p>
+            </div>
             <div className="flex items-center justify-between">
               <Label>{t("buyerLedger.redFlagLabel")}</Label>
               <Switch
@@ -1128,6 +1148,20 @@ export default function BuyerLedgerPage() {
                 className="mobile-touch-target"
               />
               <p className="text-xs text-muted-foreground">{t("buyerLedger.aadhatCommissionHint") || "Leave blank to use default from Dashboard settings"}</p>
+            </div>
+            <div className="space-y-1">
+              <Label>Buyer Limit (₹)</Label>
+              <Input
+                data-testid="input-new-buyer-limit"
+                type="text"
+                inputMode="numeric"
+                value={newLimitAmount}
+                onChange={(e) => setNewLimitAmount(e.target.value.replace(/[^0-9]/g, ""))}
+                onFocus={(e) => e.target.select()}
+                placeholder="No limit"
+                className="mobile-touch-target"
+              />
+              <p className="text-xs text-muted-foreground">Optional. Shows a warning on Stock page when buyer due exceeds this limit.</p>
             </div>
             <Button
               data-testid="button-submit-new-buyer"

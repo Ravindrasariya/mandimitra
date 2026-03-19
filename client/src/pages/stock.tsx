@@ -1041,7 +1041,7 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
   cs: ChargeSettings;
   farmerDate: string;
   overBag: boolean;
-  buyersList: { id: number; name: string; phone?: string; aadhatCommissionPercent?: string | null }[];
+  buyersList: { id: number; name: string; phone?: string; aadhatCommissionPercent?: string | null; overallDue?: string; limitAmount?: number | null }[];
 }) {
   const { t } = useLanguage();
   const [showBuyerSuggestions, setShowBuyerSuggestions] = useState(false);
@@ -1057,6 +1057,10 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
     ? parseFloat(bidBuyerData.aadhatCommissionPercent) || 0
     : null;
   const totals = calcBidTotals(bid, cs, vehicleBhadaRate, totalBagsInVehicle, bidBuyerAadhat);
+  const buyerLimit = bidBuyerData?.limitAmount ?? null;
+  const existingDue = parseFloat(bidBuyerData?.overallDue ?? "0");
+  const projectedDue = existingDue + totals.buyerReceivable;
+  const limitExceeded = bid.buyerId != null && buyerLimit !== null && projectedDue > buyerLimit;
   const buyerLabel = bid.buyerName.trim() || t("stock.buyer");
 
   return (
@@ -1210,6 +1214,13 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
             </div>
           </div>
 
+          {limitExceeded && (
+            <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-md px-3 py-2 text-xs text-red-700 font-medium" data-testid="buyer-limit-warning">
+              <AlertTriangle className="w-4 h-4 shrink-0 text-red-500" />
+              <span>Buyer limit exceeded — Limit: ₹{buyerLimit!.toLocaleString("en-IN")}, Projected Due: ₹{Math.round(projectedDue).toLocaleString("en-IN")}</span>
+            </div>
+          )}
+
           {bid.paymentType === "Cash" && (
             <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-200 rounded-md px-3 py-1.5">
               <span className="text-xs text-yellow-700 font-medium">{t("stock.cashAdvance")}</span>
@@ -1247,7 +1258,7 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
   onRemoveBid?: (lotIndex: number, bidIndex: number) => void;
   vehicleBhadaRate: number; totalBagsInVehicle: number;
   cs: ChargeSettings; farmerDate: string;
-  buyersList: { id: number; name: string; phone?: string; aadhatCommissionPercent?: string | null }[];
+  buyersList: { id: number; name: string; phone?: string; aadhatCommissionPercent?: string | null; overallDue?: string; limitAmount?: number | null }[];
   onReturnLot?: () => void;
 }) {
   const { t } = useLanguage();
@@ -1442,7 +1453,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
   cs: ChargeSettings; farmerDate: string; farmerName: string;
   currentUsername: string;
   onSyncSaved?: (updatedGroup: CropGroup) => void;
-  buyersList: { id: number; name: string; phone?: string; aadhatCommissionPercent?: string | null }[];
+  buyersList: { id: number; name: string; phone?: string; aadhatCommissionPercent?: string | null; overallDue?: string; limitAmount?: number | null }[];
   onReturnLot?: (lotIdx: number) => void;
   farmerCard?: FarmerCard;
 }) {
@@ -1884,9 +1895,9 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
   });
 
   const { data: buyersData = [] } = useQuery<any[]>({
-    queryKey: ["/api/buyers"],
+    queryKey: ["/api/buyers?withDues=true"],
   });
-  const buyersList = buyersData.map((b: any) => ({ id: b.id, name: b.name, phone: b.phone || "", aadhatCommissionPercent: b.aadhatCommissionPercent || null }));
+  const buyersList = buyersData.map((b: any) => ({ id: b.id, name: b.name, phone: b.phone || "", aadhatCommissionPercent: b.aadhatCommissionPercent || null, overallDue: b.overallDue ?? "0", limitAmount: b.limitAmount ?? null }));
 
   const filteredVillages = (locationData?.villages || []).filter(
     (v) => card.village.length >= 1 && v.toLowerCase().includes(card.village.toLowerCase()) && v.toLowerCase() !== card.village.toLowerCase()
@@ -3026,7 +3037,7 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
   cards: FarmerCard[];
   savedCardMap: Map<string, FarmerCard>;
   cs: ChargeSettings;
-  buyersList: { id: number; name: string; phone?: string; aadhatCommissionPercent?: string | null }[];
+  buyersList: { id: number; name: string; phone?: string; aadhatCommissionPercent?: string | null; overallDue?: string; limitAmount?: number | null }[];
 }) {
   const { t } = useLanguage();
   let distinctFarmers = 0, totalLots = 0, totalTxns = 0;
@@ -3147,9 +3158,9 @@ export default function StockPage() {
   });
 
   const { data: pageBuyersData = [] } = useQuery<any[]>({
-    queryKey: ["/api/buyers"],
+    queryKey: ["/api/buyers?withDues=true"],
   });
-  const pageBuyersList = pageBuyersData.map((b: any) => ({ id: b.id, name: b.name, phone: b.phone || "", aadhatCommissionPercent: b.aadhatCommissionPercent || null, licenceNo: b.licenceNo || "" }));
+  const pageBuyersList = pageBuyersData.map((b: any) => ({ id: b.id, name: b.name, phone: b.phone || "", aadhatCommissionPercent: b.aadhatCommissionPercent || null, licenceNo: b.licenceNo || "", overallDue: b.overallDue ?? "0", limitAmount: b.limitAmount ?? null }));
 
   const { data: stockPageReceiptTemplates = [] } = useQuery<ReceiptTemplate[]>({
     queryKey: ["/api/receipt-templates"],
