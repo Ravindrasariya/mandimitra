@@ -3822,9 +3822,19 @@ export default function StockPage() {
   };
 
   const handlePrintBidCopy = async () => {
+    const anyDateFilter = yearFilter !== "all" || selectedMonths.length > 0 || selectedDays.length > 0;
+    const dateMatchesCard = (card: FarmerCard) => {
+      if (!anyDateFilter) return true;
+      const [y, m, d] = (card.date || "").split("-");
+      if (yearFilter !== "all" && y !== yearFilter) return false;
+      if (selectedMonths.length > 0 && !selectedMonths.includes(String(parseInt(m)))) return false;
+      if (selectedDays.length > 0 && !selectedDays.includes(String(parseInt(d)))) return false;
+      return true;
+    };
     const cropMap = new Map<string, Map<number, { farmerName: string; totalBags: number }>>();
-    for (const card of filteredCards) {
+    for (const card of cards) {
       if (card.archived || !savedCardMap.has(card.id)) continue;
+      if (!dateMatchesCard(card)) continue;
       for (const g of card.cropGroups) {
         if (g.archived) continue;
         const srNum = parseInt(g.srNumber) || 0;
