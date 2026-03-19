@@ -3589,6 +3589,7 @@ export default function StockPage() {
               }
             }
 
+            let savedBuyerReceivableAfterSave = bid.savedBuyerReceivable;
             if (bidDbId && nw > 0) {
               const vehicleBR = parseFloat(card.vehicleBhadaRate) || 0;
               const totalBIV = parseInt(card.totalBagsInVehicle) || 0;
@@ -3620,6 +3621,7 @@ export default function StockPage() {
               const buyerAdd = hammaliBuyerTotal + extraB + aadhatBuyer + mandiBuyer;
               const farmerPayable = farmerGross - farmerDed;
               const buyerReceivable = buyerGross + buyerAdd;
+              savedBuyerReceivableAfterSave = buyerReceivable;
 
               const txnPayload: Record<string, string | number | null> = {
                 lotId: lot.dbId,
@@ -3671,7 +3673,7 @@ export default function StockPage() {
               }
             }
 
-            updatedBids.push({ ...bid, bidDbId, txnDbId });
+            updatedBids.push({ ...bid, bidDbId, txnDbId, savedBuyerReceivable: savedBuyerReceivableAfterSave });
           }
 
           finalGroups = finalGroups.map((fg, gi) =>
