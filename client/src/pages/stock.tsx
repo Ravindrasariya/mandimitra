@@ -3839,7 +3839,7 @@ export default function StockPage() {
       if (selectedDays.length > 0 && !selectedDays.includes(String(parseInt(cd)))) return false;
       return true;
     };
-    const cropMap = new Map<string, Map<number, { farmerName: string; village: string; totalBags: number }>>();
+    const cropEntries = new Map<string, Array<{ serialNumber: number; farmerName: string; village: string; totalBags: number }>>();
     for (const card of cards) {
       if (card.archived || !savedCardMap.has(card.id)) continue;
       if (!dateMatchesCard(card)) continue;
@@ -3848,24 +3848,24 @@ export default function StockPage() {
         if (cropFilter !== "all" && g.crop !== cropFilter) continue;
         const srNum = parseInt(g.srNumber) || 0;
         if (!srNum) continue;
-        const remainingBags = g.lots
-          .filter(l => !l.isReturned && (parseInt(l.numberOfBags) || 0) > 0)
-          .reduce((s, l) => {
-            const lotBags = parseInt(l.numberOfBags) || 0;
-            const bidBags = l.bids.reduce((bs, b) => bs + (parseInt(b.numberOfBags) || 0), 0);
-            return s + Math.max(0, lotBags - bidBags);
-          }, 0);
-        if (remainingBags === 0) continue;
-        if (!cropMap.has(g.crop)) cropMap.set(g.crop, new Map());
-        const srMap = cropMap.get(g.crop)!;
-        if (srMap.has(srNum)) {
-          srMap.get(srNum)!.totalBags += remainingBags;
-        } else {
-          srMap.set(srNum, { farmerName: card.farmerName, village: card.village || "", totalBags: remainingBags });
+        for (const l of g.lots) {
+          if (l.isReturned) continue;
+          const lotBags = parseInt(l.numberOfBags) || 0;
+          if (lotBags === 0) continue;
+          const bidBags = l.bids.reduce((bs, b) => bs + (parseInt(b.numberOfBags) || 0), 0);
+          const remaining = Math.max(0, lotBags - bidBags);
+          if (remaining === 0) continue;
+          if (!cropEntries.has(g.crop)) cropEntries.set(g.crop, []);
+          cropEntries.get(g.crop)!.push({
+            serialNumber: srNum,
+            farmerName: card.farmerName,
+            village: card.village || "",
+            totalBags: remaining,
+          });
         }
       }
     }
-    if (cropMap.size === 0) {
+    if (cropEntries.size === 0) {
       toast({ title: t("stock.noBidCopyData"), variant: "destructive" });
       return;
     }
@@ -3873,13 +3873,11 @@ export default function StockPage() {
     if (y0 && m0 && d0) {
       try { dateStr = format(new Date(`${y0}-${m0}-${d0}`), "dd-MMM-yyyy"); } catch {}
     }
-    const cropSections: BidCropSection[] = Array.from(cropMap.entries())
+    const cropSections: BidCropSection[] = Array.from(cropEntries.entries())
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([crop, srMap]) => ({
+      .map(([crop, lots]) => ({
         crop,
-        groups: Array.from(srMap.entries())
-          .sort(([a], [b]) => a - b)
-          .map(([serialNumber, { farmerName, village, totalBags }]) => ({ serialNumber, farmerName, village, totalBags })),
+        groups: [...lots].sort((a, b) => a.serialNumber - b.serialNumber),
       }));
     const html = generateBidCopyHtml(cropSections, user?.businessName || "", dateStr);
     await printReceipt(html, `bid-copy-${dateStr}.pdf`);
