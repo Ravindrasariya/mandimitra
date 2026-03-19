@@ -27,7 +27,7 @@ import { format } from "date-fns";
 import { CROPS, SIZES, DISTRICTS } from "@shared/schema";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem, CommandGroup } from "@/components/ui/command";
-import { printReceipt, shareReceiptAsImage, wrapWithDuplicate, generateBidCopyHtml, type BidCropSection } from "@/lib/receiptUtils";
+import { printReceipt, shareReceiptAsImage, generateBidCopyHtml, type BidCropSection } from "@/lib/receiptUtils";
 import {
   generateFarmerReceiptHtml, generateBuyerReceiptHtml, generateCombinedBuyerReceiptHtml,
   generateAllBuyerReceiptHtml,
@@ -3196,8 +3196,6 @@ export default function StockPage() {
     queryKey: ["/api/receipt-templates"],
   });
 
-  const [printBillMode] = usePersistedState<"show-all" | "hide-aadhat">("txn-printBillMode", "show-all");
-
   const cs = chargeSettings || DEFAULT_CS;
 
   const [dateMode, setDateMode] = useState<"stock" | "txn">("stock");
@@ -3880,7 +3878,7 @@ export default function StockPage() {
     if (action === "share") {
       await shareReceiptAsImage(fullHtml, buyerFileName);
     } else {
-      printReceipt(fullHtml, buyerFileName);
+      await printReceipt(fullHtml, buyerFileName);
     }
   };
 
