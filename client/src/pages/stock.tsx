@@ -122,7 +122,6 @@ type LotRow = {
   size: string;
   variety: string;
   bagMarka: string;
-  isReturned?: boolean;
   bids: BidRow[];
 };
 
@@ -1253,14 +1252,13 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
 
 // ─── Lot card ─────────────────────────────────────────────────────────────────
 
-function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate, buyersList, onReturnLot }: {
+function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate, buyersList }: {
   lot: LotRow; index: number;
   onChange: (l: LotRow) => void; onRemove: () => void;
   onRemoveBid?: (lotIndex: number, bidIndex: number) => void;
   vehicleBhadaRate: number; totalBagsInVehicle: number;
   cs: ChargeSettings; farmerDate: string;
   buyersList: { id: number; name: string; phone?: string; aadhatCommissionPercent?: string | null; overallDue?: string; limitAmount?: number | null }[];
-  onReturnLot?: () => void;
 }) {
   const { t } = useLanguage();
   const [pendingDeleteBidIdx, setPendingDeleteBidIdx] = useState<number | null>(null);
@@ -1294,11 +1292,10 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
 
   const pendingBid = pendingDeleteBidIdx !== null ? lot.bids[pendingDeleteBidIdx] : null;
   const pendingBidLabel = pendingBid?.buyerName.trim() || `Bid #${(pendingDeleteBidIdx ?? 0) + 1}`;
-
-  const [showReturnConfirm, setShowReturnConfirm] = useState(false);
+  const pendingBidHasTxn = !!pendingBid?.txnDbId;
 
   return (
-    <div className={`rounded-lg border ${lot.isReturned ? "border-orange-300 bg-orange-50/30 dark:border-orange-700 dark:bg-orange-950/20" : "border-border bg-card"} shadow-sm overflow-hidden`}>
+    <div className="rounded-lg border border-border bg-card shadow-sm overflow-hidden">
       <div className="flex items-center bg-muted/30 border-b border-border">
         <button
           type="button"
@@ -1308,11 +1305,6 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
         >
           {lot.lotOpen ? <ChevronDown className="w-[18px] h-[18px] text-muted-foreground" strokeWidth={3} /> : <ChevronRight className="w-[18px] h-[18px] text-muted-foreground" strokeWidth={3} />}
           <span className="text-xs font-bold text-foreground uppercase tracking-wide">{t("stock.lot")} #{index + 1}</span>
-          {lot.isReturned && (
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-4 border-orange-300 text-orange-600 dark:border-orange-700 dark:text-orange-400">
-              {t("stock.returned")}
-            </Badge>
-          )}
           {!lot.lotOpen && (
             <CollapsedSummary
               totalBags={totals.lotBags} remainingBags={totals.lotBags - totals.bidBags}
@@ -1324,37 +1316,16 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
           )}
         </button>
         <div className="flex items-center gap-0.5 shrink-0 mr-1">
-          {lot.dbId && !lot.isReturned && onReturnLot && (
-            <button
-              type="button"
-              data-testid={`button-return-lot-${index}`}
-              onClick={() => setShowReturnConfirm(true)}
-              className="h-8 w-8 flex items-center justify-center text-orange-400 hover:text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-950/30 transition-colors rounded"
-              title={t("stock.returnLotToFarmer")}
-            >
-              <Truck className="w-3.5 h-3.5" />
-            </button>
-          )}
-          {!lot.isReturned && (
-            <button
-              type="button"
-              data-testid={`button-remove-lot-${index}`}
-              onClick={onRemove}
-              className="h-8 w-8 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors rounded"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          )}
+          <button
+            type="button"
+            data-testid={`button-remove-lot-${index}`}
+            onClick={onRemove}
+            className="h-8 w-8 flex items-center justify-center text-red-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors rounded"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
-
-      <ConfirmDeleteDialog
-        open={showReturnConfirm}
-        title={t("stock.returnLotConfirm")}
-        description={`${t("stock.lot")} #${index + 1} ${t("stock.returnLotDesc")}`}
-        onConfirm={() => { setShowReturnConfirm(false); onReturnLot?.(); }}
-        onCancel={() => setShowReturnConfirm(false)}
-      />
 
       {lot.lotOpen && (
         <div className="p-3 space-y-3">
@@ -1440,7 +1411,7 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
       <ConfirmDeleteDialog
         open={pendingDeleteBidIdx !== null}
         title={`${t("stock.delete")} ${pendingBidLabel}?`}
-        description={t("stock.deleteBidDesc")}
+        description={pendingBidHasTxn ? t("stock.deleteBidWithTxnDesc") : t("stock.deleteBidDesc")}
         onConfirm={confirmRemoveBid}
         onCancel={() => setPendingDeleteBidIdx(null)}
       />
@@ -1450,7 +1421,7 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
 
 // ─── Crop group ───────────────────────────────────────────────────────────────
 
-function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, vehicleBhadaRate, totalBagsInVehicle, totalAllocatedAllGroups, cs, farmerDate, farmerName, currentUsername, onSyncSaved, buyersList, onReturnLot, farmerCard }: {
+function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, vehicleBhadaRate, totalBagsInVehicle, totalAllocatedAllGroups, cs, farmerDate, farmerName, currentUsername, onSyncSaved, buyersList, farmerCard }: {
   group: CropGroup;
   onChange: (g: CropGroup) => void; onArchive: () => void; onDelete: () => void;
   isPersisted: boolean;
@@ -1459,7 +1430,6 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
   currentUsername: string;
   onSyncSaved?: (updatedGroup: CropGroup) => void;
   buyersList: { id: number; name: string; phone?: string; aadhatCommissionPercent?: string | null; overallDue?: string; limitAmount?: number | null }[];
-  onReturnLot?: (lotIdx: number) => void;
   farmerCard?: FarmerCard;
 }) {
   const { t } = useLanguage();
@@ -1824,7 +1794,6 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
               cs={cs}
               farmerDate={farmerDate}
               buyersList={buyersList}
-              onReturnLot={onReturnLot ? () => onReturnLot(idx) : undefined}
             />
           ))}
           {(() => {
@@ -2381,44 +2350,6 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                   onSyncSaved(updatedCard);
                 }}
                 buyersList={buyersList}
-                onReturnLot={async (lotIdx) => {
-                  const lot = group.lots[lotIdx];
-                  if (!lot?.dbId) return;
-                  try {
-                    await apiRequest("POST", `/api/lots/${lot.dbId}/return`);
-                    const updatedLots = group.lots.map((lt: LotRow, li: number) => li === lotIdx ? { ...lt, isReturned: true } : lt);
-                    const updatedGroup = { ...group, lots: updatedLots };
-                    updateGroup(idx, updatedGroup);
-                    onSyncSaved({ ...card, cropGroups: card.cropGroups.map((cg: CropGroup, ci: number) => ci === idx ? updatedGroup : cg) });
-                    queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
-                    queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
-                    queryClient.invalidateQueries({ queryKey: ["/api/bids"] });
-                    queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
-                    queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
-                    queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
-                    queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"] });
-                    queryClient.invalidateQueries({ queryKey: ["/api/transaction-edit-history"] });
-                    queryClient.invalidateQueries({ predicate: (query) => {
-                      const key = query.queryKey[0];
-                      return typeof key === "string" && key.startsWith("/api/buyers");
-                    }});
-                    queryClient.invalidateQueries({ predicate: (query) => {
-                      const key = query.queryKey[0];
-                      return typeof key === "string" && key.startsWith("/api/farmers");
-                    }});
-                    queryClient.invalidateQueries({ predicate: (query) => {
-                      const key = query.queryKey[0];
-                      return typeof key === "string" && key.startsWith("/api/cash-entries");
-                    }});
-                    queryClient.invalidateQueries({ predicate: (query) => {
-                      const key = query.queryKey[0];
-                      return typeof key === "string" && (key.startsWith("/api/books/balance-sheet") || key.startsWith("/api/books/profit-and-loss"));
-                    }});
-                    toast({ title: t("stock.lotReturned"), description: `${t("stock.lot")} #${lotIdx + 1} ${t("stock.returnedToFarmer")}`, variant: "success" });
-                  } catch (err: any) {
-                    toast({ title: t("stock.returnLotFailed"), description: err?.message, variant: "destructive" });
-                  }
-                }}
               />
             ));
             })()}
@@ -2566,7 +2497,6 @@ function stockCardsToFarmerCards(apiCards: any[]): FarmerCard[] {
           size: lot.size || "None",
           variety: lot.variety || "",
           bagMarka: lot.bagMarka || "",
-          isReturned: lot.isReturned || false,
           bids: (lot.bids || []).map((b: any) => {
             const txn = b.transaction;
             return {
@@ -3447,12 +3377,30 @@ export default function StockPage() {
 
       const prevSavedCard = savedCardMap.get(card.id);
 
+      // Phase 0: delete removed lots (hard delete via new endpoint).
+      if (prevSavedCard) {
+        const currentLotDbIds = new Set(
+          card.cropGroups.flatMap(g => g.lots.map(l => l.dbId)).filter(Boolean)
+        );
+        for (const savedGroup of prevSavedCard.cropGroups) {
+          for (const savedLot of savedGroup.lots) {
+            if (savedLot.dbId && !currentLotDbIds.has(savedLot.dbId)) {
+              try {
+                await apiRequest("DELETE", `/api/lots/${savedLot.dbId}`);
+              } catch (err: any) {
+                toast({ title: t("stock.warning"), description: `Failed to delete lot: ${err.message}`, variant: "destructive" });
+              }
+            }
+          }
+        }
+      }
+
       // Delete removed bids BEFORE patching lots so the PATCH bag-count validation
       // does not see bids that are about to be removed.
       const restoredBidsMap = new Map<string, BidRow[]>();
       for (const group of card.cropGroups) {
         for (const lot of group.lots) {
-          if (!lot.dbId || lot.isReturned) continue;
+          if (!lot.dbId) continue;
           const savedGroup = prevSavedCard?.cropGroups.find(sg => sg.id === group.id);
           const savedLot = savedGroup?.lots.find(sl => sl.id === lot.id);
           const savedBidMap = new Map((savedLot?.bids || []).filter(b => b.bidDbId).map(b => [b.bidDbId!, b]));
@@ -3460,11 +3408,6 @@ export default function StockPage() {
           const restoredBids: BidRow[] = [];
           for (const [deletedBidDbId, deletedBid] of Array.from(savedBidMap.entries())) {
             if (!currentBidDbIds.has(deletedBidDbId)) {
-              if (deletedBid.txnDbId) {
-                toast({ title: t("stock.warning"), description: `${t("stock.cannotDeleteBidActiveTxn")} — ${deletedBid.buyerName}`, variant: "destructive" });
-                restoredBids.push(deletedBid);
-                continue;
-              }
               try {
                 await apiRequest("DELETE", `/api/bids/${deletedBidDbId}`);
               } catch (err: any) {
@@ -3535,7 +3478,7 @@ export default function StockPage() {
         const group = finalGroups[gIdx];
         for (let lIdx = 0; lIdx < group.lots.length; lIdx++) {
           const lot = group.lots[lIdx];
-          if (!lot.dbId || lot.isReturned) continue;
+          if (!lot.dbId) continue;
 
           const savedGroup = prevSavedCard?.cropGroups.find(sg => sg.id === group.id);
           const savedLot = savedGroup?.lots.find(sl => sl.id === lot.id);
@@ -3914,9 +3857,8 @@ export default function StockPage() {
         if (cropFilter !== "all" && g.crop !== cropFilter) continue;
         const srNum = parseInt(g.srNumber) || 0;
         if (!srNum) continue;
-        const cardTotalBags = g.lots.filter(l => !l.isReturned).reduce((s, l) => s + (parseInt(l.numberOfBags) || 0), 0);
+        const cardTotalBags = g.lots.reduce((s, l) => s + (parseInt(l.numberOfBags) || 0), 0);
         for (const l of g.lots) {
-          if (l.isReturned) continue;
           const lotBags = parseInt(l.numberOfBags) || 0;
           if (lotBags === 0) continue;
           const bidBags = l.bids.reduce((bs, b) => bs + (parseInt(b.numberOfBags) || 0), 0);

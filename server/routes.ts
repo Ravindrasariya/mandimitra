@@ -8,7 +8,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { db } from "./db";
-import { transactions, bids, buyers, lots, insertAssetSchema, insertLiabilitySchema, type Farmer } from "@shared/schema";
+import { transactions, bids, buyers, lots, farmers, cashEntries, transactionEditHistory, insertAssetSchema, insertLiabilitySchema, type Farmer } from "@shared/schema";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { addSseClient, removeSseClient, broadcastBusinessEvent } from "./sse";
 
@@ -584,7 +584,6 @@ export async function registerRoutes(
         
         remainingBags: number;
         isArchived: boolean;
-        isReturned: boolean;
         bids: StockCardBid[];
       }
 
@@ -647,7 +646,6 @@ export async function registerRoutes(
           bagMarka: lot.bagMarka,
           remainingBags: lot.remainingBags,
           isArchived: lot.isArchived,
-          isReturned: lot.isReturned ?? false,
           bids: [],
         });
       }
@@ -975,42 +973,6 @@ export async function registerRoutes(
     res.json(updated);
   });
 
-  app.post("/api/lots/:id/return", requireAuth, async (req, res) => {
-    try {
-      const lotId = paramId(req.params.id);
-      const businessId = req.user!.businessId;
-      const lot = await storage.getLot(lotId, businessId);
-      if (!lot) return res.status(404).json({ message: "Lot not found" });
-      if (lot.isReturned) return res.status(400).json({ message: "Lot is already returned" });
-
-      const lotBids = await storage.getBids(businessId, lotId);
-      const pendingBids = lotBids.filter(b => !b.hasTransaction);
-      if (pendingBids.length > 0) {
-        return res.status(400).json({ message: "This lot has active bids. Please return bids to stock register first before returning to farmer." });
-      }
-
-      const actual = lot.actualNumberOfBags ?? lot.numberOfBags;
-      const soldBags = actual - lot.remainingBags;
-
-      if (soldBags > 0) {
-        await storage.updateLot(lotId, businessId, {
-          actualNumberOfBags: soldBags,
-          remainingBags: 0,
-          isReturned: true,
-        } as any);
-      } else {
-        await storage.updateLot(lotId, businessId, {
-          isReturned: true,
-        } as any);
-      }
-
-      broadcastBusinessEvent(businessId);
-      res.json({ message: "Lot returned successfully", soldBags });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
-  });
-
   app.get("/api/bids", requireAuth, async (req, res) => {
     const lotId = req.query.lotId ? parseInt(req.query.lotId as string) : undefined;
     const result = await storage.getBids(req.user!.businessId, lotId);
@@ -1039,15 +1001,132 @@ export async function registerRoutes(
   });
 
   app.delete("/api/bids/:id", requireAuth, async (req, res) => {
-    const bidId = paramId(req.params.id);
-    const businessId = req.user!.businessId;
-    const existingTx = await db.select({ id: transactions.id }).from(transactions)
-      .where(and(eq(transactions.bidId, bidId), eq(transactions.businessId, businessId), eq(transactions.isReversed, false)))
-      .limit(1);
-    if (existingTx.length > 0) return res.status(400).json({ message: "Cannot delete a bid that has an active transaction" });
-    await storage.deleteBid(bidId, businessId);
-    broadcastBusinessEvent(businessId);
-    res.json({ message: "Deleted" });
+    try {
+      const bidId = paramId(req.params.id);
+      const businessId = req.user!.businessId;
+      const username = req.user!.username;
+
+      const [bid] = await db.select().from(bids).where(and(eq(bids.id, bidId), eq(bids.businessId, businessId)));
+      if (!bid) return res.status(404).json({ message: "Bid not found" });
+
+      const [buyer] = await db.select({ name: buyers.name }).from(buyers).where(eq(buyers.id, bid.buyerId));
+      const buyerName = buyer?.name || "";
+
+      const [tx] = await db.select().from(transactions)
+        .where(and(eq(transactions.bidId, bidId), eq(transactions.businessId, businessId), eq(transactions.isReversed, false)))
+        .limit(1);
+
+      const auditValue: Record<string, any> = {
+        buyerName,
+        numberOfBags: bid.numberOfBags,
+        pricePerKg: bid.pricePerKg,
+      };
+
+      if (tx) {
+        const [farmer] = await db.select({ name: farmers.name }).from(farmers).where(eq(farmers.id, tx.farmerId));
+        auditValue.transactionId = tx.transactionId;
+        auditValue.totalPayableToFarmer = tx.totalPayableToFarmer;
+        auditValue.totalReceivableFromBuyer = tx.totalReceivableFromBuyer;
+        auditValue.txnDate = tx.date;
+        auditValue.farmerName = farmer?.name || "";
+
+        await db.delete(transactionEditHistory).where(eq(transactionEditHistory.transactionId, tx.id));
+        await db.delete(cashEntries).where(eq(cashEntries.transactionId, tx.id));
+        await db.delete(transactions).where(eq(transactions.id, tx.id));
+      }
+
+      await storage.createLotEditHistory({
+        lotId: bid.lotId,
+        businessId,
+        fieldChanged: "bid_deleted",
+        oldValue: JSON.stringify(auditValue),
+        newValue: null,
+        changedBy: username,
+      });
+
+      await storage.deleteBid(bidId, businessId);
+      broadcastBusinessEvent(businessId);
+      res.json({ message: "Deleted" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  app.delete("/api/lots/:id", requireAuth, async (req, res) => {
+    try {
+      const lotId = paramId(req.params.id);
+      const businessId = req.user!.businessId;
+      const username = req.user!.username;
+
+      const lot = await storage.getLot(lotId, businessId);
+      if (!lot) return res.status(404).json({ message: "Lot not found" });
+
+      const lotBids = await db.select({
+        id: bids.id,
+        numberOfBags: bids.numberOfBags,
+        pricePerKg: bids.pricePerKg,
+        buyerName: buyers.name,
+      }).from(bids)
+        .innerJoin(buyers, eq(bids.buyerId, buyers.id))
+        .where(and(eq(bids.lotId, lotId), eq(bids.businessId, businessId)));
+
+      const lotTxns = await db.select({
+        id: transactions.id,
+        transactionId: transactions.transactionId,
+        numberOfBags: transactions.numberOfBags,
+        pricePerKg: bids.pricePerKg,
+        totalPayableToFarmer: transactions.totalPayableToFarmer,
+        totalReceivableFromBuyer: transactions.totalReceivableFromBuyer,
+        date: transactions.date,
+        buyerName: buyers.name,
+        farmerName: farmers.name,
+      }).from(transactions)
+        .innerJoin(bids, eq(transactions.bidId, bids.id))
+        .innerJoin(buyers, eq(transactions.buyerId, buyers.id))
+        .innerJoin(farmers, eq(transactions.farmerId, farmers.id))
+        .where(and(eq(transactions.lotId, lotId), eq(transactions.businessId, businessId)));
+
+      if (lotBids.length > 0 || lotTxns.length > 0) {
+        const auditValue = {
+          numberOfBags: lot.numberOfBags,
+          bids: lotBids.map(b => ({ buyerName: b.buyerName, numberOfBags: b.numberOfBags, pricePerKg: b.pricePerKg })),
+          transactions: lotTxns.map(t => ({
+            buyerName: t.buyerName,
+            farmerName: t.farmerName,
+            numberOfBags: t.numberOfBags,
+            pricePerKg: t.pricePerKg,
+            totalPayableToFarmer: t.totalPayableToFarmer,
+            totalReceivableFromBuyer: t.totalReceivableFromBuyer,
+            txnDate: t.date,
+          })),
+        };
+        await storage.createLotEditHistory({
+          lotId,
+          businessId,
+          fieldChanged: "lot_deleted",
+          oldValue: JSON.stringify(auditValue),
+          newValue: null,
+          changedBy: username,
+        });
+      }
+
+      if (lotTxns.length > 0) {
+        const txnIds = lotTxns.map(t => t.id);
+        await db.delete(transactionEditHistory).where(inArray(transactionEditHistory.transactionId, txnIds));
+        await db.delete(cashEntries).where(inArray(cashEntries.transactionId, txnIds));
+        await db.delete(transactions).where(inArray(transactions.id, txnIds));
+      }
+      if (lotBids.length > 0) {
+        const bidIds = lotBids.map(b => b.id);
+        await db.delete(bids).where(inArray(bids.id, bidIds));
+      }
+      await db.delete(lots).where(and(eq(lots.id, lotId), eq(lots.businessId, businessId)));
+
+      broadcastBusinessEvent(businessId);
+      res.json({ message: "Deleted" });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
   });
 
   app.get("/api/transactions", requireAuth, async (req, res) => {
@@ -1122,61 +1201,6 @@ export async function registerRoutes(
 
     broadcastBusinessEvent(businessId);
     res.json(updated);
-  });
-
-  app.post("/api/transactions/:id/reverse", requireAuth, async (req, res) => {
-    try {
-      const txId = paramId(req.params.id);
-      const businessId = req.user!.businessId;
-      const tx = await storage.getTransaction(txId, businessId);
-      if (!tx) return res.status(404).json({ message: "Transaction not found" });
-      if (tx.isReversed) return res.status(400).json({ message: "Transaction is already reversed" });
-
-      const bagsToReturn = tx.numberOfBags || 0;
-
-      const lot = await storage.getLot(tx.lotId, businessId);
-      if (!lot) return res.status(404).json({ message: "Lot not found" });
-
-      await storage.updateTransaction(txId, businessId, { isReversed: true } as any);
-      await storage.createTransactionEditHistory({
-        transactionId: txId,
-        businessId,
-        fieldChanged: "reversed",
-        oldValue: "false",
-        newValue: "true",
-        changedBy: req.user!.username,
-      });
-      await storage.recalculateBuyerPaymentStatus(businessId, tx.buyerId);
-      await storage.recalculateFarmerPaymentStatus(businessId, tx.farmerId);
-
-      const actual = lot.actualNumberOfBags ?? lot.numberOfBags;
-      const newActual = lot.isReturned ? actual + bagsToReturn : actual;
-
-      const { db } = await import("./db");
-      const { bids: bidsTable, transactions: txTable } = await import("@shared/schema");
-      const { eq: eqOp, and: andOp, sql: sqlOp } = await import("drizzle-orm");
-
-      const [activeBidsResult] = await db.select({
-        totalBags: sqlOp<number>`COALESCE(SUM(${bidsTable.numberOfBags}), 0)`
-      }).from(bidsTable)
-        .leftJoin(txTable, andOp(eqOp(txTable.bidId, bidsTable.id), eqOp(txTable.isReversed, true)))
-        .where(andOp(
-          eqOp(bidsTable.lotId, lot.id),
-          eqOp(bidsTable.businessId, businessId),
-          sqlOp`${txTable.id} IS NULL`
-        ));
-
-      const activeBidBags = Number(activeBidsResult?.totalBags || 0);
-      const newRemaining = Math.max(0, newActual - activeBidBags);
-
-      const updateData: any = { remainingBags: newRemaining, actualNumberOfBags: newActual };
-      await storage.updateLot(lot.id, businessId, updateData);
-
-      broadcastBusinessEvent(businessId);
-      res.json({ message: "Transaction reversed successfully", bagsReturned: bagsToReturn });
-    } catch (err: any) {
-      res.status(500).json({ message: err.message });
-    }
   });
 
   app.get("/api/bank-accounts", requireAuth, async (req, res) => {

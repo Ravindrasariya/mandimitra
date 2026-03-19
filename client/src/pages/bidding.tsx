@@ -169,7 +169,6 @@ export default function BiddingPage() {
   const filteredLots = useMemo(() => {
     const searchLower = farmerSearch.trim().toLowerCase();
     return lots.filter(l => {
-      if (l.isReturned) return false;
       if (activeGrade !== ALL_VALUE && l.size !== activeGrade) return false;
       if (yearFilter !== ALL_VALUE) {
         const d = new Date(l.date);
