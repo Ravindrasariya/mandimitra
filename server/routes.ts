@@ -8,7 +8,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { db } from "./db";
-import { transactions, bids, buyers, lots, farmers, cashEntries, transactionEditHistory, insertAssetSchema, insertLiabilitySchema, type Farmer } from "@shared/schema";
+import { transactions, bids, buyers, lots, farmers, cashEntries, transactionEditHistory, lotEditHistory, insertAssetSchema, insertLiabilitySchema, type Farmer } from "@shared/schema";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { addSseClient, removeSseClient, broadcastBusinessEvent } from "./sse";
 
@@ -1086,7 +1086,8 @@ export async function registerRoutes(
         .innerJoin(farmers, eq(transactions.farmerId, farmers.id))
         .where(and(eq(transactions.lotId, lotId), eq(transactions.businessId, businessId)));
 
-      if (lotBids.length > 0 || lotTxns.length > 0) {
+      await db.transaction(async (tx) => {
+        // Write audit snapshot before deletion
         const auditValue = {
           numberOfBags: lot.numberOfBags,
           bids: lotBids.map(b => ({ buyerName: b.buyerName, numberOfBags: b.numberOfBags, pricePerKg: b.pricePerKg })),
@@ -1100,7 +1101,7 @@ export async function registerRoutes(
             txnDate: t.date,
           })),
         };
-        await storage.createLotEditHistory({
+        await tx.insert(lotEditHistory).values({
           lotId,
           businessId,
           fieldChanged: "lot_deleted",
@@ -1108,19 +1109,26 @@ export async function registerRoutes(
           newValue: null,
           changedBy: username,
         });
-      }
 
-      if (lotTxns.length > 0) {
-        const txnIds = lotTxns.map(t => t.id);
-        await db.delete(transactionEditHistory).where(inArray(transactionEditHistory.transactionId, txnIds));
-        await db.delete(cashEntries).where(inArray(cashEntries.transactionId, txnIds));
-        await db.delete(transactions).where(inArray(transactions.id, txnIds));
-      }
-      if (lotBids.length > 0) {
-        const bidIds = lotBids.map(b => b.id);
-        await db.delete(bids).where(inArray(bids.id, bidIds));
-      }
-      await db.delete(lots).where(and(eq(lots.id, lotId), eq(lots.businessId, businessId)));
+        // Null out lotId FK on ALL lot_edit_history rows so the lot can be deleted
+        // (lot_edit_history.lotId is nullable; audit rows are preserved without FK)
+        await tx.update(lotEditHistory)
+          .set({ lotId: null } as any)
+          .where(eq(lotEditHistory.lotId, lotId));
+
+        // Cascade-delete child records
+        if (lotTxns.length > 0) {
+          const txnIds = lotTxns.map(t => t.id);
+          await tx.delete(transactionEditHistory).where(inArray(transactionEditHistory.transactionId, txnIds));
+          await tx.delete(cashEntries).where(inArray(cashEntries.transactionId, txnIds));
+          await tx.delete(transactions).where(inArray(transactions.id, txnIds));
+        }
+        if (lotBids.length > 0) {
+          const bidIds = lotBids.map(b => b.id);
+          await tx.delete(bids).where(inArray(bids.id, bidIds));
+        }
+        await tx.delete(lots).where(and(eq(lots.id, lotId), eq(lots.businessId, businessId)));
+      });
 
       broadcastBusinessEvent(businessId);
       res.json({ message: "Deleted" });

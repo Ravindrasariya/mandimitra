@@ -99,7 +99,7 @@ export const buyerEditHistory = pgTable("buyer_edit_history", {
 
 export const lotEditHistory = pgTable("lot_edit_history", {
   id: serial("id").primaryKey(),
-  lotId: integer("lot_id").notNull().references(() => lots.id),
+  lotId: integer("lot_id").references(() => lots.id),
   businessId: integer("business_id").notNull().references(() => businesses.id),
   fieldChanged: text("field_changed").notNull(),
   oldValue: text("old_value"),
