@@ -3621,7 +3621,6 @@ export default function StockPage() {
               const buyerAdd = hammaliBuyerTotal + extraB + aadhatBuyer + mandiBuyer;
               const farmerPayable = farmerGross - farmerDed;
               const buyerReceivable = buyerGross + buyerAdd;
-              savedBuyerReceivableAfterSave = buyerReceivable;
 
               const txnPayload: Record<string, string | number | null> = {
                 lotId: lot.dbId,
@@ -3661,12 +3660,14 @@ export default function StockPage() {
                   const txnRes = await apiRequest("POST", "/api/transactions", txnPayload);
                   const createdTxn = await txnRes.json();
                   txnDbId = createdTxn.id;
+                  savedBuyerReceivableAfterSave = buyerReceivable;
                 } catch (err: any) {
                   toast({ title: t("stock.warning"), description: `${t("stock.failedCreateTxn")}: ${err.message}`, variant: "destructive" });
                 }
               } else {
                 try {
                   await apiRequest("PATCH", `/api/transactions/${txnDbId}`, txnPayload);
+                  savedBuyerReceivableAfterSave = buyerReceivable;
                 } catch (err: any) {
                   toast({ title: t("stock.warning"), description: `${t("stock.failedUpdateTxn")}: ${err.message}`, variant: "destructive" });
                 }
