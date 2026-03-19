@@ -1288,6 +1288,8 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
     runningBags += parseInt(b.numberOfBags) || 0;
     return lotBags > 0 && runningBags > lotBags;
   });
+  const totalBidBags = lot.bids.reduce((s, b) => s + (parseInt(b.numberOfBags) || 0), 0);
+  const addBidDisabled = lotBags > 0 && totalBidBags >= lotBags;
 
   const pendingBid = pendingDeleteBidIdx !== null ? lot.bids[pendingDeleteBidIdx] : null;
   const pendingBidLabel = pendingBid?.buyerName.trim() || `Bid #${(pendingDeleteBidIdx ?? 0) + 1}`;
@@ -1423,6 +1425,8 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
             <Button
               type="button" variant="outline" size="sm"
               onClick={addBid}
+              disabled={addBidDisabled}
+              title={addBidDisabled ? t("stock.lotBagsFullyAllocated") : undefined}
               className="w-full h-7 text-xs gap-1.5 border-dashed mt-2"
               data-testid="button-add-bid"
             >
@@ -1445,11 +1449,11 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
 
 // ─── Crop group ───────────────────────────────────────────────────────────────
 
-function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, vehicleBhadaRate, totalBagsInVehicle, cs, farmerDate, farmerName, currentUsername, onSyncSaved, buyersList, onReturnLot, farmerCard }: {
+function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, vehicleBhadaRate, totalBagsInVehicle, totalAllocatedAllGroups, cs, farmerDate, farmerName, currentUsername, onSyncSaved, buyersList, onReturnLot, farmerCard }: {
   group: CropGroup;
   onChange: (g: CropGroup) => void; onArchive: () => void; onDelete: () => void;
   isPersisted: boolean;
-  vehicleBhadaRate: number; totalBagsInVehicle: number;
+  vehicleBhadaRate: number; totalBagsInVehicle: number; totalAllocatedAllGroups: number;
   cs: ChargeSettings; farmerDate: string; farmerName: string;
   currentUsername: string;
   onSyncSaved?: (updatedGroup: CropGroup) => void;
@@ -1822,9 +1826,21 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
               onReturnLot={onReturnLot ? () => onReturnLot(idx) : undefined}
             />
           ))}
-          <Button type="button" variant="outline" size="sm" onClick={addLot} className="w-full h-8 text-xs gap-1.5 border-dashed">
-            <Plus className="w-3.5 h-3.5" /> {t("stock.addLotUnder")} {group.crop}
-          </Button>
+          {(() => {
+            const addLotDisabled = totalBagsInVehicle > 0 && totalAllocatedAllGroups >= totalBagsInVehicle;
+            return (
+              <Button
+                type="button" variant="outline" size="sm"
+                onClick={addLot}
+                disabled={addLotDisabled}
+                title={addLotDisabled ? t("stock.vehicleCapacityReached") : undefined}
+                className="w-full h-8 text-xs gap-1.5 border-dashed"
+                data-testid={`button-add-lot-${group.crop.toLowerCase()}`}
+              >
+                <Plus className="w-3.5 h-3.5" /> {t("stock.addLotUnder")} {group.crop}
+              </Button>
+            );
+          })()}
         </div>
       )}
 
@@ -2353,6 +2369,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                 isPersisted={group.persisted}
                 vehicleBhadaRate={vehicleBhadaRate}
                 totalBagsInVehicle={totalBagsInVehicle}
+                totalAllocatedAllGroups={grandTotalBags}
                 cs={cs}
                 farmerDate={card.date}
                 farmerName={card.farmerName}
@@ -3309,6 +3326,18 @@ export default function StockPage() {
     if (allocatedBags > vehicleBags) {
       toast({ title: t("stock.error"), description: `${t("stock.bagsExceedCapacity")} (${allocatedBags} > ${vehicleBags})`, variant: "destructive" });
       return;
+    }
+
+    for (const g of card.cropGroups.filter(gg => !gg.archived)) {
+      for (let li = 0; li < g.lots.length; li++) {
+        const lot = g.lots[li];
+        const lotBags = parseInt(lot.numberOfBags) || 0;
+        const totalBidBagsForLot = lot.bids.reduce((s, b) => s + (parseInt(b.numberOfBags) || 0), 0);
+        if (lotBags > 0 && totalBidBagsForLot > lotBags) {
+          toast({ title: t("stock.error"), description: `${g.crop} ${t("stock.lot")} #${li + 1}: ${t("stock.bidBagsExceedLot")} (${totalBidBagsForLot} > ${lotBags})`, variant: "destructive" });
+          return;
+        }
+      }
     }
 
     const unmatchedBuyer = card.cropGroups

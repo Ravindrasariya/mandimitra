@@ -896,6 +896,35 @@ export async function registerRoutes(
       if (data.numberOfBags < soldBags) {
         return res.status(400).json({ message: `Cannot reduce original bags below already sold bags (${soldBags})` });
       }
+
+      // Check (a): total sibling lot bags must not exceed vehicle capacity
+      const effectiveTBIV = data.totalBagsInVehicle ?? lot.totalBagsInVehicle;
+      if (effectiveTBIV != null && effectiveTBIV > 0) {
+        const siblingLots = await db
+          .select({ id: lots.id, numberOfBags: lots.numberOfBags })
+          .from(lots)
+          .where(and(
+            eq(lots.farmerId, lot.farmerId),
+            eq(lots.date, lot.date),
+            eq(lots.businessId, businessId),
+            eq(lots.isArchived, false)
+          ));
+        const newTotal = siblingLots.reduce((s, l) => s + (l.id === lotId ? data.numberOfBags : l.numberOfBags), 0);
+        if (newTotal > effectiveTBIV) {
+          return res.status(400).json({ message: `Total lot bags (${newTotal}) would exceed vehicle capacity (${effectiveTBIV})` });
+        }
+      }
+
+      // Check (b): existing bid bags must not exceed the new lot bag count
+      const lotBids = await db
+        .select({ numberOfBags: bids.numberOfBags })
+        .from(bids)
+        .where(and(eq(bids.lotId, lotId), eq(bids.businessId, businessId)));
+      const totalBidBags = lotBids.reduce((s, b) => s + (b.numberOfBags || 0), 0);
+      if (totalBidBags > data.numberOfBags) {
+        return res.status(400).json({ message: `Cannot reduce lot bags below already allocated bid bags (${totalBidBags})` });
+      }
+
       if (data.actualNumberOfBags == null) {
         const effectiveActual = Math.min(oldActual, data.numberOfBags);
         data.actualNumberOfBags = effectiveActual;
