@@ -424,7 +424,7 @@ const uid = () => Math.random().toString(36).slice(2, 8);
 
 const emptyBid = (date?: string): BidRow => ({
   id: uid(),
-  bidOpen: true,
+  bidOpen: false,
   buyerName: "",
   pricePerKg: "",
   numberOfBags: "",
