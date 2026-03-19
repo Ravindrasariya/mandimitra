@@ -153,11 +153,11 @@ function dbRecordToEditEntry(rec: { fieldChanged: string; oldValue: string | nul
     let detail = "";
     try {
       const data = JSON.parse(rec.oldValue || "{}");
-      const parts: string[] = [];
-      if (data.buyerName) parts.push(data.buyerName);
-      if (data.numberOfBags) parts.push(`${data.numberOfBags} bags`);
-      if (data.pricePerKg) parts.push(`₹${data.pricePerKg}/kg`);
-      detail = parts.join(", ");
+      const namePart = data.buyerName ? String(data.buyerName) : "";
+      const bagsPart = data.numberOfBags ? `${data.numberOfBags} bags` : "";
+      const pricePart = data.pricePerKg ? `₹${parseFloat(data.pricePerKg)}/kg` : "";
+      const suffix = [bagsPart, pricePart].filter(Boolean).join(", ");
+      detail = namePart && suffix ? `${namePart} — ${suffix}` : namePart || suffix;
     } catch {}
     return { timestamp, username, changes: [{ kind: "deleted", path: "Bid", detail: detail || undefined }] };
   }
@@ -1501,12 +1501,18 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
     const lot = group.lots[lotIndex];
     if (!lot) return;
     const deletedBid = lot.bids[bidIndex];
-    const buyerName = deletedBid?.buyerName?.trim() || "";
     const now = format(new Date(), "dd/MM/yyyy HH:mm");
+    const parts: string[] = [];
+    const buyerName = deletedBid?.buyerName?.trim() || "";
+    const bags = parseInt(deletedBid?.numberOfBags || "0");
+    const price = parseFloat(deletedBid?.pricePerKg || "0");
+    if (buyerName) parts.push(buyerName);
+    if (bags > 0) parts.push(`${bags} bags`);
+    if (price > 0) parts.push(`₹${price}/kg`);
     const entry: EditEntry = {
       timestamp: now,
       username: currentUsername,
-      changes: [{ kind: "deleted", path: `Lot ${lotIndex + 1} > Bid ${bidIndex + 1}`, detail: buyerName || undefined }],
+      changes: [{ kind: "deleted", path: `Lot ${lotIndex + 1} > Bid ${bidIndex + 1}`, detail: parts.join(" — ") || undefined }],
     };
     onChange({
       ...group,
@@ -1518,11 +1524,30 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
   const confirmDeleteLot = () => {
     if (pendingDeleteLotIdx !== null) {
       const now = format(new Date(), "dd/MM/yyyy HH:mm");
-      const entry: EditEntry = {
-        timestamp: now,
-        username: currentUsername,
-        changes: [{ kind: "deleted", path: `Lot ${pendingDeleteLotIdx + 1}` }],
-      };
+      const deletedLot = group.lots[pendingDeleteLotIdx];
+      const lotNum = pendingDeleteLotIdx + 1;
+      const changes: ChangeRecord[] = [];
+      const lotParts: string[] = [];
+      const bags = parseInt(deletedLot?.numberOfBags || "0");
+      if (bags > 0) lotParts.push(`${bags} bags`);
+      if (deletedLot?.variety?.trim()) lotParts.push(deletedLot.variety.trim());
+      if (deletedLot?.size?.trim()) lotParts.push(deletedLot.size.trim());
+      changes.push({ kind: "deleted", path: `Lot ${lotNum}`, detail: lotParts.join(", ") || undefined });
+      if (deletedLot?.bids) {
+        deletedLot.bids.forEach((bid, bi) => {
+          const bidParts: string[] = [];
+          const bn = bid.buyerName?.trim() || "";
+          const bb = parseInt(bid.numberOfBags || "0");
+          const bp = parseFloat(bid.pricePerKg || "0");
+          if (bn) bidParts.push(bn);
+          if (bb > 0) bidParts.push(`${bb} bags`);
+          if (bp > 0) bidParts.push(`₹${bp}/kg`);
+          if (bidParts.length > 0) {
+            changes.push({ kind: "deleted", path: `Lot ${lotNum} > Bid ${bi + 1}`, detail: bidParts.join(" — ") });
+          }
+        });
+      }
+      const entry: EditEntry = { timestamp: now, username: currentUsername, changes };
       onChange({
         ...group,
         lots: group.lots.filter((_, i) => i !== pendingDeleteLotIdx),
@@ -3735,14 +3760,6 @@ export default function StockPage() {
         }
       }
 
-      const restoredBidBuyerNames = new Set<string>();
-      for (const rbids of Array.from(restoredBidsMap.values())) {
-        for (const bid of rbids) {
-          const name = bid.buyerName?.trim();
-          if (name) restoredBidBuyerNames.add(name);
-        }
-      }
-
       const savedCard = savedCardMap.get(card.id);
       const isFirstSave = !savedCard;
       const now = format(new Date(), "dd/MM/yyyy HH:mm");
@@ -3756,20 +3773,15 @@ export default function StockPage() {
           if (isFirstSave) return withPersisted;
           const savedGroup = savedCard!.cropGroups.find(sg => sg.id === g.id);
           if (!savedGroup) return withPersisted;
-          const baseHistory = restoredBidBuyerNames.size > 0
-            ? g.editHistory.filter(e =>
-                !e.changes?.some(c => c.kind === "deleted" && restoredBidBuyerNames.has(c.detail || ""))
-              )
-            : g.editHistory;
           const allDiffChanges = diffCropGroup(savedGroup, g, t);
           const alreadyLogged = new Set(
-            baseHistory
+            g.editHistory
               .slice(savedGroup.editHistory.length)
               .flatMap(e => e.changes?.filter(c => c.kind === "deleted").map(c => c.path) ?? [])
           );
           const changes = allDiffChanges.filter(c => !(c.kind === "deleted" && alreadyLogged.has(c.path)));
-          if (changes.length === 0) return { ...withPersisted, editHistory: baseHistory };
-          return { ...withPersisted, editHistory: [...baseHistory, { timestamp: now, username: currentUsername, changes }] };
+          if (changes.length === 0) return { ...withPersisted, editHistory: g.editHistory };
+          return { ...withPersisted, editHistory: [...g.editHistory, { timestamp: now, username: currentUsername, changes }] };
         }),
       };
 
