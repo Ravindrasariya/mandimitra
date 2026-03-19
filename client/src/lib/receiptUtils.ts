@@ -157,7 +157,17 @@ export function generateBidCopyHtml(
           <td style="${tdStyle}"></td>
         </tr>`
       ).join("");
-      return firstRow + extraRows;
+      const blankRow = `<tr style="border-top:1px dashed #bbb;">
+        <td style="${tdStyle}color:#ccc;font-size:9px;text-align:center;"></td>
+        <td style="${tdStyle}"></td>
+        <td style="${tdStyle}"></td>
+        <td style="${tdStyle}"></td>
+        <td style="${tdStyle}"></td>
+        <td style="${tdStyle}"></td>
+        <td style="${tdStyle}"></td>
+        <td style="${tdStyle}"></td>
+      </tr>`;
+      return firstRow + extraRows + blankRow;
     }).join("");
 
     return `<div style="margin-bottom:20px;">
