@@ -25,7 +25,7 @@ import {
   ASSET_DEPRECIATION_RATES,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, ilike, or, sql, desc, asc, gte, lte, ne, isNotNull, getTableColumns } from "drizzle-orm";
+import { eq, and, ilike, or, sql, desc, asc, gte, lte, ne, isNotNull, getTableColumns, inArray } from "drizzle-orm";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -67,6 +67,7 @@ export interface IStorage {
   getBuyersWithDues(businessId: number, search?: string): Promise<(Buyer & { receivableDue: string; overallDue: string; bidDates: string[] })[]>;
 
   getLotEditHistory(lotId: number, businessId: number): Promise<LotEditHistory[]>;
+  getLotEditHistoryBulk(lotIds: number[], businessId: number): Promise<LotEditHistory[]>;
   createLotEditHistory(entry: InsertLotEditHistory): Promise<LotEditHistory>;
   getTransactionEditHistory(transactionId: number, businessId: number): Promise<TransactionEditHistory[]>;
   createTransactionEditHistory(entry: InsertTransactionEditHistory): Promise<TransactionEditHistory>;
@@ -527,6 +528,13 @@ export class DatabaseStorage implements IStorage {
     return db.select().from(lotEditHistory)
       .where(and(eq(lotEditHistory.lotId, lotId), eq(lotEditHistory.businessId, businessId)))
       .orderBy(desc(lotEditHistory.createdAt));
+  }
+
+  async getLotEditHistoryBulk(lotIds: number[], businessId: number): Promise<LotEditHistory[]> {
+    if (lotIds.length === 0) return [];
+    return db.select().from(lotEditHistory)
+      .where(and(inArray(lotEditHistory.lotId, lotIds), eq(lotEditHistory.businessId, businessId)))
+      .orderBy(asc(lotEditHistory.createdAt));
   }
 
   async createLotEditHistory(entry: InsertLotEditHistory): Promise<LotEditHistory> {

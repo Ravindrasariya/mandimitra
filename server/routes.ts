@@ -371,6 +371,19 @@ export async function registerRoutes(
     res.json(history);
   });
 
+  app.get("/api/lot-edit-history-bulk", requireAuth, async (req, res) => {
+    try {
+      const lotIdsStr = req.query.lotIds as string;
+      if (!lotIdsStr) return res.json([]);
+      const lotIds = lotIdsStr.split(",").map(s => parseInt(s.trim())).filter(n => !isNaN(n) && n > 0);
+      if (lotIds.length === 0) return res.json([]);
+      const history = await storage.getLotEditHistoryBulk(lotIds, req.user!.businessId);
+      res.json(history);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   app.get("/api/transaction-edit-history/:transactionId", requireAuth, async (req, res) => {
     const history = await storage.getTransactionEditHistory(paramId(req.params.transactionId), req.user!.businessId);
     res.json(history);

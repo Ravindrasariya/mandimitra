@@ -133,6 +133,41 @@ type ChangeRecord =
 
 type EditEntry = { timestamp: string; username: string; changes: ChangeRecord[]; label?: string };
 
+const LOT_FIELD_LABELS: Record<string, string> = {
+  numberOfBags: "Bags",
+  actualNumberOfBags: "Actual Bags",
+  crop: "Crop",
+  variety: "Variety",
+  size: "Size",
+  bagMarka: "Bag Marka",
+  vehicleNumber: "Vehicle No.",
+  vehicleBhadaRate: "Bhada Rate",
+  farmerAdvanceAmount: "Farmer Advance",
+  farmerAdvanceMode: "Advance Mode",
+};
+
+function dbRecordToEditEntry(rec: { fieldChanged: string; oldValue: string | null; newValue: string | null; changedBy: string | null; createdAt: string }): EditEntry {
+  const timestamp = format(new Date(rec.createdAt), "dd/MM/yyyy HH:mm");
+  const username = rec.changedBy || "";
+  if (rec.fieldChanged === "bid_deleted") {
+    let detail = "";
+    try {
+      const data = JSON.parse(rec.oldValue || "{}");
+      const parts: string[] = [];
+      if (data.buyerName) parts.push(data.buyerName);
+      if (data.numberOfBags) parts.push(`${data.numberOfBags} bags`);
+      if (data.pricePerKg) parts.push(`₹${data.pricePerKg}/kg`);
+      detail = parts.join(", ");
+    } catch {}
+    return { timestamp, username, changes: [{ kind: "deleted", path: "Bid", detail: detail || undefined }] };
+  }
+  const path = LOT_FIELD_LABELS[rec.fieldChanged] || rec.fieldChanged;
+  if (rec.oldValue !== null && rec.newValue !== null) {
+    return { timestamp, username, changes: [{ kind: "field", path, oldVal: rec.oldValue, newVal: rec.newValue }] };
+  }
+  return { timestamp, username, changes: [], label: path };
+}
+
 type CropGroup = {
   id: string; crop: string; srNumber: string; groupOpen: boolean; lots: LotRow[];
   archived: boolean;
@@ -3232,6 +3267,34 @@ export default function StockPage() {
     const allCards = sortCardsByMaxSr([...newDrafts, ...mergedLoaded]);
     setCards(allCards.length > 0 ? allCards : [emptyCard()]);
     setSavedCardMap(map);
+
+    const allLotIds = loaded.flatMap(c =>
+      c.cropGroups.flatMap(g => g.lots.map(l => l.dbId).filter((id): id is number => typeof id === "number"))
+    );
+    if (allLotIds.length > 0) {
+      fetch(`/api/lot-edit-history-bulk?lotIds=${allLotIds.join(",")}`, { credentials: "include" })
+        .then(r => r.json())
+        .then((historyRecords: any[]) => {
+          const historyByLotId = new Map<number, any[]>();
+          for (const rec of historyRecords) {
+            if (rec.lotId == null) continue;
+            if (!historyByLotId.has(rec.lotId)) historyByLotId.set(rec.lotId, []);
+            historyByLotId.get(rec.lotId)!.push(rec);
+          }
+          setCards(prev => prev.map(card => ({
+            ...card,
+            cropGroups: card.cropGroups.map(g => {
+              const dbEntries: any[] = g.lots.flatMap(l =>
+                l.dbId ? (historyByLotId.get(l.dbId) || []) : []
+              );
+              if (dbEntries.length === 0) return g;
+              const dbHistory = dbEntries.map(dbRecordToEditEntry);
+              return { ...g, editHistory: [...dbHistory, ...g.editHistory] };
+            }),
+          })));
+        })
+        .catch(() => {});
+    }
   }, [stockCardsData, businessId]);
 
   useEffect(() => {
