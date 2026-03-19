@@ -903,7 +903,7 @@ export async function registerRoutes(
     const txTotalResult = await db
       .select({ total: sql<number>`COALESCE(SUM(${transactions.numberOfBags}), 0)` })
       .from(transactions)
-      .where(and(eq(transactions.lotId, lotId), eq(transactions.businessId, businessId), eq(transactions.isReversed, false)));
+      .where(and(eq(transactions.lotId, lotId), eq(transactions.businessId, businessId), eq(transactions.isReversed, false), eq(transactions.isArchived, false)));
     const soldBags = Math.min(Number(txTotalResult[0]?.total || 0), lot.numberOfBags);
 
     const newOriginal = data.numberOfBags ?? lot.numberOfBags;
