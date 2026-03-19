@@ -1730,8 +1730,13 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
               if (dbLots.length > 0) {
                 queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
                 queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
+                queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
                 queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
                 queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
+                queryClient.invalidateQueries({ predicate: (query) => {
+                  const key = query.queryKey[0];
+                  return typeof key === "string" && key.startsWith("/api/buyers");
+                }});
               }
               const updatedGroup = { ...group, archived: false, groupOpen: true };
               onChange(updatedGroup);
@@ -2044,8 +2049,13 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
         if (dbLots.length > 0) {
           queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
           queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
+          queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
           queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
           queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
+          queryClient.invalidateQueries({ predicate: (query) => {
+            const key = query.queryKey[0];
+            return typeof key === "string" && key.startsWith("/api/buyers");
+          }});
         }
         const updatedCard = { ...card, cropGroups: card.cropGroups.map((g, i) => i === pendingArchiveGroupIdx ? { ...g, archived: true } : g) };
         onChange(updatedCard);
@@ -2539,7 +2549,12 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
               queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
               queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
               queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
+              queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
               queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+              queryClient.invalidateQueries({ predicate: (query) => {
+                const key = query.queryKey[0];
+                return typeof key === "string" && key.startsWith("/api/buyers");
+              }});
               const updatedCard = { ...card, archived: false, cardOpen: true };
               onChange(updatedCard);
               onSyncSaved(updatedCard);
@@ -3886,7 +3901,12 @@ export default function StockPage() {
         queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
         queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
         queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
         queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
+        queryClient.invalidateQueries({ predicate: (query) => {
+          const key = query.queryKey[0];
+          return typeof key === "string" && key.startsWith("/api/buyers");
+        }});
       } catch (err: any) {
         toast({ title: t("stock.archiveFailed"), description: err.message, variant: "destructive" });
         return;
