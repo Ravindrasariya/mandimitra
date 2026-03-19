@@ -944,14 +944,18 @@ export async function registerRoutes(
         }
       }
 
-      // Check (b): existing bid bags must not exceed the new lot bag count
-      const lotBids = await db
-        .select({ numberOfBags: bids.numberOfBags })
-        .from(bids)
-        .where(and(eq(bids.lotId, lotId), eq(bids.businessId, businessId)));
-      const totalBidBags = lotBids.reduce((s, b) => s + (b.numberOfBags || 0), 0);
-      if (totalBidBags > data.numberOfBags) {
-        return res.status(400).json({ message: `Cannot reduce lot bags below already allocated bid bags (${totalBidBags})` });
+      // Check (b): only reject if the user is actively REDUCING bags below already-allocated bid bags.
+      // If the lot already has a pre-existing inconsistency (bid bags > lot bags), we allow saving
+      // as long as the user is not making it worse (i.e. not reducing further).
+      if (data.numberOfBags < lot.numberOfBags) {
+        const lotBids = await db
+          .select({ numberOfBags: bids.numberOfBags })
+          .from(bids)
+          .where(and(eq(bids.lotId, lotId), eq(bids.businessId, businessId)));
+        const totalBidBags = lotBids.reduce((s, b) => s + (b.numberOfBags || 0), 0);
+        if (totalBidBags > data.numberOfBags) {
+          return res.status(400).json({ message: `Cannot reduce lot bags below already allocated bid bags (${totalBidBags})` });
+        }
       }
 
       if (data.actualNumberOfBags == null) {
