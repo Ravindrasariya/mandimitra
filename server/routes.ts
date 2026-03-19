@@ -888,7 +888,15 @@ export async function registerRoutes(
     if (!lot) return res.status(404).json({ message: "Lot not found" });
 
     const oldActual = lot.actualNumberOfBags ?? lot.numberOfBags;
-    const soldBags = oldActual - lot.remainingBags;
+
+    // Compute soldBags from actual active transactions (source of truth).
+    // Using actualNumberOfBags - remainingBags can exceed numberOfBags when
+    // there are data inconsistencies, causing false validation failures.
+    const txTotalResult = await db
+      .select({ total: sql<number>`COALESCE(SUM(${transactions.numberOfBags}), 0)` })
+      .from(transactions)
+      .where(and(eq(transactions.lotId, lotId), eq(transactions.businessId, businessId), eq(transactions.isReversed, false)));
+    const soldBags = Math.min(Number(txTotalResult[0]?.total || 0), lot.numberOfBags);
 
     const newOriginal = data.numberOfBags ?? lot.numberOfBags;
 
