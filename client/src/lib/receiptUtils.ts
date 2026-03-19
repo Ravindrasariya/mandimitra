@@ -110,7 +110,7 @@ function canvasToPdfBlob(canvas: HTMLCanvasElement): Blob {
 
 export type BidCropSection = {
   crop: string;
-  groups: Array<{ serialNumber: number; farmerName: string; totalBags: number }>;
+  groups: Array<{ serialNumber: number; farmerName: string; village: string; totalBags: number }>;
 };
 
 function escHtml(s: string): string {
@@ -137,14 +137,16 @@ export function generateBidCopyHtml(
 
     const bodyRows = sortedGroups.map(g => {
       const rowCount = getBidRows(g.totalBags);
+      const farmerLabel = g.village ? `${escHtml(g.farmerName)} (${escHtml(g.village)})` : escHtml(g.farmerName);
       const firstRow = `<tr style="border-top:2.5px solid #444;">
         <td rowspan="${rowCount}" style="${tdStyle}text-align:center;font-weight:700;vertical-align:middle;">${g.serialNumber}</td>
-        <td rowspan="${rowCount}" style="${tdStyle}vertical-align:middle;">${escHtml(g.farmerName)}</td>
+        <td rowspan="${rowCount}" style="${tdStyle}vertical-align:middle;">${farmerLabel}</td>
         <td rowspan="${rowCount}" style="${tdStyle}text-align:center;vertical-align:middle;">${g.totalBags}</td>
-        <td style="${tdStyle}min-width:90px;"></td>
+        <td style="${tdStyle}min-width:60px;"></td>
         <td style="${tdStyle}text-align:center;width:55px;"></td>
         <td style="${tdStyle}text-align:center;width:45px;"></td>
         <td style="${tdStyle}text-align:center;width:65px;"></td>
+        <td style="${tdStyle}min-width:80px;"></td>
       </tr>`;
       const extraRows = Array.from({ length: rowCount - 1 }, () =>
         `<tr>
@@ -152,6 +154,7 @@ export function generateBidCopyHtml(
           <td style="${tdStyle}text-align:center;"></td>
           <td style="${tdStyle}text-align:center;"></td>
           <td style="${tdStyle}text-align:center;"></td>
+          <td style="${tdStyle}"></td>
         </tr>`
       ).join("");
       return firstRow + extraRows;
@@ -168,11 +171,12 @@ export function generateBidCopyHtml(
           <tr>
             <th style="${thStyle}text-align:center;width:38px;">SR#</th>
             <th style="${thStyle}text-align:left;min-width:95px;">Farmer Name</th>
-            <th style="${thStyle}text-align:center;width:50px;">Bags</th>
-            <th style="${thStyle}text-align:left;min-width:90px;">Buyer Name</th>
+            <th style="${thStyle}text-align:center;width:50px;">Rem. Bags</th>
+            <th style="${thStyle}text-align:left;min-width:60px;">Buyer Name</th>
             <th style="${thStyle}text-align:center;width:55px;">Rate/Kg</th>
             <th style="${thStyle}text-align:center;width:45px;"># Bags</th>
             <th style="${thStyle}text-align:center;width:65px;">Cash/Credit</th>
+            <th style="${thStyle}text-align:left;">Remarks</th>
           </tr>
         </thead>
         <tbody>${bodyRows}</tbody>

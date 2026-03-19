@@ -2645,7 +2645,7 @@ function StockFilterBar({
   buyersList,
   onExportStockCsv, onExportTxnCsv,
   canPrintOverallBill, onPrintAllBuyerReceipt,
-  onPrintBidCopy,
+  canPrintBidCopy, onPrintBidCopy,
 }: {
   cards: FarmerCard[];
   dateMode: "stock" | "txn";
@@ -2669,6 +2669,7 @@ function StockFilterBar({
   onExportTxnCsv: () => void;
   canPrintOverallBill: boolean;
   onPrintAllBuyerReceipt: () => void;
+  canPrintBidCopy: boolean;
   onPrintBidCopy: () => void;
 }) {
   const { t, language } = useLanguage();
@@ -2991,14 +2992,14 @@ function StockFilterBar({
 
       <Button
         variant="outline"
-        size="sm"
-        className="h-8 gap-1 px-2 text-xs"
+        size="icon"
+        className={`h-8 w-8 ${!canPrintBidCopy ? "opacity-40 cursor-not-allowed" : ""}`}
         data-testid="button-print-bid-copy"
         title={t("stock.printBidCopy")}
-        onClick={onPrintBidCopy}
+        onClick={canPrintBidCopy ? onPrintBidCopy : undefined}
+        disabled={!canPrintBidCopy}
       >
         <ClipboardList className="w-3.5 h-3.5" />
-        <span className="hidden sm:inline">{t("stock.printBidCopy")}</span>
       </Button>
 
       <DropdownMenu>
@@ -3729,6 +3730,7 @@ export default function StockPage() {
 
   const isSingleDateFilter = selectedMonths.length === 1 && selectedDays.length === 1;
   const canPrintOverallBill = isSingleDateFilter && buyerFilter.trim() !== "" && cropFilter !== "all";
+  const canPrintBidCopy = isSingleDateFilter && yearFilter !== "all" && cropFilter !== "all";
 
   const handlePrintAllBuyerReceipt = async () => {
     if (!canPrintOverallBill) {
@@ -3822,33 +3824,39 @@ export default function StockPage() {
   };
 
   const handlePrintBidCopy = async () => {
-    const anyDateFilter = yearFilter !== "all" || selectedMonths.length > 0 || selectedDays.length > 0;
+    const [y0, m0, d0] = (yearFilter !== "all" && selectedMonths.length === 1 && selectedDays.length === 1)
+      ? [yearFilter, selectedMonths[0].padStart(2, "0"), selectedDays[0].padStart(2, "0")]
+      : ["", "", ""];
     const dateMatchesCard = (card: FarmerCard) => {
-      if (!anyDateFilter) return true;
-      const [y, m, d] = (card.date || "").split("-");
-      if (yearFilter !== "all" && y !== yearFilter) return false;
-      if (selectedMonths.length > 0 && !selectedMonths.includes(String(parseInt(m)))) return false;
-      if (selectedDays.length > 0 && !selectedDays.includes(String(parseInt(d)))) return false;
+      const [cy, cm, cd] = (card.date || "").split("-");
+      if (yearFilter !== "all" && cy !== yearFilter) return false;
+      if (selectedMonths.length > 0 && !selectedMonths.includes(String(parseInt(cm)))) return false;
+      if (selectedDays.length > 0 && !selectedDays.includes(String(parseInt(cd)))) return false;
       return true;
     };
-    const cropMap = new Map<string, Map<number, { farmerName: string; totalBags: number }>>();
+    const cropMap = new Map<string, Map<number, { farmerName: string; village: string; totalBags: number }>>();
     for (const card of cards) {
       if (card.archived || !savedCardMap.has(card.id)) continue;
       if (!dateMatchesCard(card)) continue;
       for (const g of card.cropGroups) {
         if (g.archived) continue;
+        if (cropFilter !== "all" && g.crop !== cropFilter) continue;
         const srNum = parseInt(g.srNumber) || 0;
         if (!srNum) continue;
-        const totalBags = g.lots
+        const remainingBags = g.lots
           .filter(l => !l.isReturned && (parseInt(l.numberOfBags) || 0) > 0)
-          .reduce((s, l) => s + (parseInt(l.numberOfBags) || 0), 0);
-        if (totalBags === 0) continue;
+          .reduce((s, l) => {
+            const lotBags = parseInt(l.numberOfBags) || 0;
+            const bidBags = l.bids.reduce((bs, b) => bs + (parseInt(b.numberOfBags) || 0), 0);
+            return s + Math.max(0, lotBags - bidBags);
+          }, 0);
+        if (remainingBags === 0) continue;
         if (!cropMap.has(g.crop)) cropMap.set(g.crop, new Map());
         const srMap = cropMap.get(g.crop)!;
         if (srMap.has(srNum)) {
-          srMap.get(srNum)!.totalBags += totalBags;
+          srMap.get(srNum)!.totalBags += remainingBags;
         } else {
-          srMap.set(srNum, { farmerName: card.farmerName, totalBags });
+          srMap.set(srNum, { farmerName: card.farmerName, village: card.village || "", totalBags: remainingBags });
         }
       }
     }
@@ -3857,10 +3865,8 @@ export default function StockPage() {
       return;
     }
     let dateStr = format(new Date(), "dd-MMM-yyyy");
-    if (selectedMonths.length === 1 && selectedDays.length === 1 && yearFilter !== "all") {
-      const m = selectedMonths[0].padStart(2, "0");
-      const d = selectedDays[0].padStart(2, "0");
-      try { dateStr = format(new Date(`${yearFilter}-${m}-${d}`), "dd-MMM-yyyy"); } catch {}
+    if (y0 && m0 && d0) {
+      try { dateStr = format(new Date(`${y0}-${m0}-${d0}`), "dd-MMM-yyyy"); } catch {}
     }
     const cropSections: BidCropSection[] = Array.from(cropMap.entries())
       .sort(([a], [b]) => a.localeCompare(b))
@@ -3868,7 +3874,7 @@ export default function StockPage() {
         crop,
         groups: Array.from(srMap.entries())
           .sort(([a], [b]) => a - b)
-          .map(([serialNumber, { farmerName, totalBags }]) => ({ serialNumber, farmerName, totalBags })),
+          .map(([serialNumber, { farmerName, village, totalBags }]) => ({ serialNumber, farmerName, village, totalBags })),
       }));
     const html = generateBidCopyHtml(cropSections, user?.businessName || "", dateStr);
     await printReceipt(html, `bid-copy-${dateStr}.pdf`);
@@ -4006,6 +4012,7 @@ export default function StockPage() {
             onExportTxnCsv={exportTxnCsv}
             canPrintOverallBill={canPrintOverallBill}
             onPrintAllBuyerReceipt={handlePrintAllBuyerReceipt}
+            canPrintBidCopy={canPrintBidCopy}
             onPrintBidCopy={handlePrintBidCopy}
           />
         )}
