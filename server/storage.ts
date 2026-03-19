@@ -1411,7 +1411,8 @@ export class DatabaseStorage implements IStorage {
       eq(cashEntries.businessId, businessId),
       eq(cashEntries.outflowType, "Hammali"),
       eq(cashEntries.category, "outward"),
-      eq(cashEntries.isReversed, false)
+      eq(cashEntries.isReversed, false),
+      eq(cashEntries.isArchived, false)
     ));
 
     const paidExtraChargesResult = await db.select({
@@ -1420,7 +1421,8 @@ export class DatabaseStorage implements IStorage {
       eq(cashEntries.businessId, businessId),
       eq(cashEntries.outflowType, "Extra Charges"),
       eq(cashEntries.category, "outward"),
-      eq(cashEntries.isReversed, false)
+      eq(cashEntries.isReversed, false),
+      eq(cashEntries.isArchived, false)
     ));
 
     const paidMandiResult = await db.select({
@@ -1429,7 +1431,8 @@ export class DatabaseStorage implements IStorage {
       eq(cashEntries.businessId, businessId),
       eq(cashEntries.outflowType, "Mandi Commission"),
       eq(cashEntries.category, "outward"),
-      eq(cashEntries.isReversed, false)
+      eq(cashEntries.isReversed, false),
+      eq(cashEntries.isArchived, false)
     ));
 
     return {
@@ -1676,10 +1679,10 @@ export class DatabaseStorage implements IStorage {
       const opening = parseFloat(ba.openingBalance || "0");
       const inwardResult = await db.select({
         total: sql<string>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`
-      }).from(cashEntries).where(and(eq(cashEntries.businessId, businessId), eq(cashEntries.bankAccountId, ba.id), eq(cashEntries.category, "inward"), eq(cashEntries.isReversed, false)));
+      }).from(cashEntries).where(and(eq(cashEntries.businessId, businessId), eq(cashEntries.bankAccountId, ba.id), eq(cashEntries.category, "inward"), eq(cashEntries.isReversed, false), eq(cashEntries.isArchived, false)));
       const outwardResult = await db.select({
         total: sql<string>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`
-      }).from(cashEntries).where(and(eq(cashEntries.businessId, businessId), eq(cashEntries.bankAccountId, ba.id), or(eq(cashEntries.category, "outward"), eq(cashEntries.category, "expense")), eq(cashEntries.isReversed, false)));
+      }).from(cashEntries).where(and(eq(cashEntries.businessId, businessId), eq(cashEntries.bankAccountId, ba.id), or(eq(cashEntries.category, "outward"), eq(cashEntries.category, "expense")), eq(cashEntries.isReversed, false), eq(cashEntries.isArchived, false)));
       const balance = opening + parseFloat(inwardResult[0]?.total || "0") - parseFloat(outwardResult[0]?.total || "0");
       if (ba.accountType === "Limit" && balance < 0) {
         bankDetails.push({ name: ba.name, balance: 0 });
@@ -1708,10 +1711,10 @@ export class DatabaseStorage implements IStorage {
         const opening = parseFloat(ba.openingBalance || "0");
         const inwardResult = await db.select({
           total: sql<string>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`
-        }).from(cashEntries).where(and(eq(cashEntries.businessId, businessId), eq(cashEntries.bankAccountId, ba.id), eq(cashEntries.category, "inward"), eq(cashEntries.isReversed, false)));
+        }).from(cashEntries).where(and(eq(cashEntries.businessId, businessId), eq(cashEntries.bankAccountId, ba.id), eq(cashEntries.category, "inward"), eq(cashEntries.isReversed, false), eq(cashEntries.isArchived, false)));
         const outwardResult = await db.select({
           total: sql<string>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`
-        }).from(cashEntries).where(and(eq(cashEntries.businessId, businessId), eq(cashEntries.bankAccountId, ba.id), or(eq(cashEntries.category, "outward"), eq(cashEntries.category, "expense")), eq(cashEntries.isReversed, false)));
+        }).from(cashEntries).where(and(eq(cashEntries.businessId, businessId), eq(cashEntries.bankAccountId, ba.id), or(eq(cashEntries.category, "outward"), eq(cashEntries.category, "expense")), eq(cashEntries.isReversed, false), eq(cashEntries.isArchived, false)));
         const balance = opening + parseFloat(inwardResult[0]?.total || "0") - parseFloat(outwardResult[0]?.total || "0");
         if (balance < 0) limitOutstanding += Math.abs(balance);
       }
@@ -1780,6 +1783,7 @@ export class DatabaseStorage implements IStorage {
       eq(cashEntries.category, "outward"),
       eq(cashEntries.outflowType, "Salary"),
       eq(cashEntries.isReversed, false),
+      eq(cashEntries.isArchived, false),
       gte(sql`cast(${cashEntries.createdAt} as date)`, fyStartDate),
       lte(sql`cast(${cashEntries.createdAt} as date)`, fyEndDate),
     ));
@@ -1792,6 +1796,7 @@ export class DatabaseStorage implements IStorage {
       eq(cashEntries.category, "outward"),
       eq(cashEntries.outflowType, "General Expenses"),
       eq(cashEntries.isReversed, false),
+      eq(cashEntries.isArchived, false),
       gte(sql`cast(${cashEntries.createdAt} as date)`, fyStartDate),
       lte(sql`cast(${cashEntries.createdAt} as date)`, fyEndDate),
     ));
