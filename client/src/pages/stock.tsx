@@ -109,6 +109,7 @@ type BidRow = {
   paymentStatus?: "due" | "paid" | "partial";
   farmerPaymentStatus?: "due" | "paid" | "partial";
   farmerPaidAmount?: string;
+  savedBuyerReceivable?: number;
   paidAmount?: string;
 };
 
@@ -1059,7 +1060,7 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
   const totals = calcBidTotals(bid, cs, vehicleBhadaRate, totalBagsInVehicle, bidBuyerAadhat);
   const buyerLimit = bidBuyerData?.limitAmount ?? null;
   const existingDue = parseFloat(bidBuyerData?.overallDue ?? "0");
-  const projectedDue = existingDue + totals.buyerReceivable;
+  const projectedDue = existingDue - (bid.savedBuyerReceivable ?? 0) + totals.buyerReceivable;
   const limitExceeded = bid.buyerId != null && buyerLimit !== null && projectedDue > buyerLimit;
   const buyerLabel = bid.buyerName.trim() || t("stock.buyer");
 
@@ -2595,6 +2596,7 @@ function stockCardsToFarmerCards(apiCards: any[]): FarmerCard[] {
                 extraThelaBhada: txn.extraThelaBhadaFarmer?.toString() || "0",
                 extraOthers: txn.extraOthersFarmer?.toString() || "0",
               } : emptyTxn(),
+              savedBuyerReceivable: txn?.totalReceivableFromBuyer ? parseFloat(txn.totalReceivableFromBuyer) : undefined,
               paymentStatus: txn?.paymentStatus || "due",
               farmerPaymentStatus: txn?.farmerPaymentStatus || "due",
               farmerPaidAmount: txn?.farmerPaidAmount?.toString() || "0",
