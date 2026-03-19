@@ -3256,7 +3256,7 @@ export default function StockPage() {
     setCards(prev => prev.map((c, i) => (i === idx ? card : c)));
 
   const saveCard = async (idx: number, collapseAfter = false) => {
-    const card = cards[idx];
+    let card = cards[idx];
     if (!card.farmerName.trim()) {
       toast({ title: t("stock.error"), description: t("stock.farmerNameRequired"), variant: "destructive" });
       return;
@@ -3378,6 +3378,7 @@ export default function StockPage() {
       const prevSavedCard = savedCardMap.get(card.id);
 
       // Phase 0: delete removed lots (hard delete via new endpoint).
+      // On failure, restore the lot back into the current card state so UI stays in sync.
       if (prevSavedCard) {
         const currentLotDbIds = new Set(
           card.cropGroups.flatMap(g => g.lots.map(l => l.dbId)).filter(Boolean)
@@ -3389,6 +3390,16 @@ export default function StockPage() {
                 await apiRequest("DELETE", `/api/lots/${savedLot.dbId}`);
               } catch (err: any) {
                 toast({ title: t("stock.warning"), description: `Failed to delete lot: ${err.message}`, variant: "destructive" });
+                // Restore the lot into the current card state to keep UI in sync with DB.
+                card = {
+                  ...card,
+                  cropGroups: card.cropGroups.map(g => {
+                    if (g.id !== savedGroup.id) return g;
+                    const alreadyPresent = g.lots.some(l => l.dbId === savedLot.dbId);
+                    if (alreadyPresent) return g;
+                    return { ...g, lots: [...g.lots, savedLot] };
+                  }),
+                };
               }
             }
           }

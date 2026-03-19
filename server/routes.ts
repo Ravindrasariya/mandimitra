@@ -1013,7 +1013,7 @@ export async function registerRoutes(
       const buyerName = buyer?.name || "";
 
       const [tx] = await db.select().from(transactions)
-        .where(and(eq(transactions.bidId, bidId), eq(transactions.businessId, businessId), eq(transactions.isReversed, false)))
+        .where(and(eq(transactions.bidId, bidId), eq(transactions.businessId, businessId)))
         .limit(1);
 
       const auditValue: Record<string, any> = {

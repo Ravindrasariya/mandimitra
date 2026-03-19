@@ -606,7 +606,7 @@ const translations: Record<string, Record<Language, string>> = {
   "stock.vehicleNumber": { en: "Vehicle #", hi: "वाहन नंबर" },
   "stock.village": { en: "Village", hi: "गाँव" },
   "stock.deleteBidDesc": { en: "This bid will be permanently removed. The lot itself will remain.", hi: "यह बोली स्थायी रूप से हटा दी जाएगी। लॉट बना रहेगा।" },
-  "stock.deleteBidWithTxnDesc": { en: "This bid and its linked transaction will be permanently deleted. This cannot be undone.", hi: "यह बोली और उससे जुड़ा लेनदेन स्थायी रूप से हटा दिया जाएगा। यह पूर्ववत नहीं किया जा सकता।" },
+  "stock.deleteBidWithTxnDesc": { en: "This bid, its linked transaction, and all associated payment and cash entries will be permanently deleted. This cannot be undone.", hi: "यह बोली, उससे जुड़ा लेनदेन, और सभी संबंधित भुगतान व नकद प्रविष्टियाँ स्थायी रूप से हटा दी जाएंगी। यह पूर्ववत नहीं किया जा सकता।" },
   "stock.receiptError": { en: "Receipt error", hi: "रसीद त्रुटि" },
   "stock.noTxnDataFound": { en: "No transaction data found", hi: "कोई लेनदेन डेटा नहीं मिला" },
   "stock.noTxnForBuyer": { en: "No transactions found for this buyer", hi: "इस खरीदार के लिए कोई लेनदेन नहीं मिला" },
