@@ -335,6 +335,16 @@ export async function registerRoutes(
     }
 
     const updated = await storage.updateFarmer(farmerId, businessId, data);
+
+    if (data.isArchived !== undefined && data.isArchived !== existing.isArchived) {
+      const farmerLots = await db.select({ id: lots.id }).from(lots)
+        .where(and(eq(lots.farmerId, farmerId), eq(lots.businessId, businessId)));
+      for (const lot of farmerLots) {
+        await db.update(lots).set({ isArchived: data.isArchived }).where(and(eq(lots.id, lot.id), eq(lots.businessId, businessId)));
+        await storage.cascadeArchiveToLot(lot.id, businessId, data.isArchived);
+      }
+    }
+
     broadcastBusinessEvent(businessId);
     res.json(updated);
   });
@@ -969,6 +979,11 @@ export async function registerRoutes(
 
     const updated = await storage.updateLot(lotId, businessId, data);
     if (!updated) return res.status(404).json({ message: "Lot not found" });
+
+    if (data.isArchived !== undefined && data.isArchived !== lot.isArchived) {
+      await storage.cascadeArchiveToLot(lotId, businessId, data.isArchived);
+    }
+
     broadcastBusinessEvent(businessId);
     res.json(updated);
   });

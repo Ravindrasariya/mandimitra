@@ -86,7 +86,7 @@ export interface IStorage {
 
   getBuyerPendingTransactions(businessId: number, buyerId: number): Promise<any[]>;
   getFarmerPendingTransactions(businessId: number, farmerId: number): Promise<any[]>;
-  getTransactions(businessId: number, filters?: { farmerId?: number; buyerId?: number; dateFrom?: string; dateTo?: string }): Promise<(Transaction & { farmer: Farmer; buyer: Buyer; lot: Lot; bid: Bid })[]>;
+  getTransactions(businessId: number, filters?: { farmerId?: number; buyerId?: number; dateFrom?: string; dateTo?: string; includeArchived?: boolean }): Promise<(Transaction & { farmer: Farmer; buyer: Buyer; lot: Lot; bid: Bid })[]>;
   getTransaction(id: number, businessId: number): Promise<(Transaction & { farmer: Farmer; buyer: Buyer; lot: Lot; bid: Bid }) | undefined>;
   createTransaction(transaction: InsertTransaction): Promise<Transaction>;
   updateTransaction(id: number, businessId: number, data: Partial<InsertTransaction>): Promise<Transaction | undefined>;
@@ -129,6 +129,8 @@ export interface IStorage {
   createLiabilityPayment(payment: InsertLiabilityPayment): Promise<LiabilityPayment>;
   reverseLiabilityPayment(id: number, businessId: number): Promise<LiabilityPayment | undefined>;
   settleLiability(id: number, businessId: number): Promise<Liability | undefined>;
+
+  cascadeArchiveToLot(lotId: number, businessId: number, isArchived: boolean): Promise<void>;
 
   getBalanceSheet(businessId: number, fy: string): Promise<any>;
   getProfitAndLoss(businessId: number, fy: string): Promise<any>;
@@ -334,7 +336,7 @@ export class DatabaseStorage implements IStorage {
       const txnRows = await db.select({
         payable: sql<string>`cast(${transactions.totalPayableToFarmer} as numeric)`,
         paid: sql<string>`cast(${transactions.farmerPaidAmount} as numeric)`,
-      }).from(transactions).where(and(eq(transactions.businessId, businessId), eq(transactions.farmerId, farmer.id), eq(transactions.isReversed, false)));
+      }).from(transactions).where(and(eq(transactions.businessId, businessId), eq(transactions.farmerId, farmer.id), eq(transactions.isReversed, false), eq(transactions.isArchived, false)));
 
       const totalPayable = txnRows.reduce((s, r) => s + parseFloat(r.payable || "0"), 0);
       const totalTxnPaid = txnRows.reduce((s, r) => s + parseFloat(r.paid || "0"), 0);
@@ -576,7 +578,7 @@ export class DatabaseStorage implements IStorage {
       const txnRows = await db.select({
         receivable: sql<string>`cast(${transactions.totalReceivableFromBuyer} as numeric)`,
         paid: sql<string>`cast(${transactions.paidAmount} as numeric)`,
-      }).from(transactions).where(and(eq(transactions.businessId, businessId), eq(transactions.buyerId, buyer.id), eq(transactions.isReversed, false)));
+      }).from(transactions).where(and(eq(transactions.businessId, businessId), eq(transactions.buyerId, buyer.id), eq(transactions.isReversed, false), eq(transactions.isArchived, false)));
 
       const totalReceivable = txnRows.reduce((s, r) => s + parseFloat(r.receivable || "0"), 0);
       const totalTxnPaid = txnRows.reduce((s, r) => s + parseFloat(r.paid || "0"), 0);
@@ -779,12 +781,13 @@ export class DatabaseStorage implements IStorage {
     }
   }
 
-  async getTransactions(businessId: number, filters?: { farmerId?: number; buyerId?: number; dateFrom?: string; dateTo?: string }): Promise<(Transaction & { farmer: Farmer; buyer: Buyer; lot: Lot; bid: Bid })[]> {
+  async getTransactions(businessId: number, filters?: { farmerId?: number; buyerId?: number; dateFrom?: string; dateTo?: string; includeArchived?: boolean }): Promise<(Transaction & { farmer: Farmer; buyer: Buyer; lot: Lot; bid: Bid })[]> {
     let conditions = [eq(transactions.businessId, businessId)];
     if (filters?.farmerId) conditions.push(eq(transactions.farmerId, filters.farmerId));
     if (filters?.buyerId) conditions.push(eq(transactions.buyerId, filters.buyerId));
     if (filters?.dateFrom) conditions.push(gte(transactions.date, filters.dateFrom));
     if (filters?.dateTo) conditions.push(lte(transactions.date, filters.dateTo));
+    if (!filters?.includeArchived) conditions.push(eq(transactions.isArchived, false));
 
     const results = await db.select({
       transaction: transactions,
@@ -815,6 +818,7 @@ export class DatabaseStorage implements IStorage {
         eq(transactions.businessId, businessId),
         eq(transactions.buyerId, buyerId),
         eq(transactions.isReversed, false),
+        eq(transactions.isArchived, false),
       ))
       .orderBy(transactions.date, transactions.id);
 
@@ -883,6 +887,7 @@ export class DatabaseStorage implements IStorage {
         eq(transactions.businessId, businessId),
         eq(transactions.farmerId, farmerId),
         eq(transactions.isReversed, false),
+        eq(transactions.isArchived, false),
       ))
       .orderBy(transactions.date, transactions.id);
 
@@ -1110,6 +1115,7 @@ export class DatabaseStorage implements IStorage {
       }
     }
 
+    conditions.push(eq(cashEntries.isArchived, false));
     const results = await db
       .select({
         ...getTableColumns(cashEntries),
@@ -1395,7 +1401,8 @@ export class DatabaseStorage implements IStorage {
       totalMandiCommission: sql<number>`coalesce(sum(cast(${transactions.mandiCharges} as numeric)), 0)`,
     }).from(transactions).where(and(
       eq(transactions.businessId, businessId),
-      eq(transactions.isReversed, false)
+      eq(transactions.isReversed, false),
+      eq(transactions.isArchived, false)
     ));
 
     const paidHammaliResult = await db.select({
@@ -1439,13 +1446,13 @@ export class DatabaseStorage implements IStorage {
     const farmer = await this.getFarmer(farmerId, businessId);
     if (!farmer) throw new Error("Farmer not found");
 
-    let txConditions = [eq(transactions.businessId, businessId), eq(transactions.farmerId, farmerId)];
+    let txConditions = [eq(transactions.businessId, businessId), eq(transactions.farmerId, farmerId), eq(transactions.isArchived, false)];
     if (dateFrom) txConditions.push(gte(transactions.date, dateFrom));
     if (dateTo) txConditions.push(lte(transactions.date, dateTo));
 
     const txns = await db.select().from(transactions).where(and(...txConditions)).orderBy(asc(transactions.date));
 
-    let cashConditions = [eq(cashEntries.businessId, businessId), eq(cashEntries.farmerId, farmerId)];
+    let cashConditions = [eq(cashEntries.businessId, businessId), eq(cashEntries.farmerId, farmerId), eq(cashEntries.isArchived, false)];
     if (dateFrom) cashConditions.push(gte(cashEntries.date, dateFrom));
     if (dateTo) cashConditions.push(lte(cashEntries.date, dateTo));
 
@@ -1458,13 +1465,13 @@ export class DatabaseStorage implements IStorage {
     const buyer = await this.getBuyer(buyerId, businessId);
     if (!buyer) throw new Error("Buyer not found");
 
-    let txConditions = [eq(transactions.businessId, businessId), eq(transactions.buyerId, buyerId)];
+    let txConditions = [eq(transactions.businessId, businessId), eq(transactions.buyerId, buyerId), eq(transactions.isArchived, false)];
     if (dateFrom) txConditions.push(gte(transactions.date, dateFrom));
     if (dateTo) txConditions.push(lte(transactions.date, dateTo));
 
     const txns = await db.select().from(transactions).where(and(...txConditions)).orderBy(asc(transactions.date));
 
-    let cashConditions = [eq(cashEntries.businessId, businessId), eq(cashEntries.buyerId, buyerId)];
+    let cashConditions = [eq(cashEntries.businessId, businessId), eq(cashEntries.buyerId, buyerId), eq(cashEntries.isArchived, false)];
     if (dateFrom) cashConditions.push(gte(cashEntries.date, dateFrom));
     if (dateTo) cashConditions.push(lte(cashEntries.date, dateTo));
 
@@ -1631,6 +1638,22 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
+  async cascadeArchiveToLot(lotId: number, businessId: number, isArchived: boolean): Promise<void> {
+    await db.update(bids).set({ isArchived }).where(and(eq(bids.lotId, lotId), eq(bids.businessId, businessId)));
+    const txnRows = await db.select({ id: transactions.id })
+      .from(transactions)
+      .where(and(eq(transactions.lotId, lotId), eq(transactions.businessId, businessId)));
+    await db.update(transactions).set({ isArchived }).where(and(eq(transactions.lotId, lotId), eq(transactions.businessId, businessId)));
+    if (txnRows.length > 0) {
+      const txnIds = txnRows.map(t => t.id);
+      await db.update(cashEntries).set({ isArchived })
+        .where(and(
+          eq(cashEntries.businessId, businessId),
+          sql`${cashEntries.transactionId} IN (${sql.join(txnIds.map(id => sql`${id}`), sql`, `)})`,
+        ));
+    }
+  }
+
   async getBalanceSheet(businessId: number, fy: string): Promise<any> {
     const parts = fy.split("-");
     const fyEndYear = parseInt(parts[0]) + 1;
@@ -1727,6 +1750,7 @@ export class DatabaseStorage implements IStorage {
     }).from(transactions).where(and(
       eq(transactions.businessId, businessId),
       eq(transactions.isReversed, false),
+      eq(transactions.isArchived, false),
       gte(transactions.date, fyStartDate),
       lte(transactions.date, fyEndDate),
     ));

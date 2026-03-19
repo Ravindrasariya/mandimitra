@@ -157,6 +157,7 @@ export const bids = pgTable("bids", {
   grade: text("grade").default("Large"),
   paymentType: text("payment_type").default("Credit").notNull(),
   advanceAmount: decimal("advance_amount", { precision: 10, scale: 2 }).default("0"),
+  isArchived: boolean("is_archived").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -199,6 +200,7 @@ export const transactions = pgTable("transactions", {
   farmerPaymentStatus: text("farmer_payment_status").default("due").notNull(),
   date: date("date"),
   isReversed: boolean("is_reversed").default(false).notNull(),
+  isArchived: boolean("is_archived").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   uniqueTransactionPerBusiness: uniqueIndex("transactions_business_transaction_id_unique").on(table.businessId, table.transactionId),
@@ -256,6 +258,7 @@ export const cashEntries = pgTable("cash_entries", {
   splitLog: text("split_log"),
   isReversed: boolean("is_reversed").default(false).notNull(),
   reversedAt: timestamp("reversed_at"),
+  isArchived: boolean("is_archived").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

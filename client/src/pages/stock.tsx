@@ -118,6 +118,7 @@ type LotRow = {
   dbId?: number;
   lotId?: string;
   lotOpen: boolean;
+  isArchived?: boolean;
   numberOfBags: string;
   size: string;
   variety: string;
@@ -2493,6 +2494,7 @@ function stockCardsToFarmerCards(apiCards: any[]): FarmerCard[] {
           dbId: lot.dbId,
           lotId: lot.lotId || "",
           lotOpen: false,
+          isArchived: lot.isArchived || false,
           numberOfBags: lot.numberOfBags?.toString() || "",
           size: lot.size || "None",
           variety: lot.variety || "",
@@ -3969,14 +3971,14 @@ export default function StockPage() {
       "Proportionate Freight (₹)",
       "Payable to Farmer (₹)", "Receivable from Buyer (₹)",
       "Farmer Payment Status", "Buyer Payment Status",
+      "Status",
     ];
     const rows: string[] = [];
     for (const card of filteredCards) {
-      if (card.archived || !savedCardMap.has(card.id)) continue;
+      if (!savedCardMap.has(card.id)) continue;
       const vbr = parseFloat(card.vehicleBhadaRate) || 0;
       const tbi = parseInt(card.totalBagsInVehicle) || 0;
       for (const g of card.cropGroups) {
-        if (g.archived) continue;
         for (const lot of g.lots) {
           for (const bid of lot.bids) {
             if (!bid.txnDbId) continue;
@@ -3988,6 +3990,7 @@ export default function StockPage() {
             const freight = tbi > 0 ? ((vbr * bidBags) / tbi).toFixed(2) : "0";
             const fStat = bid.farmerPaymentStatus === "paid" ? "Paid" : bid.farmerPaymentStatus === "partial" ? "Partial" : "Due";
             const bStat = bid.paymentStatus === "paid" ? "Paid" : bid.paymentStatus === "partial" ? "Partial" : "Due";
+            const archiveStatus = (card.archived || g.archived || lot.isArchived) ? "Archived" : "Active";
             rows.push([
               bid.txnDbId, bid.txnDate, lot.lotId || lot.dbId?.toString() || "", g.srNumber, g.crop, lot.variety || "",
               card.farmerName, card.farmerPhone, card.village,
@@ -3999,6 +4002,7 @@ export default function StockPage() {
               freight,
               bt.farmerPayable.toFixed(2), bt.buyerReceivable.toFixed(2),
               fStat, bStat,
+              archiveStatus,
             ].map(escCSV).join(","));
           }
         }
