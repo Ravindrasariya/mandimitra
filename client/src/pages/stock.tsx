@@ -2596,7 +2596,7 @@ function stockCardsToFarmerCards(apiCards: any[]): FarmerCard[] {
                 extraThelaBhada: txn.extraThelaBhadaFarmer?.toString() || "0",
                 extraOthers: txn.extraOthersFarmer?.toString() || "0",
               } : emptyTxn(),
-              savedBuyerReceivable: txn?.totalReceivableFromBuyer ? parseFloat(txn.totalReceivableFromBuyer) : undefined,
+              savedBuyerReceivable: txn?.totalReceivableFromBuyer != null ? parseFloat(txn.totalReceivableFromBuyer) : undefined,
               paymentStatus: txn?.paymentStatus || "due",
               farmerPaymentStatus: txn?.farmerPaymentStatus || "due",
               farmerPaidAmount: txn?.farmerPaidAmount?.toString() || "0",
