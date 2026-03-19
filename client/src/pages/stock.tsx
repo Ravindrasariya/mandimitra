@@ -3839,7 +3839,7 @@ export default function StockPage() {
       if (selectedDays.length > 0 && !selectedDays.includes(String(parseInt(cd)))) return false;
       return true;
     };
-    const cropEntries = new Map<string, Array<{ serialNumber: number; farmerName: string; village: string; totalBags: number }>>();
+    const cropEntries = new Map<string, Array<{ serialNumber: number; farmerName: string; village: string; totalBags: number; lotBags: number; cardTotalBags: number }>>();
     for (const card of cards) {
       if (card.archived || !savedCardMap.has(card.id)) continue;
       if (!dateMatchesCard(card)) continue;
