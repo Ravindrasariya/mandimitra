@@ -3679,6 +3679,7 @@ export default function StockPage() {
             }
 
             let savedBuyerReceivableAfterSave = bid.savedBuyerReceivable;
+            let savedFarmerPayableAfterSave = bid.savedFarmerPayable;
             if (bidDbId && nw > 0) {
               const vehicleBR = parseFloat(card.vehicleBhadaRate) || 0;
               const totalBIV = parseInt(card.totalBagsInVehicle) || 0;
@@ -3750,6 +3751,7 @@ export default function StockPage() {
                   const createdTxn = await txnRes.json();
                   txnDbId = createdTxn.id;
                   savedBuyerReceivableAfterSave = buyerReceivable;
+                  savedFarmerPayableAfterSave = farmerPayable;
                 } catch (err: any) {
                   toast({ title: t("stock.warning"), description: `${t("stock.failedCreateTxn")}: ${err.message}`, variant: "destructive" });
                 }
@@ -3757,13 +3759,14 @@ export default function StockPage() {
                 try {
                   await apiRequest("PATCH", `/api/transactions/${txnDbId}`, txnPayload);
                   savedBuyerReceivableAfterSave = buyerReceivable;
+                  savedFarmerPayableAfterSave = farmerPayable;
                 } catch (err: any) {
                   toast({ title: t("stock.warning"), description: `${t("stock.failedUpdateTxn")}: ${err.message}`, variant: "destructive" });
                 }
               }
             }
 
-            updatedBids.push({ ...bid, bidDbId, txnDbId, savedBuyerReceivable: savedBuyerReceivableAfterSave });
+            updatedBids.push({ ...bid, bidDbId, txnDbId, savedBuyerReceivable: savedBuyerReceivableAfterSave, savedFarmerPayable: savedFarmerPayableAfterSave });
           }
 
           finalGroups = finalGroups.map((fg, gi) =>
