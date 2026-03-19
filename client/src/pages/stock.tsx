@@ -3445,6 +3445,38 @@ export default function StockPage() {
         }
       }
 
+      const prevSavedCard = savedCardMap.get(card.id);
+
+      // Delete removed bids BEFORE patching lots so the PATCH bag-count validation
+      // does not see bids that are about to be removed.
+      const restoredBidsMap = new Map<string, BidRow[]>();
+      for (const group of card.cropGroups) {
+        for (const lot of group.lots) {
+          if (!lot.dbId || lot.isReturned) continue;
+          const savedGroup = prevSavedCard?.cropGroups.find(sg => sg.id === group.id);
+          const savedLot = savedGroup?.lots.find(sl => sl.id === lot.id);
+          const savedBidMap = new Map((savedLot?.bids || []).filter(b => b.bidDbId).map(b => [b.bidDbId!, b]));
+          const currentBidDbIds = new Set(lot.bids.filter(b => b.bidDbId).map(b => b.bidDbId!));
+          const restoredBids: BidRow[] = [];
+          for (const [deletedBidDbId, deletedBid] of Array.from(savedBidMap.entries())) {
+            if (!currentBidDbIds.has(deletedBidDbId)) {
+              if (deletedBid.txnDbId) {
+                toast({ title: t("stock.warning"), description: `${t("stock.cannotDeleteBidActiveTxn")} — ${deletedBid.buyerName}`, variant: "destructive" });
+                restoredBids.push(deletedBid);
+                continue;
+              }
+              try {
+                await apiRequest("DELETE", `/api/bids/${deletedBidDbId}`);
+              } catch (err: any) {
+                toast({ title: t("stock.warning"), description: `${t("stock.failedDeleteBid")}: ${err.message}`, variant: "destructive" });
+                restoredBids.push(deletedBid);
+              }
+            }
+          }
+          restoredBidsMap.set(lot.id, restoredBids);
+        }
+      }
+
       for (const { dbId, lotData } of existingLots) {
         await apiRequest("PATCH", `/api/lots/${dbId}`, lotData);
       }
@@ -3499,8 +3531,6 @@ export default function StockPage() {
         return { ...g, lots: updatedLots, srNumber: updatedSrNumber };
       });
 
-      const prevSavedCard = savedCardMap.get(card.id);
-
       for (let gIdx = 0; gIdx < finalGroups.length; gIdx++) {
         const group = finalGroups[gIdx];
         for (let lIdx = 0; lIdx < group.lots.length; lIdx++) {
@@ -3511,25 +3541,7 @@ export default function StockPage() {
           const savedLot = savedGroup?.lots.find(sl => sl.id === lot.id);
           const savedBidMap = new Map((savedLot?.bids || []).filter(b => b.bidDbId).map(b => [b.bidDbId!, b]));
 
-          const currentBidDbIds = new Set(lot.bids.filter(b => b.bidDbId).map(b => b.bidDbId!));
-          const restoredBids: BidRow[] = [];
-          for (const [deletedBidDbId, deletedBid] of Array.from(savedBidMap.entries())) {
-            if (!currentBidDbIds.has(deletedBidDbId)) {
-              if (deletedBid.txnDbId) {
-                toast({ title: t("stock.warning"), description: `${t("stock.cannotDeleteBidActiveTxn")} — ${deletedBid.buyerName}`, variant: "destructive" });
-                restoredBids.push(deletedBid);
-                continue;
-              }
-              try {
-                await apiRequest("DELETE", `/api/bids/${deletedBidDbId}`);
-              } catch (err: any) {
-                toast({ title: t("stock.warning"), description: `${t("stock.failedDeleteBid")}: ${err.message}`, variant: "destructive" });
-                restoredBids.push(deletedBid);
-              }
-            }
-          }
-
-          const updatedBids: BidRow[] = [...restoredBids];
+          const updatedBids: BidRow[] = [...(restoredBidsMap.get(lot.id) || [])];
           for (const bid of lot.bids) {
             if (!bid.buyerId || !bid.pricePerKg || !(parseInt(bid.numberOfBags) > 0)) {
               updatedBids.push(bid);
