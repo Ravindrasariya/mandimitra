@@ -1087,33 +1087,35 @@ export async function registerRoutes(
         .where(and(eq(transactions.lotId, lotId), eq(transactions.businessId, businessId)));
 
       await db.transaction(async (tx) => {
-        // Write audit snapshot before deletion
-        const auditValue = {
-          numberOfBags: lot.numberOfBags,
-          bids: lotBids.map(b => ({ buyerName: b.buyerName, numberOfBags: b.numberOfBags, pricePerKg: b.pricePerKg })),
-          transactions: lotTxns.map(t => ({
-            buyerName: t.buyerName,
-            farmerName: t.farmerName,
-            numberOfBags: t.numberOfBags,
-            pricePerKg: t.pricePerKg,
-            totalPayableToFarmer: t.totalPayableToFarmer,
-            totalReceivableFromBuyer: t.totalReceivableFromBuyer,
-            txnDate: t.date,
-          })),
-        };
-        await tx.insert(lotEditHistory).values({
-          lotId,
-          businessId,
-          fieldChanged: "lot_deleted",
-          oldValue: JSON.stringify(auditValue),
-          newValue: null,
-          changedBy: username,
-        });
+        // Write audit snapshot only when there is meaningful data to record
+        if (lotBids.length > 0 || lotTxns.length > 0) {
+          const auditValue = {
+            numberOfBags: lot.numberOfBags,
+            bids: lotBids.map(b => ({ buyerName: b.buyerName, numberOfBags: b.numberOfBags, pricePerKg: b.pricePerKg })),
+            transactions: lotTxns.map(t => ({
+              buyerName: t.buyerName,
+              farmerName: t.farmerName,
+              numberOfBags: t.numberOfBags,
+              pricePerKg: t.pricePerKg,
+              totalPayableToFarmer: t.totalPayableToFarmer,
+              totalReceivableFromBuyer: t.totalReceivableFromBuyer,
+              txnDate: t.date,
+            })),
+          };
+          await tx.insert(lotEditHistory).values({
+            lotId,
+            businessId,
+            fieldChanged: "lot_deleted",
+            oldValue: JSON.stringify(auditValue),
+            newValue: null,
+            changedBy: username,
+          });
+        }
 
-        // Null out lotId FK on ALL lot_edit_history rows so the lot can be deleted
-        // (lot_edit_history.lotId is nullable; audit rows are preserved without FK)
+        // Null out lotId FK on ALL lot_edit_history rows so the lot can be deleted.
+        // lot_edit_history.lotId is nullable; audit rows are preserved after lot removal.
         await tx.update(lotEditHistory)
-          .set({ lotId: null } as any)
+          .set({ lotId: null })
           .where(eq(lotEditHistory.lotId, lotId));
 
         // Cascade-delete child records
