@@ -3391,15 +3391,21 @@ export default function StockPage() {
               } catch (err: any) {
                 toast({ title: t("stock.warning"), description: `Failed to delete lot: ${err.message}`, variant: "destructive" });
                 // Restore the lot into the current card state to keep UI in sync with DB.
-                card = {
-                  ...card,
-                  cropGroups: card.cropGroups.map(g => {
-                    if (g.id !== savedGroup.id) return g;
-                    const alreadyPresent = g.lots.some(l => l.dbId === savedLot.dbId);
-                    if (alreadyPresent) return g;
-                    return { ...g, lots: [...g.lots, savedLot] };
-                  }),
-                };
+                // If the entire crop group was also removed, recreate it.
+                const groupExists = card.cropGroups.some(g => g.id === savedGroup.id);
+                if (!groupExists) {
+                  card = { ...card, cropGroups: [...card.cropGroups, { ...savedGroup, lots: [savedLot] }] };
+                } else {
+                  card = {
+                    ...card,
+                    cropGroups: card.cropGroups.map(g => {
+                      if (g.id !== savedGroup.id) return g;
+                      const alreadyPresent = g.lots.some(l => l.dbId === savedLot.dbId);
+                      if (alreadyPresent) return g;
+                      return { ...g, lots: [...g.lots, savedLot] };
+                    }),
+                  };
+                }
               }
             }
           }

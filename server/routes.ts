@@ -1074,7 +1074,7 @@ export async function registerRoutes(
         id: transactions.id,
         transactionId: transactions.transactionId,
         numberOfBags: transactions.numberOfBags,
-        pricePerKg: bids.pricePerKg,
+        pricePerKg: transactions.pricePerKg,
         totalPayableToFarmer: transactions.totalPayableToFarmer,
         totalReceivableFromBuyer: transactions.totalReceivableFromBuyer,
         date: transactions.date,
