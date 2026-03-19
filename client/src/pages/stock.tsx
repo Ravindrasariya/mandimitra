@@ -2181,13 +2181,13 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
               {conflictType === "error" && conflictCard && (
                 <div className="flex items-start gap-2 rounded-md border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950/40 px-3 py-2 text-xs text-red-700 dark:text-red-400" data-testid="banner-conflict-error">
                   <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                  <span>A card for <strong>{conflictCard.farmerName}</strong> already exists on {card.date} without a vehicle number. Please add a vehicle number to that card before creating a second card for the same farmer on this date.</span>
+                  <span>{t("stock.conflictForFarmer")} <strong>{conflictCard.farmerName}</strong> {t("stock.conflictNoVehicleDetail").replace("{date}", card.date)}</span>
                 </div>
               )}
               {conflictType === "warning" && conflictCard && (
                 <div className="flex items-start gap-2 rounded-md border border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-950/40 px-3 py-2 text-xs text-orange-700 dark:text-orange-400" data-testid="banner-conflict-warning">
                   <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                  <span>A card for <strong>{conflictCard.farmerName}</strong> already exists on {card.date} (vehicle: {conflictCard.vehicleNumber}). Make sure this new card has a different vehicle number.</span>
+                  <span>{t("stock.conflictForFarmer")} <strong>{conflictCard.farmerName}</strong> {t("stock.conflictHasVehicleDetail").replace("{date}", card.date).replace("{vehicle}", conflictCard.vehicleNumber || "")}</span>
                 </div>
               )}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
