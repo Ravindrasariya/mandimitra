@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   Plus, Trash2, ChevronDown, ChevronRight, Truck, User,
-  AlertTriangle, Scale, Wheat, ChevronsUpDown, X, Calculator,
+  AlertTriangle, AlertCircle, Scale, Wheat, ChevronsUpDown, X, Calculator,
   Archive, History, Save, Check, Printer, Share2, Loader2,
   Layers, Landmark, ShoppingBag, Calendar, Search, Filter, RotateCcw, Download, ClipboardList,
 } from "lucide-react";
@@ -1918,7 +1918,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
 
 // ─── Farmer card ──────────────────────────────────────────────────────────────
 
-function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onCancel, onArchive, onSyncSaved, cs, currentUsername, saving }: {
+function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onCancel, onArchive, onSyncSaved, cs, currentUsername, saving, allCards }: {
   card: FarmerCard;
   savedCard: FarmerCard | null;
   onChange: (c: FarmerCard) => void;
@@ -1930,6 +1930,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
   onSyncSaved: (c: FarmerCard) => void;
   cs: ChargeSettings;
   currentUsername: string;
+  allCards: FarmerCard[];
 }) {
   const { t } = useLanguage();
   const { toast } = useToast();
@@ -2003,6 +2004,18 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
         return getDataFingerprint(card) !== getDataFingerprint(comparableSaved);
       })()
     : hasAnyInput;
+
+  const conflictCard = (card.savedAt === null && card.farmerId)
+    ? allCards.find(c =>
+        c.id !== card.id &&
+        c.farmerId === card.farmerId &&
+        c.date === card.date &&
+        c.cropGroups.some(g => g.lots.some(l => !!l.dbId))
+      )
+    : undefined;
+  const conflictType: "warning" | "error" | null = conflictCard
+    ? (conflictCard.vehicleNumber?.trim() ? "warning" : "error")
+    : null;
 
   const handleCardToggle = () => {
     if (card.cardOpen && isDirty) {
@@ -2165,6 +2178,18 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
             icon={<User className="w-3.5 h-3.5" />} label={t("stock.farmerDetails")} />
           {card.farmerOpen && (
             <div className="space-y-3 pl-2">
+              {conflictType === "error" && conflictCard && (
+                <div className="flex items-start gap-2 rounded-md border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-950/40 px-3 py-2 text-xs text-red-700 dark:text-red-400" data-testid="banner-conflict-error">
+                  <AlertCircle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  <span>A card for <strong>{conflictCard.farmerName}</strong> already exists on {card.date} without a vehicle number. Please add a vehicle number to that card before creating a second card for the same farmer on this date.</span>
+                </div>
+              )}
+              {conflictType === "warning" && conflictCard && (
+                <div className="flex items-start gap-2 rounded-md border border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-950/40 px-3 py-2 text-xs text-orange-700 dark:text-orange-400" data-testid="banner-conflict-warning">
+                  <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  <span>A card for <strong>{conflictCard.farmerName}</strong> already exists on {card.date} (vehicle: {conflictCard.vehicleNumber}). Make sure this new card has a different vehicle number.</span>
+                </div>
+              )}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="relative">
                   <Label className="text-xs text-muted-foreground">{t("stock.farmerName")}</Label>
@@ -2464,8 +2489,8 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
               )}
               <Button type="button"
                 onClick={onSave}
-                disabled={!isDirty || saving}
-                className={`h-8 gap-1.5 text-sm transition-all ${isDirty && !saving ? "bg-primary text-primary-foreground" : "opacity-50"}`}
+                disabled={!isDirty || saving || conflictType === "error"}
+                className={`h-8 gap-1.5 text-sm transition-all ${isDirty && !saving && conflictType !== "error" ? "bg-primary text-primary-foreground" : "opacity-50"}`}
                 data-testid="button-save-entry">
                 {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} {saving ? t("stock.saving") || "Saving..." : t("stock.saveEntry")}
               </Button>
@@ -4189,6 +4214,7 @@ export default function StockPage() {
               cs={cs}
               currentUsername={currentUsername}
               saving={savingCardId === card.id}
+              allCards={cards}
             />
           );
         })}

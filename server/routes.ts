@@ -9,7 +9,7 @@ import path from "path";
 import fs from "fs";
 import { db } from "./db";
 import { transactions, bids, buyers, lots, farmers, cashEntries, transactionEditHistory, lotEditHistory, insertAssetSchema, insertLiabilitySchema, type Farmer } from "@shared/schema";
-import { eq, and, inArray, sql } from "drizzle-orm";
+import { eq, and, inArray, sql, isNull } from "drizzle-orm";
 import { addSseClient, removeSseClient, broadcastBusinessEvent } from "./sse";
 
 const uploadsDir = path.join(process.cwd(), "uploads");
@@ -843,6 +843,21 @@ export async function registerRoutes(
       const totalLotBags = lotItems.reduce((sum: number, l: any) => sum + parseInt(l.numberOfBags || 0), 0);
       if (totalBagsInVehicle && totalLotBags > parseInt(totalBagsInVehicle)) {
         return res.status(400).json({ message: "Sum of lot bags exceeds total bags in vehicle" });
+      }
+
+      const incomingVehicle = vehicleNumber ? vehicleNumber.toUpperCase().trim() : null;
+      const existingForCard = await db
+        .select({ id: lots.id })
+        .from(lots)
+        .where(and(
+          eq(lots.businessId, businessId),
+          eq(lots.farmerId, parseInt(farmerId)),
+          eq(lots.date, dateStr),
+          incomingVehicle ? eq(lots.vehicleNumber, incomingVehicle) : isNull(lots.vehicleNumber)
+        ))
+        .limit(1);
+      if (existingForCard.length > 0) {
+        return res.status(409).json({ message: "A card for this farmer already exists on this date with the same vehicle number." });
       }
 
       const baseSerial = await storage.getNextSerialNumber(businessId, dateStr);
