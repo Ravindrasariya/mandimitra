@@ -110,6 +110,7 @@ type BidRow = {
   farmerPaymentStatus?: "due" | "paid" | "partial";
   farmerPaidAmount?: string;
   savedBuyerReceivable?: number;
+  savedFarmerPayable?: number;
   paidAmount?: string;
 };
 
@@ -153,11 +154,13 @@ function dbRecordToEditEntry(rec: { fieldChanged: string; oldValue: string | nul
     let detail = "";
     try {
       const data = JSON.parse(rec.oldValue || "{}");
-      const namePart = data.buyerName ? String(data.buyerName) : "";
-      const bagsPart = data.numberOfBags ? `${data.numberOfBags} bags` : "";
-      const pricePart = data.pricePerKg ? `₹${parseFloat(data.pricePerKg)}/kg` : "";
-      const suffix = [bagsPart, pricePart].filter(Boolean).join(", ");
-      detail = namePart && suffix ? `${namePart} — ${suffix}` : namePart || suffix;
+      const parts: string[] = [];
+      if (data.buyerName) parts.push(String(data.buyerName));
+      if (data.numberOfBags) parts.push(`${data.numberOfBags} bags`);
+      if (data.pricePerKg) parts.push(`₹${parseFloat(data.pricePerKg)}/kg`);
+      if (data.totalPayableToFarmer != null) parts.push(`Farmer: ₹${parseFloat(data.totalPayableToFarmer).toLocaleString("en-IN")}`);
+      if (data.totalReceivableFromBuyer != null) parts.push(`Buyer: ₹${parseFloat(data.totalReceivableFromBuyer).toLocaleString("en-IN")}`);
+      detail = parts.join(" — ");
     } catch {}
     return { timestamp, username, changes: [{ kind: "deleted", path: "Bid", detail: detail || undefined }] };
   }
@@ -1509,6 +1512,10 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
     if (buyerName) parts.push(buyerName);
     if (bags > 0) parts.push(`${bags} bags`);
     if (price > 0) parts.push(`₹${price}/kg`);
+    if (deletedBid?.txnDbId) {
+      if (deletedBid.savedFarmerPayable != null) parts.push(`Farmer: ₹${deletedBid.savedFarmerPayable.toLocaleString("en-IN")}`);
+      if (deletedBid.savedBuyerReceivable != null) parts.push(`Buyer: ₹${deletedBid.savedBuyerReceivable.toLocaleString("en-IN")}`);
+    }
     const entry: EditEntry = {
       timestamp: now,
       username: currentUsername,
@@ -1542,6 +1549,10 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
           if (bn) bidParts.push(bn);
           if (bb > 0) bidParts.push(`${bb} bags`);
           if (bp > 0) bidParts.push(`₹${bp}/kg`);
+          if (bid.txnDbId) {
+            if (bid.savedFarmerPayable != null) bidParts.push(`Farmer: ₹${bid.savedFarmerPayable.toLocaleString("en-IN")}`);
+            if (bid.savedBuyerReceivable != null) bidParts.push(`Buyer: ₹${bid.savedBuyerReceivable.toLocaleString("en-IN")}`);
+          }
           if (bidParts.length > 0) {
             changes.push({ kind: "deleted", path: `Lot ${lotNum} > Bid ${bi + 1}`, detail: bidParts.join(" — ") });
           }
@@ -2589,6 +2600,7 @@ function stockCardsToFarmerCards(apiCards: any[]): FarmerCard[] {
                 extraOthers: txn.extraOthersFarmer?.toString() || "0",
               } : emptyTxn(),
               savedBuyerReceivable: txn?.totalReceivableFromBuyer != null ? parseFloat(txn.totalReceivableFromBuyer) : undefined,
+              savedFarmerPayable: txn?.totalPayableToFarmer != null ? parseFloat(txn.totalPayableToFarmer) : undefined,
               paymentStatus: txn?.paymentStatus || "due",
               farmerPaymentStatus: txn?.farmerPaymentStatus || "due",
               farmerPaidAmount: txn?.farmerPaidAmount?.toString() || "0",
