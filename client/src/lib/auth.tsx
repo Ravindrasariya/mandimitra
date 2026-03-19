@@ -35,7 +35,7 @@ type AuthUser = {
 type AuthContextType = {
   user: AuthUser | null;
   isLoading: boolean;
-  login: (username: string, password: string) => Promise<AuthUser>;
+  login: (username: string, password: string, captchaToken?: string) => Promise<AuthUser>;
   logout: () => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string, phone?: string) => Promise<void>;
   switchBusiness: (businessId: number) => Promise<void>;
@@ -90,8 +90,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [user?.id, user?.businessId]);
 
   const loginMutation = useMutation({
-    mutationFn: async ({ username, password }: { username: string; password: string }) => {
-      const res = await apiRequest("POST", "/api/auth/login", { username, password });
+    mutationFn: async ({ username, password, captchaToken }: { username: string; password: string; captchaToken?: string }) => {
+      const res = await apiRequest("POST", "/api/auth/login", { username, password, ...(captchaToken ? { captchaToken } : {}) });
       return res.json() as Promise<AuthUser>;
     },
     onSuccess: async (data) => {
@@ -159,8 +159,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     },
   });
 
-  const login = async (username: string, password: string) => {
-    return loginMutation.mutateAsync({ username, password });
+  const login = async (username: string, password: string, captchaToken?: string) => {
+    return loginMutation.mutateAsync({ username, password, captchaToken });
   };
 
   const logout = async () => {

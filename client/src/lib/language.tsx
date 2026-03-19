@@ -275,6 +275,8 @@ const translations: Record<string, Record<Language, string>> = {
   "login.signingIn": { en: "Signing in...", hi: "लॉगिन हो रहा है..." },
   "login.changePassword": { en: "Change Password", hi: "पासवर्ड बदलें" },
   "login.needHelp": { en: "Need Help? Please reach out to", hi: "मदद चाहिए? कृपया संपर्क करें" },
+  "login.captchaRequired": { en: "Please complete the CAPTCHA verification", hi: "कृपया CAPTCHA सत्यापन पूरा करें" },
+  "login.captchaFailed": { en: "CAPTCHA verification failed. Please try again.", hi: "CAPTCHA सत्यापन विफल हुआ। कृपया पुनः प्रयास करें।" },
   "login.enterUsername": { en: "Enter Your Username", hi: "अपना उपयोगकर्ता नाम दर्ज करें" },
   "login.enterPassword": { en: "Enter password", hi: "पासवर्ड दर्ज करें" },
 

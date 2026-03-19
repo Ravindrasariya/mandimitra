@@ -40,6 +40,22 @@ declare global {
   }
 }
 
+async function verifyCaptcha(token: string): Promise<boolean> {
+  const secret = process.env.RECAPTCHA_SECRET_KEY;
+  if (!secret) return true;
+  try {
+    const res = await fetch("https://www.google.com/recaptcha/api/siteverify", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `secret=${encodeURIComponent(secret)}&response=${encodeURIComponent(token)}`,
+    });
+    const data = await res.json() as { success: boolean };
+    return data.success === true;
+  } catch {
+    return false;
+  }
+}
+
 export async function setupAuth(app: Express): Promise<void> {
   const PgSession = connectPgSimple(session);
 
@@ -126,7 +142,19 @@ export async function setupAuth(app: Express): Promise<void> {
     }
   });
 
-  app.post("/api/auth/login", (req, res) => {
+  app.post("/api/auth/login", async (req, res, next) => {
+    const shouldEnforceCaptcha = !!process.env.RECAPTCHA_SECRET_KEY && process.env.NODE_ENV !== "development";
+    if (shouldEnforceCaptcha) {
+      const token: string = req.body.captchaToken || "";
+      if (!token) {
+        return res.status(400).json({ message: "CAPTCHA verification required" });
+      }
+      const ok = await verifyCaptcha(token);
+      if (!ok) {
+        return res.status(400).json({ message: "CAPTCHA verification failed. Please try again." });
+      }
+    }
+
     passport.authenticate("local", (err: any, user: Express.User | false, info: any) => {
       if (err) {
         console.error("Login error:", err);

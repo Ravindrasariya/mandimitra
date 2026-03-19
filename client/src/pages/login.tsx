@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
+import ReCAPTCHA from "react-google-recaptcha";
 import { useAuth } from "@/lib/auth";
 import { useLanguage } from "@/lib/language";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,8 @@ import { useToast } from "@/hooks/use-toast";
 import { Wheat, Eye, EyeOff, Globe } from "lucide-react";
 import { Link } from "wouter";
 
+const RECAPTCHA_SITE_KEY = import.meta.env.DEV ? "" : (import.meta.env.VITE_RECAPTCHA_SITE_KEY || "");
+
 export default function LoginPage() {
   const { login } = useAuth();
   const { toast } = useToast();
@@ -17,15 +20,25 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const recaptchaRef = useRef<ReCAPTCHA>(null);
+
+  const captchaRequired = !!RECAPTCHA_SITE_KEY;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username || !password) return;
+    if (captchaRequired && !captchaToken) {
+      toast({ title: t("login.captchaRequired"), variant: "destructive" });
+      return;
+    }
     setLoading(true);
     try {
-      await login(username, password);
+      await login(username, password, captchaToken ?? undefined);
     } catch (err: any) {
       toast({ title: "Login Failed", description: err.message, variant: "destructive" });
+      recaptchaRef.current?.reset();
+      setCaptchaToken(null);
     } finally {
       setLoading(false);
     }
@@ -92,11 +105,21 @@ export default function LoginPage() {
                 </button>
               </div>
             </div>
+            {captchaRequired && (
+              <div className="flex justify-center">
+                <ReCAPTCHA
+                  ref={recaptchaRef}
+                  sitekey={RECAPTCHA_SITE_KEY}
+                  onChange={(token) => setCaptchaToken(token)}
+                  onExpired={() => setCaptchaToken(null)}
+                />
+              </div>
+            )}
             <Button
               type="submit"
               data-testid="button-login"
               className="w-full mobile-touch-target bg-green-500"
-              disabled={loading || !username || !password}
+              disabled={loading || !username || !password || (captchaRequired && !captchaToken)}
             >
               {loading ? t("login.signingIn") : t("login.login")}
             </Button>
