@@ -19,7 +19,7 @@ import {
   Plus, Trash2, ChevronDown, ChevronRight, Truck, User,
   AlertTriangle, Scale, Wheat, ChevronsUpDown, X, Calculator,
   Archive, History, Save, Check, Printer, Share2, Loader2,
-  Layers, Landmark, ShoppingBag, Calendar, Search, Filter, RotateCcw, Download,
+  Layers, Landmark, ShoppingBag, Calendar, Search, Filter, RotateCcw, Download, ClipboardList,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -27,7 +27,7 @@ import { format } from "date-fns";
 import { CROPS, SIZES, DISTRICTS } from "@shared/schema";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem, CommandGroup } from "@/components/ui/command";
-import { printReceipt, shareReceiptAsImage, wrapWithDuplicate } from "@/lib/receiptUtils";
+import { printReceipt, shareReceiptAsImage, wrapWithDuplicate, generateBidCopyHtml, type BidCropSection } from "@/lib/receiptUtils";
 import {
   generateFarmerReceiptHtml, generateBuyerReceiptHtml, generateCombinedBuyerReceiptHtml,
   generateAllBuyerReceiptHtml,
@@ -2645,6 +2645,7 @@ function StockFilterBar({
   buyersList,
   onExportStockCsv, onExportTxnCsv,
   canPrintOverallBill, onPrintAllBuyerReceipt,
+  onPrintBidCopy,
 }: {
   cards: FarmerCard[];
   dateMode: "stock" | "txn";
@@ -2668,6 +2669,7 @@ function StockFilterBar({
   onExportTxnCsv: () => void;
   canPrintOverallBill: boolean;
   onPrintAllBuyerReceipt: () => void;
+  onPrintBidCopy: () => void;
 }) {
   const { t, language } = useLanguage();
   const MONTH_LABELS = language === "hi" ? MONTH_LABELS_HI : MONTH_LABELS_EN;
@@ -2986,6 +2988,18 @@ function StockFilterBar({
           <Printer className="w-4 h-4" />
         </Button>
       )}
+
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-8 gap-1 px-2 text-xs"
+        data-testid="button-print-bid-copy"
+        title={t("stock.printBidCopy")}
+        onClick={onPrintBidCopy}
+      >
+        <ClipboardList className="w-3.5 h-3.5" />
+        <span className="hidden sm:inline">{t("stock.printBidCopy")}</span>
+      </Button>
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
@@ -3807,6 +3821,49 @@ export default function StockPage() {
     }
   };
 
+  const handlePrintBidCopy = async () => {
+    const cropMap = new Map<string, Map<number, { farmerName: string; totalBags: number }>>();
+    for (const card of filteredCards) {
+      if (card.archived || !savedCardMap.has(card.id)) continue;
+      for (const g of card.cropGroups) {
+        if (g.archived) continue;
+        const srNum = parseInt(g.srNumber) || 0;
+        if (!srNum) continue;
+        const totalBags = g.lots
+          .filter(l => !l.isReturned && (parseInt(l.numberOfBags) || 0) > 0)
+          .reduce((s, l) => s + (parseInt(l.numberOfBags) || 0), 0);
+        if (totalBags === 0) continue;
+        if (!cropMap.has(g.crop)) cropMap.set(g.crop, new Map());
+        const srMap = cropMap.get(g.crop)!;
+        if (srMap.has(srNum)) {
+          srMap.get(srNum)!.totalBags += totalBags;
+        } else {
+          srMap.set(srNum, { farmerName: card.farmerName, totalBags });
+        }
+      }
+    }
+    if (cropMap.size === 0) {
+      toast({ title: t("stock.noBidCopyData"), variant: "destructive" });
+      return;
+    }
+    let dateStr = format(new Date(), "dd-MMM-yyyy");
+    if (selectedMonths.length === 1 && selectedDays.length === 1 && yearFilter !== "all") {
+      const m = selectedMonths[0].padStart(2, "0");
+      const d = selectedDays[0].padStart(2, "0");
+      try { dateStr = format(new Date(`${yearFilter}-${m}-${d}`), "dd-MMM-yyyy"); } catch {}
+    }
+    const cropSections: BidCropSection[] = Array.from(cropMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([crop, srMap]) => ({
+        crop,
+        groups: Array.from(srMap.entries())
+          .sort(([a], [b]) => a - b)
+          .map(([serialNumber, { farmerName, totalBags }]) => ({ serialNumber, farmerName, totalBags })),
+      }));
+    const html = generateBidCopyHtml(cropSections, user?.businessName || "", dateStr);
+    await printReceipt(html, `bid-copy-${dateStr}.pdf`);
+  };
+
   const escCSV = (val: any) => {
     let s = String(val ?? "");
     if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
@@ -3939,6 +3996,7 @@ export default function StockPage() {
             onExportTxnCsv={exportTxnCsv}
             canPrintOverallBill={canPrintOverallBill}
             onPrintAllBuyerReceipt={handlePrintAllBuyerReceipt}
+            onPrintBidCopy={handlePrintBidCopy}
           />
         )}
         {!loadingCards && <StockSummaryBar cards={filteredCards} savedCardMap={savedCardMap} cs={cs} buyersList={pageBuyersList} />}

@@ -108,6 +108,87 @@ function canvasToPdfBlob(canvas: HTMLCanvasElement): Blob {
   return pdf.output("blob");
 }
 
+export type BidCropSection = {
+  crop: string;
+  groups: Array<{ serialNumber: number; farmerName: string; totalBags: number }>;
+};
+
+export function generateBidCopyHtml(
+  cropSections: BidCropSection[],
+  businessName: string,
+  date: string
+): string {
+  function getBidRows(bags: number): number {
+    if (bags <= 10) return 1;
+    if (bags <= 50) return 2;
+    if (bags <= 150) return 3;
+    return 4;
+  }
+
+  const tdStyle = "border:1px solid #333;padding:5px 7px;";
+  const thStyle = "border:1px solid #333;padding:5px 7px;background:#e8e8e8;font-weight:600;font-size:10.5px;";
+
+  const sections = cropSections.map(({ crop, groups }) => {
+    const sortedGroups = [...groups].sort((a, b) => a.serialNumber - b.serialNumber);
+
+    const bodyRows = sortedGroups.map(g => {
+      const rowCount = getBidRows(g.totalBags);
+      const firstRow = `<tr style="border-top:2.5px solid #444;">
+        <td rowspan="${rowCount}" style="${tdStyle}text-align:center;font-weight:700;vertical-align:middle;">${g.serialNumber}</td>
+        <td rowspan="${rowCount}" style="${tdStyle}vertical-align:middle;">${g.farmerName}</td>
+        <td rowspan="${rowCount}" style="${tdStyle}text-align:center;vertical-align:middle;">${g.totalBags}</td>
+        <td style="${tdStyle}min-width:90px;"></td>
+        <td style="${tdStyle}text-align:center;width:55px;"></td>
+        <td style="${tdStyle}text-align:center;width:45px;"></td>
+        <td style="${tdStyle}text-align:center;width:65px;"></td>
+      </tr>`;
+      const extraRows = Array.from({ length: rowCount - 1 }, () =>
+        `<tr>
+          <td style="${tdStyle}"></td>
+          <td style="${tdStyle}text-align:center;"></td>
+          <td style="${tdStyle}text-align:center;"></td>
+          <td style="${tdStyle}text-align:center;"></td>
+        </tr>`
+      ).join("");
+      return firstRow + extraRows;
+    }).join("");
+
+    return `<div style="margin-bottom:20px;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
+        <span style="font-size:12px;font-weight:600;">${businessName}</span>
+        <span style="font-size:13px;font-weight:700;letter-spacing:0.3px;">CROP: ${crop.toUpperCase()} &mdash; BID COPY</span>
+        <span style="font-size:11px;">${date}</span>
+      </div>
+      <table style="width:100%;border-collapse:collapse;font-size:11px;">
+        <thead>
+          <tr>
+            <th style="${thStyle}text-align:center;width:38px;">SR#</th>
+            <th style="${thStyle}text-align:left;min-width:95px;">Farmer Name</th>
+            <th style="${thStyle}text-align:center;width:50px;">Bags</th>
+            <th style="${thStyle}text-align:left;min-width:90px;">Buyer Name</th>
+            <th style="${thStyle}text-align:center;width:55px;">Rate/Kg</th>
+            <th style="${thStyle}text-align:center;width:45px;"># Bags</th>
+            <th style="${thStyle}text-align:center;width:65px;">Cash/Credit</th>
+          </tr>
+        </thead>
+        <tbody>${bodyRows}</tbody>
+      </table>
+      <div style="margin-top:10px;border-top:1px solid #aaa;padding-top:5px;font-size:10px;color:#555;">
+        Notes / Signature: &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+      </div>
+    </div>`;
+  });
+
+  const body = sections.join('<div style="page-break-before:always;"></div>');
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8">
+<style>
+@page { size: A4 portrait; margin: 10mm; }
+body { margin:0; font-family:Arial,sans-serif; font-size:11px; color:#111; }
+</style>
+</head><body>${body}</body></html>`;
+}
+
 export async function shareReceiptAsImage(html: string, fileName: string): Promise<void> {
   const bodyHtml = extractBodyHtml(html);
   const headStyles = extractHeadStyles(html);
