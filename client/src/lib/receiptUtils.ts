@@ -113,6 +113,10 @@ export type BidCropSection = {
   groups: Array<{ serialNumber: number; farmerName: string; totalBags: number }>;
 };
 
+function escHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
 export function generateBidCopyHtml(
   cropSections: BidCropSection[],
   businessName: string,
@@ -135,7 +139,7 @@ export function generateBidCopyHtml(
       const rowCount = getBidRows(g.totalBags);
       const firstRow = `<tr style="border-top:2.5px solid #444;">
         <td rowspan="${rowCount}" style="${tdStyle}text-align:center;font-weight:700;vertical-align:middle;">${g.serialNumber}</td>
-        <td rowspan="${rowCount}" style="${tdStyle}vertical-align:middle;">${g.farmerName}</td>
+        <td rowspan="${rowCount}" style="${tdStyle}vertical-align:middle;">${escHtml(g.farmerName)}</td>
         <td rowspan="${rowCount}" style="${tdStyle}text-align:center;vertical-align:middle;">${g.totalBags}</td>
         <td style="${tdStyle}min-width:90px;"></td>
         <td style="${tdStyle}text-align:center;width:55px;"></td>
@@ -155,8 +159,8 @@ export function generateBidCopyHtml(
 
     return `<div style="margin-bottom:20px;">
       <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;">
-        <span style="font-size:12px;font-weight:600;">${businessName}</span>
-        <span style="font-size:13px;font-weight:700;letter-spacing:0.3px;">CROP: ${crop.toUpperCase()} &mdash; BID COPY</span>
+        <span style="font-size:12px;font-weight:600;">${escHtml(businessName)}</span>
+        <span style="font-size:13px;font-weight:700;letter-spacing:0.3px;">CROP: ${escHtml(crop.toUpperCase())} &mdash; BID COPY</span>
         <span style="font-size:11px;">${date}</span>
       </div>
       <table style="width:100%;border-collapse:collapse;font-size:11px;">
