@@ -3115,7 +3115,12 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
 function sortCardsByMaxSr(cards: FarmerCard[]): FarmerCard[] {
   return [...cards].sort((a, b) => {
     const maxSr = (c: FarmerCard) => Math.max(0, ...c.cropGroups.map(g => parseInt(g.srNumber) || 0));
-    return maxSr(b) - maxSr(a);
+    const srA = maxSr(a);
+    const srB = maxSr(b);
+    if (srA === 0 && srB === 0) return 0;
+    if (srA === 0) return -1;
+    if (srB === 0) return 1;
+    return srB - srA;
   });
 }
 
