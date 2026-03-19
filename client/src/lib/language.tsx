@@ -597,6 +597,7 @@ const translations: Record<string, Record<Language, string>> = {
   "stock.mandiStockDesc": { en: "Add farmers, lots, bids and weights in one place", hi: "किसान, लॉट, बोली और वज़न एक जगह जोड़ें" },
   "stock.months": { en: "Months", hi: "महीने" },
   "stock.printOverallBill": { en: "Print overall buyer bill for", hi: "खरीदार का कुल बिल प्रिंट करें" },
+  "stock.shareOverallBill": { en: "Share Overall Bill", hi: "समग्र बिल शेयर करें" },
   "stock.printBidCopy": { en: "Print Bid Copy", hi: "बोली प्रति प्रिंट करें" },
   "stock.noBidCopyData": { en: "No saved lots found to print bid copy", hi: "बोली प्रति के लिए कोई सहेजी हुई खेप नहीं मिली" },
   "stock.reinstateFarmerDesc": { en: "This farmer entry and all its crop groups, lots, and bids will be included in all calculations again, including dues and payments.", hi: "यह किसान एंट्री और उसके सभी फसल समूह, लॉट और बोलियाँ फिर से सभी गणनाओं में शामिल की जाएँगी, जिसमें बकाया और भुगतान शामिल हैं।" },

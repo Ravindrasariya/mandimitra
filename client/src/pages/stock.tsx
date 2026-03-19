@@ -2698,7 +2698,7 @@ function StockFilterBar({
   onExportStockCsv: () => void;
   onExportTxnCsv: () => void;
   canPrintOverallBill: boolean;
-  onPrintAllBuyerReceipt: () => void;
+  onPrintAllBuyerReceipt: (action: "print" | "share") => void;
   canPrintBidCopy: boolean;
   onPrintBidCopy: () => void;
 }) {
@@ -3008,16 +3008,27 @@ function StockFilterBar({
       )}
 
       {canPrintOverallBill && (
-        <Button
-          variant="outline"
-          size="icon"
-          className="h-8 w-8"
-          data-testid="button-print-all-buyer-receipt"
-          title={`${t("stock.printOverallBill")} ${buyerFilter.trim()} (${cropFilter})`}
-          onClick={onPrintAllBuyerReceipt}
-        >
-          <Printer className="w-4 h-4" />
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="outline"
+              size="icon"
+              className="h-8 w-8"
+              data-testid="button-print-all-buyer-receipt"
+              title={`${t("stock.printOverallBill")} ${buyerFilter.trim()} (${cropFilter})`}
+            >
+              <Printer className="w-4 h-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => onPrintAllBuyerReceipt("print")} data-testid="receipt-print-overall">
+              <Printer className="w-3.5 h-3.5 mr-2" /> {t("stock.printOverallBill")}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onPrintAllBuyerReceipt("share")} data-testid="receipt-share-overall">
+              <Share2 className="w-3.5 h-3.5 mr-2" /> {t("stock.shareOverallBill")}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       )}
 
       <Button
@@ -3782,7 +3793,7 @@ export default function StockPage() {
   const canPrintOverallBill = isSingleDateFilter && buyerFilter.trim() !== "" && cropFilter !== "all";
   const canPrintBidCopy = isSingleDateFilter && yearFilter !== "all" && cropFilter !== "all";
 
-  const handlePrintAllBuyerReceipt = async () => {
+  const handlePrintAllBuyerReceipt = async (action: "print" | "share" = "print") => {
     if (!canPrintOverallBill) {
       toast({ title: t("stock.selectSingleDateBuyerCrop"), variant: "destructive" });
       return;
@@ -3858,18 +3869,18 @@ export default function StockPage() {
       }
     }
 
+    const safeBuyerName = buyerFilter.trim().replace(/[^a-zA-Z0-9]/g, "_");
+    const buyerFileName = `Overall_Receipt_${safeBuyerName}_${cropFilter}_${receiptDate}.pdf`;
+
     const overallTmpl = stockPageReceiptTemplates.find(tmpl => tmpl.templateType === "buyer-overall");
-    if (overallTmpl) {
-      const fullHtml = applyCombinedBuyerTemplate(overallTmpl.templateHtml, entries, 0, receiptDate, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo, receiptSerialNumber);
-      printReceipt(wrapWithDuplicate(fullHtml));
+    const fullHtml = overallTmpl
+      ? applyCombinedBuyerTemplate(overallTmpl.templateHtml, entries, 0, receiptDate, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo, receiptSerialNumber)
+      : generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress, receiptSerialNumber, false, user?.businessPhone);
+
+    if (action === "share") {
+      await shareReceiptAsImage(fullHtml, buyerFileName);
     } else {
-      const fullHtml = generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress, receiptSerialNumber, false, user?.businessPhone);
-      if (printBillMode === "hide-aadhat") {
-        const cleanHtml = generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress, receiptSerialNumber, true, user?.businessPhone);
-        printReceipt(wrapWithDuplicate(fullHtml, cleanHtml));
-      } else {
-        printReceipt(wrapWithDuplicate(fullHtml));
-      }
+      printReceipt(fullHtml, buyerFileName);
     }
   };
 
