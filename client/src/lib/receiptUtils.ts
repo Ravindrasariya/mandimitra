@@ -137,7 +137,7 @@ export function generateBidCopyHtml(
 
     const bodyRows = sortedGroups.map(g => {
       const rowCount = getBidRows(g.totalBags);
-      const farmerLabel = g.village ? `${escHtml(g.farmerName)} (${escHtml(g.village)})` : escHtml(g.farmerName);
+      const farmerLabel = g.village ? `${escHtml(g.farmerName)}<br><span style="font-size:9.5px;color:#555;">${escHtml(g.village)}</span>` : escHtml(g.farmerName);
       const firstRow = `<tr style="border-top:2.5px solid #444;">
         <td rowspan="${rowCount}" style="${tdStyle}text-align:center;font-weight:700;vertical-align:middle;">${g.serialNumber}</td>
         <td rowspan="${rowCount}" style="${tdStyle}vertical-align:middle;">${farmerLabel}</td>
