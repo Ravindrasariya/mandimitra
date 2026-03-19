@@ -3333,7 +3333,7 @@ export default function StockPage() {
         const lot = g.lots[li];
         const lotBags = parseInt(lot.numberOfBags) || 0;
         const totalBidBagsForLot = lot.bids.reduce((s, b) => s + (parseInt(b.numberOfBags) || 0), 0);
-        if (lotBags > 0 && totalBidBagsForLot > lotBags) {
+        if (totalBidBagsForLot > lotBags) {
           toast({ title: t("stock.error"), description: `${g.crop} ${t("stock.lot")} #${li + 1}: ${t("stock.bidBagsExceedLot")} (${totalBidBagsForLot} > ${lotBags})`, variant: "destructive" });
           return;
         }
