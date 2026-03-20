@@ -40,6 +40,10 @@ export async function registerRoutes(
 ): Promise<Server> {
   await setupAuth(app);
 
+  app.get("/api/recaptcha-config", (_req, res) => {
+    res.json({ siteKey: process.env.RECAPTCHA_SITE_KEY || null });
+  });
+
   app.get("/api/events", requireAuth, (req, res) => {
     const businessId = req.user!.businessId;
     res.setHeader("Content-Type", "text/event-stream");

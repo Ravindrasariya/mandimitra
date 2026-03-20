@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import ReCAPTCHA from "react-google-recaptcha";
 import { useAuth } from "@/lib/auth";
 import { useLanguage } from "@/lib/language";
@@ -10,8 +10,6 @@ import { useToast } from "@/hooks/use-toast";
 import { Wheat, Eye, EyeOff, Globe } from "lucide-react";
 import { Link } from "wouter";
 
-const RECAPTCHA_SITE_KEY = import.meta.env.DEV ? "" : (import.meta.env.VITE_RECAPTCHA_SITE_KEY || "");
-
 export default function LoginPage() {
   const { login } = useAuth();
   const { toast } = useToast();
@@ -22,8 +20,16 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [captchaToken, setCaptchaToken] = useState<string | null>(null);
   const recaptchaRef = useRef<ReCAPTCHA>(null);
+  const [siteKey, setSiteKey] = useState<string | null>(null);
 
-  const captchaRequired = !!RECAPTCHA_SITE_KEY;
+  useEffect(() => {
+    fetch("/api/recaptcha-config")
+      .then(r => r.json())
+      .then(d => setSiteKey(d.siteKey || null))
+      .catch(() => setSiteKey(null));
+  }, []);
+
+  const captchaRequired = !!siteKey;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -109,7 +115,7 @@ export default function LoginPage() {
               <div className="flex justify-center">
                 <ReCAPTCHA
                   ref={recaptchaRef}
-                  sitekey={RECAPTCHA_SITE_KEY}
+                  sitekey={siteKey!}
                   onChange={(token) => setCaptchaToken(token)}
                   onExpired={() => setCaptchaToken(null)}
                 />
