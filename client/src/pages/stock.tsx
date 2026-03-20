@@ -501,7 +501,7 @@ const emptyCard = (): FarmerCard => ({
   driverContact: "",
   vehicleBhadaRate: "",
   totalBagsInVehicle: "",
-  freightType: "",
+  freightType: "Advance",
   advanceAmount: "",
   advanceMode: "",
   cropGroups: [],
