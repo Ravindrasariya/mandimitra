@@ -946,7 +946,7 @@ export default function BuyerLedgerPage() {
               <Input
                 data-testid="input-edit-buyer-name"
                 value={editName}
-                onChange={(e) => setEditName(e.target.value)}
+                onChange={(e) => setEditName(e.target.value.replace(/\b\w/g, c => c.toUpperCase()))}
                 className="mobile-touch-target"
               />
             </div>
@@ -955,7 +955,7 @@ export default function BuyerLedgerPage() {
               <Input
                 data-testid="input-edit-buyer-address"
                 value={editAddress}
-                onChange={(e) => setEditAddress(e.target.value)}
+                onChange={(e) => setEditAddress(e.target.value.replace(/\b\w/g, c => c.toUpperCase()))}
                 className="mobile-touch-target"
               />
             </div>
