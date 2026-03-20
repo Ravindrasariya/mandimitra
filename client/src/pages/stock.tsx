@@ -1123,6 +1123,11 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
               <span className="text-blue-700 dark:text-blue-400 font-bold">{t("stock.buyer")}: ₹{totals.buyerReceivable.toFixed(0)}</span>
             </span>
           )}
+          {!bid.bidOpen && bid.paymentType === "Cash" && parseFloat(bid.advanceAmount || "0") > 0 && (
+            <span className="text-xs font-semibold bg-yellow-100 text-yellow-800 border border-yellow-300 rounded px-1.5 py-0.5">
+              {t("stock.cash")} · ₹{parseFloat(bid.advanceAmount).toLocaleString("en-IN")}
+            </span>
+          )}
         </button>
         {canRemove && onRemove && (
           <button
@@ -1247,7 +1252,6 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
                 <SelectContent>
                   <SelectItem value="Credit">{t("stock.credit")}</SelectItem>
                   <SelectItem value="Cash">{t("stock.cash")}</SelectItem>
-                  <SelectItem value="UPI">{t("stock.upi")}</SelectItem>
                 </SelectContent>
               </Select>
             </div>

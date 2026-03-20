@@ -473,7 +473,6 @@ const translations: Record<string, Record<Language, string>> = {
   "stock.payment": { en: "Payment", hi: "भुगतान" },
   "stock.credit": { en: "Credit", hi: "उधार" },
   "stock.cash": { en: "Cash", hi: "नकद" },
-  "stock.upi": { en: "UPI", hi: "UPI" },
   "stock.cashAdvance": { en: "Cash advance ₹", hi: "नकद अग्रिम ₹" },
   "stock.addBid": { en: "Add Bid", hi: "बोली जोड़ें" },
   "stock.noBids": { en: "No bids. Add one below.", hi: "कोई बोली नहीं। नीचे जोड़ें।" },
