@@ -15,7 +15,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import type { Farmer, FarmerEditHistory } from "@shared/schema";
-import { Users, Search, Pencil, RefreshCw, Printer, Archive, AlertTriangle, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, Calendar, Download, X } from "lucide-react";
+import { DISTRICTS } from "@shared/schema";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
+import { Users, Search, Pencil, RefreshCw, Printer, Archive, AlertTriangle, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, Calendar, Download, X, Check, ChevronsUpDown } from "lucide-react";
 import { useKeyboardNav } from "@/hooks/use-keyboard-nav";
 import { format } from "date-fns";
 import { printReceipt } from "@/lib/receiptUtils";
@@ -81,6 +83,8 @@ export default function FarmerLedgerPage() {
   const [yearFilter, setYearFilter] = useState(String(new Date().getFullYear()));
   const [showArchived, setShowArchived] = usePersistedState("fl-showArchived", false);
 
+  const capFirst = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingFarmer, setEditingFarmer] = useState<FarmerWithDues | null>(null);
   const [editName, setEditName] = useState("");
@@ -93,6 +97,10 @@ export default function FarmerLedgerPage() {
   const [editBankName, setEditBankName] = useState("");
   const [editBankAccountNumber, setEditBankAccountNumber] = useState("");
   const [editIfscCode, setEditIfscCode] = useState("");
+
+  const [showVillageSuggestions, setShowVillageSuggestions] = useState(false);
+  const [showTehsilSuggestions, setShowTehsilSuggestions] = useState(false);
+  const [districtOpen, setDistrictOpen] = useState(false);
 
   const [mergeConfirmOpen, setMergeConfirmOpen] = useState(false);
   const [duplicateFarmer, setDuplicateFarmer] = useState<Farmer | null>(null);
@@ -119,6 +127,19 @@ export default function FarmerLedgerPage() {
     queryKey: ["/api/farmer-edit-history", historyFarmerId],
     enabled: !!historyFarmerId,
   });
+
+  const { data: locationData } = useQuery<{ villages: string[]; tehsils: string[] }>({
+    queryKey: ["/api/farmers/locations"],
+  });
+
+  const filteredVillages = (locationData?.villages || []).filter(
+    (v) => editVillage.length >= 1 && v.toLowerCase().includes(editVillage.toLowerCase()) && v.toLowerCase() !== editVillage.toLowerCase()
+  );
+  const filteredTehsils = (locationData?.tehsils || []).filter(
+    (th) => editTehsil.length >= 1 && th.toLowerCase().includes(editTehsil.toLowerCase()) && th.toLowerCase() !== editTehsil.toLowerCase()
+  );
+  const villageKb = useKeyboardNav(filteredVillages);
+  const tehsilKb = useKeyboardNav(filteredTehsils);
 
   const updateFarmerMutation = useMutation({
     mutationFn: async ({ id, data }: { id: number; data: any }) => {
@@ -738,7 +759,7 @@ export default function FarmerLedgerPage() {
                   <Input
                     data-testid="input-edit-farmer-name"
                     value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
+                    onChange={(e) => setEditName(capFirst(e.target.value))}
                   />
                 </div>
                 <div className="space-y-1">
@@ -756,38 +777,103 @@ export default function FarmerLedgerPage() {
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">{t("common.village")}</Label>
-                  <Input
-                    data-testid="input-edit-farmer-village"
-                    value={editVillage}
-                    onChange={(e) => setEditVillage(e.target.value)}
-                  />
+                  <div className="relative">
+                    <Input
+                      data-testid="input-edit-farmer-village"
+                      value={editVillage}
+                      onChange={(e) => { setEditVillage(capFirst(e.target.value)); setShowVillageSuggestions(true); }}
+                      onFocus={() => setShowVillageSuggestions(true)}
+                      onBlur={() => setTimeout(() => { setShowVillageSuggestions(false); villageKb.reset(); }, 150)}
+                      onKeyDown={(e) => {
+                        if (showVillageSuggestions && filteredVillages.length > 0) {
+                          villageKb.handleKeyDown(e, (v) => { setEditVillage(v); setShowVillageSuggestions(false); villageKb.reset(); }, () => { setShowVillageSuggestions(false); villageKb.reset(); });
+                        }
+                      }}
+                      autoComplete="off"
+                    />
+                    {showVillageSuggestions && filteredVillages.length > 0 && (
+                      <div ref={villageKb.listRef} className="absolute z-50 w-full bg-popover border rounded-md shadow-lg mt-1 max-h-40 overflow-y-auto top-full">
+                        {filteredVillages.map((v, i) => (
+                          <button key={v} type="button" data-testid={`suggestion-edit-village-${v}`}
+                            className={`w-full text-left px-3 py-2 text-sm border-b last:border-b-0 ${i === villageKb.activeIndex ? "bg-accent" : "hover:bg-muted"}`}
+                            onMouseEnter={() => villageKb.setActiveIndex(i)}
+                            onMouseDown={() => { setEditVillage(v); setShowVillageSuggestions(false); villageKb.reset(); }}>
+                            {v}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Tehsil</Label>
-                  <Input
-                    data-testid="input-edit-farmer-tehsil"
-                    value={editTehsil}
-                    onChange={(e) => setEditTehsil(e.target.value)}
-                    placeholder="e.g. Ujjain"
-                  />
+                  <div className="relative">
+                    <Input
+                      data-testid="input-edit-farmer-tehsil"
+                      value={editTehsil}
+                      onChange={(e) => { setEditTehsil(capFirst(e.target.value)); setShowTehsilSuggestions(true); }}
+                      onFocus={() => setShowTehsilSuggestions(true)}
+                      onBlur={() => setTimeout(() => { setShowTehsilSuggestions(false); tehsilKb.reset(); }, 150)}
+                      onKeyDown={(e) => {
+                        if (showTehsilSuggestions && filteredTehsils.length > 0) {
+                          tehsilKb.handleKeyDown(e, (th) => { setEditTehsil(th); setShowTehsilSuggestions(false); tehsilKb.reset(); }, () => { setShowTehsilSuggestions(false); tehsilKb.reset(); });
+                        }
+                      }}
+                      autoComplete="off"
+                    />
+                    {showTehsilSuggestions && filteredTehsils.length > 0 && (
+                      <div ref={tehsilKb.listRef} className="absolute z-50 w-full bg-popover border rounded-md shadow-lg mt-1 max-h-40 overflow-y-auto top-full">
+                        {filteredTehsils.map((th, i) => (
+                          <button key={th} type="button" data-testid={`suggestion-edit-tehsil-${th}`}
+                            className={`w-full text-left px-3 py-2 text-sm border-b last:border-b-0 ${i === tehsilKb.activeIndex ? "bg-accent" : "hover:bg-muted"}`}
+                            onMouseEnter={() => tehsilKb.setActiveIndex(i)}
+                            onMouseDown={() => { setEditTehsil(th); setShowTehsilSuggestions(false); tehsilKb.reset(); }}>
+                            {th}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">District</Label>
-                  <Input
-                    data-testid="input-edit-farmer-district"
-                    value={editDistrict}
-                    onChange={(e) => setEditDistrict(e.target.value)}
-                    placeholder="e.g. Ujjain"
-                  />
+                  <Popover open={districtOpen} onOpenChange={setDistrictOpen}>
+                    <PopoverTrigger asChild>
+                      <Button data-testid="select-edit-farmer-district" variant="outline" role="combobox" aria-expanded={districtOpen} className="w-full justify-between font-normal">
+                        {editDistrict || <span className="text-muted-foreground">Select district</span>}
+                        <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[200px] p-0" align="start">
+                      <Command>
+                        <CommandInput placeholder="Search district..." className="h-9 text-sm" />
+                        <CommandList>
+                          <CommandEmpty className="py-3 text-xs">No district found.</CommandEmpty>
+                          <CommandGroup>
+                            {DISTRICTS.map(d => (
+                              <CommandItem key={d} value={d} onSelect={() => { setEditDistrict(d); setDistrictOpen(false); }} className="text-sm">
+                                <Check className={`mr-2 h-3.5 w-3.5 ${editDistrict === d ? "opacity-100" : "opacity-0"}`} />
+                                {d}
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">State</Label>
-                  <Input
-                    data-testid="input-edit-farmer-state"
-                    value={editState}
-                    onChange={(e) => setEditState(e.target.value)}
-                    placeholder="e.g. Madhya Pradesh"
-                  />
+                  <Select value={editState} onValueChange={setEditState}>
+                    <SelectTrigger data-testid="select-edit-farmer-state">
+                      <SelectValue placeholder="Select state" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Madhya Pradesh">Madhya Pradesh</SelectItem>
+                      <SelectItem value="Gujarat">Gujarat</SelectItem>
+                      <SelectItem value="Uttar Pradesh">Uttar Pradesh</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div className="space-y-1">
                   <Label className="text-xs">Bank Name</Label>
