@@ -759,7 +759,7 @@ export default function FarmerLedgerPage() {
                   <Input
                     data-testid="input-edit-farmer-name"
                     value={editName}
-                    onChange={(e) => setEditName(capFirst(e.target.value))}
+                    onChange={(e) => setEditName(e.target.value.replace(/\b\w/g, c => c.toUpperCase()))}
                   />
                 </div>
                 <div className="space-y-1">

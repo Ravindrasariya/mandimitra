@@ -2205,7 +2205,7 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
                   <Label className="text-xs text-muted-foreground">{t("stock.farmerName")}</Label>
                   <Input data-testid="input-farmer-name" placeholder={t("stock.farmerNamePlaceholder")} value={card.farmerName}
                     onChange={e => {
-                      const val = capFirst(e.target.value);
+                      const val = e.target.value.replace(/\b\w/g, c => c.toUpperCase());
                       set("farmerName", val);
                       if (card.farmerId) {
                         set("farmerId", undefined);
