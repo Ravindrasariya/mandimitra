@@ -9,7 +9,7 @@ import path from "path";
 import fs from "fs";
 import { db } from "./db";
 import { transactions, bids, buyers, lots, farmers, cashEntries, transactionEditHistory, lotEditHistory, insertAssetSchema, insertLiabilitySchema, type Farmer } from "@shared/schema";
-import { eq, and, inArray, sql, isNull } from "drizzle-orm";
+import { eq, and, inArray, notInArray, sql, isNull } from "drizzle-orm";
 import { addSseClient, removeSseClient, broadcastBusinessEvent } from "./sse";
 
 const uploadsDir = path.join(process.cwd(), "uploads");
@@ -837,18 +837,20 @@ export async function registerRoutes(
   app.post("/api/lots/check-card-conflict", requireAuth, async (req, res) => {
     try {
       const businessId = req.user!.businessId;
-      const { farmerId, date, vehicleNumber } = req.body;
+      const { farmerId, date, vehicleNumber, excludeLotIds } = req.body;
       if (!farmerId || !date) return res.json({ conflict: false });
       const incomingVehicle = vehicleNumber ? vehicleNumber.toUpperCase().trim() : null;
+      const baseConditions = and(
+        eq(lots.businessId, businessId),
+        eq(lots.farmerId, parseInt(farmerId)),
+        eq(lots.date, date),
+        incomingVehicle ? eq(lots.vehicleNumber, incomingVehicle) : isNull(lots.vehicleNumber)
+      );
+      const idsToExclude: number[] = Array.isArray(excludeLotIds) ? excludeLotIds.filter((id: unknown) => typeof id === "number") : [];
       const existing = await db
         .select({ id: lots.id })
         .from(lots)
-        .where(and(
-          eq(lots.businessId, businessId),
-          eq(lots.farmerId, parseInt(farmerId)),
-          eq(lots.date, date),
-          incomingVehicle ? eq(lots.vehicleNumber, incomingVehicle) : isNull(lots.vehicleNumber)
-        ))
+        .where(idsToExclude.length > 0 ? and(baseConditions, notInArray(lots.id, idsToExclude)) : baseConditions)
         .limit(1);
       res.json({ conflict: existing.length > 0 });
     } catch (e: any) {

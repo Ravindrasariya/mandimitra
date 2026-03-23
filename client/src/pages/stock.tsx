@@ -3483,10 +3483,14 @@ export default function StockPage() {
 
       const farmerChanged = !!originalFarmerId && originalFarmerId !== currentFarmerId;
       if (farmerChanged) {
+        const existingLotDbIds = card.cropGroups
+          .flatMap(g => g.lots.map(l => l.dbId))
+          .filter((id): id is number => id != null);
         const conflictRes = await apiRequest("POST", "/api/lots/check-card-conflict", {
           farmerId: currentFarmerId,
           date: card.date,
           vehicleNumber: card.vehicleNumber ? card.vehicleNumber.toUpperCase() : null,
+          excludeLotIds: existingLotDbIds,
         });
         const conflictData = await conflictRes.json();
         if (conflictData.conflict) {
@@ -3517,7 +3521,14 @@ export default function StockPage() {
         const group = card.cropGroups[gIdx];
         for (let lIdx = 0; lIdx < group.lots.length; lIdx++) {
           const lot = group.lots[lIdx];
-          const lotPayload: Record<string, any> = {
+          const lotPayload: {
+            crop: string; variety: string | null; numberOfBags: number;
+            size: string | null; bagMarka: string | null; vehicleNumber: string | null;
+            vehicleBhadaRate: string | null; driverName: string | null; driverContact: string | null;
+            freightType: string | null; totalBagsInVehicle: number | null;
+            farmerAdvanceAmount: string | null; farmerAdvanceMode: string | null;
+            isArchived: boolean; farmerId?: number;
+          } = {
             crop: group.crop,
             variety: lot.variety || null,
             numberOfBags: parseInt(lot.numberOfBags) || 0,
@@ -3532,10 +3543,8 @@ export default function StockPage() {
             farmerAdvanceAmount: card.advanceAmount || null,
             farmerAdvanceMode: card.advanceMode || null,
             isArchived: group.archived,
+            ...(farmerChanged && { farmerId: currentFarmerId }),
           };
-          if (farmerChanged) {
-            lotPayload.farmerId = currentFarmerId;
-          }
 
           if (lot.dbId) {
             existingLots.push({ dbId: lot.dbId, lotData: lotPayload });
