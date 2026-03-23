@@ -3605,6 +3605,7 @@ export default function StockPage() {
           totalBagsInVehicle: card.totalBagsInVehicle ? parseInt(card.totalBagsInVehicle) : null,
           farmerAdvanceAmount: card.advanceAmount || null,
           farmerAdvanceMode: card.advanceMode || null,
+          isAddingToExistingCard: existingLots.length > 0,
           lots: newLots.map(nl => ({
             crop: nl.lotData.crop,
             variety: nl.lotData.variety,
