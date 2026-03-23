@@ -251,6 +251,10 @@ export default function CashPage() {
         } else if (e.type === "account_to_cash" && e.bankAccountId) {
           cashReceived += amt;
           acctExpense[e.bankAccountId] = (acctExpense[e.bankAccountId] || 0) + amt;
+        } else if (e.type === "account_to_account_out" && e.bankAccountId) {
+          acctExpense[e.bankAccountId] = (acctExpense[e.bankAccountId] || 0) + amt;
+        } else if (e.type === "account_to_account_in" && e.bankAccountId) {
+          acctReceived[e.bankAccountId] = (acctReceived[e.bankAccountId] || 0) + amt;
         }
       }
     });
@@ -645,9 +649,54 @@ export default function CashPage() {
     }
   };
 
-  const submitTransfer = () => {
+  const submitTransfer = async () => {
     if (!transferAmount || parseFloat(transferAmount) <= 0) {
       toast({ title: t("common.error"), description: "Enter valid amount", variant: "destructive" });
+      return;
+    }
+    if (transferFromType === "account" && transferToType === "account") {
+      if (!transferFromAccountId || !transferToAccountId) {
+        toast({ title: t("common.error"), description: "Select both bank accounts", variant: "destructive" });
+        return;
+      }
+      if (transferFromAccountId === transferToAccountId) {
+        toast({ title: t("common.error"), description: "From and To accounts must be different", variant: "destructive" });
+        return;
+      }
+      const fromName = getAccountName(parseInt(transferFromAccountId));
+      const toName = getAccountName(parseInt(transferToAccountId));
+      const flowId = crypto.randomUUID();
+      try {
+        await apiRequest("POST", "/api/cash-entries", {
+          category: "transfer",
+          type: "account_to_account_out",
+          outflowType: "Transfer",
+          bankAccountId: parseInt(transferFromAccountId),
+          partyName: toName,
+          amount: transferAmount,
+          date: transferDate,
+          paymentMode: "Online",
+          notes: transferNotes || null,
+          cashFlowId: flowId,
+        });
+        await apiRequest("POST", "/api/cash-entries", {
+          category: "transfer",
+          type: "account_to_account_in",
+          outflowType: "Transfer",
+          bankAccountId: parseInt(transferToAccountId),
+          partyName: fromName,
+          amount: transferAmount,
+          date: transferDate,
+          paymentMode: "Online",
+          notes: transferNotes || null,
+          cashFlowId: flowId,
+        });
+        invalidateCashQueries();
+        toast({ title: t("common.saved"), variant: "success" });
+        clearTransferForm();
+      } catch (err: any) {
+        toast({ title: t("common.error"), description: err.message, variant: "destructive" });
+      }
       return;
     }
     const isCashToAccount = transferFromType === "cash";
@@ -739,6 +788,20 @@ export default function CashPage() {
       "Petty Adj": e.pettyAdj || "0",
       "Payment Mode": e.paymentMode,
       "Bank Account": e.bankAccountId ? getAccountName(e.bankAccountId) : "",
+      "Transfer From Account": (() => {
+        if (e.type === "cash_to_account") return "Cash";
+        if (e.type === "account_to_cash") return e.bankAccountId ? getAccountName(e.bankAccountId) : "";
+        if (e.type === "account_to_account_out") return e.bankAccountId ? getAccountName(e.bankAccountId) : "";
+        if (e.type === "account_to_account_in") return e.partyName || "";
+        return "";
+      })(),
+      "Transfer To Account": (() => {
+        if (e.type === "cash_to_account") return e.bankAccountId ? getAccountName(e.bankAccountId) : "";
+        if (e.type === "account_to_cash") return "Cash";
+        if (e.type === "account_to_account_out") return e.partyName || "";
+        if (e.type === "account_to_account_in") return e.bankAccountId ? getAccountName(e.bankAccountId) : "";
+        return "";
+      })(),
       "Notes": e.notes || "",
       "Status": e.isReversed ? "Reversed" : "Active",
     }));
@@ -1695,7 +1758,17 @@ export default function CashPage() {
                   )}
                   <div className="space-y-1">
                     <Label className="text-xs">{t("cash.to")}</Label>
-                    <Input value={transferToType === "cash" ? "Cash" : "Bank Account"} readOnly className="h-9 text-sm bg-muted" />
+                    {transferFromType === "account" ? (
+                      <Select value={transferToType} onValueChange={v => { setTransferToType(v); if (v === "cash") setTransferToAccountId(""); }}>
+                        <SelectTrigger className="h-9 text-sm" data-testid="transfer-to-type"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="cash">Cash</SelectItem>
+                          <SelectItem value="account">Bank Account</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <Input value="Bank Account" readOnly className="h-9 text-sm bg-muted" />
+                    )}
                   </div>
                   {transferToType === "account" && (
                     <div className="space-y-1">
@@ -1703,7 +1776,9 @@ export default function CashPage() {
                       <Select value={transferToAccountId} onValueChange={setTransferToAccountId}>
                         <SelectTrigger className="h-9 text-sm" data-testid="transfer-to-account"><SelectValue placeholder={t("cash.selectAccount")} /></SelectTrigger>
                         <SelectContent>
-                          {bankAccountsList.map(a => <SelectItem key={a.id} value={a.id.toString()}>{a.name}</SelectItem>)}
+                          {bankAccountsList
+                            .filter(a => a.id.toString() !== transferFromAccountId)
+                            .map(a => <SelectItem key={a.id} value={a.id.toString()}>{a.name}</SelectItem>)}
                         </SelectContent>
                       </Select>
                     </div>
