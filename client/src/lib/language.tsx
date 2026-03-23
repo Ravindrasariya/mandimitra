@@ -571,6 +571,7 @@ const translations: Record<string, Record<Language, string>> = {
   "stock.farmerReinstated": { en: "Farmer reinstated", hi: "किसान बहाल किया गया" },
   "stock.saved": { en: "Saved", hi: "सहेजा गया" },
   "stock.saveFailed": { en: "Save Failed", hi: "सहेजने में विफल" },
+  "stock.duplicateCard": { en: "A card for this farmer already exists on this date with the same vehicle number.", hi: "इस किसान का इस तारीख और उसी वाहन नंबर के साथ पहले से एक कार्ड मौजूद है।" },
   "stock.entrySavedSuccess": { en: "entry saved successfully", hi: "एंट्री सफलतापूर्वक सहेजी गई" },
   "stock.error": { en: "Error", hi: "त्रुटि" },
   "stock.farmerNameRequired": { en: "Farmer name is required", hi: "किसान का नाम आवश्यक है" },

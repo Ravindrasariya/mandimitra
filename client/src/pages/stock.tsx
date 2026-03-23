@@ -3446,6 +3446,7 @@ export default function StockPage() {
     savingRef.current = card.id;
     setSavingCardId(card.id);
     try {
+      const originalFarmerId = savedCardMap.get(card.id)?.farmerId;
       let currentFarmerId = card.farmerId;
 
       if (!currentFarmerId) {
@@ -3480,6 +3481,20 @@ export default function StockPage() {
         });
       }
 
+      const farmerChanged = !!originalFarmerId && originalFarmerId !== currentFarmerId;
+      if (farmerChanged) {
+        const conflictRes = await apiRequest("POST", "/api/lots/check-card-conflict", {
+          farmerId: currentFarmerId,
+          date: card.date,
+          vehicleNumber: card.vehicleNumber ? card.vehicleNumber.toUpperCase() : null,
+        });
+        const conflictData = await conflictRes.json();
+        if (conflictData.conflict) {
+          toast({ title: t("stock.saveFailed"), description: t("stock.duplicateCard"), variant: "destructive" });
+          return;
+        }
+      }
+
       const unmatchedBuyers: string[] = [];
       for (const group of card.cropGroups) {
         for (const lot of group.lots) {
@@ -3502,7 +3517,7 @@ export default function StockPage() {
         const group = card.cropGroups[gIdx];
         for (let lIdx = 0; lIdx < group.lots.length; lIdx++) {
           const lot = group.lots[lIdx];
-          const lotPayload = {
+          const lotPayload: Record<string, any> = {
             crop: group.crop,
             variety: lot.variety || null,
             numberOfBags: parseInt(lot.numberOfBags) || 0,
@@ -3518,6 +3533,9 @@ export default function StockPage() {
             farmerAdvanceMode: card.advanceMode || null,
             isArchived: group.archived,
           };
+          if (farmerChanged) {
+            lotPayload.farmerId = currentFarmerId;
+          }
 
           if (lot.dbId) {
             existingLots.push({ dbId: lot.dbId, lotData: lotPayload });

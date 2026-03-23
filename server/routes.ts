@@ -834,6 +834,28 @@ export async function registerRoutes(
     }
   });
 
+  app.post("/api/lots/check-card-conflict", requireAuth, async (req, res) => {
+    try {
+      const businessId = req.user!.businessId;
+      const { farmerId, date, vehicleNumber } = req.body;
+      if (!farmerId || !date) return res.json({ conflict: false });
+      const incomingVehicle = vehicleNumber ? vehicleNumber.toUpperCase().trim() : null;
+      const existing = await db
+        .select({ id: lots.id })
+        .from(lots)
+        .where(and(
+          eq(lots.businessId, businessId),
+          eq(lots.farmerId, parseInt(farmerId)),
+          eq(lots.date, date),
+          incomingVehicle ? eq(lots.vehicleNumber, incomingVehicle) : isNull(lots.vehicleNumber)
+        ))
+        .limit(1);
+      res.json({ conflict: existing.length > 0 });
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
   app.post("/api/lots/batch", requireAuth, async (req, res) => {
     try {
       const businessId = req.user!.businessId;
@@ -1019,6 +1041,17 @@ export async function registerRoutes(
 
     if (data.isArchived !== undefined && data.isArchived !== lot.isArchived) {
       await storage.cascadeArchiveToLot(lotId, businessId, data.isArchived);
+    }
+
+    if (data.farmerId != null && data.farmerId !== lot.farmerId) {
+      await db.update(transactions)
+        .set({ farmerId: data.farmerId })
+        .where(and(
+          eq(transactions.lotId, lotId),
+          eq(transactions.businessId, businessId),
+          eq(transactions.isReversed, false),
+          eq(transactions.isArchived, false)
+        ));
     }
 
     broadcastBusinessEvent(businessId);
