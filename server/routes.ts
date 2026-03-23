@@ -849,21 +849,20 @@ export async function registerRoutes(
         return res.status(400).json({ message: "Sum of lot bags exceeds total bags in vehicle" });
       }
 
-      if (!isAddingToExistingCard) {
-        const incomingVehicle = vehicleNumber ? vehicleNumber.toUpperCase().trim() : null;
-        const existingForCard = await db
-          .select({ id: lots.id })
-          .from(lots)
-          .where(and(
-            eq(lots.businessId, businessId),
-            eq(lots.farmerId, parseInt(farmerId)),
-            eq(lots.date, dateStr),
-            incomingVehicle ? eq(lots.vehicleNumber, incomingVehicle) : isNull(lots.vehicleNumber)
-          ))
-          .limit(1);
-        if (existingForCard.length > 0) {
-          return res.status(409).json({ message: "A card for this farmer already exists on this date with the same vehicle number." });
-        }
+      const incomingVehicle = vehicleNumber ? vehicleNumber.toUpperCase().trim() : null;
+      const existingForCard = await db
+        .select({ id: lots.id })
+        .from(lots)
+        .where(and(
+          eq(lots.businessId, businessId),
+          eq(lots.farmerId, parseInt(farmerId)),
+          eq(lots.date, dateStr),
+          incomingVehicle ? eq(lots.vehicleNumber, incomingVehicle) : isNull(lots.vehicleNumber)
+        ))
+        .limit(1);
+      const cardAlreadyExists = existingForCard.length > 0;
+      if (cardAlreadyExists && !isAddingToExistingCard) {
+        return res.status(409).json({ message: "A card for this farmer already exists on this date with the same vehicle number." });
       }
 
       const baseSerial = await storage.getNextSerialNumber(businessId, dateStr);
