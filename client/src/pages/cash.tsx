@@ -465,6 +465,7 @@ export default function CashPage() {
     clearInwardAllocations();
     clearInwardBankAccountId();
     clearInwardPaymentMode();
+    clearInwardDate();
     setAllocationSearch("");
   };
 
@@ -475,6 +476,8 @@ export default function CashPage() {
     clearOutwardReceiverName();
     clearFarmerAllocations();
     clearOutwardBankAccountId();
+    clearOutwardPaymentMode();
+    clearOutwardDate();
     setFarmerAllocationSearch("");
   };
 
@@ -483,6 +486,7 @@ export default function CashPage() {
     clearTransferNotes();
     clearTransferFromAccountId();
     clearTransferToAccountId();
+    clearTransferDate();
   };
 
   const submitInward = () => {
