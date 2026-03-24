@@ -3137,18 +3137,6 @@ function StockFilterBar({
         <ClipboardList className="w-3.5 h-3.5" />
       </Button>
 
-      <Button
-        variant="outline"
-        size="icon"
-        className={`h-8 w-8 ${!canPrintAadhatNakal ? "opacity-40 cursor-not-allowed" : ""}`}
-        data-testid="button-print-aadhat-nakal"
-        title={t("stock.aadhatNakal")}
-        onClick={canPrintAadhatNakal ? onPrintAadhatNakal : undefined}
-        disabled={!canPrintAadhatNakal}
-      >
-        <FileText className="w-3.5 h-3.5" />
-      </Button>
-
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm" className="h-8 gap-1 px-2" data-testid="button-csv-download">
@@ -3165,6 +3153,18 @@ function StockFilterBar({
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
+
+      <Button
+        variant="outline"
+        size="icon"
+        className={`h-8 w-8 ${!canPrintAadhatNakal ? "opacity-40 cursor-not-allowed" : ""}`}
+        data-testid="button-print-aadhat-nakal"
+        title={t("stock.aadhatNakal")}
+        onClick={canPrintAadhatNakal ? onPrintAadhatNakal : undefined}
+        disabled={!canPrintAadhatNakal}
+      >
+        <FileText className="w-3.5 h-3.5" />
+      </Button>
     </div>
   );
 }

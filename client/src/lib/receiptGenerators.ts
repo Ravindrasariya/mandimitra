@@ -717,7 +717,7 @@ export function generateAadhatNakalHtml(
 
     const totalRow = `<tr style="background:#f0f0f0;font-weight:bold;">
       <td style="${td}">Total</td>
-      <td style="${td}">Qty: ${sec.totalBags} Bags sr# ${sec.srNumbers.join(", ")} &nbsp;&nbsp; Weight: ${sec.totalWeight.toFixed(2)}</td>
+      <td style="${td}">Qty: ${sec.totalBags} Bags &nbsp;&nbsp; SR#: ${sec.srNumbers.length} &nbsp;&nbsp; Weight: ${sec.totalWeight.toFixed(2)}</td>
       <td style="${td}text-align:right;">${sec.totalReceivable.toFixed(2)}</td>
     </tr>`;
 
