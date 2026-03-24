@@ -4407,9 +4407,10 @@ export default function StockPage() {
         {filteredCards.map((card) => {
           const idx = cards.findIndex(c => c.id === card.id);
           const mergeBack = (edited: FarmerCard) => {
-            if (cropFilter === "all") return updateCard(idx, edited);
             const original = cards[idx];
-            const hiddenGroups = original.cropGroups.filter(g => !g.archived && g.crop !== cropFilter);
+            const visibleIds = new Set(edited.cropGroups.map(g => g.id));
+            const hiddenGroups = original.cropGroups.filter(g => !visibleIds.has(g.id));
+            if (hiddenGroups.length === 0) return updateCard(idx, edited);
             updateCard(idx, { ...edited, cropGroups: [...edited.cropGroups, ...hiddenGroups] });
           };
           return (
