@@ -234,10 +234,10 @@ export function applyFarmerTemplate(tmpl: string, sg: UnifiedSerialGroup, busine
   }, 0);
   const farmerAdvance = parseFloat(firstLot?.farmerAdvanceAmount || "0");
   const totalAdvanceAdjust2 = sg.lotGroups.reduce((s, lg) => s + parseFloat(lg.lot?.advanceAdjust || "0"), 0);
-  const totalDeduction = hammaliAndExtras + totalThelaBhada + totalFreight + totalAadhat + totalMandi;
+  const totalDeduction = hammaliAndExtras + totalThelaBhada + totalFreight + totalAadhat + totalMandi + totalAdvanceAdjust2;
   const totalGross = allTxns.reduce((s, t) => s + parseFloat(t.netWeight || "0") * (parseFloat(t.pricePerKg || "0") + parseFloat((t as any).extraPerKgFarmer || "0")), 0);
   const totalNetWeight = allTxns.reduce((s, t) => s + parseFloat(t.netWeight || "0"), 0);
-  const netPayable = totalGross - totalDeduction - totalAdvanceAdjust2;
+  const netPayable = totalGross - totalDeduction;
 
   const txnRowsHtml = allTxns.map(t => {
     const nw = parseFloat(t.netWeight || "0");
