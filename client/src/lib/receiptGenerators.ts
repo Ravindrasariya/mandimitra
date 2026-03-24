@@ -693,7 +693,7 @@ export function generateAadhatNakalHtml(
 
     const headerLabel = sec.licenceNo
       ? `${sec.buyerLabel} (LN- ${sec.licenceNo})`
-      : sec.buyerLabel;
+      : `${sec.buyerLabel} (LN- )`;
 
     const firstRow = sec.rows[0];
     const remainingRows = sec.rows.slice(1).map(r =>
@@ -706,18 +706,18 @@ export function generateAadhatNakalHtml(
 
     const chargeRows = `<tr>
         <td style="${td}">&nbsp;</td>
-        <td style="${td}font-size:10px;color:#444;">Incl. Aadhat: ${sec.aadhatTotal.toFixed(2)}</td>
-        <td style="${td}">&nbsp;</td>
+        <td style="${td}">Add Aadhat</td>
+        <td style="${td}text-align:right;">${sec.aadhatTotal.toFixed(2)}</td>
       </tr>
       <tr>
         <td style="${td}">&nbsp;</td>
-        <td style="${td}font-size:10px;color:#444;">Incl. Muddat + Anya: ${sec.muddatAnyaTotal.toFixed(2)}</td>
-        <td style="${td}">&nbsp;</td>
+        <td style="${td}">Add Muddat + Anya</td>
+        <td style="${td}text-align:right;">${sec.muddatAnyaTotal.toFixed(2)}</td>
       </tr>`;
 
     const totalRow = `<tr style="background:#f0f0f0;font-weight:bold;">
       <td style="${td}">Total</td>
-      <td style="${td}">Qty: ${sec.totalBags} Bags &nbsp;&nbsp; SR#: ${sec.srNumbers.length} &nbsp;&nbsp; Weight: ${sec.totalWeight.toFixed(2)}</td>
+      <td style="${td}">Qty: ${sec.totalBags} Bags &nbsp;&nbsp;&nbsp; Weight: ${sec.totalWeight.toFixed(2)}</td>
       <td style="${td}text-align:right;">${sec.totalReceivable.toFixed(2)}</td>
     </tr>`;
 
@@ -733,17 +733,19 @@ export function generateAadhatNakalHtml(
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Aadhat Nakal</title>
 <style>
-@page { size: A4 portrait; margin: 10mm 10mm 15mm 10mm; @bottom-right { content: "Page " counter(page) " of " counter(pages); font-size: 9px; color: #555; } }
+@page { size: A4 portrait; margin: 10mm 10mm 15mm 10mm; }
 body { font-family: Arial, sans-serif; margin: 10px 15px; color: #111; font-size: 11px; }
 table { width: 100%; border-collapse: collapse; }
 @media print { body { margin: 6mm; } .no-print { display: none !important; } }
-.page-footer { position: fixed; bottom: 0; right: 10px; font-size: 9px; color: #555; }
 </style></head><body>
-<div style="text-align:center;margin-bottom:8px;">
+<div style="text-align:center;margin-bottom:10px;">
   <div style="font-size:16px;font-weight:bold;text-decoration:underline;">${businessName}</div>
-  <div style="margin-top:6px;font-size:11px;">
-    Date : ${fullDateDisplay} &nbsp;&nbsp;&nbsp; (${dateDisplay}) &nbsp;&nbsp;&nbsp; AADHAT NAKAL
-  </div>
+</div>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:11px;">
+  <div>Date : ${fullDateDisplay}</div>
+  <div>(${dateDisplay})</div>
+  <div style="font-weight:bold;">AADHAT NAKAL</div>
+  <div>Page 1 of Total</div>
 </div>
 
 <table>
@@ -758,7 +760,7 @@ table { width: 100%; border-collapse: collapse; }
     ${sectionRows}
     <tr style="border-top:3px double #333;font-weight:bold;font-size:12px;background:#e0e0e0;">
       <td style="${td}font-weight:bold;">Debit Total</td>
-      <td style="${td}font-weight:bold;">Total Qty: ${grandTotalBags} Bags &nbsp;&nbsp; Total Weight: ${grandTotalWeight.toFixed(2)}</td>
+      <td style="${td}font-weight:bold;">Total Qty: ${grandTotalBags} Bags &nbsp;&nbsp;&nbsp; Total Weight: ${grandTotalWeight.toFixed(2)}</td>
       <td style="${td}text-align:right;font-weight:bold;">${grandTotalReceivable.toFixed(2)}</td>
     </tr>
   </tbody>
