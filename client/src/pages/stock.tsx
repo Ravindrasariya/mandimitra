@@ -4042,9 +4042,11 @@ export default function StockPage() {
       toast({ title: t("stock.selectSingleDate"), variant: "destructive" });
       return;
     }
+    const targetDate = `${yearFilter}-${selectedMonths[0].padStart(2, "0")}-${selectedDays[0].padStart(2, "0")}`;
     const nakalBids: AadhatNakalBid[] = [];
-    for (const card of filteredCards) {
+    for (const card of cards) {
       if (card.archived) continue;
+      if (card.date !== targetDate) continue;
       const saved = savedCardMap.get(card.id);
       if (!saved) continue;
       for (const g of card.cropGroups) {
@@ -4082,9 +4084,8 @@ export default function StockPage() {
       toast({ title: t("stock.noTransactions"), variant: "destructive" });
       return;
     }
-    const dateStr = `${yearFilter}-${selectedMonths[0]}-${selectedDays[0]}`;
-    const html = generateAadhatNakalHtml(nakalBids, user?.businessName || "Mandi", dateStr);
-    await shareReceiptAsImage(html, `AadhatNakal_${dateStr}`);
+    const html = generateAadhatNakalHtml(nakalBids, user?.businessName || "Mandi", targetDate);
+    await printReceipt(html, `AadhatNakal_${targetDate}.pdf`);
   };
 
   const handlePrintAllBuyerReceipt = async (action: "print" | "share" = "print") => {

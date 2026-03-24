@@ -733,10 +733,11 @@ export function generateAadhatNakalHtml(
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Aadhat Nakal</title>
 <style>
-@page { size: A4 portrait; margin: 10mm; }
+@page { size: A4 portrait; margin: 10mm 10mm 15mm 10mm; @bottom-right { content: "Page " counter(page) " of " counter(pages); font-size: 9px; color: #555; } }
 body { font-family: Arial, sans-serif; margin: 10px 15px; color: #111; font-size: 11px; }
 table { width: 100%; border-collapse: collapse; }
 @media print { body { margin: 6mm; } .no-print { display: none !important; } }
+.page-footer { position: fixed; bottom: 0; right: 10px; font-size: 9px; color: #555; }
 </style></head><body>
 <div style="text-align:center;margin-bottom:8px;">
   <div style="font-size:16px;font-weight:bold;text-decoration:underline;">${businessName}</div>
