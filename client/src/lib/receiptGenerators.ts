@@ -277,9 +277,7 @@ export function applyFarmerTemplate(tmpl: string, sg: UnifiedSerialGroup, busine
     "{{CROP}}": firstLot?.crop || "",
     "{{TXN_ROWS_HTML}}": txnRowsHtml,
   };
-  let result = Object.entries(replacements).reduce((html, [token, val]) => html.split(token).join(val), tmpl);
-  result = result.replace(/text-decoration:\s*underline;?/gi, "");
-  return result;
+  return Object.entries(replacements).reduce((html, [token, val]) => html.split(token).join(val), tmpl);
 }
 
 export function applyBuyerTemplate(tmpl: string, lot: Lot, farmer: Farmer, tx: TransactionWithDetails, businessName?: string, businessAddress?: string, businessInitials?: string, businessPhone?: string, businessLicenceNo?: string, businessShopNo?: string): string {
@@ -332,9 +330,7 @@ export function applyBuyerTemplate(tmpl: string, lot: Lot, farmer: Farmer, tx: T
     "{{MANDI_PCT}}": tx.mandiBuyerPercent || "0",
     "{{TOTAL_RECEIVABLE}}": parseFloat(tx.totalReceivableFromBuyer || "0").toFixed(2),
   };
-  let result = Object.entries(replacements).reduce((html, [token, val]) => html.split(token).join(val), tmpl);
-  result = result.replace(/text-decoration:\s*underline;?/gi, "");
-  return result;
+  return Object.entries(replacements).reduce((html, [token, val]) => html.split(token).join(val), tmpl);
 }
 
 export function generateCombinedBuyerReceiptHtml(entries: BuyerLotEntry[], serialNumber: number, date: string, businessName?: string, businessAddress?: string, businessPhone?: string): string {
@@ -597,7 +593,5 @@ export function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[
     "{{TXN_ROWS_HTML}}": txnRowsHtml,
     "{{SUMMARY_ROWS_HTML}}": summaryRowsHtml,
   };
-  let result = Object.entries(replacements).reduce((html, [token, val]) => html.split(token).join(val), tmpl);
-  result = result.replace(/text-decoration:\s*underline;?/gi, "");
-  return result;
+  return Object.entries(replacements).reduce((html, [token, val]) => html.split(token).join(val), tmpl);
 }
