@@ -1334,6 +1334,8 @@ export async function registerRoutes(
       mandiCommissionBuyerPercent: "1",
       aadhatCommissionFarmerPercent: "0",
       aadhatCommissionBuyerPercent: "2",
+      muddatAnyaFarmerPercent: "0",
+      muddatAnyaBuyerPercent: "0",
       hammaliFarmerPerBag: "0",
       hammaliBuyerPerBag: "0",
     });
@@ -1346,6 +1348,8 @@ export async function registerRoutes(
         mandiCommissionBuyerPercent: req.body.mandiCommissionBuyerPercent,
         aadhatCommissionFarmerPercent: req.body.aadhatCommissionFarmerPercent,
         aadhatCommissionBuyerPercent: req.body.aadhatCommissionBuyerPercent,
+        muddatAnyaFarmerPercent: req.body.muddatAnyaFarmerPercent,
+        muddatAnyaBuyerPercent: req.body.muddatAnyaBuyerPercent,
         hammaliFarmerPerBag: req.body.hammaliFarmerPerBag,
         hammaliBuyerPerBag: req.body.hammaliBuyerPerBag,
       });
