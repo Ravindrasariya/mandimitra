@@ -1382,7 +1382,7 @@ export default function BuyerLedgerPage() {
               <Input
                 data-testid="input-new-buyer-name"
                 value={newName}
-                onChange={(e) => setNewName(e.target.value)}
+                onChange={(e) => setNewName(e.target.value.replace(/\b\w/g, c => c.toUpperCase()))}
                 placeholder={t("bidding.buyerName")}
                 className="mobile-touch-target"
               />
@@ -1392,7 +1392,7 @@ export default function BuyerLedgerPage() {
               <Input
                 data-testid="input-new-buyer-address"
                 value={newAddress}
-                onChange={(e) => setNewAddress(e.target.value)}
+                onChange={(e) => setNewAddress(e.target.value.replace(/\b\w/g, c => c.toUpperCase()))}
                 placeholder={t("common.address")}
                 className="mobile-touch-target"
               />
