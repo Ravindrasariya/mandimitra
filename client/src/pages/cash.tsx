@@ -34,6 +34,7 @@ const OUTFLOW_TYPES = [
   "Mandi Commission",
   "Salary",
   "Interest Payment on Loan/LOC",
+  "Freight/Bhada",
 ] as const;
 
 export default function CashPage() {
@@ -584,7 +585,7 @@ export default function CashPage() {
   };
 
   const submitOutward = () => {
-    const needsFarmer = outwardOutflowType === "Farmer-Advance" || outwardOutflowType === "Farmer-Harvest Sale";
+    const needsFarmer = outwardOutflowType === "Farmer-Advance" || outwardOutflowType === "Farmer-Harvest Sale" || outwardOutflowType === "Freight/Bhada";
     if (needsFarmer && !outwardFarmerId) {
       toast({ title: t("common.error"), description: "Select a farmer", variant: "destructive" });
       return;
@@ -1442,16 +1443,16 @@ export default function CashPage() {
                       <Input value={outwardReceiverName} onChange={e => setOutwardReceiverName(e.target.value)} placeholder="Enter receiver name" className="h-9 text-sm" data-testid="outward-receiver-name" />
                     </div>
                   )}
-                  {(outwardOutflowType === "Farmer-Advance" || outwardOutflowType === "Farmer-Harvest Sale") && (
+                  {(outwardOutflowType === "Farmer-Advance" || outwardOutflowType === "Farmer-Harvest Sale" || outwardOutflowType === "Freight/Bhada") && (
                     <div className="space-y-1">
-                      <Label className="text-xs">{outwardOutflowType === "Farmer-Advance" ? t("cash.farmer") : t("cash.farmerWithDues")}</Label>
+                      <Label className="text-xs">{outwardOutflowType === "Farmer-Harvest Sale" ? t("cash.farmerWithDues") : t("cash.farmer")}</Label>
                       <div className="relative">
                         {outwardFarmerId ? (
                           <div className="h-9 text-sm rounded-md border border-input bg-background px-3 flex items-center gap-2">
                             <span className="truncate flex-1" data-testid="text-outward-farmer-selected">
                               {(() => { const f = farmersWithDues.find(f => f.id === parseInt(outwardFarmerId)); return f ? (parseFloat(f.totalDue) > 0 ? `${f.name} - Due: ₹${parseFloat(f.totalDue).toLocaleString("en-IN")}` : f.name) : ""; })()}
                             </span>
-                            <button onClick={() => { setOutwardFarmerId(""); setOutwardFarmerSearch(""); setFarmerAllocations([]); setFarmerAllocationSearch(""); if (outwardOutflowType === "Farmer-Harvest Sale" || outwardOutflowType === "Farmer-Advance") setOutwardAmount(""); }} className="shrink-0" data-testid="button-clear-outward-farmer"><X className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => { setOutwardFarmerId(""); setOutwardFarmerSearch(""); setFarmerAllocations([]); setFarmerAllocationSearch(""); if (outwardOutflowType === "Farmer-Harvest Sale" || outwardOutflowType === "Farmer-Advance" || outwardOutflowType === "Freight/Bhada") setOutwardAmount(""); }} className="shrink-0" data-testid="button-clear-outward-farmer"><X className="w-3.5 h-3.5" /></button>
                           </div>
                         ) : (
                           <>
@@ -1468,7 +1469,7 @@ export default function CashPage() {
                             {outwardFarmerOpen && (
                               <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-[200px] overflow-y-auto">
                                 {(() => {
-                                  const isAdvance = outwardOutflowType === "Farmer-Advance";
+                                  const isAdvance = outwardOutflowType === "Farmer-Advance" || outwardOutflowType === "Freight/Bhada";
                                   const farmerList = isAdvance
                                     ? farmersWithDues.filter(f => !f.isArchived).sort((a, b) => a.name.localeCompare(b.name))
                                     : farmersWithDues.filter(f => !f.isArchived && parseFloat(f.totalDue) > 0).sort((a, b) => a.name.localeCompare(b.name));
