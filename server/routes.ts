@@ -8,7 +8,7 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { db } from "./db";
-import { transactions, bids, buyers, lots, farmers, cashEntries, transactionEditHistory, lotEditHistory, insertAssetSchema, insertLiabilitySchema, type Farmer } from "@shared/schema";
+import { transactions, bids, buyers, lots, farmers, cashEntries, transactionEditHistory, lotEditHistory, insertAssetSchema, insertLiabilitySchema, type Farmer, type Transaction, type CashEntry } from "@shared/schema";
 import { eq, and, inArray, notInArray, sql, isNull } from "drizzle-orm";
 import { addSseClient, removeSseClient, broadcastBusinessEvent } from "./sse";
 
@@ -1501,8 +1501,8 @@ export async function registerRoutes(
       const ledger = await storage.getBuyerLedger(businessId, buyerId, fyStart, fyEnd);
       const { buyer, transactions: txns, cashEntries: cash } = ledger;
 
-      const filteredTxns = (txns as any[]).filter(t => !t.isReversed);
-      const filteredCash = (cash as any[]).filter(c => !c.isReversed);
+      const filteredTxns = txns.filter((t: Transaction) => !t.isReversed && !t.isArchived);
+      const filteredCash = cash.filter((c: CashEntry) => !c.isReversed && !c.isArchived);
 
       type LedgerEntry = {
         date: string;
@@ -1515,23 +1515,23 @@ export async function registerRoutes(
       };
 
       const entries: LedgerEntry[] = [
-        ...filteredTxns.map(t => ({
+        ...filteredTxns.map((t: Transaction) => ({
           date: t.date || fyStart,
-          refCode: t.transactionId as string,
+          refCode: t.transactionId,
           particulars: "Purchase",
           dr: parseFloat(t.totalReceivableFromBuyer || "0"),
           cr: 0,
           sourceType: "transaction" as const,
-          sourceId: t.id as number,
+          sourceId: t.id,
         })),
-        ...filteredCash.map(c => ({
-          date: c.date as string,
-          refCode: (c.cashFlowId as string | null) || `CE${c.id}`,
+        ...filteredCash.map((c: CashEntry) => ({
+          date: c.date,
+          refCode: c.cashFlowId || `CE${c.id}`,
           particulars: `Payment (${c.paymentMode || "Cash"})`,
           dr: 0,
           cr: parseFloat(c.amount || "0"),
           sourceType: "payment" as const,
-          sourceId: c.id as number,
+          sourceId: c.id,
         })),
       ];
 
