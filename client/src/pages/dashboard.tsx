@@ -702,7 +702,7 @@ export default function DashboardPage() {
           </DialogHeader>
           {chargeSettings?.updatedAt && (
             <p className="text-xs text-muted-foreground" data-testid="text-charge-settings-updated">
-              Last updated: {new Date(chargeSettings.updatedAt).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+              Last updated: {(() => { const d = new Date(chargeSettings.updatedAt!); return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`; })()}
             </p>
           )}
           <div className="space-y-4">
@@ -883,7 +883,7 @@ export default function DashboardPage() {
                     {chargeHistory.map((h, i) => (
                       <tr key={h.id} className={i === 0 ? "bg-primary/5 font-medium" : "border-t"}>
                         <td className="p-1.5 whitespace-nowrap">
-                          {new Date(h.updatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "2-digit" })}
+                          {(() => { const d = new Date(h.updatedAt); return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${String(d.getFullYear()).slice(2)}`; })()}
                         </td>
                         <td className="p-1.5 text-right whitespace-nowrap">{h.mandiCommissionFarmerPercent}/{h.mandiCommissionBuyerPercent}</td>
                         <td className="p-1.5 text-right whitespace-nowrap">{h.aadhatCommissionFarmerPercent}/{h.aadhatCommissionBuyerPercent}</td>
