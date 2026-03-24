@@ -19,7 +19,7 @@ import {
   Plus, Trash2, ChevronDown, ChevronRight, Truck, User,
   AlertTriangle, AlertCircle, Scale, Wheat, ChevronsUpDown, X, Calculator,
   Archive, History, Save, Check, Printer, Share2, Loader2,
-  Layers, Landmark, ShoppingBag, Calendar, Search, Filter, RotateCcw, Download, ClipboardList,
+  Layers, Landmark, ShoppingBag, Calendar, Search, Filter, RotateCcw, Download, ClipboardList, FileText,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -32,6 +32,8 @@ import {
   generateFarmerReceiptHtml, generateBuyerReceiptHtml, generateCombinedBuyerReceiptHtml,
   generateAllBuyerReceiptHtml,
   applyFarmerTemplate, applyBuyerTemplate, applyCombinedBuyerTemplate,
+  generateAadhatNakalHtml,
+  type AadhatNakalBid,
   type UnifiedSerialGroup, type UnifiedLotGroup, type BuyerLotEntry, type TransactionWithDetails,
 } from "@/lib/receiptGenerators";
 import { usePersistedState } from "@/hooks/use-persisted-state";
@@ -2765,6 +2767,7 @@ function StockFilterBar({
   onExportStockCsv, onExportTxnCsv,
   canPrintOverallBill, onPrintAllBuyerReceipt,
   canPrintBidCopy, onPrintBidCopy,
+  canPrintAadhatNakal, onPrintAadhatNakal,
 }: {
   cards: FarmerCard[];
   dateMode: "stock" | "txn";
@@ -2790,6 +2793,8 @@ function StockFilterBar({
   onPrintAllBuyerReceipt: (action: "print" | "share") => void;
   canPrintBidCopy: boolean;
   onPrintBidCopy: () => void;
+  canPrintAadhatNakal: boolean;
+  onPrintAadhatNakal: () => void;
 }) {
   const { t, language } = useLanguage();
   const MONTH_LABELS = language === "hi" ? MONTH_LABELS_HI : MONTH_LABELS_EN;
@@ -3130,6 +3135,18 @@ function StockFilterBar({
         disabled={!canPrintBidCopy}
       >
         <ClipboardList className="w-3.5 h-3.5" />
+      </Button>
+
+      <Button
+        variant="outline"
+        size="icon"
+        className={`h-8 w-8 ${!canPrintAadhatNakal ? "opacity-40 cursor-not-allowed" : ""}`}
+        data-testid="button-print-aadhat-nakal"
+        title={t("stock.aadhatNakal")}
+        onClick={canPrintAadhatNakal ? onPrintAadhatNakal : undefined}
+        disabled={!canPrintAadhatNakal}
+      >
+        <FileText className="w-3.5 h-3.5" />
       </Button>
 
       <DropdownMenu>
@@ -4018,6 +4035,57 @@ export default function StockPage() {
   const isSingleDateFilter = selectedMonths.length === 1 && selectedDays.length === 1;
   const canPrintOverallBill = isSingleDateFilter && buyerFilter.trim() !== "" && cropFilter !== "all";
   const canPrintBidCopy = isSingleDateFilter && yearFilter !== "all" && cropFilter !== "all";
+  const canPrintAadhatNakal = isSingleDateFilter && yearFilter !== "all";
+
+  const handlePrintAadhatNakal = async () => {
+    if (!canPrintAadhatNakal) {
+      toast({ title: t("stock.selectSingleDate"), variant: "destructive" });
+      return;
+    }
+    const nakalBids: AadhatNakalBid[] = [];
+    for (const card of filteredCards) {
+      if (card.archived) continue;
+      const saved = savedCardMap.get(card.id);
+      if (!saved) continue;
+      for (const g of card.cropGroups) {
+        if (g.archived) continue;
+        for (const lot of g.lots) {
+          for (const bid of lot.bids) {
+            if (!bid.txnDbId) continue;
+            const savedGroup = saved.cropGroups.find(sg => sg.crop === g.crop);
+            const savedLot = savedGroup?.lots.find(sl => sl.id === lot.id);
+            const savedBid = savedLot?.bids.find(sb => sb.id === bid.id);
+            const buyerData = pageBuyersList.find(b => b.id === bid.buyerId);
+            const nw = parseFloat(bid.txn.netWeightInput) || 0;
+            const ppk = parseFloat(bid.pricePerKg) || 0;
+            nakalBids.push({
+              buyerName: bid.buyerName,
+              buyerId: bid.buyerId ?? undefined,
+              crop: g.crop,
+              srNumber: g.srNumber || "",
+              bags: parseInt(bid.numberOfBags) || 0,
+              netWeight: nw,
+              pricePerKg: ppk,
+              grossAmount: nw * ppk,
+              paymentType: bid.paymentType,
+              aadhatBuyerPercent: parseFloat(bid.savedCharges?.aadhatCommissionBuyerPercent ?? cs.aadhatCommissionBuyerPercent ?? "0"),
+              muddatAnyaBuyerPercent: parseFloat(bid.savedCharges?.muddatAnyaBuyerPercent ?? cs.muddatAnyaBuyerPercent ?? "0"),
+              mandiBuyerPercent: parseFloat(bid.savedCharges?.mandiCommissionBuyerPercent ?? cs.mandiCommissionBuyerPercent ?? "0"),
+              buyerReceivable: savedBid?.savedBuyerReceivable ?? 0,
+              licenceNo: buyerData?.licenceNo ?? "",
+            });
+          }
+        }
+      }
+    }
+    if (nakalBids.length === 0) {
+      toast({ title: t("stock.noTransactions"), variant: "destructive" });
+      return;
+    }
+    const dateStr = `${yearFilter}-${selectedMonths[0]}-${selectedDays[0]}`;
+    const html = generateAadhatNakalHtml(nakalBids, user?.businessName || "Mandi", dateStr);
+    await shareReceiptAsImage(html, `AadhatNakal_${dateStr}`);
+  };
 
   const handlePrintAllBuyerReceipt = async (action: "print" | "share" = "print") => {
     if (!canPrintOverallBill) {
@@ -4310,6 +4378,8 @@ export default function StockPage() {
             onPrintAllBuyerReceipt={handlePrintAllBuyerReceipt}
             canPrintBidCopy={canPrintBidCopy}
             onPrintBidCopy={handlePrintBidCopy}
+            canPrintAadhatNakal={canPrintAadhatNakal}
+            onPrintAadhatNakal={handlePrintAadhatNakal}
           />
         )}
         {!loadingCards && <StockSummaryBar cards={filteredCards} savedCardMap={savedCardMap} cs={cs} buyersList={pageBuyersList} />}

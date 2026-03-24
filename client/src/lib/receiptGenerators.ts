@@ -595,3 +595,172 @@ export function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[
   };
   return Object.entries(replacements).reduce((html, [token, val]) => html.split(token).join(val), tmpl);
 }
+
+export type AadhatNakalBid = {
+  buyerName: string;
+  buyerId?: number;
+  crop: string;
+  srNumber: string;
+  bags: number;
+  netWeight: number;
+  pricePerKg: number;
+  grossAmount: number;
+  paymentType: string;
+  aadhatBuyerPercent: number;
+  muddatAnyaBuyerPercent: number;
+  mandiBuyerPercent: number;
+  buyerReceivable: number;
+  licenceNo: string;
+};
+
+export function generateAadhatNakalHtml(
+  bids: AadhatNakalBid[],
+  businessName: string,
+  dateStr: string,
+): string {
+  const [yr, mo, dy] = dateStr.split("-");
+  const dateObj = new Date(parseInt(yr), parseInt(mo) - 1, parseInt(dy));
+  const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const monthNames = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const dayName = dayNames[dateObj.getDay()];
+  const dateDisplay = `${dy}/${mo}/${yr}`;
+  const fullDateDisplay = `${dayName}, ${parseInt(dy)} ${monthNames[parseInt(mo)-1]}, ${yr}`;
+
+  type Section = {
+    buyerLabel: string;
+    sortKey: string;
+    licenceNo: string;
+    isCash: boolean;
+    crop: string;
+    rows: { srNumber: string; bags: number; netWeight: number; pricePerKg: number; grossAmount: number; buyerReceivable: number }[];
+    totalBags: number;
+    totalWeight: number;
+    totalGross: number;
+    totalReceivable: number;
+    aadhatTotal: number;
+    muddatAnyaTotal: number;
+    srNumbers: string[];
+  };
+
+  const sectionMap = new Map<string, Section>();
+  for (const b of bids) {
+    const isCash = b.paymentType === "Cash";
+    const displayName = isCash ? `${b.buyerName} (Cash)` : b.buyerName;
+    const key = `${b.buyerName.toLowerCase()}__${b.crop}__${isCash ? "cash" : "credit"}`;
+    if (!sectionMap.has(key)) {
+      sectionMap.set(key, {
+        buyerLabel: displayName,
+        sortKey: b.buyerName.toLowerCase(),
+        licenceNo: isCash ? "" : (b.licenceNo || ""),
+        isCash,
+        crop: b.crop,
+        rows: [],
+        totalBags: 0,
+        totalWeight: 0,
+        totalGross: 0,
+        totalReceivable: 0,
+        aadhatTotal: 0,
+        muddatAnyaTotal: 0,
+        srNumbers: [],
+      });
+    }
+    const sec = sectionMap.get(key)!;
+    sec.rows.push({ srNumber: b.srNumber, bags: b.bags, netWeight: b.netWeight, pricePerKg: b.pricePerKg, grossAmount: b.grossAmount, buyerReceivable: b.buyerReceivable });
+    sec.totalBags += b.bags;
+    sec.totalWeight += b.netWeight;
+    sec.totalGross += b.grossAmount;
+    sec.totalReceivable += b.buyerReceivable;
+    sec.aadhatTotal += (b.grossAmount * b.aadhatBuyerPercent) / 100;
+    sec.muddatAnyaTotal += (b.grossAmount * (b.muddatAnyaBuyerPercent + b.mandiBuyerPercent)) / 100;
+    if (!sec.srNumbers.includes(b.srNumber)) sec.srNumbers.push(b.srNumber);
+  }
+
+  const sections = Array.from(sectionMap.values()).sort((a, b) => {
+    if (a.isCash !== b.isCash) return a.isCash ? 1 : -1;
+    return a.sortKey.localeCompare(b.sortKey) || a.crop.localeCompare(b.crop);
+  });
+
+  let grandTotalBags = 0;
+  let grandTotalWeight = 0;
+  let grandTotalReceivable = 0;
+
+  const td = "padding:4px 6px;border:1px solid #555;vertical-align:top;font-size:11px;";
+
+  const sectionRows = sections.map(sec => {
+    grandTotalBags += sec.totalBags;
+    grandTotalWeight += sec.totalWeight;
+    grandTotalReceivable += sec.totalReceivable;
+
+    const headerLabel = sec.licenceNo
+      ? `${sec.buyerLabel} (LN- ${sec.licenceNo})`
+      : sec.buyerLabel;
+
+    const firstRow = sec.rows[0];
+    const remainingRows = sec.rows.slice(1).map(r =>
+      `<tr>
+        <td style="${td}">&nbsp;</td>
+        <td style="${td}">${sec.crop} - ${r.bags} Bags x ${r.netWeight.toFixed(2)} x ${r.pricePerKg.toFixed(2)}</td>
+        <td style="${td}text-align:right;">${r.grossAmount.toFixed(2)}</td>
+      </tr>`
+    ).join("");
+
+    const chargeRows = `<tr>
+        <td style="${td}">&nbsp;</td>
+        <td style="${td}">Add Aadhat</td>
+        <td style="${td}text-align:right;">${sec.aadhatTotal.toFixed(2)}</td>
+      </tr>
+      <tr>
+        <td style="${td}">&nbsp;</td>
+        <td style="${td}">Add Muddat + Anya</td>
+        <td style="${td}text-align:right;">${sec.muddatAnyaTotal.toFixed(2)}</td>
+      </tr>`;
+
+    const totalRow = `<tr style="background:#f0f0f0;font-weight:bold;">
+      <td style="${td}">Total</td>
+      <td style="${td}">Qty: ${sec.totalBags} Bags sr# ${sec.srNumbers.join(", ")} &nbsp;&nbsp; Weight: ${sec.totalWeight.toFixed(2)}</td>
+      <td style="${td}text-align:right;">${sec.totalReceivable.toFixed(2)}</td>
+    </tr>`;
+
+    return `<tr style="border-top:2px solid #333;">
+      <td style="${td}font-weight:bold;">${headerLabel}</td>
+      <td style="${td}">${sec.crop} - ${firstRow.bags} Bags x ${firstRow.netWeight.toFixed(2)} x ${firstRow.pricePerKg.toFixed(2)}</td>
+      <td style="${td}text-align:right;">${firstRow.grossAmount.toFixed(2)}</td>
+    </tr>
+    ${remainingRows}
+    ${chargeRows}
+    ${totalRow}`;
+  }).join("");
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Aadhat Nakal</title>
+<style>
+@page { size: A4 portrait; margin: 10mm; }
+body { font-family: Arial, sans-serif; margin: 10px 15px; color: #111; font-size: 11px; }
+table { width: 100%; border-collapse: collapse; }
+@media print { body { margin: 6mm; } .no-print { display: none !important; } }
+</style></head><body>
+<div style="text-align:center;margin-bottom:8px;">
+  <div style="font-size:16px;font-weight:bold;text-decoration:underline;">${businessName}</div>
+  <div style="margin-top:6px;font-size:11px;">
+    Date : ${fullDateDisplay} &nbsp;&nbsp;&nbsp; (${dateDisplay}) &nbsp;&nbsp;&nbsp; AADHAT NAKAL
+  </div>
+</div>
+
+<table>
+  <thead>
+    <tr style="background:#e8e8e8;">
+      <th style="${td}text-align:left;font-weight:bold;width:30%;">Particulars</th>
+      <th style="${td}text-align:left;font-weight:bold;width:45%;">Remarks</th>
+      <th style="${td}text-align:right;font-weight:bold;width:25%;">Amount</th>
+    </tr>
+  </thead>
+  <tbody>
+    ${sectionRows}
+    <tr style="border-top:3px double #333;font-weight:bold;font-size:12px;background:#e0e0e0;">
+      <td style="${td}font-weight:bold;">Debit Total</td>
+      <td style="${td}font-weight:bold;">Total Qty: ${grandTotalBags} Bags &nbsp;&nbsp; Total Weight: ${grandTotalWeight.toFixed(2)}</td>
+      <td style="${td}text-align:right;font-weight:bold;">${grandTotalReceivable.toFixed(2)}</td>
+    </tr>
+  </tbody>
+</table>
+</body></html>`;
+}
