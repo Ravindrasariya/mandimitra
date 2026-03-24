@@ -1,0 +1,110 @@
+Architecture Overview
+
+It's a two-layer pattern: the parent list (table of buyers) has rows that expand inline to show a child ledger (chronological debit/credit entries with running balance).
+Backend: Ledger API Endpoint
+
+Route: GET /api/buyers/:id/ledger
+What it returns:
+
+{
+  buyerName: string,
+  merchantName: string,
+  merchantAddress: string,
+  merchantContact: string,
+  openingBalance: number,    // Computed PY carry-forward
+  fyStart: string,           // e.g. "2025-04-01"
+  fyEnd: string,             // e.g. "2026-03-31"
+  entries: LedgerEntry[]
+}
+
+LedgerEntry structure:
+
+interface LedgerEntry {
+  date: string;         // "YYYY-MM-DD"
+  refCode: string;      // Reference like "SR #5 Lot #3"
+  particulars: string;  // Description like "Harvest Cold Store Charges" or "Payment (Cash)"
+  dr: number;           // Debit amount (0 if credit entry)
+  cr: number;           // Credit amount (0 if debit entry)
+  sourceType: string;   // Category tag: "harvest_charge" | "payment" etc.
+  sourceId: number;     // ID of the source record
+}
+
+Backend logic flow:
+
+    Determine FY boundaries — Calculate fyStart and fyEnd from current date (April 1 to March 31)
+    Compute opening balance — The carry-forward from previous year
+    Gather credit entries — Query all transactions/charges for this entity in current FY, extract amounts as cr
+    Gather debit entries — Query all payments for this entity in current FY, extract amounts as dr
+    Filter reversed entries — Exclude any entries where isReversed === true
+    Sort entries — By date ascending, then by type (charges before payments as tie-breaker), then by sourceId
+    Return — { openingBalance, entries, metadata }
+
+Frontend: Expandable Row Component
+State management:
+
+const [expandedId, setExpandedId] = useState<number | null>(null);
+
+const toggleExpand = (id: number) => {
+  setExpandedId(prev => prev === id ? null : id);
+};
+
+Parent row (clickable):
+
+<TableRow 
+  className="cursor-pointer hover:bg-muted/30"
+  onClick={() => toggleExpand(item.id)}
+>
+  <TableCell>
+    {expandedId === item.id 
+      ? <ChevronDown className="h-4 w-4" /> 
+      : <ChevronRight className="h-4 w-4" />}
+    {item.name}
+  </TableCell>
+  {/* ...other columns... */}
+</TableRow>
+
+Child ledger section (conditionally rendered):
+
+{expandedId === item.id && (
+  <TableRow>
+    <TableCell colSpan={totalColumns} className="p-0">
+      <LedgerSection id={item.id} />
+    </TableCell>
+  </TableRow>
+)}
+
+LedgerSection component:
+
+function LedgerSection({ id }: { id: number }) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['/api/entity-ledger', id, 'ledger'],
+    enabled: true,  // Only mounts when expanded, so always enabled
+  });
+
+  // Compute running balance rows
+  const ledgerRows = useMemo(() => {
+    if (!data) return [];
+    let balance = data.openingBalance;
+    return data.entries.map(entry => {
+      balance = balance + entry.cr - entry.dr;  // or dr - cr depending on your convention
+      return { ...entry, balance };
+    });
+  }, [data]);
+
+  // Render table: Date | Ref# | Particulars | Dr | Cr | Balance
+  // First row is "Opening Balance" (static, from data.openingBalance)
+  // Then map ledgerRows into subsequent rows
+}
+
+Key interaction detail — stopping event propagation:
+
+Any buttons inside the parent row (edit, toggle, etc.) need e.stopPropagation() so clicking them doesn't trigger the expand/collapse:
+
+<Button onClick={(e) => { e.stopPropagation(); handleEdit(item); }}>
+  Edit
+</Button>
+
+PDF export:
+
+Uses jsPDF + jspdf-autotable — renders the same ledger data into a PDF table with a header showing entity name and merchant details.
+
