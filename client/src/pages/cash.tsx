@@ -40,6 +40,12 @@ export default function CashPage() {
   const { toast } = useToast();
   const { t } = useLanguage();
   const now = new Date();
+  useEffect(() => {
+    localStorage.removeItem("cash-inwardDate");
+    localStorage.removeItem("cash-outwardDate");
+    localStorage.removeItem("cash-transferDate");
+    localStorage.removeItem("cash-capitalDate");
+  }, []);
   const [activeTab, setActiveTab] = usePersistedState<"inward" | "outward" | "transfer">("cash-activeTab", "inward");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [detailEntry, setDetailEntry] = useState<CashEntry | null>(null);
@@ -61,7 +67,7 @@ export default function CashPage() {
   const [inwardPartyType, setInwardPartyType, clearInwardPartyType] = usePersistedState("cash-inwardPartyType", "Buyer");
   const [inwardBuyerId, setInwardBuyerId, clearInwardBuyerId] = usePersistedState("cash-inwardBuyerId", "");
   const [inwardAmount, setInwardAmount, clearInwardAmount] = usePersistedState("cash-inwardAmount", "");
-  const [inwardDate, setInwardDate, clearInwardDate] = usePersistedState("cash-inwardDate", format(now, "yyyy-MM-dd"));
+  const [inwardDate, setInwardDate] = useState(format(now, "yyyy-MM-dd"));
   const [inwardPaymentMode, setInwardPaymentMode, clearInwardPaymentMode] = usePersistedState("cash-inwardPaymentMode", "Cash");
   const [inwardBankAccountId, setInwardBankAccountId, clearInwardBankAccountId] = usePersistedState("cash-inwardBankAccountId", "");
   const [inwardNotes, setInwardNotes, clearInwardNotes] = usePersistedState("cash-inwardNotes", "");
@@ -82,7 +88,7 @@ export default function CashPage() {
   const [outwardOutflowType, setOutwardOutflowType, clearOutwardOutflowType] = usePersistedState<string>("cash-outwardOutflowType", "Farmer-Advance");
   const [outwardFarmerId, setOutwardFarmerId, clearOutwardFarmerId] = usePersistedState("cash-outwardFarmerId", "");
   const [outwardAmount, setOutwardAmount, clearOutwardAmount] = usePersistedState("cash-outwardAmount", "");
-  const [outwardDate, setOutwardDate, clearOutwardDate] = usePersistedState("cash-outwardDate", format(now, "yyyy-MM-dd"));
+  const [outwardDate, setOutwardDate] = useState(format(now, "yyyy-MM-dd"));
   const [outwardPaymentMode, setOutwardPaymentMode, clearOutwardPaymentMode] = usePersistedState("cash-outwardPaymentMode", "Cash");
   const [outwardBankAccountId, setOutwardBankAccountId, clearOutwardBankAccountId] = usePersistedState("cash-outwardBankAccountId", "");
   const [outwardNotes, setOutwardNotes, clearOutwardNotes] = usePersistedState("cash-outwardNotes", "");
@@ -105,7 +111,7 @@ export default function CashPage() {
   const [transferToType, setTransferToType, clearTransferToType] = usePersistedState("cash-transferToType", "account");
   const [transferToAccountId, setTransferToAccountId, clearTransferToAccountId] = usePersistedState("cash-transferToAccountId", "");
   const [transferAmount, setTransferAmount, clearTransferAmount] = usePersistedState("cash-transferAmount", "");
-  const [transferDate, setTransferDate, clearTransferDate] = usePersistedState("cash-transferDate", format(now, "yyyy-MM-dd"));
+  const [transferDate, setTransferDate] = useState(format(now, "yyyy-MM-dd"));
   const [transferNotes, setTransferNotes, clearTransferNotes] = usePersistedState("cash-transferNotes", "");
 
   const [filterFarmerSearch, setFilterFarmerSearch] = useState("");
@@ -121,7 +127,7 @@ export default function CashPage() {
   const [capitalCategory, setCapitalCategory, clearCapitalCategory] = usePersistedState("cash-capitalCategory", "");
   const [capitalDepRate, setCapitalDepRate, clearCapitalDepRate] = usePersistedState("cash-capitalDepRate", "");
   const [capitalAmount, setCapitalAmount, clearCapitalAmount] = usePersistedState("cash-capitalAmount", "");
-  const [capitalDate, setCapitalDate, clearCapitalDate] = usePersistedState("cash-capitalDate", format(now, "yyyy-MM-dd"));
+  const [capitalDate, setCapitalDate] = useState(format(now, "yyyy-MM-dd"));
   const [capitalRemarks, setCapitalRemarks, clearCapitalRemarks] = usePersistedState("cash-capitalRemarks", "");
 
   const [cashInHandOpening, setCashInHandOpening] = useState("");
@@ -423,7 +429,7 @@ export default function CashPage() {
       clearCapitalCategory();
       clearCapitalDepRate();
       clearCapitalAmount();
-      clearCapitalDate();
+      setCapitalDate(format(new Date(), "yyyy-MM-dd"));
       clearCapitalRemarks();
       toast({ title: t("common.saved"), variant: "success" });
     },
@@ -465,7 +471,7 @@ export default function CashPage() {
     clearInwardAllocations();
     clearInwardBankAccountId();
     clearInwardPaymentMode();
-    clearInwardDate();
+    setInwardDate(format(new Date(), "yyyy-MM-dd"));
     setAllocationSearch("");
   };
 
@@ -477,7 +483,7 @@ export default function CashPage() {
     clearFarmerAllocations();
     clearOutwardBankAccountId();
     clearOutwardPaymentMode();
-    clearOutwardDate();
+    setOutwardDate(format(new Date(), "yyyy-MM-dd"));
     setFarmerAllocationSearch("");
   };
 
@@ -486,7 +492,7 @@ export default function CashPage() {
     clearTransferNotes();
     clearTransferFromAccountId();
     clearTransferToAccountId();
-    clearTransferDate();
+    setTransferDate(format(new Date(), "yyyy-MM-dd"));
   };
 
   const submitInward = () => {
