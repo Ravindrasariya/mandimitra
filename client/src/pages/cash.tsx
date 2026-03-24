@@ -464,6 +464,7 @@ export default function CashPage() {
     clearInwardBuyerId();
     clearInwardAllocations();
     clearInwardBankAccountId();
+    clearInwardPaymentMode();
     setAllocationSearch("");
   };
 
