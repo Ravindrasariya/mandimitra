@@ -89,7 +89,7 @@ export default function DashboardPage() {
       return res.json();
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/charge-settings"] });
+      queryClient.resetQueries({ queryKey: ["/api/charge-settings"] });
       queryClient.invalidateQueries({ queryKey: ["/api/charge-settings/history"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
