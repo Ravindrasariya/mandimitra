@@ -48,6 +48,8 @@ type ChargeSettings = {
   mandiCommissionBuyerPercent: string;
   aadhatCommissionFarmerPercent: string;
   aadhatCommissionBuyerPercent: string;
+  muddatAnyaFarmerPercent: string;
+  muddatAnyaBuyerPercent: string;
   hammaliFarmerPerBag: string;
   hammaliBuyerPerBag: string;
 };
@@ -57,6 +59,8 @@ const DEFAULT_CS: ChargeSettings = {
   mandiCommissionBuyerPercent: "1",
   aadhatCommissionFarmerPercent: "0",
   aadhatCommissionBuyerPercent: "2",
+  muddatAnyaFarmerPercent: "0",
+  muddatAnyaBuyerPercent: "0",
   hammaliFarmerPerBag: "0",
   hammaliBuyerPerBag: "0",
 };
@@ -643,15 +647,19 @@ function calcBidTotals(bid: BidRow, cs: ChargeSettings, vehicleBhadaRate: number
   const aadhatBPct = buyerAadhatOverride != null ? buyerAadhatOverride : parseFloat(cs.aadhatCommissionBuyerPercent) || 0;
   const mandiFPct = parseFloat(cs.mandiCommissionFarmerPercent) || 0;
   const mandiBPct = parseFloat(cs.mandiCommissionBuyerPercent) || 0;
+  const muddatAnyaFPct = parseFloat(cs.muddatAnyaFarmerPercent) || 0;
+  const muddatAnyaBPct = parseFloat(cs.muddatAnyaBuyerPercent) || 0;
   const freight = totalBagsInVehicle > 0 ? (vehicleBhadaRate * bidBags) / totalBagsInVehicle : 0;
-  const farmerDed = hfRate * bidBags + extraFarmer + (farmerGross * aadhatFPct) / 100 + (farmerGross * mandiFPct) / 100 + freight;
-  const buyerAdd = hbRate * bidBags + extraBuyer + (buyerGross * aadhatBPct) / 100 + (buyerGross * mandiBPct) / 100;
+  const muddatAnyaBuyer = (buyerGross * muddatAnyaBPct) / 100;
+  const farmerDed = hfRate * bidBags + extraFarmer + (farmerGross * aadhatFPct) / 100 + (farmerGross * mandiFPct) / 100 + (farmerGross * muddatAnyaFPct) / 100 + freight;
+  const buyerAdd = hbRate * bidBags + extraBuyer + (buyerGross * aadhatBPct) / 100 + (buyerGross * mandiBPct) / 100 + muddatAnyaBuyer;
   const aadhatBuyer = (buyerGross * aadhatBPct) / 100;
   return {
     bidBags,
     farmerPayable: farmerGross - farmerDed,
     buyerReceivable: buyerGross + buyerAdd,
     aadhatBuyer,
+    muddatAnyaBuyer,
     hasData: nw > 0 && pricePerKg > 0,
   };
 }
@@ -671,6 +679,7 @@ function calcLotTotals(lot: LotRow, cs: ChargeSettings, vehicleBhadaRate: number
     farmerPayable: bidTotals.reduce((s, t) => s + t.farmerPayable, 0),
     buyerReceivable: bidTotals.reduce((s, t) => s + t.buyerReceivable, 0),
     aadhatBuyer: bidTotals.reduce((s, t) => s + t.aadhatBuyer, 0),
+    muddatAnyaBuyer: bidTotals.reduce((s, t) => s + t.muddatAnyaBuyer, 0),
     hasData: bidTotals.some(t => t.hasData),
   };
 }
@@ -750,6 +759,8 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
   const aadhatBuyerPct = buyerAadhatOverride != null ? buyerAadhatOverride : parseFloat(cs.aadhatCommissionBuyerPercent) || 0;
   const mandiFarmerPct = parseFloat(cs.mandiCommissionFarmerPercent) || 0;
   const mandiBuyerPct = parseFloat(cs.mandiCommissionBuyerPercent) || 0;
+  const muddatAnyaFarmerPct = parseFloat(cs.muddatAnyaFarmerPercent) || 0;
+  const muddatAnyaBuyerPct = parseFloat(cs.muddatAnyaBuyerPercent) || 0;
 
   const freightFarmerTotal = totalBagsInVehicle > 0 ? (vehicleBhadaRate * bags) / totalBagsInVehicle : 0;
 
@@ -759,9 +770,11 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
   const aadhatBuyer = (buyerGross * aadhatBuyerPct) / 100;
   const mandiFarmer = (farmerGross * mandiFarmerPct) / 100;
   const mandiBuyer = (buyerGross * mandiBuyerPct) / 100;
+  const muddatAnyaFarmer = (farmerGross * muddatAnyaFarmerPct) / 100;
+  const muddatAnyaBuyer = (buyerGross * muddatAnyaBuyerPct) / 100;
 
-  const farmerDeductions = hammaliFarmerTotal + extraFarmer + aadhatFarmer + mandiFarmer + freightFarmerTotal;
-  const buyerAdditions = hammaliBuyerTotal + extraBuyer + aadhatBuyer + mandiBuyer;
+  const farmerDeductions = hammaliFarmerTotal + extraFarmer + aadhatFarmer + mandiFarmer + muddatAnyaFarmer + freightFarmerTotal;
+  const buyerAdditions = hammaliBuyerTotal + extraBuyer + aadhatBuyer + mandiBuyer + muddatAnyaBuyer;
   const farmerPayable = farmerGross - farmerDeductions;
   const buyerReceivable = buyerGross + buyerAdditions;
 
@@ -973,6 +986,12 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
                   <span className="shrink-0">-₹{aadhatFarmer.toFixed(2)}</span>
                 </div>
               )}
+              {muddatAnyaFarmerPct > 0 && (
+                <div className="flex justify-between gap-1 text-muted-foreground pl-2">
+                  <span className="min-w-0 flex-1">Muddat + Anya ({muddatAnyaFarmerPct}%):</span>
+                  <span className="shrink-0">-₹{muddatAnyaFarmer.toFixed(2)}</span>
+                </div>
+              )}
               {mandiFarmerPct > 0 && (
                 <div className="flex justify-between gap-1 text-muted-foreground pl-2">
                   <span className="min-w-0 flex-1">{t("stock.mandi")} ({mandiFarmerPct}%):</span>
@@ -1046,6 +1065,12 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
                 <div className="flex justify-between gap-1 text-muted-foreground pl-2">
                   <span className="min-w-0 flex-1">{t("stock.aadhat")} ({aadhatBuyerPct}%):</span>
                   <span className="shrink-0">+₹{aadhatBuyer.toFixed(2)}</span>
+                </div>
+              )}
+              {muddatAnyaBuyerPct > 0 && (
+                <div className="flex justify-between gap-1 text-muted-foreground pl-2">
+                  <span className="min-w-0 flex-1">Muddat + Anya ({muddatAnyaBuyerPct}%):</span>
+                  <span className="shrink-0">+₹{muddatAnyaBuyer.toFixed(2)}</span>
                 </div>
               )}
               {mandiBuyerPct > 0 && (
@@ -3772,15 +3797,19 @@ export default function StockPage() {
                 : parseFloat(cs.aadhatCommissionBuyerPercent) || 0;
               const mandiFPct = parseFloat(cs.mandiCommissionFarmerPercent) || 0;
               const mandiBPct = parseFloat(cs.mandiCommissionBuyerPercent) || 0;
+              const muddatAnyaFPct = parseFloat(cs.muddatAnyaFarmerPercent) || 0;
+              const muddatAnyaBPct = parseFloat(cs.muddatAnyaBuyerPercent) || 0;
               const freight = totalBIV > 0 ? (vehicleBR * bidBags) / totalBIV : 0;
               const hammaliFarmerTotal = hfRate * bidBags;
               const hammaliBuyerTotal = hbRate * bidBags;
               const aadhatFarmer = (farmerGross * aadhatFPct) / 100;
               const mandiFarmer = (farmerGross * mandiFPct) / 100;
+              const muddatAnyaFarmer = (farmerGross * muddatAnyaFPct) / 100;
               const aadhatBuyer = (buyerGross * aadhatBPct) / 100;
               const mandiBuyer = (buyerGross * mandiBPct) / 100;
-              const farmerDed = hammaliFarmerTotal + extraF + aadhatFarmer + mandiFarmer + freight;
-              const buyerAdd = hammaliBuyerTotal + extraB + aadhatBuyer + mandiBuyer;
+              const muddatAnyaBuyer = (buyerGross * muddatAnyaBPct) / 100;
+              const farmerDed = hammaliFarmerTotal + extraF + aadhatFarmer + mandiFarmer + muddatAnyaFarmer + freight;
+              const buyerAdd = hammaliBuyerTotal + extraB + aadhatBuyer + mandiBuyer + muddatAnyaBuyer;
               const farmerPayable = farmerGross - farmerDed;
               const buyerReceivable = buyerGross + buyerAdd;
 
@@ -3806,10 +3835,13 @@ export default function StockPage() {
                 freightCharges: freight.toFixed(2),
                 aadhatCharges: aadhatBuyer.toFixed(2),
                 mandiCharges: mandiBuyer.toFixed(2),
+                muddatAnyaCharges: muddatAnyaBuyer.toFixed(2),
                 aadhatFarmerPercent: aadhatFPct.toFixed(2),
                 mandiFarmerPercent: mandiFPct.toFixed(2),
+                muddatAnyaFarmerPercent: muddatAnyaFPct.toFixed(2),
                 aadhatBuyerPercent: aadhatBPct.toFixed(2),
                 mandiBuyerPercent: mandiBPct.toFixed(2),
+                muddatAnyaBuyerPercent: muddatAnyaBPct.toFixed(2),
                 hammaliFarmerPerBag: hfRate.toFixed(2),
                 hammaliBuyerPerBag: hbRate.toFixed(2),
                 totalPayableToFarmer: farmerPayable.toFixed(2),

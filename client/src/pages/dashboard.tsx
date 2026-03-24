@@ -35,6 +35,8 @@ type ChargeSettingsData = {
   mandiCommissionBuyerPercent: string;
   aadhatCommissionFarmerPercent: string;
   aadhatCommissionBuyerPercent: string;
+  muddatAnyaFarmerPercent: string;
+  muddatAnyaBuyerPercent: string;
   hammaliFarmerPerBag: string;
   hammaliBuyerPerBag: string;
 };
@@ -61,6 +63,8 @@ export default function DashboardPage() {
     mandiCommissionBuyerPercent: "1",
     aadhatCommissionFarmerPercent: "0",
     aadhatCommissionBuyerPercent: "2",
+    muddatAnyaFarmerPercent: "0",
+    muddatAnyaBuyerPercent: "0",
     hammaliFarmerPerBag: "0",
     hammaliBuyerPerBag: "0",
   });
@@ -103,6 +107,8 @@ export default function DashboardPage() {
         mandiCommissionBuyerPercent: chargeSettings.mandiCommissionBuyerPercent || "1",
         aadhatCommissionFarmerPercent: chargeSettings.aadhatCommissionFarmerPercent || "0",
         aadhatCommissionBuyerPercent: chargeSettings.aadhatCommissionBuyerPercent || "2",
+        muddatAnyaFarmerPercent: chargeSettings.muddatAnyaFarmerPercent || "0",
+        muddatAnyaBuyerPercent: chargeSettings.muddatAnyaBuyerPercent || "0",
         hammaliFarmerPerBag: chargeSettings.hammaliFarmerPerBag || "0",
         hammaliBuyerPerBag: chargeSettings.hammaliBuyerPerBag || "0",
       });
@@ -741,6 +747,36 @@ export default function DashboardPage() {
                     inputMode="decimal"
                     value={chargeForm.aadhatCommissionBuyerPercent}
                     onChange={(e) => setChargeForm(f => ({ ...f, aadhatCommissionBuyerPercent: e.target.value }))}
+                    onFocus={(e) => e.target.select()}
+                    className="mobile-touch-target"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold">{t("dash.muddatAnyaPct")}</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">{t("dash.farmer")}</Label>
+                  <Input
+                    data-testid="input-muddatanya-farmer"
+                    type="text"
+                    inputMode="decimal"
+                    value={chargeForm.muddatAnyaFarmerPercent}
+                    onChange={(e) => setChargeForm(f => ({ ...f, muddatAnyaFarmerPercent: e.target.value }))}
+                    onFocus={(e) => e.target.select()}
+                    className="mobile-touch-target"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-muted-foreground">{t("dash.buyer")}</Label>
+                  <Input
+                    data-testid="input-muddatanya-buyer"
+                    type="text"
+                    inputMode="decimal"
+                    value={chargeForm.muddatAnyaBuyerPercent}
+                    onChange={(e) => setChargeForm(f => ({ ...f, muddatAnyaBuyerPercent: e.target.value }))}
                     onFocus={(e) => e.target.select()}
                     className="mobile-touch-target"
                   />

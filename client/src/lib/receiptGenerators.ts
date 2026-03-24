@@ -162,6 +162,7 @@ export function generateBuyerReceiptHtml(lot: Lot, farmer: Farmer, tx: Transacti
   const extraBuyer = parseFloat(tx.extraChargesBuyer || "0");
   const aadhatBuyer = grossAmount * parseFloat(tx.aadhatBuyerPercent || "0") / 100;
   const mandiBuyer = grossAmount * parseFloat(tx.mandiBuyerPercent || "0") / 100;
+  const muddatAnyaBuyer = grossAmount * parseFloat((tx as any).muddatAnyaBuyerPercent || "0") / 100;
 
   const rateDisplay = `Rs.${effectiveRate.toFixed(2)}/kg`;
 
@@ -199,6 +200,7 @@ ${businessAddress ? `<p style="font-size:0.85em;color:#555;margin:2px 0">${busin
 ${hammaliBuyer > 0 ? `<div class="summary-row"><span>Hammali (${bags} bags):</span><span>Rs.${hammaliBuyer.toFixed(2)}</span></div>` : ""}
 ${extraBuyer > 0 ? `<div class="summary-row"><span>Extra Charges:</span><span>Rs.${extraBuyer.toFixed(2)}</span></div>` : ""}
 ${aadhatBuyer > 0 ? `<div class="summary-row"><span>Aadhat:</span><span>Rs.${aadhatBuyer.toFixed(2)}</span></div>` : ""}
+${muddatAnyaBuyer > 0 ? `<div class="summary-row"><span>Muddat + Anya:</span><span>Rs.${muddatAnyaBuyer.toFixed(2)}</span></div>` : ""}
 ${mandiBuyer > 0 ? `<div class="summary-row"><span>Mandi (${tx.mandiBuyerPercent}%):</span><span>Rs.${mandiBuyer.toFixed(2)}</span></div>` : ""}
 <div class="summary-row total"><span>Total Receivable from Buyer:</span><span>Rs.${parseFloat(tx.totalReceivableFromBuyer || "0").toFixed(2)}</span></div>
 </div>
@@ -336,6 +338,7 @@ export function generateCombinedBuyerReceiptHtml(entries: BuyerLotEntry[], seria
   const crop = entries[0].lot.crop;
   const aadhatPct = parseFloat(firstTx.aadhatBuyerPercent || "0");
   const mandiPct = parseFloat(firstTx.mandiBuyerPercent || "0");
+  const muddatAnyaPct = parseFloat((firstTx as any).muddatAnyaBuyerPercent || "0");
 
   const rows = entries.map(({ lot, tx }) => {
     const nw = parseFloat(tx.netWeight || "0");
@@ -354,7 +357,8 @@ export function generateCombinedBuyerReceiptHtml(entries: BuyerLotEntry[], seria
   const totalExtra = rows.reduce((s, r) => s + r.extra, 0);
   const totalAadhat = totalGross * aadhatPct / 100;
   const totalMandi = totalGross * mandiPct / 100;
-  const grandTotal = totalGross + totalHammali + totalExtra + totalAadhat + totalMandi;
+  const totalMuddatAnya = totalGross * muddatAnyaPct / 100;
+  const grandTotal = totalGross + totalHammali + totalExtra + totalAadhat + totalMandi + totalMuddatAnya;
 
   const rowsHtml = rows.map(r => `
 <tr>
@@ -413,6 +417,7 @@ ${rowsHtml}
 ${totalHammali > 0 ? `<div class="summary-row"><span>Hammali (${totalBags} bags):</span><span>Rs.${totalHammali.toFixed(2)}</span></div>` : ""}
 ${totalExtra > 0 ? `<div class="summary-row"><span>Extra Charges:</span><span>Rs.${totalExtra.toFixed(2)}</span></div>` : ""}
 ${totalAadhat > 0 ? `<div class="summary-row"><span>Aadhat:</span><span>Rs.${totalAadhat.toFixed(2)}</span></div>` : ""}
+${totalMuddatAnya > 0 ? `<div class="summary-row"><span>Muddat + Anya:</span><span>Rs.${totalMuddatAnya.toFixed(2)}</span></div>` : ""}
 ${totalMandi > 0 ? `<div class="summary-row"><span>Mandi (${mandiPct}%):</span><span>Rs.${totalMandi.toFixed(2)}</span></div>` : ""}
 <div class="summary-row total"><span>Total Receivable from Buyer:</span><span>Rs.${grandTotal.toFixed(2)}</span></div>
 </div>
@@ -425,6 +430,7 @@ export function generateAllBuyerReceiptHtml(entries: BuyerLotEntry[], businessNa
   const buyer = firstTx.buyer;
   const aadhatPct = parseFloat(firstTx.aadhatBuyerPercent || "0");
   const mandiPct = parseFloat(firstTx.mandiBuyerPercent || "0");
+  const muddatAnyaPct = parseFloat((firstTx as any).muddatAnyaBuyerPercent || "0");
 
   const rows = entries.map(({ lot, tx }) => {
     const nw = parseFloat(tx.netWeight || "0");
@@ -443,7 +449,8 @@ export function generateAllBuyerReceiptHtml(entries: BuyerLotEntry[], businessNa
   const totalExtra = rows.reduce((s, r) => s + r.extra, 0);
   const totalAadhat = totalGross * aadhatPct / 100;
   const totalMandi = totalGross * mandiPct / 100;
-  const grandTotal = totalGross + totalHammali + totalExtra + totalAadhat + totalMandi;
+  const totalMuddatAnya = totalGross * muddatAnyaPct / 100;
+  const grandTotal = totalGross + totalHammali + totalExtra + totalAadhat + totalMandi + totalMuddatAnya;
 
   const rowsHtml = rows.map(r => `
 <tr>
@@ -504,6 +511,7 @@ ${rowsHtml}
 ${totalHammali > 0 ? `<div class="summary-row"><span>Hammali (${totalBags} bags):</span><span>Rs.${totalHammali.toFixed(2)}</span></div>` : ""}
 ${totalExtra > 0 ? `<div class="summary-row"><span>Extra Charges:</span><span>Rs.${totalExtra.toFixed(2)}</span></div>` : ""}
 ${!hideAadhat && totalAadhat > 0 ? `<div class="summary-row"><span>Aadhat:</span><span>Rs.${totalAadhat.toFixed(2)}</span></div>` : ""}
+${!hideAadhat && totalMuddatAnya > 0 ? `<div class="summary-row"><span>Muddat + Anya:</span><span>Rs.${totalMuddatAnya.toFixed(2)}</span></div>` : ""}
 ${!hideAadhat && totalMandi > 0 ? `<div class="summary-row"><span>Mandi (${mandiPct}%):</span><span>Rs.${totalMandi.toFixed(2)}</span></div>` : ""}
 ${!hideAadhat ? `<div class="summary-row total"><span>Total Receivable from Buyer:</span><span>Rs.${grandTotal.toFixed(2)}</span></div>` : ""}
 </div>
