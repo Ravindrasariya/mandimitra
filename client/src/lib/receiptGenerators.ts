@@ -277,7 +277,9 @@ export function applyFarmerTemplate(tmpl: string, sg: UnifiedSerialGroup, busine
     "{{CROP}}": firstLot?.crop || "",
     "{{TXN_ROWS_HTML}}": txnRowsHtml,
   };
-  return Object.entries(replacements).reduce((html, [token, val]) => html.split(token).join(val), tmpl);
+  let result = Object.entries(replacements).reduce((html, [token, val]) => html.split(token).join(val), tmpl);
+  result = result.replace(/text-decoration:\s*underline;?/gi, "");
+  return result;
 }
 
 export function applyBuyerTemplate(tmpl: string, lot: Lot, farmer: Farmer, tx: TransactionWithDetails, businessName?: string, businessAddress?: string, businessInitials?: string, businessPhone?: string, businessLicenceNo?: string, businessShopNo?: string): string {
@@ -330,7 +332,9 @@ export function applyBuyerTemplate(tmpl: string, lot: Lot, farmer: Farmer, tx: T
     "{{MANDI_PCT}}": tx.mandiBuyerPercent || "0",
     "{{TOTAL_RECEIVABLE}}": parseFloat(tx.totalReceivableFromBuyer || "0").toFixed(2),
   };
-  return Object.entries(replacements).reduce((html, [token, val]) => html.split(token).join(val), tmpl);
+  let result = Object.entries(replacements).reduce((html, [token, val]) => html.split(token).join(val), tmpl);
+  result = result.replace(/text-decoration:\s*underline;?/gi, "");
+  return result;
 }
 
 export function generateCombinedBuyerReceiptHtml(entries: BuyerLotEntry[], serialNumber: number, date: string, businessName?: string, businessAddress?: string, businessPhone?: string): string {
@@ -568,8 +572,8 @@ export function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[
     "{{DATE}}": date,
     "{{BUYER_NAME}}": firstTx.buyer.name,
     "{{BUYER_CODE}}": firstTx.buyer.licenceNo || "",
-    "{{FARMER_NAME}}": "",
-    "{{FARMER_VILLAGE}}": "",
+    "{{FARMER_NAME}}": [...new Set(entries.map(e => (e.tx as any).farmer?.name).filter(Boolean))].join(", "),
+    "{{FARMER_VILLAGE}}": [...new Set(entries.map(e => (e.tx as any).farmer?.village).filter(Boolean))].join(", "),
     "{{CROP}}": firstLot.crop,
     "{{SIZE}}": firstLot.size || "",
     "{{LOT_ID}}": "",
@@ -593,5 +597,7 @@ export function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[
     "{{TXN_ROWS_HTML}}": txnRowsHtml,
     "{{SUMMARY_ROWS_HTML}}": summaryRowsHtml,
   };
-  return Object.entries(replacements).reduce((html, [token, val]) => html.split(token).join(val), tmpl);
+  let result = Object.entries(replacements).reduce((html, [token, val]) => html.split(token).join(val), tmpl);
+  result = result.replace(/text-decoration:\s*underline;?/gi, "");
+  return result;
 }
