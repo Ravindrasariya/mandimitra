@@ -162,7 +162,7 @@ export function generateBuyerReceiptHtml(lot: Lot, farmer: Farmer, tx: Transacti
   const extraBuyer = parseFloat(tx.extraChargesBuyer || "0");
   const aadhatBuyer = grossAmount * parseFloat(tx.aadhatBuyerPercent || "0") / 100;
   const mandiBuyer = grossAmount * parseFloat(tx.mandiBuyerPercent || "0") / 100;
-  const muddatAnyaBuyer = grossAmount * parseFloat((tx as any).muddatAnyaBuyerPercent || "0") / 100;
+  const muddatAnyaBuyer = grossAmount * parseFloat(tx.muddatAnyaBuyerPercent || "0") / 100;
 
   const rateDisplay = `Rs.${effectiveRate.toFixed(2)}/kg`;
 
@@ -338,7 +338,7 @@ export function generateCombinedBuyerReceiptHtml(entries: BuyerLotEntry[], seria
   const crop = entries[0].lot.crop;
   const aadhatPct = parseFloat(firstTx.aadhatBuyerPercent || "0");
   const mandiPct = parseFloat(firstTx.mandiBuyerPercent || "0");
-  const muddatAnyaPct = parseFloat((firstTx as any).muddatAnyaBuyerPercent || "0");
+  const muddatAnyaPct = parseFloat(firstTx.muddatAnyaBuyerPercent || "0");
 
   const rows = entries.map(({ lot, tx }) => {
     const nw = parseFloat(tx.netWeight || "0");
@@ -430,7 +430,7 @@ export function generateAllBuyerReceiptHtml(entries: BuyerLotEntry[], businessNa
   const buyer = firstTx.buyer;
   const aadhatPct = parseFloat(firstTx.aadhatBuyerPercent || "0");
   const mandiPct = parseFloat(firstTx.mandiBuyerPercent || "0");
-  const muddatAnyaPct = parseFloat((firstTx as any).muddatAnyaBuyerPercent || "0");
+  const muddatAnyaPct = parseFloat(firstTx.muddatAnyaBuyerPercent || "0");
 
   const rows = entries.map(({ lot, tx }) => {
     const nw = parseFloat(tx.netWeight || "0");

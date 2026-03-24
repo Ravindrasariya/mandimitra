@@ -30,6 +30,7 @@ const translations: Record<string, Record<Language, string>> = {
   "dash.mandiCommPct": { en: "Mandi Commission (%)", hi: "मण्डी कमीशन (%)" },
   "dash.aadhatCommPct": { en: "Aadhat Commission (%)", hi: "आढ़त कमीशन (%)" },
   "dash.muddatAnyaPct": { en: "Muddat + Anya (%)", hi: "मुद्दत + अन्य (%)" },
+  "stock.muddatAnya": { en: "Muddat + Anya", hi: "मुद्दत + अन्य" },
   "dash.hammaliPerBag": { en: "Hammali (₹/bag)", hi: "हम्माली (₹/थैला)" },
   "dash.farmer": { en: "Farmer", hi: "किसान" },
   "dash.buyer": { en: "Buyer", hi: "खरीदार" },

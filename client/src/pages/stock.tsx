@@ -988,7 +988,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
               )}
               {muddatAnyaFarmerPct > 0 && (
                 <div className="flex justify-between gap-1 text-muted-foreground pl-2">
-                  <span className="min-w-0 flex-1">Muddat + Anya ({muddatAnyaFarmerPct}%):</span>
+                  <span className="min-w-0 flex-1">{t("stock.muddatAnya")} ({muddatAnyaFarmerPct}%):</span>
                   <span className="shrink-0">-₹{muddatAnyaFarmer.toFixed(2)}</span>
                 </div>
               )}
@@ -1069,7 +1069,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
               )}
               {muddatAnyaBuyerPct > 0 && (
                 <div className="flex justify-between gap-1 text-muted-foreground pl-2">
-                  <span className="min-w-0 flex-1">Muddat + Anya ({muddatAnyaBuyerPct}%):</span>
+                  <span className="min-w-0 flex-1">{t("stock.muddatAnya")} ({muddatAnyaBuyerPct}%):</span>
                   <span className="shrink-0">+₹{muddatAnyaBuyer.toFixed(2)}</span>
                 </div>
               )}
