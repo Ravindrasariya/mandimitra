@@ -901,6 +901,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
         <div className="bg-background rounded border border-border p-2 space-y-1">
           <p className="font-semibold text-muted-foreground">{t("stock.farmerCharges")}</p>
           <div className="flex justify-between"><span>{t("stock.aadhat")}:</span><span>{aadhatFarmerPct}%</span></div>
+          <div className="flex justify-between"><span>{t("stock.muddatAnya")}:</span><span>{muddatAnyaFarmerPct}%</span></div>
           <div className="flex justify-between"><span>{t("stock.mandi")}:</span><span>{mandiFarmerPct}%</span></div>
           <div className="flex justify-between"><span>{t("stock.hammali")}:</span><span>₹{hammaliFarmerRate}/bag</span></div>
           {freightFarmerTotal > 0 && (
@@ -1017,6 +1018,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
         <div className="bg-background rounded border border-border p-2 space-y-1">
           <p className="font-semibold text-muted-foreground">{t("stock.buyerCharges")}</p>
           <div className="flex justify-between"><span>{t("stock.aadhat")}:</span><span>{aadhatBuyerPct}%</span></div>
+          <div className="flex justify-between"><span>{t("stock.muddatAnya")}:</span><span>{muddatAnyaBuyerPct}%</span></div>
           <div className="flex justify-between"><span>{t("stock.mandi")}:</span><span>{mandiBuyerPct}%</span></div>
           <div className="flex justify-between"><span>{t("stock.hammali")}:</span><span>₹{hammaliBuyerRate}/bag</span></div>
           <div className="flex items-center justify-between">
