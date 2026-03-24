@@ -700,19 +700,19 @@ export function generateAadhatNakalHtml(
       `<tr>
         <td style="${td}">&nbsp;</td>
         <td style="${td}">${sec.crop} - ${r.bags} Bags x ${r.netWeight.toFixed(2)} x ${r.pricePerKg.toFixed(2)}</td>
-        <td style="${td}text-align:right;">${r.grossAmount.toFixed(2)}</td>
+        <td style="${td}text-align:right;">${r.buyerReceivable.toFixed(2)}</td>
       </tr>`
     ).join("");
 
     const chargeRows = `<tr>
         <td style="${td}">&nbsp;</td>
-        <td style="${td}">Add Aadhat</td>
-        <td style="${td}text-align:right;">${sec.aadhatTotal.toFixed(2)}</td>
+        <td style="${td}font-size:10px;color:#444;">Incl. Aadhat: ${sec.aadhatTotal.toFixed(2)}</td>
+        <td style="${td}">&nbsp;</td>
       </tr>
       <tr>
         <td style="${td}">&nbsp;</td>
-        <td style="${td}">Add Muddat + Anya</td>
-        <td style="${td}text-align:right;">${sec.muddatAnyaTotal.toFixed(2)}</td>
+        <td style="${td}font-size:10px;color:#444;">Incl. Muddat + Anya: ${sec.muddatAnyaTotal.toFixed(2)}</td>
+        <td style="${td}">&nbsp;</td>
       </tr>`;
 
     const totalRow = `<tr style="background:#f0f0f0;font-weight:bold;">
@@ -724,7 +724,7 @@ export function generateAadhatNakalHtml(
     return `<tr style="border-top:2px solid #333;">
       <td style="${td}font-weight:bold;">${headerLabel}</td>
       <td style="${td}">${sec.crop} - ${firstRow.bags} Bags x ${firstRow.netWeight.toFixed(2)} x ${firstRow.pricePerKg.toFixed(2)}</td>
-      <td style="${td}text-align:right;">${firstRow.grossAmount.toFixed(2)}</td>
+      <td style="${td}text-align:right;">${firstRow.buyerReceivable.toFixed(2)}</td>
     </tr>
     ${remainingRows}
     ${chargeRows}
