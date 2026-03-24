@@ -208,7 +208,7 @@ function BuyerLedgerSection({ buyer }: { buyer: BuyerWithDues }) {
 
     let balance = openingBal;
     for (const entry of data.entries) {
-      balance = balance + entry.cr - entry.dr;
+      balance = balance + entry.dr - entry.cr;
       result.push({
         itemNo: result.length + 1,
         date: entry.date,
