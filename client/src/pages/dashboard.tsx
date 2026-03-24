@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { LayoutDashboard, ChevronDown, Calendar, Users, Package, Landmark, HandCoins, ShoppingBag, TrendingUp, Settings, Hammer } from "lucide-react";
+import { LayoutDashboard, ChevronDown, Calendar, Users, Package, Landmark, HandCoins, ShoppingBag, TrendingUp, Settings, Hammer, History } from "lucide-react";
 import type { BusinessChargeSettings } from "@shared/schema";
 import {
   PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
@@ -73,8 +73,14 @@ export default function DashboardPage() {
     queryKey: ["/api/dashboard"],
   });
 
-  const { data: chargeSettings } = useQuery<ChargeSettingsData>({
+  const { data: chargeSettings } = useQuery<ChargeSettingsData & { updatedAt?: string }>({
     queryKey: ["/api/charge-settings"],
+  });
+
+  const [showHistory, setShowHistory] = useState(false);
+  const { data: chargeHistory } = useQuery<(ChargeSettingsData & { id: number; updatedAt: string })[]>({
+    queryKey: ["/api/charge-settings/history"],
+    enabled: showHistory,
   });
 
   const saveChargeSettingsMutation = useMutation({
@@ -84,6 +90,7 @@ export default function DashboardPage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/charge-settings"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/charge-settings/history"] });
       queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
       queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
@@ -693,6 +700,11 @@ export default function DashboardPage() {
               {t("dash.chargeSettings")}
             </DialogTitle>
           </DialogHeader>
+          {chargeSettings?.updatedAt && (
+            <p className="text-xs text-muted-foreground" data-testid="text-charge-settings-updated">
+              Last updated: {new Date(chargeSettings.updatedAt).toLocaleString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+            </p>
+          )}
           <div className="space-y-4">
             <div className="space-y-2">
               <Label className="text-sm font-semibold">{t("dash.mandiCommPct")}</Label>
@@ -843,6 +855,46 @@ export default function DashboardPage() {
             >
               {saveChargeSettingsMutation.isPending ? t("dash.saving") : t("dash.saveSettings")}
             </Button>
+
+            <Button
+              data-testid="button-toggle-charge-history"
+              variant="ghost"
+              size="sm"
+              className="w-full text-xs text-muted-foreground"
+              onClick={() => setShowHistory(h => !h)}
+            >
+              <History className="w-3 h-3 mr-1" />
+              {showHistory ? "Hide change history" : "Show change history"}
+            </Button>
+
+            {showHistory && chargeHistory && chargeHistory.length > 0 && (
+              <div className="border rounded-md overflow-x-auto" data-testid="charge-settings-history">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b bg-muted/50">
+                      <th className="p-1.5 text-left font-medium">Date</th>
+                      <th className="p-1.5 text-right font-medium">Mandi F/B</th>
+                      <th className="p-1.5 text-right font-medium">Aadhat F/B</th>
+                      <th className="p-1.5 text-right font-medium">M+A F/B</th>
+                      <th className="p-1.5 text-right font-medium">Hammali F/B</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {chargeHistory.map((h, i) => (
+                      <tr key={h.id} className={i === 0 ? "bg-primary/5 font-medium" : "border-t"}>
+                        <td className="p-1.5 whitespace-nowrap">
+                          {new Date(h.updatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "2-digit" })}
+                        </td>
+                        <td className="p-1.5 text-right whitespace-nowrap">{h.mandiCommissionFarmerPercent}/{h.mandiCommissionBuyerPercent}</td>
+                        <td className="p-1.5 text-right whitespace-nowrap">{h.aadhatCommissionFarmerPercent}/{h.aadhatCommissionBuyerPercent}</td>
+                        <td className="p-1.5 text-right whitespace-nowrap">{h.muddatAnyaFarmerPercent}/{h.muddatAnyaBuyerPercent}</td>
+                        <td className="p-1.5 text-right whitespace-nowrap">{h.hammaliFarmerPerBag}/{h.hammaliBuyerPerBag}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

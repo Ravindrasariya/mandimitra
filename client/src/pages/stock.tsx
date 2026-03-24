@@ -110,6 +110,7 @@ type BidRow = {
   advanceAmount: string;
   txnDate: string;
   txn: TxnState;
+  savedCharges?: ChargeSettings;
   paymentStatus?: "due" | "paid" | "partial";
   farmerPaymentStatus?: "due" | "paid" | "partial";
   farmerPaidAmount?: string;
@@ -1311,8 +1312,8 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
             pricePerKg={pricePerKg}
             vehicleBhadaRate={vehicleBhadaRate}
             totalBagsInVehicle={totalBagsInVehicle}
-            cs={cs}
-            buyerAadhatOverride={bidBuyerAadhat}
+            cs={bid.savedCharges || cs}
+            buyerAadhatOverride={bid.savedCharges ? undefined : bidBuyerAadhat}
           />
         </div>
       )}
@@ -2670,6 +2671,16 @@ function stockCardsToFarmerCards(apiCards: any[]): FarmerCard[] {
                 extraThelaBhada: txn.extraThelaBhadaFarmer?.toString() || "0",
                 extraOthers: txn.extraOthersFarmer?.toString() || "0",
               } : emptyTxn(),
+              savedCharges: txn ? {
+                mandiCommissionFarmerPercent: txn.mandiFarmerPercent || "0",
+                mandiCommissionBuyerPercent: txn.mandiBuyerPercent || "0",
+                aadhatCommissionFarmerPercent: txn.aadhatFarmerPercent || "0",
+                aadhatCommissionBuyerPercent: txn.aadhatBuyerPercent || "0",
+                muddatAnyaFarmerPercent: txn.muddatAnyaFarmerPercent || "0",
+                muddatAnyaBuyerPercent: txn.muddatAnyaBuyerPercent || "0",
+                hammaliFarmerPerBag: txn.hammaliFarmerPerBag || "0",
+                hammaliBuyerPerBag: txn.hammaliBuyerPerBag || "0",
+              } : undefined,
               savedBuyerReceivable: txn?.totalReceivableFromBuyer != null ? parseFloat(txn.totalReceivableFromBuyer) : undefined,
               savedFarmerPayable: txn?.totalPayableToFarmer != null ? parseFloat(txn.totalPayableToFarmer) : undefined,
               paymentStatus: txn?.paymentStatus || "due",
@@ -3788,19 +3799,22 @@ export default function StockPage() {
               const epkB = parseFloat(bid.txn.extraPerKgBuyer) || 0;
               const farmerGross = nw * (ppk + epkF);
               const buyerGross = nw * (ppk + epkB);
-              const hfRate = parseFloat(cs.hammaliFarmerPerBag) || 0;
-              const hbRate = parseFloat(cs.hammaliBuyerPerBag) || 0;
+              const effectiveCs = bid.savedCharges || cs;
+              const hfRate = parseFloat(effectiveCs.hammaliFarmerPerBag) || 0;
+              const hbRate = parseFloat(effectiveCs.hammaliBuyerPerBag) || 0;
               const extraF = parseFloat(bid.txn.extraChargesFarmer) || 0;
               const extraB = parseFloat(bid.txn.extraChargesBuyer) || 0;
-              const aadhatFPct = parseFloat(cs.aadhatCommissionFarmerPercent) || 0;
+              const aadhatFPct = parseFloat(effectiveCs.aadhatCommissionFarmerPercent) || 0;
               const bidBuyerData = pageBuyersData.find((b: any) => b.id === bid.buyerId);
-              const aadhatBPct = bidBuyerData?.aadhatCommissionPercent != null && bidBuyerData.aadhatCommissionPercent !== ""
-                ? parseFloat(bidBuyerData.aadhatCommissionPercent) || 0
-                : parseFloat(cs.aadhatCommissionBuyerPercent) || 0;
-              const mandiFPct = parseFloat(cs.mandiCommissionFarmerPercent) || 0;
-              const mandiBPct = parseFloat(cs.mandiCommissionBuyerPercent) || 0;
-              const muddatAnyaFPct = parseFloat(cs.muddatAnyaFarmerPercent) || 0;
-              const muddatAnyaBPct = parseFloat(cs.muddatAnyaBuyerPercent) || 0;
+              const aadhatBPct = bid.savedCharges
+                ? parseFloat(effectiveCs.aadhatCommissionBuyerPercent) || 0
+                : bidBuyerData?.aadhatCommissionPercent != null && bidBuyerData.aadhatCommissionPercent !== ""
+                  ? parseFloat(bidBuyerData.aadhatCommissionPercent) || 0
+                  : parseFloat(cs.aadhatCommissionBuyerPercent) || 0;
+              const mandiFPct = parseFloat(effectiveCs.mandiCommissionFarmerPercent) || 0;
+              const mandiBPct = parseFloat(effectiveCs.mandiCommissionBuyerPercent) || 0;
+              const muddatAnyaFPct = parseFloat(effectiveCs.muddatAnyaFarmerPercent) || 0;
+              const muddatAnyaBPct = parseFloat(effectiveCs.muddatAnyaBuyerPercent) || 0;
               const freight = totalBIV > 0 ? (vehicleBR * bidBags) / totalBIV : 0;
               const hammaliFarmerTotal = hfRate * bidBags;
               const hammaliBuyerTotal = hbRate * bidBags;
@@ -3872,7 +3886,24 @@ export default function StockPage() {
               }
             }
 
-            updatedBids.push({ ...bid, bidDbId, txnDbId, savedBuyerReceivable: savedBuyerReceivableAfterSave, savedFarmerPayable: savedFarmerPayableAfterSave });
+            const savedChargesAfterSave = (bidDbId && nw > 0) ? {
+              mandiCommissionFarmerPercent: (bid.savedCharges || cs).mandiCommissionFarmerPercent,
+              mandiCommissionBuyerPercent: (bid.savedCharges || cs).mandiCommissionBuyerPercent,
+              aadhatCommissionFarmerPercent: (bid.savedCharges || cs).aadhatCommissionFarmerPercent,
+              aadhatCommissionBuyerPercent: bid.savedCharges
+                ? bid.savedCharges.aadhatCommissionBuyerPercent
+                : (() => {
+                    const bd = pageBuyersData.find((b: any) => b.id === bid.buyerId);
+                    return bd?.aadhatCommissionPercent != null && bd.aadhatCommissionPercent !== ""
+                      ? bd.aadhatCommissionPercent
+                      : cs.aadhatCommissionBuyerPercent;
+                  })(),
+              muddatAnyaFarmerPercent: (bid.savedCharges || cs).muddatAnyaFarmerPercent,
+              muddatAnyaBuyerPercent: (bid.savedCharges || cs).muddatAnyaBuyerPercent,
+              hammaliFarmerPerBag: (bid.savedCharges || cs).hammaliFarmerPerBag,
+              hammaliBuyerPerBag: (bid.savedCharges || cs).hammaliBuyerPerBag,
+            } : bid.savedCharges;
+            updatedBids.push({ ...bid, bidDbId, txnDbId, savedCharges: savedChargesAfterSave, savedBuyerReceivable: savedBuyerReceivableAfterSave, savedFarmerPayable: savedFarmerPayableAfterSave });
           }
 
           finalGroups = finalGroups.map((fg, gi) =>

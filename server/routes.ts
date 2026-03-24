@@ -591,6 +591,15 @@ export async function registerRoutes(
           freightCharges: string | null;
           aadhatCharges: string | null;
           mandiCharges: string | null;
+          muddatAnyaCharges: string | null;
+          aadhatFarmerPercent: string | null;
+          mandiFarmerPercent: string | null;
+          muddatAnyaFarmerPercent: string | null;
+          aadhatBuyerPercent: string | null;
+          mandiBuyerPercent: string | null;
+          muddatAnyaBuyerPercent: string | null;
+          hammaliFarmerPerBag: string | null;
+          hammaliBuyerPerBag: string | null;
           totalPayableToFarmer: string | null;
           totalReceivableFromBuyer: string | null;
           date: string | null;
@@ -726,6 +735,15 @@ export async function registerRoutes(
               freightCharges: txn.freightCharges,
               aadhatCharges: txn.aadhatCharges,
               mandiCharges: txn.mandiCharges,
+              muddatAnyaCharges: txn.muddatAnyaCharges,
+              aadhatFarmerPercent: txn.aadhatFarmerPercent,
+              mandiFarmerPercent: txn.mandiFarmerPercent,
+              muddatAnyaFarmerPercent: txn.muddatAnyaFarmerPercent,
+              aadhatBuyerPercent: txn.aadhatBuyerPercent,
+              mandiBuyerPercent: txn.mandiBuyerPercent,
+              muddatAnyaBuyerPercent: txn.muddatAnyaBuyerPercent,
+              hammaliFarmerPerBag: txn.hammaliFarmerPerBag,
+              hammaliBuyerPerBag: txn.hammaliBuyerPerBag,
               totalPayableToFarmer: txn.totalPayableToFarmer,
               totalReceivableFromBuyer: txn.totalReceivableFromBuyer,
               date: txn.date,
@@ -1357,6 +1375,11 @@ export async function registerRoutes(
     } catch (e: any) {
       res.status(400).json({ message: e.message });
     }
+  });
+
+  app.get("/api/charge-settings/history", requireAuth, async (req, res) => {
+    const history = await storage.getChargeSettingsHistory(req.user!.businessId);
+    res.json(history);
   });
 
   app.get("/api/cash-settings", requireAuth, async (req, res) => {

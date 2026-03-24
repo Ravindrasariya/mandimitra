@@ -98,6 +98,7 @@ export interface IStorage {
   deleteBankAccount(id: number, businessId: number): Promise<void>;
 
   getBusinessChargeSettings(businessId: number): Promise<BusinessChargeSettings | undefined>;
+  getChargeSettingsHistory(businessId: number): Promise<BusinessChargeSettings[]>;
   upsertBusinessChargeSettings(businessId: number, data: Partial<InsertBusinessChargeSettings>): Promise<BusinessChargeSettings>;
 
   getCashSettings(businessId: number): Promise<CashSettings | undefined>;
@@ -1074,17 +1075,21 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getBusinessChargeSettings(businessId: number): Promise<BusinessChargeSettings | undefined> {
-    const [settings] = await db.select().from(businessChargeSettings).where(eq(businessChargeSettings.businessId, businessId));
+    const [settings] = await db.select().from(businessChargeSettings)
+      .where(eq(businessChargeSettings.businessId, businessId))
+      .orderBy(desc(businessChargeSettings.updatedAt))
+      .limit(1);
     return settings;
   }
 
+  async getChargeSettingsHistory(businessId: number): Promise<BusinessChargeSettings[]> {
+    return db.select().from(businessChargeSettings)
+      .where(eq(businessChargeSettings.businessId, businessId))
+      .orderBy(desc(businessChargeSettings.updatedAt));
+  }
+
   async upsertBusinessChargeSettings(businessId: number, data: Partial<InsertBusinessChargeSettings>): Promise<BusinessChargeSettings> {
-    const existing = await this.getBusinessChargeSettings(businessId);
-    if (existing) {
-      const [updated] = await db.update(businessChargeSettings).set(data).where(eq(businessChargeSettings.businessId, businessId)).returning();
-      return updated;
-    }
-    const [created] = await db.insert(businessChargeSettings).values({ businessId, ...data }).returning();
+    const [created] = await db.insert(businessChargeSettings).values({ businessId, ...data, updatedAt: new Date() }).returning();
     return created;
   }
 

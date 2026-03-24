@@ -19,7 +19,7 @@ The system employs a modern web stack:
     -   **Stock Entry**: Vehicle-centric entry for lots, including farmer details, vehicle information, and multiple lots per vehicle. Lots are grouped by a unified serial number.
     -   **Stock Register**: Displays lots grouped by serial number with comprehensive vehicle and farmer details.
     -   **Bidding**: Interface for managing bids on individual lots.
-    -   **Transactions**: Handles net weight calculation, commission application (aadhat, mandi), and management of payable/receivable amounts. It supports customizable business charge settings.
+    -   **Transactions**: Handles net weight calculation, commission application (aadhat, mandi, muddat+anya), and management of payable/receivable amounts. It supports customizable business charge settings with versioned history (each save creates a new row; dashboard shows change history). Existing transactions preserve the charge percentages they were created with, preventing retroactive recalculation when global settings change.
     -   **Cash Management**: Tracks cash inflows and outflows, categorizing expenses (Revenue/Capital) and supporting payment allocations. Payment creation uses database transactions with row-level locking (`SELECT ... FOR UPDATE`) to prevent concurrent duplicate/overpayments against the same transaction.
     -   **Ledgers (Farmer & Buyer)**: Comprehensive tracking of opening balances, transactions, payments, and current dues. Includes functionality for editing, merging, and archiving ledger entries. Buyer merging intelligently consolidates duplicate buyer records.
     -   **Books (Beta)**: An accounting module comprising:

@@ -211,7 +211,7 @@ export const transactions = pgTable("transactions", {
 
 export const businessChargeSettings = pgTable("business_charge_settings", {
   id: serial("id").primaryKey(),
-  businessId: integer("business_id").notNull().references(() => businesses.id).unique(),
+  businessId: integer("business_id").notNull().references(() => businesses.id),
   mandiCommissionFarmerPercent: decimal("mandi_commission_farmer_percent", { precision: 5, scale: 2 }).default("0"),
   mandiCommissionBuyerPercent: decimal("mandi_commission_buyer_percent", { precision: 5, scale: 2 }).default("1"),
   aadhatCommissionFarmerPercent: decimal("aadhat_commission_farmer_percent", { precision: 5, scale: 2 }).default("0"),
@@ -221,6 +221,7 @@ export const businessChargeSettings = pgTable("business_charge_settings", {
   hammaliFarmerPerBag: decimal("hammali_farmer_per_bag", { precision: 10, scale: 2 }).default("0"),
   hammaliBuyerPerBag: decimal("hammali_buyer_per_bag", { precision: 10, scale: 2 }).default("0"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 export const bankAccounts = pgTable("bank_accounts", {
