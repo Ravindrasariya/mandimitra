@@ -198,7 +198,7 @@ ${businessAddress ? `<p style="font-size:0.85em;color:#555;margin:2px 0">${busin
 <div class="summary">
 ${hammaliBuyer > 0 ? `<div class="summary-row"><span>Hammali (${bags} bags):</span><span>Rs.${hammaliBuyer.toFixed(2)}</span></div>` : ""}
 ${extraBuyer > 0 ? `<div class="summary-row"><span>Extra Charges:</span><span>Rs.${extraBuyer.toFixed(2)}</span></div>` : ""}
-${aadhatBuyer > 0 ? `<div class="summary-row"><span>Aadhat (${tx.aadhatBuyerPercent}%):</span><span>Rs.${aadhatBuyer.toFixed(2)}</span></div>` : ""}
+${aadhatBuyer > 0 ? `<div class="summary-row"><span>Aadhat:</span><span>Rs.${aadhatBuyer.toFixed(2)}</span></div>` : ""}
 ${mandiBuyer > 0 ? `<div class="summary-row"><span>Mandi (${tx.mandiBuyerPercent}%):</span><span>Rs.${mandiBuyer.toFixed(2)}</span></div>` : ""}
 <div class="summary-row total"><span>Total Receivable from Buyer:</span><span>Rs.${parseFloat(tx.totalReceivableFromBuyer || "0").toFixed(2)}</span></div>
 </div>
@@ -412,7 +412,7 @@ ${rowsHtml}
 <div class="summary">
 ${totalHammali > 0 ? `<div class="summary-row"><span>Hammali (${totalBags} bags):</span><span>Rs.${totalHammali.toFixed(2)}</span></div>` : ""}
 ${totalExtra > 0 ? `<div class="summary-row"><span>Extra Charges:</span><span>Rs.${totalExtra.toFixed(2)}</span></div>` : ""}
-${totalAadhat > 0 ? `<div class="summary-row"><span>Aadhat (${aadhatPct}%):</span><span>Rs.${totalAadhat.toFixed(2)}</span></div>` : ""}
+${totalAadhat > 0 ? `<div class="summary-row"><span>Aadhat:</span><span>Rs.${totalAadhat.toFixed(2)}</span></div>` : ""}
 ${totalMandi > 0 ? `<div class="summary-row"><span>Mandi (${mandiPct}%):</span><span>Rs.${totalMandi.toFixed(2)}</span></div>` : ""}
 <div class="summary-row total"><span>Total Receivable from Buyer:</span><span>Rs.${grandTotal.toFixed(2)}</span></div>
 </div>
@@ -503,7 +503,7 @@ ${rowsHtml}
 <div class="summary">
 ${totalHammali > 0 ? `<div class="summary-row"><span>Hammali (${totalBags} bags):</span><span>Rs.${totalHammali.toFixed(2)}</span></div>` : ""}
 ${totalExtra > 0 ? `<div class="summary-row"><span>Extra Charges:</span><span>Rs.${totalExtra.toFixed(2)}</span></div>` : ""}
-${!hideAadhat && totalAadhat > 0 ? `<div class="summary-row"><span>Aadhat (${aadhatPct}%):</span><span>Rs.${totalAadhat.toFixed(2)}</span></div>` : ""}
+${!hideAadhat && totalAadhat > 0 ? `<div class="summary-row"><span>Aadhat:</span><span>Rs.${totalAadhat.toFixed(2)}</span></div>` : ""}
 ${!hideAadhat && totalMandi > 0 ? `<div class="summary-row"><span>Mandi (${mandiPct}%):</span><span>Rs.${totalMandi.toFixed(2)}</span></div>` : ""}
 ${!hideAadhat ? `<div class="summary-row total"><span>Total Receivable from Buyer:</span><span>Rs.${grandTotal.toFixed(2)}</span></div>` : ""}
 </div>
