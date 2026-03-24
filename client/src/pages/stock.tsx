@@ -2660,7 +2660,7 @@ function stockCardsToFarmerCards(apiCards: any[]): FarmerCard[] {
               numberOfBags: b.numberOfBags?.toString() || "",
               paymentType: b.paymentType || "Credit",
               advanceAmount: b.advanceAmount?.toString() || "0",
-              txnDate: txn?.date ? format(new Date(txn.date), "yyyy-MM-dd") : (lot.date || c.date || format(new Date(), "yyyy-MM-dd")),
+              txnDate: txn?.date || lot.date || c.date || format(new Date(), "yyyy-MM-dd"),
               txn: txn ? {
                 netWeightInput: txn.netWeight?.toString() || "",
                 showWeightCalc: false,
@@ -3395,6 +3395,7 @@ export default function StockPage() {
         .filter(cropMatchesCard)
         .map(applyCropFilter)
         .map(applyTxnDateFilter)
+        .filter(c => c.cropGroups.length > 0)
     );
     const unsaved = sorted.filter(c => !savedCardMap.has(c.id));
     const saved = sorted.filter(c => savedCardMap.has(c.id));
