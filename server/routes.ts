@@ -1343,7 +1343,6 @@ export async function registerRoutes(
 
   app.put("/api/charge-settings", requireAuth, async (req, res) => {
     try {
-      console.log("[charge-settings PUT] body:", JSON.stringify(req.body));
       const result = await storage.upsertBusinessChargeSettings(req.user!.businessId, {
         mandiCommissionFarmerPercent: req.body.mandiCommissionFarmerPercent,
         mandiCommissionBuyerPercent: req.body.mandiCommissionBuyerPercent,
@@ -1482,6 +1481,75 @@ export async function registerRoutes(
         req.query.dateTo as string | undefined,
       );
       res.json(result);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  app.get("/api/buyers/:id/ledger", requireAuth, async (req, res) => {
+    try {
+      const businessId = req.user!.businessId;
+      const buyerId = paramId(req.params.id);
+
+      const business = await storage.getBusiness(businessId);
+
+      const today = new Date();
+      const fyYear = today.getMonth() >= 3 ? today.getFullYear() : today.getFullYear() - 1;
+      const fyStart = `${fyYear}-04-01`;
+      const fyEnd = `${fyYear + 1}-03-31`;
+
+      const ledger = await storage.getBuyerLedger(businessId, buyerId, fyStart, fyEnd);
+      const { buyer, transactions: txns, cashEntries: cash } = ledger;
+
+      const filteredTxns = (txns as any[]).filter(t => !t.isReversed);
+      const filteredCash = (cash as any[]).filter(c => !c.isReversed);
+
+      type LedgerEntry = {
+        date: string;
+        refCode: string;
+        particulars: string;
+        dr: number;
+        cr: number;
+        sourceType: "transaction" | "payment";
+        sourceId: number;
+      };
+
+      const entries: LedgerEntry[] = [
+        ...filteredTxns.map(t => ({
+          date: t.date || fyStart,
+          refCode: t.transactionId as string,
+          particulars: "Purchase",
+          dr: parseFloat(t.totalReceivableFromBuyer || "0"),
+          cr: 0,
+          sourceType: "transaction" as const,
+          sourceId: t.id as number,
+        })),
+        ...filteredCash.map(c => ({
+          date: c.date as string,
+          refCode: (c.cashFlowId as string | null) || `CE${c.id}`,
+          particulars: `Payment (${c.paymentMode || "Cash"})`,
+          dr: 0,
+          cr: parseFloat(c.amount || "0"),
+          sourceType: "payment" as const,
+          sourceId: c.id as number,
+        })),
+      ];
+
+      entries.sort((a, b) => {
+        if (a.date !== b.date) return a.date.localeCompare(b.date);
+        return a.sourceType === "transaction" ? -1 : 1;
+      });
+
+      res.json({
+        buyerName: buyer.name,
+        buyerId: buyer.buyerId,
+        businessName: business?.name || "",
+        businessAddress: business?.address || "",
+        openingBalance: parseFloat(buyer.openingBalance || "0"),
+        fyStart,
+        fyEnd,
+        entries,
+      });
     } catch (e: any) {
       res.status(400).json({ message: e.message });
     }

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -16,9 +16,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import type { Buyer, BuyerEditHistory } from "@shared/schema";
-import { ShoppingBag, Search, Plus, Pencil, ArrowUpDown, ArrowUp, ArrowDown, Printer, RefreshCw, ChevronDown, Calendar, Share2, AlertTriangle } from "lucide-react";
+import { ShoppingBag, Search, Plus, Pencil, ArrowUpDown, ArrowUp, ArrowDown, Printer, RefreshCw, ChevronDown, ChevronRight, Calendar, Share2, AlertTriangle, FileText } from "lucide-react";
 import { format } from "date-fns";
 import { printReceipt, shareReceiptAsImage } from "@/lib/receiptUtils";
+import jsPDF from "jspdf";
 
 type BuyerWithDues = Buyer & { receivableDue: string; overallDue: string; bidDates?: string[] };
 type SortField = "buyerId" | "overallDue" | "receivableDue";
@@ -154,6 +155,256 @@ function generateBuyerListPrintHtml(buyers: BuyerWithDues[], summary: { total: n
 </body></html>`;
 }
 
+type LedgerEntry = {
+  date: string;
+  refCode: string;
+  particulars: string;
+  dr: number;
+  cr: number;
+  sourceType: "transaction" | "payment";
+  sourceId: number;
+};
+
+type BuyerLedgerData = {
+  buyerName: string;
+  buyerId: string;
+  businessName: string;
+  businessAddress: string;
+  openingBalance: number;
+  fyStart: string;
+  fyEnd: string;
+  entries: LedgerEntry[];
+};
+
+function BuyerLedgerSection({ buyer }: { buyer: BuyerWithDues }) {
+  const { data, isLoading } = useQuery<BuyerLedgerData>({
+    queryKey: [`/api/buyers/${buyer.id}/ledger`],
+  });
+
+  const rows = useMemo(() => {
+    if (!data) return [];
+    const openingBal = data.openingBalance;
+    const result: Array<{
+      itemNo: number;
+      date: string;
+      particulars: string;
+      refCode: string;
+      dr: number;
+      cr: number;
+      balance: number;
+      isOpening?: boolean;
+    }> = [];
+
+    result.push({
+      itemNo: 1,
+      date: data.fyStart,
+      particulars: "Opening Balance",
+      refCode: "",
+      dr: openingBal > 0 ? openingBal : 0,
+      cr: openingBal < 0 ? Math.abs(openingBal) : 0,
+      balance: openingBal,
+      isOpening: true,
+    });
+
+    let balance = openingBal;
+    for (const entry of data.entries) {
+      balance = balance + entry.cr - entry.dr;
+      result.push({
+        itemNo: result.length + 1,
+        date: entry.date,
+        particulars: entry.particulars,
+        refCode: entry.refCode,
+        dr: entry.dr,
+        cr: entry.cr,
+        balance,
+      });
+    }
+
+    return result;
+  }, [data]);
+
+  const handleDownloadPdf = () => {
+    if (!data) return;
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const pageW = 210;
+    const margin = 12;
+    const contentW = pageW - margin * 2;
+    let y = 16;
+
+    doc.setFontSize(13);
+    doc.setFont("helvetica", "bold");
+    doc.text(data.businessName || "Mandi Mitra", pageW / 2, y, { align: "center" });
+    y += 5;
+    if (data.businessAddress) {
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.text(data.businessAddress, pageW / 2, y, { align: "center" });
+      y += 5;
+    }
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Buyer Ledger: ${data.buyerName} (${data.buyerId})`, margin, y);
+    y += 5;
+    const fyStartFmt = format(new Date(data.fyStart + "T00:00:00"), "dd MMM yyyy");
+    const fyEndFmt = format(new Date(data.fyEnd + "T00:00:00"), "dd MMM yyyy");
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.text(`FY: ${fyStartFmt} to ${fyEndFmt}`, margin, y);
+    y += 8;
+
+    const cols = {
+      no: margin,
+      date: margin + 10,
+      particulars: margin + 30,
+      ref: margin + 80,
+      dr: margin + 127,
+      cr: margin + 150,
+      bal: pageW - margin,
+    };
+    const rowH = 6.5;
+    const headerH = 7;
+
+    doc.setFillColor(46, 125, 50);
+    doc.rect(margin, y - headerH + 1, contentW, headerH, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.text("#", cols.no, y - 1);
+    doc.text("Date", cols.date, y - 1);
+    doc.text("Particulars", cols.particulars, y - 1);
+    doc.text("Ref #", cols.ref, y - 1);
+    doc.text("Dr", cols.dr, y - 1, { align: "right" });
+    doc.text("Cr", cols.cr, y - 1, { align: "right" });
+    doc.text("Balance", cols.bal, y - 1, { align: "right" });
+    y += 3;
+
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(7.5);
+
+    const fmtAmt = (n: number) =>
+      n.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+
+    for (const row of rows) {
+      if (y > 280) {
+        doc.addPage();
+        y = 14;
+      }
+      if (row.isOpening) {
+        doc.setFillColor(232, 245, 233);
+        doc.rect(margin, y - rowH + 1.5, contentW, rowH, "F");
+      } else if (row.itemNo % 2 === 0) {
+        doc.setFillColor(248, 248, 248);
+        doc.rect(margin, y - rowH + 1.5, contentW, rowH, "F");
+      }
+      doc.setFont("helvetica", row.isOpening ? "bold" : "normal");
+      doc.text(String(row.itemNo), cols.no, y);
+      doc.text(format(new Date(row.date + "T00:00:00"), "dd/MM/yy"), cols.date, y);
+      const partText = row.particulars.length > 28 ? row.particulars.substring(0, 27) + "…" : row.particulars;
+      doc.text(partText, cols.particulars, y);
+      const refText = (row.refCode || "-").length > 18 ? (row.refCode || "-").substring(0, 17) + "…" : (row.refCode || "-");
+      doc.text(refText, cols.ref, y);
+      doc.text(row.dr > 0 ? fmtAmt(row.dr) : "-", cols.dr, y, { align: "right" });
+      doc.text(row.cr > 0 ? fmtAmt(row.cr) : "-", cols.cr, y, { align: "right" });
+      const balStr = (row.balance < 0 ? "(" : "") + fmtAmt(Math.abs(row.balance)) + (row.balance < 0 ? " Cr)" : row.balance > 0 ? " Dr" : "");
+      doc.text(balStr, cols.bal, y, { align: "right" });
+      y += rowH;
+      doc.setDrawColor(220, 220, 220);
+      doc.line(margin, y - rowH + 1.5, pageW - margin, y - rowH + 1.5);
+    }
+
+    y += 4;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(120, 120, 120);
+    doc.text("Generated by Mandi Mitra", pageW / 2, y, { align: "center" });
+
+    doc.save(`Buyer_Ledger_${data.buyerName.replace(/[^a-zA-Z0-9]/g, "_")}_FY${data.fyStart.substring(0, 4)}.pdf`);
+  };
+
+  return (
+    <div className="bg-muted/10 border-t px-4 py-3">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs font-semibold text-muted-foreground">
+          {isLoading ? "Loading ledger…" : `Ledger — FY ${data?.fyStart?.substring(0, 4)}-${data?.fyEnd?.substring(2, 4)}`}
+        </p>
+        <button
+          data-testid={`button-ledger-pdf-${buyer.id}`}
+          className="p-1 rounded hover:bg-muted text-muted-foreground disabled:opacity-40"
+          onClick={handleDownloadPdf}
+          title="Download PDF"
+          disabled={isLoading || !data}
+        >
+          <FileText className="w-4 h-4" />
+        </button>
+      </div>
+      {isLoading ? (
+        <div className="text-xs text-muted-foreground py-3 text-center">Loading…</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="bg-muted/50 text-left">
+                <th className="p-1.5 font-medium w-7">#</th>
+                <th className="p-1.5 font-medium w-24">Date</th>
+                <th className="p-1.5 font-medium">Particulars</th>
+                <th className="p-1.5 font-medium hidden lg:table-cell">Ref #</th>
+                <th className="p-1.5 font-medium w-24 text-right text-red-700">Dr (Rs.)</th>
+                <th className="p-1.5 font-medium w-24 text-right text-green-700">Cr (Rs.)</th>
+                <th className="p-1.5 font-medium w-28 text-right">Balance</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr
+                  key={row.itemNo}
+                  className={`border-b border-border/50 ${row.isOpening ? "bg-green-50 dark:bg-green-900/10 font-semibold" : ""}`}
+                >
+                  <td className="p-1.5 text-muted-foreground">{row.itemNo}</td>
+                  <td className="p-1.5 tabular-nums">
+                    {format(new Date(row.date + "T00:00:00"), "dd/MM/yyyy")}
+                  </td>
+                  <td className="p-1.5">
+                    <span>{row.particulars}</span>
+                    <span className="ml-1 text-muted-foreground font-mono text-[10px] lg:hidden">
+                      {row.refCode || ""}
+                    </span>
+                  </td>
+                  <td className="p-1.5 hidden lg:table-cell font-mono text-muted-foreground text-[10px]">
+                    {row.refCode || "-"}
+                  </td>
+                  <td className="p-1.5 text-right tabular-nums text-red-700">
+                    {row.dr > 0 ? formatIndianCurrency(row.dr) : ""}
+                  </td>
+                  <td className="p-1.5 text-right tabular-nums text-green-700">
+                    {row.cr > 0 ? formatIndianCurrency(row.cr) : ""}
+                  </td>
+                  <td className={`p-1.5 text-right tabular-nums font-medium ${
+                    row.balance < 0 ? "text-green-600" : row.balance > 0 ? "text-red-600" : "text-muted-foreground"
+                  }`}>
+                    {formatIndianCurrency(Math.abs(row.balance))}
+                    {row.balance !== 0 && (
+                      <span className="text-[10px] ml-0.5 font-normal">
+                        {row.balance < 0 ? "Cr" : "Dr"}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {rows.length === 1 && (
+                <tr>
+                  <td colSpan={7} className="text-center py-3 text-muted-foreground text-xs">
+                    No transactions in this financial year
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function BuyerLedgerPage() {
   const { toast } = useToast();
   const { t } = useLanguage();
@@ -169,6 +420,7 @@ export default function BuyerLedgerPage() {
   const [showAddDialog, setShowAddDialog] = useState(false);
   const [mergeConfirmOpen, setMergeConfirmOpen] = useState(false);
   const [duplicateBuyer, setDuplicateBuyer] = useState<BuyerWithDues | null>(null);
+  const [expandedBuyerId, setExpandedBuyerId] = useState<number | null>(null);
 
   const [editName, setEditName] = useState("");
   const [editAddress, setEditAddress] = useState("");
@@ -822,57 +1074,81 @@ export default function BuyerLedgerPage() {
                   </thead>
                   <tbody>
                     {sortedBuyers.map((buyer) => (
-                      <tr key={buyer.id} data-testid={`row-buyer-${buyer.id}`} className="border-b hover:bg-muted/30 transition-colors">
-                        <td className="p-3">
-                          <button
-                            data-testid={`button-edit-buyer-${buyer.id}`}
-                            className="p-1.5 rounded hover:bg-muted"
-                            onClick={() => openEdit(buyer)}
-                          >
-                            <Pencil className="w-4 h-4 text-muted-foreground" />
-                          </button>
-                        </td>
-                        <td className="p-3 font-mono text-xs">{buyer.buyerId}</td>
-                        <td className="p-3 font-medium">{buyer.name}</td>
-                        <td className="p-3 text-muted-foreground">{buyer.address || "-"}</td>
-                        <td className="p-3 text-muted-foreground">{buyer.licenceNo || "-"}</td>
-                        <td className="p-3">{buyer.phone || "-"}</td>
-                        <td className="p-3 text-center">
-                          {buyer.redFlag && (
-                            <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
-                              <AlertTriangle className="w-3 h-3 mr-0.5" />
-                              Flag
-                            </Badge>
-                          )}
-                        </td>
-                        <td className="p-3 text-center">
-                          <Switch
-                            data-testid={`switch-active-${buyer.id}`}
-                            checked={buyer.isActive}
-                            onCheckedChange={(checked) =>
-                              toggleActiveMutation.mutate({ id: buyer.id, isActive: checked })
-                            }
-                          />
-                        </td>
-                        <td className="p-3 text-right font-medium">
-                          {formatIndianCurrency(filteredDuesByBuyer.get(buyer.id)?.overall ?? parseFloat(buyer.overallDue))}
-                        </td>
-                        <td className="p-3 text-right font-medium text-orange-600">
-                          {formatIndianCurrency(filteredDuesByBuyer.get(buyer.id)?.receivable ?? parseFloat(buyer.receivableDue))}
-                        </td>
-                        <td className="p-3">
-                          <div className="flex items-center gap-1">
+                      <Fragment key={buyer.id}>
+                        <tr
+                          data-testid={`row-buyer-${buyer.id}`}
+                          className="border-b hover:bg-muted/30 transition-colors cursor-pointer"
+                          onClick={() => setExpandedBuyerId(prev => prev === buyer.id ? null : buyer.id)}
+                        >
+                          <td className="p-3" onClick={(e) => e.stopPropagation()}>
                             <button
-                              data-testid={`button-share-buyer-${buyer.id}`}
+                              data-testid={`button-edit-buyer-${buyer.id}`}
                               className="p-1.5 rounded hover:bg-muted"
-                              onClick={() => shareBuyerPaana(buyer)}
-                              title="Share via WhatsApp"
+                              onClick={() => openEdit(buyer)}
                             >
-                              <Share2 className="w-4 h-4 text-muted-foreground" />
+                              <Pencil className="w-4 h-4 text-muted-foreground" />
                             </button>
-                          </div>
-                        </td>
-                      </tr>
+                          </td>
+                          <td className="p-3 font-mono text-xs">{buyer.buyerId}</td>
+                          <td className="p-3 font-medium">{buyer.name}</td>
+                          <td className="p-3 text-muted-foreground">{buyer.address || "-"}</td>
+                          <td className="p-3 text-muted-foreground">{buyer.licenceNo || "-"}</td>
+                          <td className="p-3">{buyer.phone || "-"}</td>
+                          <td className="p-3 text-center">
+                            {buyer.redFlag && (
+                              <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                                <AlertTriangle className="w-3 h-3 mr-0.5" />
+                                Flag
+                              </Badge>
+                            )}
+                          </td>
+                          <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
+                            <Switch
+                              data-testid={`switch-active-${buyer.id}`}
+                              checked={buyer.isActive}
+                              onCheckedChange={(checked) =>
+                                toggleActiveMutation.mutate({ id: buyer.id, isActive: checked })
+                              }
+                            />
+                          </td>
+                          <td className="p-3 text-right font-medium">
+                            {formatIndianCurrency(filteredDuesByBuyer.get(buyer.id)?.overall ?? parseFloat(buyer.overallDue))}
+                          </td>
+                          <td className="p-3 text-right font-medium text-orange-600">
+                            {formatIndianCurrency(filteredDuesByBuyer.get(buyer.id)?.receivable ?? parseFloat(buyer.receivableDue))}
+                          </td>
+                          <td className="p-3" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center gap-1">
+                              <button
+                                data-testid={`button-share-buyer-${buyer.id}`}
+                                className="p-1.5 rounded hover:bg-muted"
+                                onClick={() => shareBuyerPaana(buyer)}
+                                title="Share via WhatsApp"
+                              >
+                                <Share2 className="w-4 h-4 text-muted-foreground" />
+                              </button>
+                              <button
+                                data-testid={`button-expand-buyer-${buyer.id}`}
+                                className="p-1.5 rounded hover:bg-muted"
+                                onClick={() => setExpandedBuyerId(prev => prev === buyer.id ? null : buyer.id)}
+                                title={expandedBuyerId === buyer.id ? "Collapse ledger" : "View ledger"}
+                              >
+                                {expandedBuyerId === buyer.id
+                                  ? <ChevronDown className="w-4 h-4 text-primary" />
+                                  : <ChevronRight className="w-4 h-4 text-muted-foreground opacity-60" />
+                                }
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                        {expandedBuyerId === buyer.id && (
+                          <tr data-testid={`row-ledger-${buyer.id}`}>
+                            <td colSpan={11} className="p-0 border-b">
+                              <BuyerLedgerSection buyer={buyer} />
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
                     ))}
                   </tbody>
                 </table>
@@ -880,52 +1156,76 @@ export default function BuyerLedgerPage() {
 
               <div className="md:hidden space-y-3 p-3">
                 {sortedBuyers.map((buyer) => (
-                  <Card key={buyer.id} data-testid={`card-buyer-${buyer.id}`}>
-                    <CardContent className="pt-3 pb-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0 space-y-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-mono text-xs text-muted-foreground">{buyer.buyerId}</span>
-                            {buyer.redFlag && <Badge variant="destructive" className="text-xs">{t("buyerLedger.redFlag")}</Badge>}
-                            {!buyer.isActive && <Badge variant="secondary" className="text-xs">{t("common.inactive")}</Badge>}
+                  <div key={buyer.id}>
+                    <Card
+                      data-testid={`card-buyer-${buyer.id}`}
+                      className={expandedBuyerId === buyer.id ? "rounded-b-none border-b-0" : ""}
+                    >
+                      <CardContent className="pt-3 pb-3">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0 space-y-1">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono text-xs text-muted-foreground">{buyer.buyerId}</span>
+                              {buyer.redFlag && <Badge variant="destructive" className="text-xs">{t("buyerLedger.redFlag")}</Badge>}
+                              {!buyer.isActive && <Badge variant="secondary" className="text-xs">{t("common.inactive")}</Badge>}
+                            </div>
+                            <p className="font-medium">{buyer.name}</p>
+                            {buyer.address && <p className="text-xs text-muted-foreground">{buyer.address}</p>}
+                            {buyer.phone && <p className="text-xs">{buyer.phone}</p>}
+                            {buyer.licenceNo && <p className="text-xs text-muted-foreground">Licence: {buyer.licenceNo}</p>}
+                            <div className="flex gap-4 text-xs pt-1">
+                              <span>{t("buyerLedger.overall")}: <strong>{formatIndianCurrency(filteredDuesByBuyer.get(buyer.id)?.overall ?? parseFloat(buyer.overallDue))}</strong></span>
+                              <span>{t("buyerLedger.receivable")}: <strong className="text-orange-600">{formatIndianCurrency(filteredDuesByBuyer.get(buyer.id)?.receivable ?? parseFloat(buyer.receivableDue))}</strong></span>
+                            </div>
                           </div>
-                          <p className="font-medium">{buyer.name}</p>
-                          {buyer.address && <p className="text-xs text-muted-foreground">{buyer.address}</p>}
-                          {buyer.phone && <p className="text-xs">{buyer.phone}</p>}
-                          {buyer.licenceNo && <p className="text-xs text-muted-foreground">Licence: {buyer.licenceNo}</p>}
-                          <div className="flex gap-4 text-xs pt-1">
-                            <span>{t("buyerLedger.overall")}: <strong>{formatIndianCurrency(filteredDuesByBuyer.get(buyer.id)?.overall ?? parseFloat(buyer.overallDue))}</strong></span>
-                            <span>{t("buyerLedger.receivable")}: <strong className="text-orange-600">{formatIndianCurrency(filteredDuesByBuyer.get(buyer.id)?.receivable ?? parseFloat(buyer.receivableDue))}</strong></span>
+                          <div className="flex flex-col items-end gap-2">
+                            <div className="flex items-center gap-1">
+                              <button
+                                data-testid={`button-edit-buyer-mobile-${buyer.id}`}
+                                className="p-1.5 rounded hover:bg-muted"
+                                onClick={() => openEdit(buyer)}
+                              >
+                                <Pencil className="w-4 h-4 text-muted-foreground" />
+                              </button>
+                              <button
+                                data-testid={`button-share-buyer-mobile-${buyer.id}`}
+                                className="p-1.5 rounded hover:bg-muted"
+                                onClick={() => shareBuyerPaana(buyer)}
+                              >
+                                <Share2 className="w-4 h-4 text-muted-foreground" />
+                              </button>
+                              <button
+                                data-testid={`button-expand-buyer-mobile-${buyer.id}`}
+                                className="p-1.5 rounded hover:bg-muted"
+                                onClick={() => setExpandedBuyerId(prev => prev === buyer.id ? null : buyer.id)}
+                                title={expandedBuyerId === buyer.id ? "Collapse ledger" : "View ledger"}
+                              >
+                                {expandedBuyerId === buyer.id
+                                  ? <ChevronDown className="w-4 h-4 text-primary" />
+                                  : <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                                }
+                              </button>
+                            </div>
+                            <Switch
+                              data-testid={`switch-active-mobile-${buyer.id}`}
+                              checked={buyer.isActive}
+                              onCheckedChange={(checked) =>
+                                toggleActiveMutation.mutate({ id: buyer.id, isActive: checked })
+                              }
+                            />
                           </div>
                         </div>
-                        <div className="flex flex-col items-end gap-2">
-                          <div className="flex items-center gap-1">
-                            <button
-                              data-testid={`button-edit-buyer-mobile-${buyer.id}`}
-                              className="p-1.5 rounded hover:bg-muted"
-                              onClick={() => openEdit(buyer)}
-                            >
-                              <Pencil className="w-4 h-4 text-muted-foreground" />
-                            </button>
-                            <button
-                              data-testid={`button-share-buyer-mobile-${buyer.id}`}
-                              className="p-1.5 rounded hover:bg-muted"
-                              onClick={() => shareBuyerPaana(buyer)}
-                            >
-                              <Share2 className="w-4 h-4 text-muted-foreground" />
-                            </button>
-                          </div>
-                          <Switch
-                            data-testid={`switch-active-mobile-${buyer.id}`}
-                            checked={buyer.isActive}
-                            onCheckedChange={(checked) =>
-                              toggleActiveMutation.mutate({ id: buyer.id, isActive: checked })
-                            }
-                          />
-                        </div>
+                      </CardContent>
+                    </Card>
+                    {expandedBuyerId === buyer.id && (
+                      <div
+                        data-testid={`mobile-ledger-${buyer.id}`}
+                        className="border border-t-0 rounded-b-md overflow-hidden"
+                      >
+                        <BuyerLedgerSection buyer={buyer} />
                       </div>
-                    </CardContent>
-                  </Card>
+                    )}
+                  </div>
                 ))}
               </div>
             </>
