@@ -1717,7 +1717,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
           : generateBuyerReceiptHtml(entries[0].lot, data.sg.farmer, entries[0].tx, user?.businessName, user?.businessAddress);
       } else {
         html = customTmpl
-          ? applyCombinedBuyerTemplate(customTmpl.templateHtml, entries, data.sg.serialNumber, data.sg.date, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo)
+          ? applyCombinedBuyerTemplate(customTmpl.templateHtml, entries, data.sg.serialNumber, data.sg.date, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo, undefined, data.sg.farmer)
           : generateCombinedBuyerReceiptHtml(entries, data.sg.serialNumber, data.sg.date, user?.businessName, user?.businessAddress, user?.businessPhone);
       }
       const safeName = buyerName.replace(/[^a-zA-Z0-9]/g, "_");
@@ -4069,6 +4069,7 @@ export default function StockPage() {
               muddatAnyaBuyerPercent: ecs.muddatAnyaBuyerPercent || "0",
               totalReceivableFromBuyer: bt.buyerReceivable.toFixed(2),
               buyer: fakeBuyer,
+              farmer: { name: card.farmerName, village: card.village || "" },
             } as any;
             entries.push({ lot: fakeLot, tx: fakeTx });
           }
@@ -4102,7 +4103,9 @@ export default function StockPage() {
     const safeBuyerName = buyerFilter.trim().replace(/[^a-zA-Z0-9]/g, "_");
     const buyerFileName = `Overall_Receipt_${safeBuyerName}_${cropFilter}_${receiptDate}.pdf`;
 
-    const overallTmpl = stockPageReceiptTemplates.find(tmpl => tmpl.templateType === "buyer-overall");
+    const overallTmpl = stockPageReceiptTemplates.find(tmpl => tmpl.templateType === "buyer-overall")
+      || stockPageReceiptTemplates.find(tmpl => tmpl.templateType === "buyer" && tmpl.crop === cropFilter)
+      || stockPageReceiptTemplates.find(tmpl => tmpl.templateType === "buyer" && tmpl.crop === "");
     const fullHtml = overallTmpl
       ? applyCombinedBuyerTemplate(overallTmpl.templateHtml, entries, 0, receiptDate, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo, receiptSerialNumber)
       : generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress, receiptSerialNumber, false, user?.businessPhone);

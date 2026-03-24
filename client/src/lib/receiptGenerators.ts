@@ -521,7 +521,7 @@ ${!hideAadhat ? `<div class="summary-row total"><span>Total Receivable from Buye
 </body></html>`;
 }
 
-export function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[], serialNumber: number, date: string, businessName?: string, businessAddress?: string, businessInitials?: string, businessPhone?: string, businessLicenceNo?: string, businessShopNo?: string, receiptSerialNumber?: number): string {
+export function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[], serialNumber: number, date: string, businessName?: string, businessAddress?: string, businessInitials?: string, businessPhone?: string, businessLicenceNo?: string, businessShopNo?: string, receiptSerialNumber?: number, farmer?: { name: string; village?: string }): string {
   const firstTx = entries[0].tx;
   const firstLot = entries[0].lot;
   const aadhatPct = parseFloat(firstTx.aadhatBuyerPercent || "0");
@@ -568,8 +568,8 @@ export function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[
     "{{DATE}}": date,
     "{{BUYER_NAME}}": firstTx.buyer.name,
     "{{BUYER_CODE}}": firstTx.buyer.licenceNo || "",
-    "{{FARMER_NAME}}": "",
-    "{{FARMER_VILLAGE}}": "",
+    "{{FARMER_NAME}}": [...new Set(entries.map(e => (e.tx as any).farmer?.name).filter(Boolean))].join(", ") || farmer?.name || "",
+    "{{FARMER_VILLAGE}}": [...new Set(entries.map(e => (e.tx as any).farmer?.village).filter(Boolean))].join(", ") || farmer?.village || "",
     "{{CROP}}": firstLot.crop,
     "{{SIZE}}": firstLot.size || "",
     "{{LOT_ID}}": "",
