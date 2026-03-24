@@ -210,7 +210,7 @@ export async function shareReceiptAsImage(html: string, fileName: string): Promi
   const headStyles = extractHeadStyles(html);
 
   const container = document.createElement("div");
-  container.style.cssText = "position:fixed;left:0;top:0;z-index:-1;opacity:0.01;pointer-events:none;width:800px;";
+  container.style.cssText = "position:fixed;left:-9999px;top:-9999px;z-index:-1;opacity:0;pointer-events:none;width:800px;";
 
   if (headStyles) {
     const styleEl = document.createElement("style");
