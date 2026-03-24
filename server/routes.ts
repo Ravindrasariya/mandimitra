@@ -617,7 +617,7 @@ export async function registerRoutes(
         numberOfBags: number;
         size: string | null;
         bagMarka: string | null;
-        advanceAdjust: string | null;
+        
         remainingBags: number;
         isArchived: boolean;
         bids: StockCardBid[];
@@ -680,7 +680,6 @@ export async function registerRoutes(
           numberOfBags: lot.numberOfBags,
           size: lot.size,
           bagMarka: lot.bagMarka,
-          advanceAdjust: lot.advanceAdjust,
           remainingBags: lot.remainingBags,
           isArchived: lot.isArchived,
           bids: [],
@@ -843,7 +842,6 @@ export async function registerRoutes(
         driverContact: req.body.driverContact || null,
         freightType: req.body.freightType || null,
         totalBagsInVehicle: req.body.totalBagsInVehicle ? parseInt(req.body.totalBagsInVehicle) : null,
-        advanceAdjust: req.body.advanceAdjust || "0",
       };
 
       const lot = await storage.createLot(data);
@@ -951,7 +949,6 @@ export async function registerRoutes(
           totalBagsInVehicle: totalBagsInVehicle ? parseInt(totalBagsInVehicle) : null,
           farmerAdvanceAmount: farmerAdvanceAmount || null,
           farmerAdvanceMode: farmerAdvanceMode || null,
-          advanceAdjust: item.advanceAdjust || "0",
         };
 
         const lot = await storage.createLot(data);
@@ -1662,7 +1659,7 @@ export async function registerRoutes(
           isReversed: t.isReversed,
         })),
         farmersWithDues: farmersWithDues.map(f => ({
-          id: f.id, name: f.name, totalPayable: f.totalPayable, totalDue: f.totalDue, totalAdvance: f.totalAdvance, totalAdvanceAdjust: f.totalAdvanceAdjust, advanceEntries: f.advanceEntries,
+          id: f.id, name: f.name, totalPayable: f.totalPayable, totalDue: f.totalDue, totalAdvance: f.totalAdvance, advanceEntries: f.advanceEntries,
         })),
         buyersWithDues: buyersWithDues.map(b => ({
           id: b.id, name: b.name, receivableDue: b.receivableDue, overallDue: b.overallDue, openingBalance: b.openingBalance,

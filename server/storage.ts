@@ -48,7 +48,7 @@ export interface IStorage {
   getFarmer(id: number, businessId: number): Promise<Farmer | undefined>;
   createFarmer(farmer: InsertFarmer): Promise<Farmer>;
   updateFarmer(id: number, businessId: number, data: Partial<InsertFarmer>): Promise<Farmer | undefined>;
-  getFarmersWithDues(businessId: number, search?: string): Promise<(Farmer & { totalPayable: string; totalDue: string; totalAdvance: string; totalAdvanceAdjust: string; advanceEntries: { date: string; amount: string }[]; salesCount: number; bidDates: string[] })[]>;
+  getFarmersWithDues(businessId: number, search?: string): Promise<(Farmer & { totalPayable: string; totalDue: string; totalAdvance: string; advanceEntries: { date: string; amount: string }[]; salesCount: number; bidDates: string[] })[]>;
   getFarmerEditHistory(farmerId: number, businessId: number): Promise<FarmerEditHistory[]>;
   createFarmerEditHistory(entry: InsertFarmerEditHistory): Promise<FarmerEditHistory>;
   mergeFarmers(businessId: number, keepId: number, mergeId: number, changedBy: string): Promise<Farmer>;
@@ -303,7 +303,7 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async getFarmersWithDues(businessId: number, search?: string): Promise<(Farmer & { totalPayable: string; totalDue: string; totalAdvance: string; totalAdvanceAdjust: string; advanceEntries: { date: string; amount: string }[]; salesCount: number; bidDates: string[] })[]> {
+  async getFarmersWithDues(businessId: number, search?: string): Promise<(Farmer & { totalPayable: string; totalDue: string; totalAdvance: string; advanceEntries: { date: string; amount: string }[]; salesCount: number; bidDates: string[] })[]> {
     let farmerList: Farmer[];
     if (search) {
       farmerList = await db.select().from(farmers).where(
@@ -333,7 +333,7 @@ export class DatabaseStorage implements IStorage {
       lotDateMap.get(row.farmerId)!.add(row.lotDate);
     }
 
-    const results: (Farmer & { totalPayable: string; totalDue: string; totalAdvance: string; totalAdvanceAdjust: string; advanceEntries: { date: string; amount: string }[]; salesCount: number; bidDates: string[] })[] = [];
+    const results: (Farmer & { totalPayable: string; totalDue: string; totalAdvance: string; advanceEntries: { date: string; amount: string }[]; salesCount: number; bidDates: string[] })[] = [];
     for (const farmer of farmerList) {
       const txnRows = await db.select({
         payable: sql<string>`cast(${transactions.totalPayableToFarmer} as numeric)`,
@@ -347,16 +347,13 @@ export class DatabaseStorage implements IStorage {
 
       const advanceRows = await db.select({
         advance: sql<string>`coalesce(${lots.farmerAdvanceAmount}, '0')`,
-        advAdj: sql<string>`coalesce(${lots.advanceAdjust}, '0')`,
         sn: lots.serialNumber,
         dt: lots.date,
       }).from(lots).where(and(eq(lots.businessId, businessId), eq(lots.farmerId, farmer.id)));
       const seenSr = new Set<string>();
       let totalAdvance = 0;
-      let totalAdvanceAdjust = 0;
       const advanceEntries: { date: string; amount: string }[] = [];
       for (const r of advanceRows) {
-        totalAdvanceAdjust += parseFloat(r.advAdj || "0");
         const key = `${r.dt}-${r.sn}`;
         if (!seenSr.has(key)) {
           seenSr.add(key);
@@ -383,7 +380,7 @@ export class DatabaseStorage implements IStorage {
         openingDue = Math.max(0, openingBal - parseFloat(openingPaidSum[0]?.total || "0"));
       }
 
-      const totalDue = Math.max(0, txnDue + openingDue - totalAdvanceAdjust);
+      const totalDue = Math.max(0, txnDue + openingDue);
 
       const farmerLotDates = lotDateMap.get(farmer.id);
       results.push({
@@ -391,7 +388,6 @@ export class DatabaseStorage implements IStorage {
         totalPayable: totalPayable.toFixed(2),
         totalDue: totalDue.toFixed(2),
         totalAdvance: totalAdvance.toFixed(2),
-        totalAdvanceAdjust: totalAdvanceAdjust.toFixed(2),
         advanceEntries,
         salesCount,
         bidDates: farmerLotDates ? Array.from(farmerLotDates) : [],
