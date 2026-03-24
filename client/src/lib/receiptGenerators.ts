@@ -41,13 +41,14 @@ export function generateFarmerReceiptHtml(sg: UnifiedSerialGroup, businessName?:
   const hammaliAndExtras = totalHammali + totalExtra;
   const totalShownDeductions = totalFreight + hammaliAndExtras;
   const farmerAdvance = parseFloat(firstLot?.farmerAdvanceAmount || "0");
+  const totalAdvanceAdjust = sg.lotGroups.reduce((s, lg) => s + parseFloat(lg.lot?.advanceAdjust || "0"), 0);
   const totalGross = allTxns.reduce((s, t) => {
     const nw = parseFloat(t.netWeight || "0");
     const ppk = parseFloat(t.pricePerKg || "0");
     const epk = parseFloat((t as any).extraPerKgFarmer || "0");
     return s + nw * (ppk + epk);
   }, 0);
-  const netPayable = totalGross - totalShownDeductions;
+  const netPayable = totalGross - totalShownDeductions - totalAdvanceAdjust;
 
   const B = "padding:5px 7px;border:1px solid #444;vertical-align:middle;";
   const td = (content: string, style = "") =>
@@ -87,6 +88,7 @@ export function generateFarmerReceiptHtml(sg: UnifiedSerialGroup, businessName?:
     ...(totalFreight > 0 ? [dedRow("भाड़ा", totalFreight)] : []),
     ...(hammaliAndExtras > 0 ? [dedRow("हम्माली तुलवाई", hammaliAndExtras)] : []),
     ...(totalShownDeductions > 0 ? [dedRow("टोटल खर्च", totalShownDeductions, true)] : []),
+    ...(totalAdvanceAdjust > 0 ? [dedRow("अग्रिम समायोजन", totalAdvanceAdjust, true)] : []),
   ].join("");
 
   const netPayableRow = `<tr>
@@ -231,10 +233,11 @@ export function applyFarmerTemplate(tmpl: string, sg: UnifiedSerialGroup, busine
     return s + gross * parseFloat(t.mandiFarmerPercent || "0") / 100;
   }, 0);
   const farmerAdvance = parseFloat(firstLot?.farmerAdvanceAmount || "0");
+  const totalAdvanceAdjust2 = sg.lotGroups.reduce((s, lg) => s + parseFloat(lg.lot?.advanceAdjust || "0"), 0);
   const totalDeduction = hammaliAndExtras + totalThelaBhada + totalFreight + totalAadhat + totalMandi;
   const totalGross = allTxns.reduce((s, t) => s + parseFloat(t.netWeight || "0") * (parseFloat(t.pricePerKg || "0") + parseFloat((t as any).extraPerKgFarmer || "0")), 0);
   const totalNetWeight = allTxns.reduce((s, t) => s + parseFloat(t.netWeight || "0"), 0);
-  const netPayable = totalGross - totalDeduction;
+  const netPayable = totalGross - totalDeduction - totalAdvanceAdjust2;
 
   const txnRowsHtml = allTxns.map(t => {
     const nw = parseFloat(t.netWeight || "0");
@@ -272,6 +275,7 @@ export function applyFarmerTemplate(tmpl: string, sg: UnifiedSerialGroup, busine
     "{{MANDI_CHARGES}}": totalMandi.toFixed(2),
     "{{FREIGHT}}": totalFreight.toFixed(2),
     "{{ADVANCE}}": farmerAdvance.toFixed(2),
+    "{{ADVANCE_ADJUST}}": totalAdvanceAdjust2.toFixed(2),
     "{{TOTAL_DEDUCTION}}": totalDeduction.toFixed(2),
     "{{NET_PAYABLE}}": netPayable.toFixed(2),
     "{{CROP}}": firstLot?.crop || "",

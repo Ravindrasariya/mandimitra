@@ -617,7 +617,7 @@ export async function registerRoutes(
         numberOfBags: number;
         size: string | null;
         bagMarka: string | null;
-        
+        advanceAdjust: string | null;
         remainingBags: number;
         isArchived: boolean;
         bids: StockCardBid[];
@@ -680,6 +680,7 @@ export async function registerRoutes(
           numberOfBags: lot.numberOfBags,
           size: lot.size,
           bagMarka: lot.bagMarka,
+          advanceAdjust: lot.advanceAdjust,
           remainingBags: lot.remainingBags,
           isArchived: lot.isArchived,
           bids: [],
@@ -949,6 +950,7 @@ export async function registerRoutes(
           totalBagsInVehicle: totalBagsInVehicle ? parseInt(totalBagsInVehicle) : null,
           farmerAdvanceAmount: farmerAdvanceAmount || null,
           farmerAdvanceMode: farmerAdvanceMode || null,
+          advanceAdjust: item.advanceAdjust || "0",
         };
 
         const lot = await storage.createLot(data);
