@@ -2660,7 +2660,7 @@ function stockCardsToFarmerCards(apiCards: any[]): FarmerCard[] {
               numberOfBags: b.numberOfBags?.toString() || "",
               paymentType: b.paymentType || "Credit",
               advanceAmount: b.advanceAmount?.toString() || "0",
-              txnDate: txn?.date || lot.date || c.date || format(new Date(), "yyyy-MM-dd"),
+              txnDate: txn?.date ? format(new Date(txn.date), "yyyy-MM-dd") : (lot.date || c.date || format(new Date(), "yyyy-MM-dd")),
               txn: txn ? {
                 netWeightInput: txn.netWeight?.toString() || "",
                 showWeightCalc: false,
@@ -2825,7 +2825,7 @@ function StockFilterBar({
           if (g.archived) continue;
           for (const lot of g.lots) {
             for (const bid of lot.bids) {
-              if (bid.txnDate) yearSet.add(bid.txnDate.substring(0, 4));
+              if (bid.txnDbId && bid.txnDate) yearSet.add(bid.txnDate.substring(0, 4));
             }
           }
         }
@@ -3334,7 +3334,7 @@ export default function StockPage() {
           if (g.archived) continue;
           for (const lot of g.lots) {
             for (const bid of lot.bids) {
-              if (dateMatchesValue(bid.txnDate)) return true;
+              if (bid.txnDbId && dateMatchesValue(bid.txnDate)) return true;
             }
           }
         }
@@ -3376,6 +3376,17 @@ export default function StockPage() {
       return { ...card, cropGroups: card.cropGroups.filter(g => g.archived || g.crop === cropFilter) };
     };
 
+    const applyTxnDateFilter = (card: FarmerCard): FarmerCard => {
+      if (!anyDateFilter || dateMode !== "txn") return card;
+      return {
+        ...card,
+        cropGroups: card.cropGroups.filter(g => {
+          if (g.archived) return true;
+          return g.lots.some(lot => lot.bids.some(bid => bid.txnDbId && dateMatchesValue(bid.txnDate)));
+        })
+      };
+    };
+
     const sorted = sortCardsByMaxSr(
       cards
         .filter(dateMatchesCard)
@@ -3383,6 +3394,7 @@ export default function StockPage() {
         .filter(buyerMatchesCard)
         .filter(cropMatchesCard)
         .map(applyCropFilter)
+        .map(applyTxnDateFilter)
     );
     const unsaved = sorted.filter(c => !savedCardMap.has(c.id));
     const saved = sorted.filter(c => savedCardMap.has(c.id));
