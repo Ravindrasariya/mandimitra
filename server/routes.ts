@@ -1662,7 +1662,7 @@ export async function registerRoutes(
           isReversed: t.isReversed,
         })),
         farmersWithDues: farmersWithDues.map(f => ({
-          id: f.id, name: f.name, totalPayable: f.totalPayable, totalDue: f.totalDue, totalAdvance: f.totalAdvance, advanceEntries: f.advanceEntries,
+          id: f.id, name: f.name, totalPayable: f.totalPayable, totalDue: f.totalDue, totalAdvance: f.totalAdvance, totalAdvanceAdjust: f.totalAdvanceAdjust, advanceEntries: f.advanceEntries,
         })),
         buyersWithDues: buyersWithDues.map(b => ({
           id: b.id, name: b.name, receivableDue: b.receivableDue, overallDue: b.overallDue, openingBalance: b.openingBalance,

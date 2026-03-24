@@ -23,7 +23,7 @@ type DashboardData = {
   businessName: string;
   lots: { id: number; lotId: string; crop: string; date: string; numberOfBags: number; remainingBags: number; farmerId: number; farmerName: string }[];
   transactions: { id: number; transactionId: string; date: string; crop: string; lotId: string; farmerId: number; farmerName: string; buyerId: number; buyerName: string; totalPayableToFarmer: string; totalReceivableFromBuyer: string; paidAmount: string; farmerPaidAmount: string; mandiCharges: string; aadhatCharges: string; hammaliCharges: string; extraChargesFarmer: string; extraChargesBuyer: string; netWeight: string; numberOfBags: number; isReversed: boolean }[];
-  farmersWithDues: { id: number; name: string; totalPayable: string; totalDue: string; totalAdvance: string; advanceEntries: { date: string; amount: string }[] }[];
+  farmersWithDues: { id: number; name: string; totalPayable: string; totalDue: string; totalAdvance: string; totalAdvanceAdjust?: string; advanceEntries: { date: string; amount: string }[] }[];
   buyersWithDues: { id: number; name: string; receivableDue: string; overallDue: string; openingBalance: string }[];
   txAggregates: { totalHammali: number; totalExtraCharges: number; totalMandiCommission: number; paidHammali: number; paidExtraCharges: number; paidMandiCommission: number };
 };
@@ -274,6 +274,7 @@ export default function DashboardPage() {
 
     let cumulativeFarmerDue = 0;
     let cumulativeBuyerDue = 0;
+    const totalAdvAdj = filteredFarmersWithDues.reduce((s, f) => s + parseFloat(f.totalAdvanceAdjust || "0"), 0);
 
     const result = allDates.map(date => {
       const agg = dateAggregates.get(date)!;
@@ -289,6 +290,10 @@ export default function DashboardPage() {
       };
     });
 
+    if (totalAdvAdj > 0 && result.length > 0) {
+      result[result.length - 1].farmerDue = Math.max(0, result[result.length - 1].farmerDue - Math.round(totalAdvAdj));
+    }
+
     const todayISO = new Date().toLocaleDateString("en-CA");
     const lastDate = allDates[allDates.length - 1] ?? "";
     const hasDues = Math.round(cumulativeFarmerDue) !== 0 || Math.round(cumulativeBuyerDue) !== 0;
@@ -303,7 +308,7 @@ export default function DashboardPage() {
     }
 
     return result;
-  }, [filteredTxns]);
+  }, [filteredTxns, filteredFarmersWithDues]);
 
   if (isLoading) {
     return (

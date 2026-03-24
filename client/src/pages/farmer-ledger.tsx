@@ -22,7 +22,7 @@ import { useKeyboardNav } from "@/hooks/use-keyboard-nav";
 import { format } from "date-fns";
 import { printReceipt } from "@/lib/receiptUtils";
 
-type FarmerWithDues = Farmer & { totalPayable: string; totalDue: string; totalAdvance: string; advanceEntries?: { date: string; amount: string }[]; salesCount: number; bidDates?: string[] };
+type FarmerWithDues = Farmer & { totalPayable: string; totalDue: string; totalAdvance: string; totalAdvanceAdjust?: string; advanceEntries?: { date: string; amount: string }[]; salesCount: number; bidDates?: string[] };
 type SortField = "farmerId" | "totalPayable" | "totalDue";
 type SortDir = "asc" | "desc";
 
@@ -309,6 +309,8 @@ export default function FarmerLedgerPage() {
           payable += p;
           due += Math.max(0, p - paid);
         }
+        const advAdj = parseFloat(f.totalAdvanceAdjust || "0");
+        due = Math.max(0, due - advAdj);
         map.set(f.id, { payable, due });
       }
     }
