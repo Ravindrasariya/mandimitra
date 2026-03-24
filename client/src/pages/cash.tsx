@@ -26,15 +26,15 @@ type TransactionAggregates = {
 };
 
 const OUTFLOW_TYPES = [
+  "Extra Charges",
   "Farmer-Advance",
   "Farmer-Harvest Sale",
-  "Extra Charges",
+  "Freight/Bhada",
   "General Expenses",
   "Hammali",
+  "Interest Payment on Loan/LOC",
   "Mandi Commission",
   "Salary",
-  "Interest Payment on Loan/LOC",
-  "Freight/Bhada",
 ] as const;
 
 export default function CashPage() {
