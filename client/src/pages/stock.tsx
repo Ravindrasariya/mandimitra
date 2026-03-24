@@ -4029,6 +4029,7 @@ export default function StockPage() {
               extraChargesBuyer: bid.txn.extraChargesBuyer || "0",
               aadhatBuyerPercent: String(aadhatBPct),
               mandiBuyerPercent: cs.mandiCommissionBuyerPercent || "0",
+              muddatAnyaBuyerPercent: cs.muddatAnyaBuyerPercent || "0",
               totalReceivableFromBuyer: bt.buyerReceivable.toFixed(2),
               buyer: fakeBuyer,
             } as any;

@@ -526,6 +526,7 @@ export function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[
   const firstLot = entries[0].lot;
   const aadhatPct = parseFloat(firstTx.aadhatBuyerPercent || "0");
   const mandiPct = parseFloat(firstTx.mandiBuyerPercent || "0");
+  const muddatAnyaPct = parseFloat(firstTx.muddatAnyaBuyerPercent || "0");
 
   const rows = entries.map(({ lot, tx }) => {
     const nw = parseFloat(tx.netWeight || "0");
@@ -544,7 +545,8 @@ export function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[
   const totalExtra = rows.reduce((s, r) => s + r.extra, 0);
   const totalAadhat = totalGross * aadhatPct / 100;
   const totalMandi = totalGross * mandiPct / 100;
-  const grandTotal = totalGross + totalHammali + totalExtra + totalAadhat + totalMandi;
+  const totalMuddatAnya = totalGross * muddatAnyaPct / 100;
+  const grandTotal = totalGross + totalHammali + totalExtra + totalAadhat + totalMandi + totalMuddatAnya;
   const firstRatePerQuintal = rows[0].rate * 100;
 
   const txnRowsHtml = rows.map(r =>
@@ -585,6 +587,8 @@ export function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[
     "{{AADHAT_PCT}}": String(aadhatPct),
     "{{MANDI_CHARGES}}": totalMandi.toFixed(2),
     "{{MANDI_PCT}}": String(mandiPct),
+    "{{MUDDAT_ANYA}}": totalMuddatAnya.toFixed(2),
+    "{{MUDDAT_ANYA_PCT}}": String(muddatAnyaPct),
     "{{TOTAL_RECEIVABLE}}": grandTotal.toFixed(2),
     "{{TXN_ROWS_HTML}}": txnRowsHtml,
     "{{SUMMARY_ROWS_HTML}}": summaryRowsHtml,
