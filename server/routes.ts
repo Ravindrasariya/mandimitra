@@ -1391,6 +1391,19 @@ export async function registerRoutes(
       const { allocations, ...rest } = req.body;
       const data = { ...rest, businessId: req.user!.businessId };
 
+      if (data.bankAccountId != null) {
+        const parsedBankAcctId = parseInt(data.bankAccountId);
+        if (isNaN(parsedBankAcctId)) {
+          data.bankAccountId = null;
+        } else {
+          data.bankAccountId = parsedBankAcctId;
+          const accts = await storage.getBankAccounts(req.user!.businessId);
+          if (!accts.some(a => a.id === parsedBankAcctId)) {
+            data.bankAccountId = null;
+          }
+        }
+      }
+
       const isBuyerInward = allocations && Array.isArray(allocations) && allocations.length > 0 && data.category === "inward" && data.buyerId;
       const isFarmerOutward = allocations && Array.isArray(allocations) && allocations.length > 0 && data.category === "outward" && data.farmerId;
 
