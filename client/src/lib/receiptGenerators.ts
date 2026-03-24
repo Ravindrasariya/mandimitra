@@ -709,11 +709,11 @@ export function generateAadhatNakalHtml(
         <td style="${td}">Add Aadhat</td>
         <td style="${td}text-align:right;">${sec.aadhatTotal.toFixed(2)}</td>
       </tr>
-      <tr>
+      ${sec.muddatAnyaTotal > 0 ? `<tr>
         <td style="${td}">&nbsp;</td>
         <td style="${td}">Add Muddat + Anya</td>
         <td style="${td}text-align:right;">${sec.muddatAnyaTotal.toFixed(2)}</td>
-      </tr>`;
+      </tr>` : ""}`;
 
     const totalRow = `<tr style="background:#f0f0f0;font-weight:bold;">
       <td style="${td}">Total</td>
