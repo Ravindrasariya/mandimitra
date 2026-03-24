@@ -3429,7 +3429,7 @@ export default function StockPage() {
         .filter(cropMatchesCard)
         .map(applyCropFilter)
         .map(applyTxnDateFilter)
-        .filter(c => c.cropGroups.length > 0)
+        .filter(c => c.cropGroups.length > 0 || !savedCardMap.has(c.id))
     );
     const unsaved = sorted.filter(c => !savedCardMap.has(c.id));
     const saved = sorted.filter(c => savedCardMap.has(c.id));
