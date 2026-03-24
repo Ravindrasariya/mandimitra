@@ -1537,6 +1537,7 @@ export async function registerRoutes(
 
       entries.sort((a, b) => {
         if (a.date !== b.date) return a.date.localeCompare(b.date);
+        if (a.sourceType === b.sourceType) return 0;
         return a.sourceType === "transaction" ? -1 : 1;
       });
 
