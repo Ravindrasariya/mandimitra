@@ -640,16 +640,19 @@ function calcBidTotals(bid: BidRow, cs: ChargeSettings, vehicleBhadaRate: number
   const epkBuyer = parseFloat(txn.extraPerKgBuyer) || 0;
   const farmerGross = nw * (pricePerKg + epkFarmer);
   const buyerGross = nw * (pricePerKg + epkBuyer);
-  const hfRate = parseFloat(cs.hammaliFarmerPerBag) || 0;
-  const hbRate = parseFloat(cs.hammaliBuyerPerBag) || 0;
+  const ecs = bid.savedCharges || cs;
+  const hfRate = parseFloat(ecs.hammaliFarmerPerBag) || 0;
+  const hbRate = parseFloat(ecs.hammaliBuyerPerBag) || 0;
   const extraFarmer = parseFloat(txn.extraChargesFarmer) || 0;
   const extraBuyer = parseFloat(txn.extraChargesBuyer) || 0;
-  const aadhatFPct = parseFloat(cs.aadhatCommissionFarmerPercent) || 0;
-  const aadhatBPct = buyerAadhatOverride != null ? buyerAadhatOverride : parseFloat(cs.aadhatCommissionBuyerPercent) || 0;
-  const mandiFPct = parseFloat(cs.mandiCommissionFarmerPercent) || 0;
-  const mandiBPct = parseFloat(cs.mandiCommissionBuyerPercent) || 0;
-  const muddatAnyaFPct = parseFloat(cs.muddatAnyaFarmerPercent) || 0;
-  const muddatAnyaBPct = parseFloat(cs.muddatAnyaBuyerPercent) || 0;
+  const aadhatFPct = parseFloat(ecs.aadhatCommissionFarmerPercent) || 0;
+  const aadhatBPct = bid.savedCharges
+    ? parseFloat(ecs.aadhatCommissionBuyerPercent) || 0
+    : (buyerAadhatOverride != null ? buyerAadhatOverride : parseFloat(cs.aadhatCommissionBuyerPercent) || 0);
+  const mandiFPct = parseFloat(ecs.mandiCommissionFarmerPercent) || 0;
+  const mandiBPct = parseFloat(ecs.mandiCommissionBuyerPercent) || 0;
+  const muddatAnyaFPct = parseFloat(ecs.muddatAnyaFarmerPercent) || 0;
+  const muddatAnyaBPct = parseFloat(ecs.muddatAnyaBuyerPercent) || 0;
   const freight = totalBagsInVehicle > 0 ? (vehicleBhadaRate * bidBags) / totalBagsInVehicle : 0;
   const muddatAnyaBuyer = (buyerGross * muddatAnyaBPct) / 100;
   const farmerDed = hfRate * bidBags + extraFarmer + (farmerGross * aadhatFPct) / 100 + (farmerGross * mandiFPct) / 100 + (farmerGross * muddatAnyaFPct) / 100 + freight;
@@ -4040,7 +4043,10 @@ export default function StockPage() {
               ? parseFloat(buyerData.aadhatCommissionPercent) || 0 : null;
             const bt = calcBidTotals(bid, cs, vbr, tbi, buyerAadhat);
             const bidBags = parseInt(bid.numberOfBags) || 0;
-            const aadhatBPct = buyerAadhat != null ? buyerAadhat : parseFloat(cs.aadhatCommissionBuyerPercent) || 0;
+            const ecs = bid.savedCharges || cs;
+            const aadhatBPct = bid.savedCharges
+              ? parseFloat(ecs.aadhatCommissionBuyerPercent) || 0
+              : (buyerAadhat != null ? buyerAadhat : parseFloat(cs.aadhatCommissionBuyerPercent) || 0);
             const fakeLot = {
               crop: g.crop,
               serialNumber: parseInt(g.srNumber) || 0,
@@ -4056,11 +4062,11 @@ export default function StockPage() {
               pricePerKg: bid.pricePerKg,
               extraPerKgBuyer: bid.txn.extraPerKgBuyer || "0",
               numberOfBags: bidBags,
-              hammaliBuyerPerBag: cs.hammaliBuyerPerBag || "0",
+              hammaliBuyerPerBag: ecs.hammaliBuyerPerBag || "0",
               extraChargesBuyer: bid.txn.extraChargesBuyer || "0",
               aadhatBuyerPercent: String(aadhatBPct),
-              mandiBuyerPercent: cs.mandiCommissionBuyerPercent || "0",
-              muddatAnyaBuyerPercent: cs.muddatAnyaBuyerPercent || "0",
+              mandiBuyerPercent: ecs.mandiCommissionBuyerPercent || "0",
+              muddatAnyaBuyerPercent: ecs.muddatAnyaBuyerPercent || "0",
               totalReceivableFromBuyer: bt.buyerReceivable.toFixed(2),
               buyer: fakeBuyer,
             } as any;
