@@ -1343,6 +1343,7 @@ export async function registerRoutes(
 
   app.put("/api/charge-settings", requireAuth, async (req, res) => {
     try {
+      console.log("[charge-settings PUT] body:", JSON.stringify(req.body));
       const result = await storage.upsertBusinessChargeSettings(req.user!.businessId, {
         mandiCommissionFarmerPercent: req.body.mandiCommissionFarmerPercent,
         mandiCommissionBuyerPercent: req.body.mandiCommissionBuyerPercent,
