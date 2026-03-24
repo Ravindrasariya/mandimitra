@@ -843,6 +843,7 @@ export async function registerRoutes(
         driverContact: req.body.driverContact || null,
         freightType: req.body.freightType || null,
         totalBagsInVehicle: req.body.totalBagsInVehicle ? parseInt(req.body.totalBagsInVehicle) : null,
+        advanceAdjust: req.body.advanceAdjust || "0",
       };
 
       const lot = await storage.createLot(data);
