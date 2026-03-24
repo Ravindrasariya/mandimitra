@@ -4057,10 +4057,6 @@ export default function StockPage() {
               name: bid.buyerName,
               licenceNo: buyerData?.licenceNo || "",
             } as any;
-            const fakeFarmer = {
-              name: card.farmerName,
-              village: card.village || "",
-            } as any;
             const fakeTx = {
               netWeight: bid.txn.netWeightInput || "0",
               pricePerKg: bid.pricePerKg,
@@ -4073,7 +4069,6 @@ export default function StockPage() {
               muddatAnyaBuyerPercent: ecs.muddatAnyaBuyerPercent || "0",
               totalReceivableFromBuyer: bt.buyerReceivable.toFixed(2),
               buyer: fakeBuyer,
-              farmer: fakeFarmer,
             } as any;
             entries.push({ lot: fakeLot, tx: fakeTx });
           }
