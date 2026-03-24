@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Buyer Receipt</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: Arial, sans-serif; font-size: 10.5px; color: #000; }
+.receipt-copy { width: 100%; padding: 8px 12px; }
+.cut-line { text-align: center; padding: 3px 0; font-size: 9px; color: #555; border-top: 1px dashed #888; border-bottom: 1px dashed #888; margin: 4px 0; }
+.header { text-align: center; margin-bottom: 6px; }
+.firm-title { font-size: 15px; font-weight: bold; text-decoration: underline; }
+.firm-address { font-size: 11px; text-decoration: underline; margin-bottom: 2px; }
+.mandi-line { font-size: 10px; margin: 1px 0; }
+.fields-row { display: flex; justify-content: space-between; align-items: center; margin: 5px 0; font-size: 10.5px; }
+.bold { font-weight: bold; }
+.info-grid { width: 100%; border-collapse: collapse; font-size: 10.5px; margin: 4px 0; }
+.info-grid td { padding: 2px 3px; vertical-align: middle; }
+.label-col { width: 140px; }
+.colon-col { width: 8px; }
+.right-col { text-align: right; width: 160px; white-space: nowrap; }
+.duplicate-badge { border: 1.5px solid #000; padding: 1px 7px; font-size: 9px; font-weight: bold; }
+table.produce { width: 100%; border-collapse: collapse; font-size: 10px; margin: 5px 0; }
+table.produce th, table.produce td { border: 1px solid #000; padding: 3px 5px; text-align: center; }
+table.produce th { background: #f0f0f0; }
+table.produce td:first-child, table.produce th:first-child { text-align: left; }
+table.summary { width: 100%; border-collapse: collapse; font-size: 10px; margin: 4px 0; }
+table.summary th, table.summary td { border: 1px solid #000; padding: 3px 5px; text-align: center; font-size: 10px; }
+table.summary th { background: #f0f0f0; }
+.footer-row { display: flex; justify-content: space-between; margin-top: 8px; font-size: 10.5px; }
+.note { font-size: 7.5px; line-height: 1.45; margin-top: 5px; text-align: justify; }
+@media print { body { margin: 5mm; } }
+</style>
+</head>
+<body>
+
+<!-- ========== COPY 1 (ORIGINAL) ========== -->
+<div class="receipt-copy">
+  <div class="header">
+    <div class="firm-title">{{BUSINESS_NAME}} (LN &ndash; {{BUSINESS_LICENCE}})</div>
+    <div class="firm-address">{{BUSINESS_ADDRESS}}</div>
+    <div class="mandi-line">देवी अहिल्या फल सब्जी मंडी, इंदौर (म.प्र.)</div>
+    <div class="mandi-line">{ प्रारूप&mdash;एक ( तथा संशोधित ) } &nbsp;&nbsp; उपविधि की कंडिका 4(4),4(5)(2),4(5)(3) के अंतर्गत</div>
+    <div class="mandi-line">अनुबंध/ तौल / भुगतान पर्क</div>
+  </div>
+
+  <div class="fields-row">
+    <div><span class="bold">क्रमांक :</span> {{BUSINESS_LICENCE}}/{{SERIAL_NUMBER}}</div>
+    <div><span class="bold">बुक क्रमांक :</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+    <div><span class="bold">दिनांक</span> &nbsp; {{DATE}}</div>
+  </div>
+
+  <table class="info-grid">
+    <tr>
+      <td style="width:16px">1.</td>
+      <td class="label-col">विक्रेता का नाम</td>
+      <td class="colon-col">:</td>
+      <td><span class="bold">{{BUSINESS_NAME}}</span> (LN- {{BUSINESS_LICENCE}})</td>
+      <td class="right-col"><span class="bold">मोबाइल</span> &nbsp; {{BUSINESS_INITIALS}} &ndash; {{BUSINESS_PHONE}}</td>
+    </tr>
+    <tr>
+      <td>2.</td>
+      <td class="label-col">क्रेता का नाम</td>
+      <td class="colon-col">:</td>
+      <td colspan="2"><span class="bold">{{BUYER_NAME}}</span> (LN- {{BUYER_CODE}})</td>
+    </tr>
+    <tr>
+      <td>3.</td>
+      <td class="label-col">कृषक का नाम व ग्राम</td>
+      <td class="colon-col">:</td>
+      <td colspan="2"><span class="bold">{{FARMER_NAME}}</span> &ndash; {{FARMER_VILLAGE}}</td>
+    </tr>
+  </table>
+
+  <table class="produce">
+    <thead>
+      <tr>
+        <th>कृषि उपज का नाम</th>
+        <th>सौदा नग</th>
+        <th>वास्तविक वजन</th>
+        <th>दर प्रति किंटल</th>
+        <th>कृषि उपज का मूल्य</th>
+      </tr>
+      <tr>
+        <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{TXN_ROWS_HTML}}
+    </tbody>
+  </table>
+
+  <table class="summary">
+    <thead>
+      <tr>
+        <th rowspan="2" style="width:16%">कुल रकम</th>
+        <th rowspan="2" style="width:18%;font-size:8.5px">उपविधि अनुसार कुल हमाली आदि मदों में काटी जाएगी</th>
+        <th rowspan="2" style="width:14%">ट्रक भाड़ा / अन्य</th>
+        <th rowspan="2" style="width:15%;font-size:8.5px">विक्रेता / कृषक को देय रकम</th>
+        <th colspan="2">विक्रेता/कृषक को भुगतान</th>
+      </tr>
+      <tr>
+        <th style="width:12%;font-size:8.5px">नगत भुगतान राशि</th>
+        <th style="font-size:8px">आरटीजीएस / एनईएफटी / ऑनलाइन भुगतान का यूटीआर</th>
+      </tr>
+      <tr>
+        <th>6</th><th>7</th><th>8</th><th>9</th><th>10</th><th>11</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{SUMMARY_ROWS_HTML}}
+    </tbody>
+  </table>
+
+  <div class="footer-row">
+    <div>क्रेता के हस्ताक्षर</div>
+    <div>हस्ताक्षर</div>
+  </div>
+  <div class="note">
+    नोट :- 1. मध्यप्रदेश कृषि उपज मंडी अधिनियम, 1972 की धारा 37(2)(क) - मंडी प्रांगण में, क्रय की गई कृषि उपज की कीमत का भुगतान विक्रेता / कृषक को उसी दिन प्रांगण में किया जायेगा, एवं 37(2)(ख) - यदि क्रेता खण्ड (क) के अधीन भुगतान नहीं करता है तो वह विक्रेता / कृषक को देय कृषि उपज की कुल कीमत के एक प्रतिशत की दर से प्रतिदिन भुगतान पाँच दिन के भीतर करने का दायी होगा। धारा 37(2)(ग) - यदि क्रेता उपरलेख खण्ड (क) तथा (ख) के अधीन विक्रेता / कृषक को भुगतान के साथ अतिरिक्त भुगतान पाँच दिन के भीतर नहीं करता है तो उसकी अनुज्ञप्ति छठवें दिन रद्द कर दी जायेगी। इसके पश्चात धारा 11 की उपधारा (1) के खण्ड (क) उपखण्ड (i) में निर्दिष्ट अपराध (अनुज्ञप्ति अधिनियम) की ऐसी स्थिति में न्यूनतम से अधिकतम तक दंडनीय अपराध माना जायेगा। (2) क्रेता विक्रेता / कृषक के किसी भी स्थिति में भुगतान हेतु चेक जारी नहीं किये जायेगें। (3) आरटीजीएस / एनईएफटी / ऑनलाइन बैंकिंग के माध्यम से राशि विक्रेता / कृषक के खाते में जमा करना अनिवार्य है। बैंक का पर्ची / रसीद व भुगतान नम्बर संलग्न करना अनिवार्य है। माल की ढुलाई की लागत के अलावा अन्य खर्च विक्रेता की अलग से देय होगी।
+  </div>
+</div>
+
+<!-- ========== CUT LINE ========== -->
+<div class="cut-line">&#9986; &mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;&mdash;</div>
+
+<!-- ========== COPY 2 (DUPLICATE) ========== -->
+<div class="receipt-copy">
+  <div class="header">
+    <div class="firm-title">{{BUSINESS_NAME}} (LN &ndash; {{BUSINESS_LICENCE}})</div>
+    <div class="firm-address">{{BUSINESS_ADDRESS}}</div>
+    <div class="mandi-line">देवी अहिल्या फल सब्जी मंडी, इंदौर (म.प्र.)</div>
+    <div class="mandi-line">{ प्रारूप&mdash;एक ( तथा संशोधित ) } &nbsp;&nbsp; उपविधि की कंडिका 4(4),4(5)(2),4(5)(3) के अंतर्गत</div>
+    <div class="mandi-line">अनुबंध/ तौल / भुगतान पर्क</div>
+  </div>
+
+  <div class="fields-row">
+    <div><span class="bold">क्रमांक :</span> {{BUSINESS_LICENCE}}/{{SERIAL_NUMBER}}</div>
+    <div><span class="bold">बुक क्रमांक :</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
+    <div><span class="bold">दिनांक</span> &nbsp; {{DATE}}</div>
+  </div>
+
+  <table class="info-grid">
+    <tr>
+      <td style="width:16px">1.</td>
+      <td class="label-col">विक्रेता का नाम</td>
+      <td class="colon-col">:</td>
+      <td><span class="bold">{{BUSINESS_NAME}}</span> (LN- {{BUSINESS_LICENCE}})</td>
+      <td class="right-col"><span class="bold">मोबाइल</span> &nbsp; {{BUSINESS_INITIALS}} &ndash; {{BUSINESS_PHONE}}</td>
+    </tr>
+    <tr>
+      <td>2.</td>
+      <td class="label-col">क्रेता का नाम</td>
+      <td class="colon-col">:</td>
+      <td colspan="2"><span class="bold">{{BUYER_NAME}}</span> (LN- {{BUYER_CODE}})</td>
+    </tr>
+    <tr>
+      <td>3.</td>
+      <td class="label-col">कृषक का नाम व ग्राम</td>
+      <td class="colon-col">:</td>
+      <td><span class="bold">{{FARMER_NAME}}</span> &ndash; {{FARMER_VILLAGE}}</td>
+      <td style="text-align:right"><span class="duplicate-badge">DUPLICATE</span></td>
+    </tr>
+  </table>
+
+  <table class="produce">
+    <thead>
+      <tr>
+        <th>कृषि उपज का नाम</th>
+        <th>सौदा नग</th>
+        <th>वास्तविक वजन</th>
+        <th>दर प्रति किंटल</th>
+        <th>कृषि उपज का मूल्य</th>
+      </tr>
+      <tr>
+        <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{TXN_ROWS_HTML}}
+    </tbody>
+  </table>
+
+  <table class="summary">
+    <thead>
+      <tr>
+        <th rowspan="2" style="width:16%">कुल रकम</th>
+        <th rowspan="2" style="width:18%;font-size:8.5px">उपविधि अनुसार कुल हमाली आदि मदों में काटी जाएगी</th>
+        <th rowspan="2" style="width:14%">ट्रक भाड़ा / अन्य</th>
+        <th rowspan="2" style="width:15%;font-size:8.5px">विक्रेता / कृषक को देय रकम</th>
+        <th colspan="2">विक्रेता/कृषक को भुगतान</th>
+      </tr>
+      <tr>
+        <th style="width:12%;font-size:8.5px">नगत भुगतान राशि</th>
+        <th style="font-size:8px">आरटीजीएस / एनईएफटी / ऑनलाइन भुगतान का यूटीआर</th>
+      </tr>
+      <tr>
+        <th>6</th><th>7</th><th>8</th><th>9</th><th>10</th><th>11</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{SUMMARY_ROWS_HTML}}
+    </tbody>
+  </table>
+
+  <div class="footer-row">
+    <div>क्रेता के हस्ताक्षर</div>
+    <div>हस्ताक्षर</div>
+  </div>
+  <div class="note">
+    नोट :- 1. मध्यप्रदेश कृषि उपज मंडी अधिनियम, 1972 की धारा 37(2)(क) - मंडी प्रांगण में, क्रय की गई कृषि उपज की कीमत का भुगतान विक्रेता / कृषक को उसी दिन प्रांगण में किया जायेगा, एवं 37(2)(ख) - यदि क्रेता खण्ड (क) के अधीन भुगतान नहीं करता है तो वह विक्रेता / कृषक को देय कृषि उपज की कुल कीमत के एक प्रतिशत की दर से प्रतिदिन भुगतान पाँच दिन के भीतर करने का दायी होगा। धारा 37(2)(ग) - यदि क्रेता उपरलेख खण्ड (क) तथा (ख) के अधीन विक्रेता / कृषक को भुगतान के साथ अतिरिक्त भुगतान पाँच दिन के भीतर नहीं करता है तो उसकी अनुज्ञप्ति छठवें दिन रद्द कर दी जायेगी। इसके पश्चात धारा 11 की उपधारा (1) के खण्ड (क) उपखण्ड (i) में निर्दिष्ट अपराध (अनुज्ञप्ति अधिनियम) की ऐसी स्थिति में न्यूनतम से अधिकतम तक दंडनीय अपराध माना जायेगा। (2) क्रेता विक्रेता / कृषक के किसी भी स्थिति में भुगतान हेतु चेक जारी नहीं किये जायेगें। (3) आरटीजीएस / एनईएफटी / ऑनलाइन बैंकिंग के माध्यम से राशि विक्रेता / कृषक के खाते में जमा करना अनिवार्य है। बैंक का पर्ची / रसीद व भुगतान नम्बर संलग्न करना अनिवार्य है। माल की ढुलाई की लागत के अलावा अन्य खर्च विक्रेता की अलग से देय होगी।
+  </div>
+</div>
+
+</body>
+</html>
