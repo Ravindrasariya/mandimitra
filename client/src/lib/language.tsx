@@ -635,6 +635,7 @@ const translations: Record<string, Record<Language, string>> = {
   "stock.failedCreateBid": { en: "Failed to create bid", hi: "बोली बनाने में विफल" },
   "stock.failedUpdateBid": { en: "Failed to update bid", hi: "बोली अपडेट करने में विफल" },
   "stock.saveBlocked": { en: "Save blocked", hi: "सहेजना अवरुद्ध" },
+  "stock.deleteBlocked": { en: "Delete blocked", hi: "हटाना अवरुद्ध" },
   "stock.priceCannotBeZero": { en: "Price per kg cannot be 0 for a bid with an existing transaction", hi: "मौजूदा लेनदेन वाली बोली के लिए प्रति किलो मूल्य 0 नहीं हो सकता" },
   "stock.bagsCannotBeZero": { en: "Number of bags cannot be 0 for a bid with an existing transaction", hi: "मौजूदा लेनदेन वाली बोली के लिए बोरियों की संख्या 0 नहीं हो सकती" },
   "stock.weightCannotBeZero": { en: "Net weight cannot be 0 for a bid with an existing transaction", hi: "मौजूदा लेनदेन वाली बोली के लिए शुद्ध वज़न 0 नहीं हो सकता" },

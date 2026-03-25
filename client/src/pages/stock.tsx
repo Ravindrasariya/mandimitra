@@ -1534,6 +1534,13 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
 
   const removeLot = (idx: number) => {
     const lot = group.lots[idx];
+    if (lot?.bids?.some(b => b.txnDbId && (
+      b.paymentStatus === "paid" || b.paymentStatus === "partial" ||
+      b.farmerPaymentStatus === "paid" || b.farmerPaymentStatus === "partial"
+    ))) {
+      toast({ title: t("stock.deleteBlocked"), description: "Cannot delete lot — bids with active payments exist. Please reverse all payments first.", variant: "destructive" });
+      return;
+    }
     if (isLastLot || hasLotUserData(lot)) { setPendingDeleteLotIdx(idx); return; }
     onChange({ ...group, lots: group.lots.filter((_, i) => i !== idx) });
   };
@@ -1541,6 +1548,14 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
     const lot = group.lots[lotIndex];
     if (!lot) return;
     const deletedBid = lot.bids[bidIndex];
+    if (deletedBid?.txnDbId) {
+      const hasBuyerPay = deletedBid.paymentStatus === "paid" || deletedBid.paymentStatus === "partial";
+      const hasFarmerPay = deletedBid.farmerPaymentStatus === "paid" || deletedBid.farmerPaymentStatus === "partial";
+      if (hasBuyerPay || hasFarmerPay) {
+        toast({ title: t("stock.deleteBlocked"), description: `Cannot delete bid for "${deletedBid.buyerName}" — payments exist. Please reverse all payments first.`, variant: "destructive" });
+        return;
+      }
+    }
     const now = format(new Date(), "dd/MM/yyyy HH:mm");
     const parts: string[] = [];
     const buyerName = deletedBid?.buyerName?.trim() || "";
@@ -1567,8 +1582,16 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
 
   const confirmDeleteLot = () => {
     if (pendingDeleteLotIdx !== null) {
-      const now = format(new Date(), "dd/MM/yyyy HH:mm");
       const deletedLot = group.lots[pendingDeleteLotIdx];
+      if (deletedLot?.bids?.some(b => b.txnDbId && (
+        b.paymentStatus === "paid" || b.paymentStatus === "partial" ||
+        b.farmerPaymentStatus === "paid" || b.farmerPaymentStatus === "partial"
+      ))) {
+        toast({ title: t("stock.deleteBlocked"), description: "Cannot delete lot — bids with active payments exist. Please reverse all payments first.", variant: "destructive" });
+        setPendingDeleteLotIdx(null);
+        return;
+      }
+      const now = format(new Date(), "dd/MM/yyyy HH:mm");
       const lotNum = pendingDeleteLotIdx + 1;
       const changes: ChangeRecord[] = [];
       const lotParts: string[] = [];
