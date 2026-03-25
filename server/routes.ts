@@ -1599,6 +1599,7 @@ export async function registerRoutes(
             amount: advAmt.toFixed(2),
             discount: "0",
             pettyAdj: "0",
+            isAdvanceDeposit: true,
           });
         }
         const entries = await storage.createCashEntryBatch(data, expandedAllocations);

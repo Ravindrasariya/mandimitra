@@ -1276,7 +1276,7 @@ export class DatabaseStorage implements IStorage {
     throw new Error("Failed to generate unique cash flow ID after retries");
   }
 
-  async createCashEntryBatch(baseEntry: InsertCashEntry, allocations: { transactionId: number | null; amount: string; discount: string; pettyAdj: string }[]): Promise<CashEntry[]> {
+  async createCashEntryBatch(baseEntry: InsertCashEntry, allocations: { transactionId: number | null; amount: string; discount: string; pettyAdj: string; isAdvanceDeposit?: boolean }[]): Promise<CashEntry[]> {
     const txDate = baseEntry.date ? new Date(baseEntry.date + "T00:00:00") : new Date();
     const dateStr = `${txDate.getFullYear()}${String(txDate.getMonth() + 1).padStart(2, "0")}${String(txDate.getDate()).padStart(2, "0")}`;
     const prefix = `CF${dateStr}`;
@@ -1305,10 +1305,8 @@ export class DatabaseStorage implements IStorage {
       const cashFlowId = `${prefix}${maxSeq + 1}`;
       const created: CashEntry[] = [];
 
-      const baseAdvanceAmt = parseFloat(baseEntry.advanceAmount || "0");
       for (let i = 0; i < allocations.length; i++) {
         const alloc = allocations[i];
-        const isAdvanceEntry = baseAdvanceAmt > 0 && alloc.transactionId === null && Math.abs(parseFloat(alloc.amount) - baseAdvanceAmt) < 0.01;
         const [entry] = await tx.insert(cashEntries).values({
           ...baseEntry,
           cashFlowId,
@@ -1316,7 +1314,7 @@ export class DatabaseStorage implements IStorage {
           amount: alloc.amount,
           discount: alloc.discount,
           pettyAdj: alloc.pettyAdj,
-          advanceAmount: isAdvanceEntry ? baseEntry.advanceAmount : "0",
+          advanceAmount: alloc.isAdvanceDeposit ? (baseEntry.advanceAmount || "0") : "0",
         }).returning();
         created.push(entry);
       }
