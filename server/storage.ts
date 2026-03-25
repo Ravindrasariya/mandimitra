@@ -1338,9 +1338,22 @@ export class DatabaseStorage implements IStorage {
 
     const advAmt = parseFloat(existing.advanceAmount || "0");
     if (advAmt > 0 && existing.buyerId) {
-      const currentAdvBal = await this.getBuyerAdvanceBalance(businessId, existing.buyerId);
-      if (currentAdvBal < advAmt) {
-        throw new Error("Reverse the Advance Adj entries first before reversing this payment");
+      const [advConsumed] = await db.select({
+        total: sql<string>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`
+      }).from(cashEntries).where(and(
+        eq(cashEntries.businessId, businessId),
+        eq(cashEntries.buyerId, existing.buyerId),
+        eq(cashEntries.category, "inward"),
+        eq(cashEntries.paymentMode, "Advance Adj"),
+        eq(cashEntries.isReversed, false),
+        eq(cashEntries.isArchived, false),
+      ));
+      const consumed = parseFloat(advConsumed?.total || "0");
+      if (consumed > 0) {
+        const currentAdvBal = await this.getBuyerAdvanceBalance(businessId, existing.buyerId);
+        if (currentAdvBal < advAmt) {
+          throw new Error("Reverse the Advance Adj entries first before reversing this payment");
+        }
       }
     }
 
