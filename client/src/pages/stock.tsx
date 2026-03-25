@@ -1983,9 +1983,10 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
 
 // ─── Farmer card ──────────────────────────────────────────────────────────────
 
-function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onCancel, onArchive, onSyncSaved, cs, currentUsername, saving, allCards }: {
+function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onSaveAndClose, onCancel, onArchive, onSyncSaved, cs, currentUsername, saving, allCards }: {
   card: FarmerCard;
   savedCard: FarmerCard | null;
+  unfilteredCard: FarmerCard;
   onChange: (c: FarmerCard) => void;
   onSave: () => void;
   onSaveAndClose: () => void;
@@ -2064,27 +2065,34 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
 
   const isDirty = savedCard
     ? (() => {
-        const visibleGroupIds = new Set(card.cropGroups.map(g => g.id));
+        const filteredGroupIds = new Set(card.cropGroups.map(g => g.id));
+        const filteredLotIds = new Set(card.cropGroups.flatMap(g => g.lots.map(l => l.id)));
+        const filteredBidIds = new Set(card.cropGroups.flatMap(g => g.lots.flatMap(l => l.bids.map(b => b.id))));
+        const filterHiddenGroupIds = new Set<string>();
+        const filterHiddenLotIds = new Set<string>();
+        const filterHiddenBidIds = new Set<string>();
+        for (const g of unfilteredCard.cropGroups) {
+          if (!filteredGroupIds.has(g.id)) { filterHiddenGroupIds.add(g.id); continue; }
+          for (const l of g.lots) {
+            if (!filteredLotIds.has(l.id)) { filterHiddenLotIds.add(l.id); continue; }
+            for (const b of l.bids) {
+              if (!filteredBidIds.has(b.id)) { filterHiddenBidIds.add(b.id); }
+            }
+          }
+        }
         const comparableSaved = {
           ...savedCard,
           cropGroups: savedCard.cropGroups
-            .filter(g => visibleGroupIds.has(g.id))
-            .map(sg => {
-              const cg = card.cropGroups.find(g => g.id === sg.id);
-              if (!cg) return sg;
-              const visibleLotIds = new Set(cg.lots.map(l => l.id));
-              return {
-                ...sg,
-                lots: sg.lots
-                  .filter(sl => visibleLotIds.has(sl.id))
-                  .map(sl => {
-                    const cl = cg.lots.find(l => l.id === sl.id);
-                    if (!cl) return sl;
-                    const visibleBidIds = new Set(cl.bids.map(b => b.id));
-                    return { ...sl, bids: sl.bids.filter(sb => visibleBidIds.has(sb.id)) };
-                  }),
-              };
-            }),
+            .filter(g => !filterHiddenGroupIds.has(g.id))
+            .map(sg => ({
+              ...sg,
+              lots: sg.lots
+                .filter(sl => !filterHiddenLotIds.has(sl.id))
+                .map(sl => ({
+                  ...sl,
+                  bids: sl.bids.filter(sb => !filterHiddenBidIds.has(sb.id)),
+                })),
+            })),
         };
         return getDataFingerprint(card) !== getDataFingerprint(comparableSaved);
       })()
@@ -4572,6 +4580,7 @@ export default function StockPage() {
             <FarmerCardComp
               key={card.id} card={card}
               savedCard={savedCardMap.get(card.id) ?? null}
+              unfilteredCard={cards[idx]}
               onChange={mergeBack}
               onSave={() => saveCard(idx)}
               onSaveAndClose={() => saveCard(idx, true)}
