@@ -1305,8 +1305,10 @@ export class DatabaseStorage implements IStorage {
       const cashFlowId = `${prefix}${maxSeq + 1}`;
       const created: CashEntry[] = [];
 
-      let advanceApplied = false;
-      for (const alloc of allocations) {
+      const baseAdvanceAmt = parseFloat(baseEntry.advanceAmount || "0");
+      for (let i = 0; i < allocations.length; i++) {
+        const alloc = allocations[i];
+        const isAdvanceEntry = baseAdvanceAmt > 0 && alloc.transactionId === null && Math.abs(parseFloat(alloc.amount) - baseAdvanceAmt) < 0.01;
         const [entry] = await tx.insert(cashEntries).values({
           ...baseEntry,
           cashFlowId,
@@ -1314,9 +1316,8 @@ export class DatabaseStorage implements IStorage {
           amount: alloc.amount,
           discount: alloc.discount,
           pettyAdj: alloc.pettyAdj,
-          advanceAmount: !advanceApplied ? (baseEntry.advanceAmount || "0") : "0",
+          advanceAmount: isAdvanceEntry ? baseEntry.advanceAmount : "0",
         }).returning();
-        advanceApplied = true;
         created.push(entry);
       }
 

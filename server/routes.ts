@@ -1592,6 +1592,15 @@ export async function registerRoutes(
             });
           }
         }
+        const advAmt = parseFloat(data.advanceAmount || "0");
+        if (advAmt > 0) {
+          expandedAllocations.push({
+            transactionId: null,
+            amount: advAmt.toFixed(2),
+            discount: "0",
+            pettyAdj: "0",
+          });
+        }
         const entries = await storage.createCashEntryBatch(data, expandedAllocations);
         broadcastBusinessEvent(req.user!.businessId);
         res.status(201).json(entries);
