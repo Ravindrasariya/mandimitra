@@ -586,6 +586,15 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/buyers/:id/advance-balance", requireAuth, async (req, res) => {
+    try {
+      const balance = await storage.getBuyerAdvanceBalance(req.user!.businessId, paramId(req.params.id));
+      res.json({ advanceBalance: balance.toFixed(2) });
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
   app.get("/api/farmers/:id/pending-transactions", requireAuth, async (req, res) => {
     try {
       const result = await storage.getFarmerPendingTransactions(req.user!.businessId, paramId(req.params.id));
@@ -1535,6 +1544,19 @@ export async function registerRoutes(
             data.bankAccountId = null;
           }
         }
+      }
+
+      if (data.paymentMode === "Advance Adj" && data.category === "inward" && data.buyerId) {
+        if (!allocations || !Array.isArray(allocations) || allocations.length === 0) {
+          return res.status(400).json({ message: "Advance Adj requires at least one transaction allocation" });
+        }
+        const advBal = await storage.getBuyerAdvanceBalance(req.user!.businessId, data.buyerId);
+        const totalAllocated = allocations.reduce((s: number, a: any) => s + parseFloat(a.amount || "0"), 0);
+        if (totalAllocated > advBal + 0.01) {
+          return res.status(400).json({ message: `Advance Adj amount (₹${totalAllocated.toLocaleString("en-IN")}) exceeds available advance balance (₹${advBal.toLocaleString("en-IN")})` });
+        }
+        data.bankAccountId = null;
+        data.advanceAmount = "0";
       }
 
       const isBuyerInward = allocations && Array.isArray(allocations) && allocations.length > 0 && data.category === "inward" && data.buyerId;

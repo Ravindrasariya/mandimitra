@@ -21,7 +21,7 @@ import { format } from "date-fns";
 import { printReceipt, shareReceiptAsImage } from "@/lib/receiptUtils";
 import jsPDF from "jspdf";
 
-type BuyerWithDues = Buyer & { receivableDue: string; overallDue: string; bidDates?: string[] };
+type BuyerWithDues = Buyer & { receivableDue: string; overallDue: string; advanceBalance: string; bidDates?: string[] };
 type SortField = "buyerId" | "overallDue" | "receivableDue";
 type SortDir = "asc" | "desc";
 
@@ -1069,6 +1069,7 @@ export default function BuyerLedgerPage() {
                       >
                         <span className="inline-flex items-center justify-end">{t("buyerLedger.receivables")} <SortIcon field="receivableDue" /></span>
                       </th>
+                      <th className="text-right p-3 font-medium">Advance</th>
                       <th className="p-3 w-10"></th>
                     </tr>
                   </thead>
@@ -1117,6 +1118,9 @@ export default function BuyerLedgerPage() {
                           <td className="p-3 text-right font-medium text-orange-600">
                             {formatIndianCurrency(filteredDuesByBuyer.get(buyer.id)?.receivable ?? parseFloat(buyer.receivableDue))}
                           </td>
+                          <td className="p-3 text-right font-medium text-blue-600">
+                            {parseFloat(buyer.advanceBalance || "0") > 0 ? formatIndianCurrency(buyer.advanceBalance) : "-"}
+                          </td>
                           <td className="p-3" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center gap-1">
                               <button
@@ -1143,7 +1147,7 @@ export default function BuyerLedgerPage() {
                         </tr>
                         {expandedBuyerId === buyer.id && (
                           <tr data-testid={`row-ledger-${buyer.id}`}>
-                            <td colSpan={11} className="p-0 border-b">
+                            <td colSpan={12} className="p-0 border-b">
                               <BuyerLedgerSection buyer={buyer} />
                             </td>
                           </tr>
@@ -1173,9 +1177,10 @@ export default function BuyerLedgerPage() {
                             {buyer.address && <p className="text-xs text-muted-foreground">{buyer.address}</p>}
                             {buyer.phone && <p className="text-xs">{buyer.phone}</p>}
                             {buyer.licenceNo && <p className="text-xs text-muted-foreground">Licence: {buyer.licenceNo}</p>}
-                            <div className="flex gap-4 text-xs pt-1">
+                            <div className="flex flex-wrap gap-4 text-xs pt-1">
                               <span>{t("buyerLedger.overall")}: <strong>{formatIndianCurrency(filteredDuesByBuyer.get(buyer.id)?.overall ?? parseFloat(buyer.overallDue))}</strong></span>
                               <span>{t("buyerLedger.receivable")}: <strong className="text-orange-600">{formatIndianCurrency(filteredDuesByBuyer.get(buyer.id)?.receivable ?? parseFloat(buyer.receivableDue))}</strong></span>
+                              {parseFloat(buyer.advanceBalance || "0") > 0 && <span>Advance: <strong className="text-blue-600">{formatIndianCurrency(buyer.advanceBalance)}</strong></span>}
                             </div>
                           </div>
                           <div className="flex flex-col items-end gap-2">

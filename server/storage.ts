@@ -64,7 +64,8 @@ export interface IStorage {
   getBuyerEditHistory(buyerId: number, businessId: number): Promise<BuyerEditHistory[]>;
   createBuyerEditHistory(entry: InsertBuyerEditHistory): Promise<BuyerEditHistory>;
   mergeBuyers(businessId: number, keepId: number, mergeId: number, changedBy: string): Promise<Buyer>;
-  getBuyersWithDues(businessId: number, search?: string): Promise<(Buyer & { receivableDue: string; overallDue: string; bidDates: string[] })[]>;
+  getBuyersWithDues(businessId: number, search?: string): Promise<(Buyer & { receivableDue: string; overallDue: string; advanceBalance: string; bidDates: string[] })[]>;
+  getBuyerAdvanceBalance(businessId: number, buyerId: number): Promise<number>;
 
   getLotEditHistory(lotId: number, businessId: number): Promise<LotEditHistory[]>;
   getLotEditHistoryBulk(lotIds: number[], businessId: number): Promise<LotEditHistory[]>;
@@ -554,7 +555,7 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async getBuyersWithDues(businessId: number, search?: string): Promise<(Buyer & { receivableDue: string; overallDue: string; bidDates: string[] })[]> {
+  async getBuyersWithDues(businessId: number, search?: string): Promise<(Buyer & { receivableDue: string; overallDue: string; advanceBalance: string; bidDates: string[] })[]> {
     let buyerList: Buyer[];
     if (search) {
       buyerList = await db.select().from(buyers).where(
@@ -582,7 +583,7 @@ export class DatabaseStorage implements IStorage {
       bidDateMap.get(row.buyerId)!.add(row.bidDate);
     }
 
-    const results: (Buyer & { receivableDue: string; overallDue: string; bidDates: string[] })[] = [];
+    const results: (Buyer & { receivableDue: string; overallDue: string; advanceBalance: string; bidDates: string[] })[] = [];
     for (const buyer of buyerList) {
       const txnRows = await db.select({
         receivable: sql<string>`cast(${transactions.totalReceivableFromBuyer} as numeric)`,
@@ -610,10 +611,35 @@ export class DatabaseStorage implements IStorage {
 
       const overallDue = (parseFloat(receivableDue) + openingDue).toFixed(2);
 
+      const advBal = await this.getBuyerAdvanceBalance(businessId, buyer.id);
+
       const buyerBidDates = bidDateMap.get(buyer.id);
-      results.push({ ...buyer, receivableDue, overallDue, bidDates: buyerBidDates ? Array.from(buyerBidDates) : [] });
+      results.push({ ...buyer, receivableDue, overallDue, advanceBalance: advBal.toFixed(2), bidDates: buyerBidDates ? Array.from(buyerBidDates) : [] });
     }
     return results;
+  }
+
+  async getBuyerAdvanceBalance(businessId: number, buyerId: number): Promise<number> {
+    const [advDeposited] = await db.select({
+      total: sql<string>`coalesce(sum(cast(${cashEntries.advanceAmount} as numeric)), 0)`
+    }).from(cashEntries).where(and(
+      eq(cashEntries.businessId, businessId),
+      eq(cashEntries.buyerId, buyerId),
+      eq(cashEntries.category, "inward"),
+      eq(cashEntries.isReversed, false),
+      eq(cashEntries.isArchived, false),
+    ));
+    const [advConsumed] = await db.select({
+      total: sql<string>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`
+    }).from(cashEntries).where(and(
+      eq(cashEntries.businessId, businessId),
+      eq(cashEntries.buyerId, buyerId),
+      eq(cashEntries.category, "inward"),
+      eq(cashEntries.paymentMode, "Advance Adj"),
+      eq(cashEntries.isReversed, false),
+      eq(cashEntries.isArchived, false),
+    ));
+    return Math.max(0, parseFloat(advDeposited[0]?.total || "0") - parseFloat(advConsumed[0]?.total || "0"));
   }
 
   async getDriversByVehicleNumber(businessId: number, vehicleNumber: string): Promise<{ driverName: string; driverContact: string }[]> {
@@ -1279,6 +1305,7 @@ export class DatabaseStorage implements IStorage {
       const cashFlowId = `${prefix}${maxSeq + 1}`;
       const created: CashEntry[] = [];
 
+      let advanceApplied = false;
       for (const alloc of allocations) {
         const [entry] = await tx.insert(cashEntries).values({
           ...baseEntry,
@@ -1287,7 +1314,9 @@ export class DatabaseStorage implements IStorage {
           amount: alloc.amount,
           discount: alloc.discount,
           pettyAdj: alloc.pettyAdj,
+          advanceAmount: !advanceApplied ? (baseEntry.advanceAmount || "0") : "0",
         }).returning();
+        advanceApplied = true;
         created.push(entry);
       }
 
@@ -1307,6 +1336,15 @@ export class DatabaseStorage implements IStorage {
     const [existing] = await db.select().from(cashEntries).where(and(eq(cashEntries.id, id), eq(cashEntries.businessId, businessId)));
     if (!existing) return undefined;
     if (existing.isReversed) throw new Error("Entry is already reversed");
+
+    const advAmt = parseFloat(existing.advanceAmount || "0");
+    if (advAmt > 0 && existing.buyerId) {
+      const currentAdvBal = await this.getBuyerAdvanceBalance(businessId, existing.buyerId);
+      if (currentAdvBal < advAmt) {
+        throw new Error("Reverse the Advance Adj entries first before reversing this payment");
+      }
+    }
+
     const updateData: any = { isReversed: true, reversedAt: new Date() };
     if (reason) {
       updateData.notes = existing.notes ? `${existing.notes} | ${reason}` : reason;

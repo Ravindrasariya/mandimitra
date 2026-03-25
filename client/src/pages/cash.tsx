@@ -18,7 +18,7 @@ import { Wallet, Settings, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Download
 import { format } from "date-fns";
 
 type CashEntryWithTxn = CashEntry & { srNumber: number | null; txnCode: string | null };
-type BuyerWithDues = Buyer & { receivableDue: string; overallDue: string };
+type BuyerWithDues = Buyer & { receivableDue: string; overallDue: string; advanceBalance: string };
 type FarmerWithDues = Farmer & { totalPayable: string; totalDue: string; salesCount: number };
 type TransactionAggregates = {
   totalHammali: number; totalExtraCharges: number; totalMandiCommission: number;
@@ -242,6 +242,7 @@ export default function CashPage() {
 
     allEntries.filter(e => !e.isReversed).forEach(e => {
       const amt = parseFloat(e.amount || "0");
+      if (e.paymentMode === "Advance Adj") return;
       if (e.category === "inward") {
         if (e.paymentMode === "Cash") cashReceived += amt;
         else if (e.bankAccountId) {
@@ -502,7 +503,7 @@ export default function CashPage() {
       toast({ title: t("common.error"), description: "Select a buyer", variant: "destructive" });
       return;
     }
-    if (inwardPaymentMode !== "Cash" && !inwardBankAccountId) {
+    if (inwardPaymentMode !== "Cash" && inwardPaymentMode !== "Advance Adj" && !inwardBankAccountId) {
       toast({ title: t("common.error"), description: "Select bank account", variant: "destructive" });
       return;
     }
@@ -521,7 +522,7 @@ export default function CashPage() {
         toast({ title: t("common.error"), description: "Discount % and Petty Adj cannot be negative", variant: "destructive" });
         return;
       }
-      const overAllocated = inwardAllocations.some(a => {
+      const overAllocated = inwardAllocations.filter(a => a.txnId !== -999).some(a => {
         const discountAmt = (parseFloat(a.discountPercent || "0") / 100) * a.due;
         const total = parseFloat(a.amount || "0") + discountAmt + parseFloat(a.pettyAdj || "0");
         return total > a.due + 0.01;
@@ -546,6 +547,8 @@ export default function CashPage() {
         if (pettyParts.length > 0) log += ` | Petty: ${pettyParts.join(", ")}`;
         return log;
       };
+      const advanceAlloc = inwardAllocations.find(a => a.txnId === -999);
+      const txnAllocations = inwardAllocations.filter(a => a.txnId !== -999);
       createMutation.mutate({
         category: "inward",
         type: "cash_in",
@@ -554,10 +557,11 @@ export default function CashPage() {
         amount: inwardAmount,
         date: inwardDate,
         paymentMode: inwardPaymentMode,
-        bankAccountId: inwardPaymentMode !== "Cash" ? parseInt(inwardBankAccountId) : null,
+        bankAccountId: inwardPaymentMode !== "Cash" && inwardPaymentMode !== "Advance Adj" ? parseInt(inwardBankAccountId) : null,
         notes: inwardNotes || null,
         splitLog: buildSplitLog(),
-        allocations: inwardAllocations.map(a => ({
+        advanceAmount: advanceAlloc ? advanceAlloc.amount : "0",
+        allocations: txnAllocations.map(a => ({
           transactionId: a.txnId,
           amount: a.amount || "0",
           discount: ((parseFloat(a.discountPercent || "0") / 100) * a.due).toFixed(2),
@@ -799,6 +803,7 @@ export default function CashPage() {
       "Amount": e.amount,
       "Discount": e.discount || "0",
       "Petty Adj": e.pettyAdj || "0",
+      "Advance Amount": e.advanceAmount || "0",
       "Payment Mode": e.paymentMode,
       "Bank Account": e.bankAccountId ? getAccountName(e.bankAccountId) : "",
       "Transfer From Account": (() => {
@@ -934,6 +939,7 @@ export default function CashPage() {
             <option value="Cash">Cash</option>
             <option value="Online">Account</option>
             <option value="Cheque">Cheque</option>
+            <option value="Advance Adj">Advance Adj</option>
           </select>
           <select value={filterOutflowType} onChange={(e) => setFilterOutflowType(e.target.value)} className="h-8 w-[150px] text-xs rounded-md border border-input bg-background px-2" data-testid="filter-outflow-type">
             <option value="all">Outflow: All</option>
@@ -1076,19 +1082,20 @@ export default function CashPage() {
               <div className="space-y-1">
                 <Label className="text-xs">{t("cash.paymentMode")}</Label>
                 {hasBankAccounts ? (
-                  <Select value={inwardPaymentMode} onValueChange={setInwardPaymentMode}>
+                  <Select value={inwardPaymentMode} onValueChange={(v) => { setInwardPaymentMode(v); setInwardAllocations([]); setAllocationSearch(""); if (v === "Advance Adj") { setInwardBankAccountId(""); setInwardPartyType("Buyer"); } }}>
                     <SelectTrigger className="h-9 text-sm" data-testid="inward-payment-mode"><SelectValue /></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="Cash">Cash</SelectItem>
                       <SelectItem value="Online">Account/Online</SelectItem>
                       <SelectItem value="Cheque">Cheque</SelectItem>
+                      <SelectItem value="Advance Adj">Advance Adj</SelectItem>
                     </SelectContent>
                   </Select>
                 ) : (
                   <Input value="Cash" readOnly className="h-9 text-sm bg-muted" />
                 )}
               </div>
-              {inwardPaymentMode !== "Cash" && hasBankAccounts && (
+              {inwardPaymentMode !== "Cash" && inwardPaymentMode !== "Advance Adj" && hasBankAccounts && (
                 <div className="space-y-1">
                   <Label className="text-xs">{t("cash.selectAccount")}</Label>
                   <Select value={inwardBankAccountId} onValueChange={setInwardBankAccountId}>
@@ -1099,6 +1106,7 @@ export default function CashPage() {
                   </Select>
                 </div>
               )}
+              {inwardPaymentMode !== "Advance Adj" && (
               <div className="space-y-1">
                 <Label className="text-xs">{t("cash.partyType")}</Label>
                 <Select value={inwardPartyType} onValueChange={setInwardPartyType}>
@@ -1109,21 +1117,38 @@ export default function CashPage() {
                   </SelectContent>
                 </Select>
               </div>
+              )}
               {inwardPartyType === "Buyer" && (
                 <div className="space-y-1">
-                  <Label className="text-xs">{t("cash.buyerWithDues")}</Label>
+                  <Label className="text-xs">{inwardPaymentMode === "Advance Adj" ? "Buyer (with Advance)" : t("cash.buyerWithDues")}</Label>
                   <Select value={inwardBuyerId} onValueChange={(v) => { setInwardBuyerId(v); setInwardAllocations([]); setAllocationSearch(""); }}>
                     <SelectTrigger className="h-9 text-sm" data-testid="inward-buyer"><SelectValue placeholder={t("cash.selectBuyer")} /></SelectTrigger>
                     <SelectContent>
-                      {buyersWithDues.filter(b => parseFloat(b.overallDue) > 0).map(b => (
-                        <SelectItem key={b.id} value={b.id.toString()}>
-                          {b.name} - Due: ₹{parseFloat(b.overallDue).toLocaleString("en-IN")}
-                        </SelectItem>
-                      ))}
+                      {inwardPaymentMode === "Advance Adj"
+                        ? buyersWithDues.filter(b => parseFloat(b.advanceBalance || "0") > 0 && parseFloat(b.overallDue) > 0).map(b => (
+                            <SelectItem key={b.id} value={b.id.toString()}>
+                              {b.name} - Adv: ₹{parseFloat(b.advanceBalance).toLocaleString("en-IN")} | Due: ₹{parseFloat(b.overallDue).toLocaleString("en-IN")}
+                            </SelectItem>
+                          ))
+                        : buyersWithDues.filter(b => parseFloat(b.overallDue) > 0).map(b => (
+                            <SelectItem key={b.id} value={b.id.toString()}>
+                              {b.name} - Due: ₹{parseFloat(b.overallDue).toLocaleString("en-IN")}
+                            </SelectItem>
+                          ))
+                      }
                     </SelectContent>
                   </Select>
                 </div>
               )}
+              {inwardPaymentMode === "Advance Adj" && inwardBuyerId && (() => {
+                const selectedBuyer = buyersWithDues.find(b => b.id.toString() === inwardBuyerId);
+                const advBal = parseFloat(selectedBuyer?.advanceBalance || "0");
+                return advBal > 0 ? (
+                  <div className="bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800 rounded-md p-2 text-xs text-blue-700 dark:text-blue-300" data-testid="advance-balance-info">
+                    Available Advance: <strong>₹{advBal.toLocaleString("en-IN")}</strong>
+                  </div>
+                ) : null;
+              })()}
               {inwardPartyType === "Buyer" && inwardBuyerId && (
                 <div className="space-y-1">
                   <Label className="text-xs">{t("cash.amount")}</Label>
@@ -1154,6 +1179,7 @@ export default function CashPage() {
                     {allocationDropdownOpen && (() => {
                       const selectedIds = new Set(inwardAllocations.map(a => a.txnId));
                       const hasPyOpening = inwardAllocations.some(a => a.txnId === null || a.txnLabel === "PY Opening Balance");
+                      const hasAdvance = inwardAllocations.some(a => a.txnId === -999);
                       const available = pendingTransactions.filter(pt => {
                         if (pt.transactionId === "PY_OPENING") return !hasPyOpening;
                         return !selectedIds.has(pt.id);
@@ -1163,9 +1189,44 @@ export default function CashPage() {
                         const s = allocationSearch.toLowerCase();
                         return String(pt.serialNumber).includes(s) || pt.date.toLowerCase().includes(s) || (pt.crop || "").toLowerCase().includes(s);
                       });
-                      if (filtered.length === 0) return null;
+                      const showAdvanceOption = inwardPaymentMode !== "Advance Adj" && !hasAdvance && (!allocationSearch || "advance".includes(allocationSearch.toLowerCase()));
+                      if (filtered.length === 0 && !showAdvanceOption) return null;
                       return (
                         <div className="absolute z-50 w-full mt-1 max-h-48 overflow-y-auto bg-popover border rounded-md shadow-lg">
+                          {showAdvanceOption && (
+                            <div
+                              className="px-3 py-2 hover:bg-accent cursor-pointer text-xs border-b bg-blue-50 dark:bg-blue-950"
+                              onClick={() => {
+                                setInwardAllocations(prev => {
+                                  const total = parseFloat(inwardAmount || "0");
+                                  const alreadyAllocated = prev.reduce((s, a) => s + parseFloat(a.amount || "0"), 0);
+                                  const remaining = Math.max(0, total - alreadyAllocated);
+                                  return [...prev, {
+                                    txnId: -999 as any,
+                                    txnLabel: "Advance",
+                                    serialNumber: 0,
+                                    date: inwardDate,
+                                    numberOfBags: 0,
+                                    crop: "",
+                                    due: 0,
+                                    dueDays: 0,
+                                    amount: remaining > 0 ? remaining.toFixed(2) : "",
+                                    discountPercent: "0",
+                                    pettyAdj: "0",
+                                  }];
+                                });
+                                setAllocationSearch("");
+                                setAllocationDropdownOpen(false);
+                              }}
+                              data-testid="allocation-option-advance"
+                            >
+                              <div className="flex justify-between">
+                                <span className="font-medium text-blue-700 dark:text-blue-300">Advance (Deposit)</span>
+                                <span className="text-blue-600 text-[10px]">No due limit</span>
+                              </div>
+                              <div className="text-muted-foreground mt-0.5">Excess amount kept as advance for future transactions</div>
+                            </div>
+                          )}
                           {filtered.map(pt => {
                             const dueDays = pt.date ? Math.max(0, Math.floor((Date.now() - new Date(pt.date + "T00:00:00").getTime()) / 86400000)) : 0;
                             return (
@@ -1219,15 +1280,19 @@ export default function CashPage() {
                   {inwardAllocations.length > 0 && (
                     <div className="space-y-2">
                       {inwardAllocations.map((alloc, idx) => (
-                        <div key={`${alloc.txnId}-${idx}`} className="bg-muted/60 rounded-lg p-2.5 space-y-2" data-testid={`allocation-row-${idx}`}>
+                        <div key={`${alloc.txnId}-${idx}`} className={`rounded-lg p-2.5 space-y-2 ${alloc.txnId === -999 ? "bg-blue-50 dark:bg-blue-950/40" : "bg-muted/60"}`} data-testid={`allocation-row-${idx}`}>
                           <div className="flex items-center justify-between">
                             <div className="flex flex-wrap items-center gap-1.5 text-xs">
-                              <Badge variant="secondary" className="text-[10px]">{alloc.txnLabel}</Badge>
-                              <span className="text-muted-foreground">{alloc.date}</span>
-                              {alloc.numberOfBags > 0 && <span>{alloc.numberOfBags} bags</span>}
-                              {alloc.crop && <span className="text-muted-foreground">{alloc.crop}</span>}
-                              <span className="text-orange-600">Due ₹{alloc.due.toLocaleString("en-IN")}</span>
-                              <span className="text-muted-foreground">{alloc.dueDays}d</span>
+                              <Badge variant="secondary" className={`text-[10px] ${alloc.txnId === -999 ? "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300" : ""}`}>{alloc.txnLabel}</Badge>
+                              {alloc.txnId !== -999 && (
+                                <>
+                                  <span className="text-muted-foreground">{alloc.date}</span>
+                                  {alloc.numberOfBags > 0 && <span>{alloc.numberOfBags} bags</span>}
+                                  {alloc.crop && <span className="text-muted-foreground">{alloc.crop}</span>}
+                                  <span className="text-orange-600">Due ₹{alloc.due.toLocaleString("en-IN")}</span>
+                                  <span className="text-muted-foreground">{alloc.dueDays}d</span>
+                                </>
+                              )}
                             </div>
                             <Button
                               variant="ghost" size="icon" className="h-5 w-5 shrink-0"
@@ -1237,6 +1302,19 @@ export default function CashPage() {
                               <X className="w-3 h-3" />
                             </Button>
                           </div>
+                          {alloc.txnId === -999 ? (
+                            <div className="space-y-0.5">
+                              <Label className="text-[10px] text-muted-foreground">Advance Amount</Label>
+                              <Input
+                                type="number" inputMode="decimal"
+                                value={alloc.amount}
+                                onChange={e => setInwardAllocations(prev => prev.map((a, i) => i === idx ? { ...a, amount: e.target.value } : a))}
+                                onFocus={e => e.target.select()}
+                                className="h-7 text-xs px-1.5"
+                                data-testid={`allocation-amount-${idx}`}
+                              />
+                            </div>
+                          ) : (<>
                           <div className="grid grid-cols-3 gap-1.5 items-end">
                             <div className="space-y-0.5">
                               <Label className="text-[10px] text-muted-foreground">Amount</Label>
@@ -1304,6 +1382,7 @@ export default function CashPage() {
                               </div>
                             );
                           })()}
+                          </>)}
                         </div>
                       ))}
                       {(() => {

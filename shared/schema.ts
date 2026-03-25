@@ -262,6 +262,7 @@ export const cashEntries = pgTable("cash_entries", {
   partyName: text("party_name"),
   notes: text("notes"),
   splitLog: text("split_log"),
+  advanceAmount: decimal("advance_amount", { precision: 12, scale: 2 }).default("0"),
   isReversed: boolean("is_reversed").default(false).notNull(),
   reversedAt: timestamp("reversed_at"),
   isArchived: boolean("is_archived").default(false).notNull(),
