@@ -1190,7 +1190,7 @@ export default function CashPage() {
                                       dueDays,
                                       amount: autoAmt.toFixed(2),
                                       discountPercent: "0",
-                                      pettyAdj: autoPetty > 0.005 ? Math.min(autoPetty, 100).toFixed(2) : "0",
+                                      pettyAdj: "0",
                                     }];
                                   });
                                   setAllocationSearch("");
@@ -1244,17 +1244,12 @@ export default function CashPage() {
                                 value={alloc.amount}
                                 onChange={e => {
                                   const raw = e.target.value;
-                                  const discAmt = (parseFloat(alloc.discountPercent || "0") / 100) * alloc.due;
-                                  const parsed = parseFloat(raw || "0");
-                                  const newPetty = Math.min(1000, Math.max(0, alloc.due - parsed - discAmt));
-                                  setInwardAllocations(prev => prev.map((a, i) => i === idx ? { ...a, amount: raw, pettyAdj: newPetty > 0.005 ? Math.min(newPetty, 100).toFixed(2) : "0" } : a));
+                                  setInwardAllocations(prev => prev.map((a, i) => i === idx ? { ...a, amount: raw } : a));
                                 }}
                                 onBlur={e => {
                                   const raw = parseFloat(e.target.value || "0");
                                   const capped = Math.min(Math.max(0, raw), alloc.due);
-                                  const discAmt = (parseFloat(alloc.discountPercent || "0") / 100) * alloc.due;
-                                  const newPetty = Math.min(1000, Math.max(0, alloc.due - capped - discAmt));
-                                  setInwardAllocations(prev => prev.map((a, i) => i === idx ? { ...a, amount: capped.toFixed(2), pettyAdj: newPetty > 0.005 ? Math.min(newPetty, 100).toFixed(2) : "0" } : a));
+                                  setInwardAllocations(prev => prev.map((a, i) => i === idx ? { ...a, amount: capped.toFixed(2) } : a));
                                 }}
                                 onFocus={e => e.target.select()}
                                 className="h-7 text-xs px-1.5"
@@ -1275,9 +1270,7 @@ export default function CashPage() {
                                 value={alloc.discountPercent}
                                 onChange={e => {
                                   const newDiscPct = e.target.value;
-                                  const discAmt = (parseFloat(newDiscPct || "0") / 100) * alloc.due;
-                                  const newPetty = Math.min(1000, Math.max(0, alloc.due - parseFloat(alloc.amount || "0") - discAmt));
-                                  setInwardAllocations(prev => prev.map((a, i) => i === idx ? { ...a, discountPercent: newDiscPct, pettyAdj: newPetty > 0.005 ? Math.min(newPetty, 100).toFixed(2) : "0" } : a));
+                                  setInwardAllocations(prev => prev.map((a, i) => i === idx ? { ...a, discountPercent: newDiscPct } : a));
                                 }}
                                 onFocus={e => e.target.select()}
                                 className="h-7 text-xs px-1.5"
