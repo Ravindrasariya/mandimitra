@@ -73,7 +73,7 @@ export default function CashPage() {
   const [inwardPaymentMode, setInwardPaymentMode, clearInwardPaymentMode] = usePersistedState("cash-inwardPaymentMode", "Cash");
   const [inwardBankAccountId, setInwardBankAccountId, clearInwardBankAccountId] = usePersistedState("cash-inwardBankAccountId", "");
   const [inwardNotes, setInwardNotes, clearInwardNotes] = usePersistedState("cash-inwardNotes", "");
-  const [inwardAllocations, setInwardAllocations, clearInwardAllocations] = usePersistedState<{ txnId: number | null; txnLabel: string; serialNumber: number; date: string; numberOfBags: number; crop: string; due: number; dueDays: number; amount: string; discountPercent: string; pettyAdj: string }[]>("cash-inwardAllocations", []);
+  const [inwardAllocations, setInwardAllocations, clearInwardAllocations] = usePersistedState<{ txnId: number | null | -999; txnLabel: string; serialNumber: number; date: string; numberOfBags: number; crop: string; due: number; dueDays: number; amount: string; discountPercent: string; pettyAdj: string }[]>("cash-inwardAllocations", []);
   const [allocationSearch, setAllocationSearch] = useState("");
   const [allocationDropdownOpen, setAllocationDropdownOpen] = useState(false);
   const allocationDropdownRef = useRef<HTMLDivElement>(null);
@@ -1202,7 +1202,7 @@ export default function CashPage() {
                                   const alreadyAllocated = prev.reduce((s, a) => s + parseFloat(a.amount || "0"), 0);
                                   const remaining = Math.max(0, total - alreadyAllocated);
                                   return [...prev, {
-                                    txnId: -999 as any,
+                                    txnId: -999,
                                     txnLabel: "Advance",
                                     serialNumber: 0,
                                     date: inwardDate,
