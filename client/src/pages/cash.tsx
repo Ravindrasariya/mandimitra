@@ -1189,40 +1189,6 @@ export default function CashPage() {
                       if (filtered.length === 0 && !showAdvanceOption) return null;
                       return (
                         <div className="absolute z-50 w-full mt-1 max-h-48 overflow-y-auto bg-popover border rounded-md shadow-lg">
-                          {showAdvanceOption && (
-                            <div
-                              className="px-3 py-2 hover:bg-accent cursor-pointer text-xs border-b bg-blue-50 dark:bg-blue-950"
-                              onClick={() => {
-                                setInwardAllocations(prev => {
-                                  const total = parseFloat(inwardAmount || "0");
-                                  const alreadyAllocated = prev.reduce((s, a) => s + parseFloat(a.amount || "0"), 0);
-                                  const remaining = Math.max(0, total - alreadyAllocated);
-                                  return [...prev, {
-                                    txnId: -999,
-                                    txnLabel: "Advance",
-                                    serialNumber: 0,
-                                    date: inwardDate,
-                                    numberOfBags: 0,
-                                    crop: "",
-                                    due: 0,
-                                    dueDays: 0,
-                                    amount: remaining > 0 ? remaining.toFixed(2) : "",
-                                    discountPercent: "0",
-                                    pettyAdj: "0",
-                                  }];
-                                });
-                                setAllocationSearch("");
-                                setAllocationDropdownOpen(false);
-                              }}
-                              data-testid="allocation-option-advance"
-                            >
-                              <div className="flex justify-between">
-                                <span className="font-medium text-blue-700 dark:text-blue-300">Advance (Deposit)</span>
-                                <span className="text-blue-600 text-[10px]">No due limit</span>
-                              </div>
-                              <div className="text-muted-foreground mt-0.5">Excess amount kept as advance for future transactions</div>
-                            </div>
-                          )}
                           {filtered.map(pt => {
                             const dueDays = pt.date ? Math.max(0, Math.floor((Date.now() - new Date(pt.date + "T00:00:00").getTime()) / 86400000)) : 0;
                             return (
@@ -1268,6 +1234,40 @@ export default function CashPage() {
                               </div>
                             );
                           })}
+                          {showAdvanceOption && (
+                            <div
+                              className="px-3 py-2 hover:bg-accent cursor-pointer text-xs border-t bg-blue-50 dark:bg-blue-950"
+                              onClick={() => {
+                                setInwardAllocations(prev => {
+                                  const total = parseFloat(inwardAmount || "0");
+                                  const alreadyAllocated = prev.reduce((s, a) => s + parseFloat(a.amount || "0"), 0);
+                                  const remaining = Math.max(0, total - alreadyAllocated);
+                                  return [...prev, {
+                                    txnId: -999,
+                                    txnLabel: "Advance",
+                                    serialNumber: 0,
+                                    date: inwardDate,
+                                    numberOfBags: 0,
+                                    crop: "",
+                                    due: 0,
+                                    dueDays: 0,
+                                    amount: remaining > 0 ? remaining.toFixed(2) : "",
+                                    discountPercent: "0",
+                                    pettyAdj: "0",
+                                  }];
+                                });
+                                setAllocationSearch("");
+                                setAllocationDropdownOpen(false);
+                              }}
+                              data-testid="allocation-option-advance"
+                            >
+                              <div className="flex justify-between">
+                                <span className="font-medium text-blue-700 dark:text-blue-300">Advance (Deposit)</span>
+                                <span className="text-blue-600 text-[10px]">No due limit</span>
+                              </div>
+                              <div className="text-muted-foreground mt-0.5">Excess amount kept as advance for future transactions</div>
+                            </div>
+                          )}
                         </div>
                       );
                     })()}

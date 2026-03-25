@@ -641,7 +641,15 @@ export class DatabaseStorage implements IStorage {
     ));
     const dep = parseFloat(advDeposited?.total || "0");
     const con = parseFloat(advConsumed?.total || "0");
-    return Math.max(0, dep - con);
+
+    const buyerRow = await db.select({ openingBalance: buyers.openingBalance })
+      .from(buyers)
+      .where(and(eq(buyers.id, buyerId), eq(buyers.businessId, businessId)))
+      .limit(1);
+    const openingBal = parseFloat(buyerRow[0]?.openingBalance || "0");
+    const negativeOpeningCredit = openingBal < 0 ? Math.abs(openingBal) : 0;
+
+    return Math.max(0, dep - con + negativeOpeningCredit);
   }
 
   async getDriversByVehicleNumber(businessId: number, vehicleNumber: string): Promise<{ driverName: string; driverContact: string }[]> {
