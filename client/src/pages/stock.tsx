@@ -3403,10 +3403,14 @@ export default function StockPage() {
       if (!anyDateFilter || dateMode !== "txn") return card;
       return {
         ...card,
-        cropGroups: card.cropGroups.filter(g => {
-          if (g.archived) return true;
-          return g.lots.some(lot => lot.bids.some(bid => bid.txnDbId && dateMatchesValue(bid.txnDate)));
-        })
+        cropGroups: card.cropGroups.map(g => {
+          if (g.archived) return g;
+          const filteredLots = g.lots.map(lot => ({
+            ...lot,
+            bids: lot.bids.filter(bid => bid.txnDbId && dateMatchesValue(bid.txnDate)),
+          })).filter(lot => lot.bids.length > 0);
+          return { ...g, lots: filteredLots };
+        }).filter(g => g.archived || g.lots.length > 0),
       };
     };
 
