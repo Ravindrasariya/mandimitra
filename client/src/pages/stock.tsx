@@ -4457,8 +4457,14 @@ export default function StockPage() {
           const idx = cards.findIndex(c => c.id === card.id);
           const mergeBack = (edited: FarmerCard) => {
             const original = cards[idx];
+            const visibleGroupIds = new Set(edited.cropGroups.map(g => g.id));
+            const hiddenGroups = original.cropGroups.filter(g => !visibleGroupIds.has(g.id));
+            const hasBidLevelFilter = buyerFilter.trim() !== "" || ((yearFilter !== "all" || selectedMonths.length > 0 || selectedDays.length > 0) && dateMode === "txn");
+            if (!hasBidLevelFilter) {
+              const allGroups = [...edited.cropGroups, ...hiddenGroups];
+              return updateCard(idx, { ...edited, cropGroups: allGroups });
+            }
             const editedGroupMap = new Map(edited.cropGroups.map(g => [g.id, g]));
-            const originalGroupIds = new Set(original.cropGroups.map(g => g.id));
             const mergedGroups = original.cropGroups.map(og => {
               const eg = editedGroupMap.get(og.id);
               if (!eg) return og;
@@ -4477,6 +4483,7 @@ export default function StockPage() {
               const newLots = eg.lots.filter(l => !originalLotIds.has(l.id));
               return { ...eg, lots: [...mergedLots, ...newLots] };
             });
+            const originalGroupIds = new Set(original.cropGroups.map(g => g.id));
             const newGroups = edited.cropGroups.filter(g => !originalGroupIds.has(g.id));
             updateCard(idx, { ...edited, cropGroups: [...mergedGroups, ...newGroups] });
           };
