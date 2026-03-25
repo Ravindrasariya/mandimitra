@@ -23,7 +23,7 @@ import { format } from "date-fns";
 import { printReceipt } from "@/lib/receiptUtils";
 
 type FarmerWithDues = Farmer & { totalPayable: string; totalDue: string; totalAdvance: string; advanceEntries?: { date: string; amount: string }[]; salesCount: number; bidDates?: string[] };
-type SortField = "farmerId" | "totalPayable" | "totalDue";
+type SortField = "farmerId" | "name" | "totalPayable" | "totalDue";
 type SortDir = "asc" | "desc";
 
 function formatIndianCurrency(value: string | number): string {
@@ -321,6 +321,8 @@ export default function FarmerLedgerPage() {
       let cmp = 0;
       if (sortField === "farmerId") {
         cmp = a.farmerId.localeCompare(b.farmerId);
+      } else if (sortField === "name") {
+        cmp = a.name.localeCompare(b.name);
       } else if (sortField === "totalPayable") {
         const aVal = filteredDuesByFarmer.get(a.id)?.payable ?? parseFloat(a.totalPayable);
         const bVal = filteredDuesByFarmer.get(b.id)?.payable ?? parseFloat(b.totalPayable);
@@ -348,7 +350,7 @@ export default function FarmerLedgerPage() {
       setSortDir(prev => prev === "asc" ? "desc" : "asc");
     } else {
       setSortField(field);
-      setSortDir(field === "farmerId" ? "asc" : "desc");
+      setSortDir(field === "farmerId" || field === "name" ? "asc" : "desc");
     }
   };
 
@@ -669,7 +671,13 @@ export default function FarmerLedgerPage() {
                 >
                   <span className="inline-flex items-center">{t("farmerLedger.farmerId")} <SortIcon field="farmerId" /></span>
                 </th>
-                <th className="text-left p-2 font-medium text-muted-foreground">{t("common.name")}</th>
+                <th
+                  className="text-left p-2 font-medium text-muted-foreground cursor-pointer select-none"
+                  onClick={() => toggleSort("name")}
+                  data-testid="sort-name"
+                >
+                  <span className="inline-flex items-center">{t("common.name")} <SortIcon field="name" /></span>
+                </th>
                 <th className="text-left p-2 font-medium text-muted-foreground">{t("common.village")}</th>
                 <th className="text-left p-2 font-medium text-muted-foreground">{t("common.contact")}</th>
                 <th

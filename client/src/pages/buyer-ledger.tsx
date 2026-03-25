@@ -22,7 +22,7 @@ import { printReceipt, shareReceiptAsImage } from "@/lib/receiptUtils";
 import jsPDF from "jspdf";
 
 type BuyerWithDues = Buyer & { receivableDue: string; overallDue: string; advanceBalance: string; bidDates?: string[] };
-type SortField = "buyerId" | "overallDue" | "receivableDue";
+type SortField = "buyerId" | "name" | "overallDue" | "receivableDue";
 type SortDir = "asc" | "desc";
 
 function formatIndianCurrency(value: string | number): string {
@@ -683,6 +683,8 @@ export default function BuyerLedgerPage() {
       let cmp = 0;
       if (sortField === "buyerId") {
         cmp = a.buyerId.localeCompare(b.buyerId);
+      } else if (sortField === "name") {
+        cmp = a.name.localeCompare(b.name);
       } else if (sortField === "overallDue") {
         const aVal = filteredDuesByBuyer.get(a.id)?.overall ?? parseFloat(a.overallDue);
         const bVal = filteredDuesByBuyer.get(b.id)?.overall ?? parseFloat(b.overallDue);
@@ -738,7 +740,7 @@ export default function BuyerLedgerPage() {
       setSortDir(prev => prev === "asc" ? "desc" : "asc");
     } else {
       setSortField(field);
-      setSortDir(field === "buyerId" ? "asc" : "desc");
+      setSortDir(field === "buyerId" || field === "name" ? "asc" : "desc");
     }
   };
 
@@ -1058,7 +1060,13 @@ export default function BuyerLedgerPage() {
                       >
                         <span className="inline-flex items-center">{t("buyerLedger.buyerId")} <SortIcon field="buyerId" /></span>
                       </th>
-                      <th className="text-left p-3 font-medium">{t("common.name")}</th>
+                      <th
+                        className="text-left p-3 font-medium cursor-pointer select-none"
+                        onClick={() => toggleSort("name")}
+                        data-testid="sort-name"
+                      >
+                        <span className="inline-flex items-center">{t("common.name")} <SortIcon field="name" /></span>
+                      </th>
                       <th className="text-left p-3 font-medium">{t("common.address")}</th>
                       <th className="text-left p-3 font-medium">{t("buyerLedger.mandiCode")}</th>
                       <th className="text-left p-3 font-medium">{t("common.contact")}</th>
