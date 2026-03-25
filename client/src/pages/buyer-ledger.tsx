@@ -149,7 +149,7 @@ function generateBuyerListPrintHtml(buyers: BuyerWithDues[], summary: { total: n
 <div class="summary-card"><div style="font-size:0.8em;color:#666">With Dues</div><div style="font-size:1.3em;font-weight:bold;color:#dc2626">${summary.withDues}</div></div>
 <div class="summary-card"><div style="font-size:0.8em;color:#666">Overall Due</div><div style="font-size:1.3em;font-weight:bold;color:#2563eb">${formatIndianCurrency(summary.totalOverallDue)}</div></div>
 <div class="summary-card"><div style="font-size:0.8em;color:#666">Receivable Due</div><div style="font-size:1.3em;font-weight:bold;color:#dc2626">${formatIndianCurrency(summary.totalReceivableDue)}</div></div>
-${summary.totalAdvance > 0 ? `<div class="summary-card"><div style="font-size:0.8em;color:#666">Total Advance</div><div style="font-size:1.3em;font-weight:bold;color:#0891b2">${formatIndianCurrency(summary.totalAdvance)}</div></div>` : ""}
+<div class="summary-card"><div style="font-size:0.8em;color:#666">Total Advance</div><div style="font-size:1.3em;font-weight:bold;color:#0891b2">${formatIndianCurrency(summary.totalAdvance)}</div></div>
 </div>
 <table>${rows ? `<thead><tr><th>Buyer ID</th><th>Name</th><th>Phone</th><th style="text-align:right">Overall Due</th><th style="text-align:right">Receivable Due</th></tr></thead><tbody>${rows}</tbody>` : ""}</table>
 <div style="text-align:center;margin-top:20px;padding-top:10px;border-top:1px dashed #ccc;font-size:15px;font-weight:bold;color:#555">हमें सेवा का अवसर देने के लिए धन्यवाद!</div>
