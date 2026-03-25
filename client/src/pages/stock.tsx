@@ -2042,7 +2042,27 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
   const isDirty = savedCard
     ? (() => {
         const visibleGroupIds = new Set(card.cropGroups.map(g => g.id));
-        const comparableSaved = { ...savedCard, cropGroups: savedCard.cropGroups.filter(g => visibleGroupIds.has(g.id)) };
+        const comparableSaved = {
+          ...savedCard,
+          cropGroups: savedCard.cropGroups
+            .filter(g => visibleGroupIds.has(g.id))
+            .map(sg => {
+              const cg = card.cropGroups.find(g => g.id === sg.id);
+              if (!cg) return sg;
+              const visibleLotIds = new Set(cg.lots.map(l => l.id));
+              return {
+                ...sg,
+                lots: sg.lots
+                  .filter(sl => visibleLotIds.has(sl.id))
+                  .map(sl => {
+                    const cl = cg.lots.find(l => l.id === sl.id);
+                    if (!cl) return sl;
+                    const visibleBidIds = new Set(cl.bids.map(b => b.id));
+                    return { ...sl, bids: sl.bids.filter(sb => visibleBidIds.has(sb.id)) };
+                  }),
+              };
+            }),
+        };
         return getDataFingerprint(card) !== getDataFingerprint(comparableSaved);
       })()
     : hasAnyInput;
@@ -4437,10 +4457,27 @@ export default function StockPage() {
           const idx = cards.findIndex(c => c.id === card.id);
           const mergeBack = (edited: FarmerCard) => {
             const original = cards[idx];
-            const visibleIds = new Set(edited.cropGroups.map(g => g.id));
-            const hiddenGroups = original.cropGroups.filter(g => !visibleIds.has(g.id));
-            if (hiddenGroups.length === 0) return updateCard(idx, edited);
-            updateCard(idx, { ...edited, cropGroups: [...edited.cropGroups, ...hiddenGroups] });
+            const visibleGroupIds = new Set(edited.cropGroups.map(g => g.id));
+            const hiddenGroups = original.cropGroups.filter(g => !visibleGroupIds.has(g.id));
+            const mergedGroups = edited.cropGroups.map(eg => {
+              const og = original.cropGroups.find(g => g.id === eg.id);
+              if (!og) return eg;
+              const visibleLotIds = new Set(eg.lots.map(l => l.id));
+              const hiddenLots = og.lots.filter(l => !visibleLotIds.has(l.id));
+              const mergedLots = eg.lots.map(el => {
+                const ol = og.lots.find(l => l.id === el.id);
+                if (!ol) return el;
+                const visibleBidIds = new Set(el.bids.map(b => b.id));
+                const hiddenBids = ol.bids.filter(b => !visibleBidIds.has(b.id));
+                if (hiddenBids.length === 0) return el;
+                return { ...el, bids: [...el.bids, ...hiddenBids] };
+              });
+              const allLots = [...mergedLots, ...hiddenLots];
+              if (allLots.length === eg.lots.length && mergedLots.every((l, i) => l === eg.lots[i])) return eg;
+              return { ...eg, lots: allLots };
+            });
+            const allGroups = [...mergedGroups, ...hiddenGroups];
+            updateCard(idx, { ...edited, cropGroups: allGroups });
           };
           return (
             <FarmerCardComp
