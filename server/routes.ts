@@ -353,6 +353,24 @@ export async function registerRoutes(
     res.json(updated);
   });
 
+  app.post("/api/lots/bulk-archive", requireAuth, async (req, res) => {
+    try {
+      const businessId = req.user!.businessId;
+      const { lotIds, isArchived } = req.body;
+      if (!Array.isArray(lotIds) || lotIds.length === 0 || typeof isArchived !== "boolean") {
+        return res.status(400).json({ message: "lotIds (non-empty array) and isArchived (boolean) required" });
+      }
+      for (const lotId of lotIds) {
+        await db.update(lots).set({ isArchived }).where(and(eq(lots.id, lotId), eq(lots.businessId, businessId)));
+        await storage.cascadeArchiveToLot(lotId, businessId, isArchived);
+      }
+      broadcastBusinessEvent(businessId);
+      res.json({ success: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   app.get("/api/farmers-with-dues", requireAuth, async (req, res) => {
     const search = req.query.search as string | undefined;
     const result = await storage.getFarmersWithDues(req.user!.businessId, search);

@@ -2580,9 +2580,10 @@ function FarmerCardComp({ card, savedCard, onChange, onSave, onSaveAndClose, onC
         description={t("stock.reinstateFarmerDesc")}
         onConfirm={async () => {
           setShowReinstateConfirm(false);
-          if (card.farmerId) {
+          const lotIds = card.cropGroups.flatMap(g => g.lots.map(l => l.dbId)).filter(Boolean) as number[];
+          if (lotIds.length > 0) {
             try {
-              await apiRequest("PATCH", `/api/farmers/${card.farmerId}`, { isArchived: false });
+              await apiRequest("POST", "/api/lots/bulk-archive", { lotIds, isArchived: false });
               queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
               queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
               queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
@@ -2702,9 +2703,10 @@ function stockCardsToFarmerCards(apiCards: any[]): FarmerCard[] {
       cardOpen: false,
       farmerOpen: false,
       vehicleOpen: false,
-      archived: farmer.isArchived || false,
+      archived: false,
       savedAt: c.latestCreatedAt ? format(new Date(c.latestCreatedAt), "dd/MM/yyyy HH:mm") : "loaded",
     };
+    card.archived = card.cropGroups.length > 0 && card.cropGroups.every(g => g.archived);
     return card;
   });
 }
@@ -4047,9 +4049,10 @@ export default function StockPage() {
 
   const archiveCard = async (idx: number) => {
     const card = cards[idx];
-    if (card.farmerId) {
+    const lotIds = card.cropGroups.flatMap(g => g.lots.map(l => l.dbId)).filter(Boolean) as number[];
+    if (lotIds.length > 0) {
       try {
-        await apiRequest("PATCH", `/api/farmers/${card.farmerId}`, { isArchived: true });
+        await apiRequest("POST", "/api/lots/bulk-archive", { lotIds, isArchived: true });
         queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
         queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
         queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
