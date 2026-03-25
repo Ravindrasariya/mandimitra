@@ -4458,24 +4458,25 @@ export default function StockPage() {
           const mergeBack = (edited: FarmerCard) => {
             const original = cards[idx];
             const editedGroupMap = new Map(edited.cropGroups.map(g => [g.id, g]));
+            const originalGroupIds = new Set(original.cropGroups.map(g => g.id));
             const mergedGroups = original.cropGroups.map(og => {
               const eg = editedGroupMap.get(og.id);
               if (!eg) return og;
               const editedLotMap = new Map(eg.lots.map(l => [l.id, l]));
+              const originalLotIds = new Set(og.lots.map(l => l.id));
               const mergedLots = og.lots.map(ol => {
                 const el = editedLotMap.get(ol.id);
                 if (!el) return ol;
-                const editedBidIds = new Set(el.bids.map(b => b.id));
-                const hasHiddenBids = ol.bids.some(b => !editedBidIds.has(b.id));
-                if (!hasHiddenBids) return el;
                 const editedBidMap = new Map(el.bids.map(b => [b.id, b]));
-                return { ...el, bids: ol.bids.map(ob => editedBidMap.get(ob.id) ?? ob) };
+                const originalBidIds = new Set(ol.bids.map(b => b.id));
+                const restoredBids = ol.bids.map(ob => editedBidMap.get(ob.id) ?? ob);
+                const newBids = el.bids.filter(b => !originalBidIds.has(b.id));
+                if (newBids.length === 0 && restoredBids.length === el.bids.length) return el;
+                return { ...el, bids: [...restoredBids, ...newBids] };
               });
-              const editedLotIds = new Set(eg.lots.map(l => l.id));
-              if (og.lots.every(l => editedLotIds.has(l.id)) && mergedLots.every((l, i) => l === eg.lots[i])) return eg;
-              return { ...eg, lots: mergedLots };
+              const newLots = eg.lots.filter(l => !originalLotIds.has(l.id));
+              return { ...eg, lots: [...mergedLots, ...newLots] };
             });
-            const originalGroupIds = new Set(original.cropGroups.map(g => g.id));
             const newGroups = edited.cropGroups.filter(g => !originalGroupIds.has(g.id));
             updateCard(idx, { ...edited, cropGroups: [...mergedGroups, ...newGroups] });
           };
