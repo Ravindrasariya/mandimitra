@@ -639,7 +639,9 @@ export class DatabaseStorage implements IStorage {
       eq(cashEntries.isReversed, false),
       eq(cashEntries.isArchived, false),
     ));
-    return Math.max(0, parseFloat(advDeposited[0]?.total || "0") - parseFloat(advConsumed[0]?.total || "0"));
+    const dep = parseFloat(advDeposited?.total || "0");
+    const con = parseFloat(advConsumed?.total || "0");
+    return Math.max(0, dep - con);
   }
 
   async getDriversByVehicleNumber(businessId: number, vehicleNumber: string): Promise<{ driverName: string; driverContact: string }[]> {
