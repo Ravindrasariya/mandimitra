@@ -1121,7 +1121,7 @@ export default function CashPage() {
                     <SelectTrigger className="h-9 text-sm" data-testid="inward-buyer"><SelectValue placeholder={t("cash.selectBuyer")} /></SelectTrigger>
                     <SelectContent>
                       {inwardPaymentMode === "Advance Adj"
-                        ? buyersWithDues.filter(b => parseFloat(b.advanceBalance || "0") > 0 && parseFloat(b.overallDue) > 0).map(b => (
+                        ? buyersWithDues.filter(b => parseFloat(b.advanceBalance || "0") > 0).map(b => (
                             <SelectItem key={b.id} value={b.id.toString()}>
                               {b.name} - Adv: ₹{parseFloat(b.advanceBalance).toLocaleString("en-IN")} | Due: ₹{parseFloat(b.overallDue).toLocaleString("en-IN")}
                             </SelectItem>
