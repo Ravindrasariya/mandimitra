@@ -3867,6 +3867,22 @@ export default function StockPage() {
                 toast({ title: t("stock.saveBlocked"), description: `${t("stock.weightCannotBeZero")} (${bid.buyerName})`, variant: "destructive" });
                 throw new Error("Net weight cannot be 0 for a bid with an existing transaction.");
               }
+              const hasBuyerPayment = bid.paymentStatus === "paid" || bid.paymentStatus === "partial";
+              const hasFarmerPayment = bid.farmerPaymentStatus === "paid" || bid.farmerPaymentStatus === "partial";
+              if (hasBuyerPayment || hasFarmerPayment) {
+                const savedBid = savedBidMap.get(bidDbId);
+                const txnFields: (keyof TxnState)[] = ["netWeightInput", "extraChargesFarmer", "extraChargesBuyer", "extraPerKgFarmer", "extraPerKgBuyer", "extraTulai", "extraBharai", "extraKhadiKarai", "extraThelaBhada", "extraOthers"];
+                const txnChanged = savedBid && (
+                  savedBid.numberOfBags !== bid.numberOfBags ||
+                  savedBid.pricePerKg !== bid.pricePerKg ||
+                  savedBid.buyerId !== bid.buyerId ||
+                  txnFields.some(f => String(bid.txn[f] || "") !== String(savedBid.txn?.[f] || ""))
+                );
+                if (txnChanged) {
+                  toast({ title: t("stock.saveBlocked"), description: `Cannot edit transaction for "${bid.buyerName}" — payments exist. Please reverse all payments first.`, variant: "destructive" });
+                  throw new Error("Cannot edit a transaction with active payments.");
+                }
+              }
             }
 
             let savedBuyerReceivableAfterSave = bid.savedBuyerReceivable;

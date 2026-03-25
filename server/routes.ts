@@ -1002,10 +1002,6 @@ export async function registerRoutes(
     const newOriginal = data.numberOfBags ?? lot.numberOfBags;
 
     if (data.numberOfBags != null) {
-      if (data.numberOfBags < soldBags) {
-        return res.status(400).json({ message: `Cannot reduce original bags below already sold bags (${soldBags})` });
-      }
-
       // Check (a): total sibling lot bags must not exceed vehicle capacity
       const effectiveTBIV = data.totalBagsInVehicle ?? lot.totalBagsInVehicle;
       if (effectiveTBIV != null && effectiveTBIV > 0) {
@@ -1041,7 +1037,7 @@ export async function registerRoutes(
       if (data.actualNumberOfBags == null) {
         const effectiveActual = Math.min(oldActual, data.numberOfBags);
         data.actualNumberOfBags = effectiveActual;
-        data.remainingBags = effectiveActual - soldBags;
+        data.remainingBags = Math.max(0, effectiveActual - soldBags);
       }
     }
 
@@ -1049,10 +1045,7 @@ export async function registerRoutes(
       if (data.actualNumberOfBags > newOriginal) {
         data.actualNumberOfBags = newOriginal;
       }
-      if (data.actualNumberOfBags < soldBags) {
-        return res.status(400).json({ message: `Cannot reduce below already sold bags (${soldBags})` });
-      }
-      data.remainingBags = data.actualNumberOfBags - soldBags;
+      data.remainingBags = Math.max(0, data.actualNumberOfBags - soldBags);
     }
 
     const trackFields = ["numberOfBags", "actualNumberOfBags", "crop", "variety", "size", "bagMarka", "vehicleNumber", "vehicleBhadaRate", "farmerAdvanceAmount", "farmerAdvanceMode"];
@@ -1146,6 +1139,18 @@ export async function registerRoutes(
       };
 
       if (tx) {
+        const [activeCashEntry] = await db.select({ id: cashEntries.id })
+          .from(cashEntries)
+          .where(and(
+            eq(cashEntries.transactionId, tx.id),
+            eq(cashEntries.businessId, businessId),
+            eq(cashEntries.isReversed, false)
+          ))
+          .limit(1);
+        if (activeCashEntry) {
+          return res.status(400).json({ message: "Cannot delete bid: payments exist against this transaction. Please reverse all payments first." });
+        }
+
         const [farmer] = await db.select({ name: farmers.name }).from(farmers).where(eq(farmers.id, tx.farmerId));
         auditValue.transactionId = tx.transactionId;
         auditValue.totalPayableToFarmer = tx.totalPayableToFarmer;
@@ -1208,6 +1213,21 @@ export async function registerRoutes(
         .innerJoin(buyers, eq(transactions.buyerId, buyers.id))
         .innerJoin(farmers, eq(transactions.farmerId, farmers.id))
         .where(and(eq(transactions.lotId, lotId), eq(transactions.businessId, businessId)));
+
+      if (lotTxns.length > 0) {
+        const txnIds = lotTxns.map(t => t.id);
+        const [activeCashEntry] = await db.select({ id: cashEntries.id })
+          .from(cashEntries)
+          .where(and(
+            inArray(cashEntries.transactionId, txnIds),
+            eq(cashEntries.businessId, businessId),
+            eq(cashEntries.isReversed, false)
+          ))
+          .limit(1);
+        if (activeCashEntry) {
+          return res.status(400).json({ message: "Cannot delete lot: payments exist against transactions in this lot. Please reverse all payments first." });
+        }
+      }
 
       await db.transaction(async (tx) => {
         // Write audit snapshot only when there is meaningful data to record
@@ -1307,6 +1327,24 @@ export async function registerRoutes(
     if (!oldTx) return res.status(404).json({ message: "Transaction not found" });
 
     const txTrackFields = ["numberOfBags", "extraChargesFarmer", "extraTulaiFarmer", "extraBharaiFarmer", "extraKhadiKaraiFarmer", "extraThelaBhadaFarmer", "extraOthersFarmer", "extraChargesBuyer", "extraPerKgFarmer", "extraPerKgBuyer", "netWeight", "pricePerKg", "totalPayableToFarmer", "totalReceivableFromBuyer", "hammaliCharges", "freightCharges", "aadhatCharges", "mandiCharges", "muddatAnyaCharges"];
+    const hasFieldChange = txTrackFields.some(f => {
+      if (req.body[f] === undefined) return false;
+      return String(req.body[f] ?? "") !== String((oldTx as any)[f] ?? "");
+    });
+    if (hasFieldChange) {
+      const [activeCashEntry] = await db.select({ id: cashEntries.id })
+        .from(cashEntries)
+        .where(and(
+          eq(cashEntries.transactionId, txId),
+          eq(cashEntries.businessId, businessId),
+          eq(cashEntries.isReversed, false)
+        ))
+        .limit(1);
+      if (activeCashEntry) {
+        return res.status(400).json({ message: "Cannot edit transaction: payments exist. Please reverse all payments first." });
+      }
+    }
+
     const changedBy = req.user!.username;
     const updated = await storage.updateTransaction(txId, businessId, req.body);
     if (!updated) return res.status(404).json({ message: "Transaction not found" });
