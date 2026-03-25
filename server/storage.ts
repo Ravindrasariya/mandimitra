@@ -1815,7 +1815,20 @@ export class DatabaseStorage implements IStorage {
     ));
     const generalExpense = parseFloat(generalRows[0]?.total || "0");
 
-    const totalExpenses = depreciation + interestOnLiabilities + salaryExpense + generalExpense;
+    const tdsRows = await db.select({
+      total: sql<string>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`
+    }).from(cashEntries).where(and(
+      eq(cashEntries.businessId, businessId),
+      eq(cashEntries.category, "outward"),
+      eq(cashEntries.outflowType, "TDS"),
+      eq(cashEntries.isReversed, false),
+      eq(cashEntries.isArchived, false),
+      gte(sql`cast(${cashEntries.createdAt} as date)`, fyStartDate),
+      lte(sql`cast(${cashEntries.createdAt} as date)`, fyEndDate),
+    ));
+    const tdsExpense = parseFloat(tdsRows[0]?.total || "0");
+
+    const totalExpenses = depreciation + interestOnLiabilities + salaryExpense + generalExpense + tdsExpense;
     const netProfitLoss = totalIncome - totalExpenses;
 
     return {
@@ -1829,6 +1842,7 @@ export class DatabaseStorage implements IStorage {
         interestOnLiabilities,
         salaryExpense,
         generalExpense,
+        tdsExpense,
         total: totalExpenses,
       },
       netProfitLoss,

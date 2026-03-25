@@ -35,6 +35,7 @@ const OUTFLOW_TYPES = [
   "Interest Payment on Loan/LOC",
   "Mandi Commission",
   "Salary",
+  "TDS",
 ] as const;
 
 export default function CashPage() {
