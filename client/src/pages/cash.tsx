@@ -1081,19 +1081,15 @@ export default function CashPage() {
             <div className="space-y-3 p-3 bg-background rounded-lg">
               <div className="space-y-1">
                 <Label className="text-xs">{t("cash.paymentMode")}</Label>
-                {hasBankAccounts ? (
-                  <Select value={inwardPaymentMode} onValueChange={(v) => { setInwardPaymentMode(v); setInwardAllocations([]); setAllocationSearch(""); if (v === "Advance Adj") { setInwardBankAccountId(""); setInwardPartyType("Buyer"); } }}>
-                    <SelectTrigger className="h-9 text-sm" data-testid="inward-payment-mode"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Cash">Cash</SelectItem>
-                      <SelectItem value="Online">Account/Online</SelectItem>
-                      <SelectItem value="Cheque">Cheque</SelectItem>
-                      <SelectItem value="Advance Adj">Advance Adj</SelectItem>
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <Input value="Cash" readOnly className="h-9 text-sm bg-muted" />
-                )}
+                <Select value={inwardPaymentMode} onValueChange={(v) => { setInwardPaymentMode(v); setInwardAllocations([]); setAllocationSearch(""); if (v === "Advance Adj") { setInwardBankAccountId(""); setInwardPartyType("Buyer"); } }}>
+                  <SelectTrigger className="h-9 text-sm" data-testid="inward-payment-mode"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Cash">Cash</SelectItem>
+                    {hasBankAccounts && <SelectItem value="Online">Account/Online</SelectItem>}
+                    {hasBankAccounts && <SelectItem value="Cheque">Cheque</SelectItem>}
+                    <SelectItem value="Advance Adj">Advance Adj</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               {inwardPaymentMode !== "Cash" && inwardPaymentMode !== "Advance Adj" && hasBankAccounts && (
                 <div className="space-y-1">

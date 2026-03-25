@@ -129,7 +129,7 @@ function generateBuyerPaanaHtml(
 </body></html>`;
 }
 
-function generateBuyerListPrintHtml(buyers: BuyerWithDues[], summary: { total: number; withDues: number; totalOverallDue: number; totalReceivableDue: number; duesOver15: number; duesOver30: number }) {
+function generateBuyerListPrintHtml(buyers: BuyerWithDues[], summary: { total: number; withDues: number; totalOverallDue: number; totalReceivableDue: number; duesOver15: number; duesOver30: number; totalAdvance: number }) {
   const rows = buyers.map(b => `<tr>
 <td style="padding:6px 10px;border:1px solid #ddd">${b.buyerId}</td>
 <td style="padding:6px 10px;border:1px solid #ddd">${b.name}</td>
@@ -149,6 +149,7 @@ function generateBuyerListPrintHtml(buyers: BuyerWithDues[], summary: { total: n
 <div class="summary-card"><div style="font-size:0.8em;color:#666">With Dues</div><div style="font-size:1.3em;font-weight:bold;color:#dc2626">${summary.withDues}</div></div>
 <div class="summary-card"><div style="font-size:0.8em;color:#666">Overall Due</div><div style="font-size:1.3em;font-weight:bold;color:#2563eb">${formatIndianCurrency(summary.totalOverallDue)}</div></div>
 <div class="summary-card"><div style="font-size:0.8em;color:#666">Receivable Due</div><div style="font-size:1.3em;font-weight:bold;color:#dc2626">${formatIndianCurrency(summary.totalReceivableDue)}</div></div>
+${summary.totalAdvance > 0 ? `<div class="summary-card"><div style="font-size:0.8em;color:#666">Total Advance</div><div style="font-size:1.3em;font-weight:bold;color:#0891b2">${formatIndianCurrency(summary.totalAdvance)}</div></div>` : ""}
 </div>
 <table>${rows ? `<thead><tr><th>Buyer ID</th><th>Name</th><th>Phone</th><th style="text-align:right">Overall Due</th><th style="text-align:right">Receivable Due</th></tr></thead><tbody>${rows}</tbody>` : ""}</table>
 <div style="text-align:center;margin-top:20px;padding-top:10px;border-top:1px dashed #ccc;font-size:15px;font-weight:bold;color:#555">हमें सेवा का अवसर देने के लिए धन्यवाद!</div>
@@ -701,11 +702,13 @@ export default function BuyerLedgerPage() {
     let withDues = 0;
     let totalOverallDue = 0;
     let totalReceivableDue = 0;
+    let totalAdvance = 0;
     filteredBuyers.forEach(b => {
       const dues = filteredDuesByBuyer.get(b.id) || { receivable: 0, overall: 0 };
       if (dues.overall > 0) withDues++;
       totalOverallDue += dues.overall;
       totalReceivableDue += dues.receivable;
+      totalAdvance += parseFloat(b.advanceBalance || "0");
     });
 
     const today = new Date();
@@ -727,7 +730,7 @@ export default function BuyerLedgerPage() {
       if (diffDays > 15) duesOver15 += due;
     });
 
-    return { total, withDues, totalOverallDue, totalReceivableDue, duesOver15, duesOver30 };
+    return { total, withDues, totalOverallDue, totalReceivableDue, duesOver15, duesOver30, totalAdvance };
   }, [filteredBuyers, filteredDuesByBuyer, allTransactions]);
 
   const toggleSort = (field: SortField) => {
@@ -997,7 +1000,7 @@ export default function BuyerLedgerPage() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
         <Card className="border-l-4 border-l-blue-500">
           <CardContent className="pt-3 pb-3 text-center">
             <p className="text-xs text-muted-foreground">{t("buyerLedger.totalBuyers")}</p>
@@ -1015,6 +1018,12 @@ export default function BuyerLedgerPage() {
           <CardContent className="pt-3 pb-3 text-center">
             <p className="text-xs text-muted-foreground">{t("buyerLedger.totalReceivableDue")}</p>
             <p className="text-base font-bold text-orange-600" data-testid="text-receivable-due">{formatIndianCurrency(summary.totalReceivableDue)}</p>
+          </CardContent>
+        </Card>
+        <Card className="border-l-4 border-l-cyan-500">
+          <CardContent className="pt-3 pb-3 text-center">
+            <p className="text-xs text-muted-foreground">{t("buyerLedger.totalAdvance")}</p>
+            <p className="text-base font-bold text-cyan-600" data-testid="text-total-advance">{formatIndianCurrency(summary.totalAdvance)}</p>
           </CardContent>
         </Card>
         <Card className="border-l-4 border-l-red-500">

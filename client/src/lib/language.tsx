@@ -266,6 +266,7 @@ const translations: Record<string, Record<Language, string>> = {
   "buyerLedger.buyersWithDues": { en: "With Dues", hi: "बकाया वाले" },
   "buyerLedger.totalOverallDue": { en: "Overall Due", hi: "कुल बकाया" },
   "buyerLedger.totalReceivableDue": { en: "Receivable Due", hi: "प्राप्य बकाया" },
+  "buyerLedger.totalAdvance": { en: "Total Advance", hi: "कुल अग्रिम" },
   "buyerLedger.duesOver30": { en: "Dues > 30 Days", hi: "बकाया > 30 दिन" },
   "buyerLedger.duesOver15": { en: "Dues > 15 Days", hi: "बकाया > 15 दिन" },
   "buyerLedger.allYears": { en: "All Years", hi: "सभी वर्ष" },
