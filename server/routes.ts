@@ -338,6 +338,31 @@ export async function registerRoutes(
       }
     }
 
+    if (data.isArchived === true && !existing.isArchived) {
+      const farmerLots = await db.select({ id: lots.id }).from(lots)
+        .where(and(eq(lots.farmerId, farmerId), eq(lots.businessId, businessId)));
+      if (farmerLots.length > 0) {
+        const lotIds = farmerLots.map(l => l.id);
+        const farmerTxns = await db.select({ id: transactions.id })
+          .from(transactions)
+          .where(and(inArray(transactions.lotId, lotIds), eq(transactions.businessId, businessId)));
+        if (farmerTxns.length > 0) {
+          const txnIds = farmerTxns.map(t => t.id);
+          const [activeCashEntry] = await db.select({ id: cashEntries.id })
+            .from(cashEntries)
+            .where(and(
+              inArray(cashEntries.transactionId, txnIds),
+              eq(cashEntries.businessId, businessId),
+              eq(cashEntries.isReversed, false)
+            ))
+            .limit(1);
+          if (activeCashEntry) {
+            return res.status(400).json({ message: "Cannot archive farmer: active payments exist against transactions. Please reverse all payments first." });
+          }
+        }
+      }
+    }
+
     const updated = await storage.updateFarmer(farmerId, businessId, data);
 
     if (data.isArchived !== undefined && data.isArchived !== existing.isArchived) {
@@ -360,6 +385,27 @@ export async function registerRoutes(
       if (!Array.isArray(lotIds) || lotIds.length === 0 || typeof isArchived !== "boolean") {
         return res.status(400).json({ message: "lotIds (non-empty array) and isArchived (boolean) required" });
       }
+
+      if (isArchived) {
+        const lotTxns = await db.select({ id: transactions.id })
+          .from(transactions)
+          .where(and(inArray(transactions.lotId, lotIds), eq(transactions.businessId, businessId)));
+        if (lotTxns.length > 0) {
+          const txnIds = lotTxns.map(t => t.id);
+          const [activeCashEntry] = await db.select({ id: cashEntries.id })
+            .from(cashEntries)
+            .where(and(
+              inArray(cashEntries.transactionId, txnIds),
+              eq(cashEntries.businessId, businessId),
+              eq(cashEntries.isReversed, false)
+            ))
+            .limit(1);
+          if (activeCashEntry) {
+            return res.status(400).json({ message: "Cannot archive: active payments exist against transactions. Please reverse all payments first." });
+          }
+        }
+      }
+
       for (const lotId of lotIds) {
         await db.update(lots).set({ isArchived }).where(and(eq(lots.id, lotId), eq(lots.businessId, businessId)));
         await storage.cascadeArchiveToLot(lotId, businessId, isArchived);
@@ -1063,6 +1109,26 @@ export async function registerRoutes(
             newValue: newVal,
             changedBy,
           });
+        }
+      }
+    }
+
+    if (data.isArchived === true && !lot.isArchived) {
+      const lotTxns = await db.select({ id: transactions.id })
+        .from(transactions)
+        .where(and(eq(transactions.lotId, lotId), eq(transactions.businessId, businessId)));
+      if (lotTxns.length > 0) {
+        const txnIds = lotTxns.map(t => t.id);
+        const [activeCashEntry] = await db.select({ id: cashEntries.id })
+          .from(cashEntries)
+          .where(and(
+            inArray(cashEntries.transactionId, txnIds),
+            eq(cashEntries.businessId, businessId),
+            eq(cashEntries.isReversed, false)
+          ))
+          .limit(1);
+        if (activeCashEntry) {
+          return res.status(400).json({ message: "Cannot archive lot: active payments exist against transactions. Please reverse all payments first." });
         }
       }
     }
