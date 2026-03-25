@@ -3371,6 +3371,27 @@ export default function StockPage() {
       return card.cropGroups.some(g => !g.archived && g.crop === cropFilter);
     };
 
+    const applyBuyerFilter = (card: FarmerCard): FarmerCard => {
+      if (!buyerFilter.trim()) return card;
+      const q = buyerFilter.toLowerCase();
+      const matchingBuyerIds = new Set(
+        pageBuyersList.filter(b => b.name.toLowerCase().includes(q)).map(b => b.id)
+      );
+      const bidMatches = (bid: BidRow) =>
+        bid.buyerName.toLowerCase().includes(q) || (bid.buyerId != null && matchingBuyerIds.has(bid.buyerId));
+      return {
+        ...card,
+        cropGroups: card.cropGroups.map(g => {
+          if (g.archived) return g;
+          const filteredLots = g.lots.map(lot => ({
+            ...lot,
+            bids: lot.bids.filter(bidMatches),
+          })).filter(lot => lot.bids.length > 0);
+          return { ...g, lots: filteredLots };
+        }).filter(g => g.archived || g.lots.length > 0),
+      };
+    };
+
     const applyCropFilter = (card: FarmerCard): FarmerCard => {
       if (cropFilter === "all") return card;
       return { ...card, cropGroups: card.cropGroups.filter(g => g.archived || g.crop === cropFilter) };
@@ -3393,6 +3414,7 @@ export default function StockPage() {
         .filter(farmerMatchesCard)
         .filter(buyerMatchesCard)
         .filter(cropMatchesCard)
+        .map(applyBuyerFilter)
         .map(applyCropFilter)
         .map(applyTxnDateFilter)
         .filter(c => c.cropGroups.length > 0 || !savedCardMap.has(c.id))
