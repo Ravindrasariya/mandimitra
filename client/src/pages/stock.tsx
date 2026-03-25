@@ -4457,25 +4457,74 @@ export default function StockPage() {
           const idx = cards.findIndex(c => c.id === card.id);
           const mergeBack = (edited: FarmerCard) => {
             const original = cards[idx];
+            const hasBuyerF = buyerFilter.trim() !== "";
+            const anyDateF = yearFilter !== "all" || selectedMonths.length > 0 || selectedDays.length > 0;
+            const hasTxnDateF = anyDateF && dateMode === "txn";
+            if (!hasBuyerF && !hasTxnDateF) {
+              const visibleGroupIds = new Set(edited.cropGroups.map(g => g.id));
+              const hiddenGroups = original.cropGroups.filter(g => !visibleGroupIds.has(g.id));
+              updateCard(idx, { ...edited, cropGroups: [...edited.cropGroups, ...hiddenGroups] });
+              return;
+            }
+            const filterHiddenBidIds = new Set<string>();
+            const filterHiddenLotIds = new Set<string>();
+            const filterHiddenGroupIds = new Set<string>();
+            const bq = hasBuyerF ? buyerFilter.toLowerCase() : "";
+            const bMatchIds = hasBuyerF ? new Set(pageBuyersList.filter(b => b.name.toLowerCase().includes(bq)).map(b => b.id)) : null;
+            const bidPassesFilter = (bid: BidRow) => {
+              if (hasBuyerF) {
+                const match = bid.buyerName.toLowerCase().includes(bq) || (bid.buyerId != null && bMatchIds!.has(bid.buyerId));
+                if (!match) return false;
+              }
+              if (hasTxnDateF) {
+                if (!bid.txnDbId) return false;
+                const ds = bid.txnDate;
+                if (!ds) return false;
+                const [y, m, d] = ds.split("-");
+                if (yearFilter !== "all" && y !== yearFilter) return false;
+                if (selectedMonths.length > 0 && !selectedMonths.includes(String(parseInt(m)))) return false;
+                if (selectedDays.length > 0 && !selectedDays.includes(String(parseInt(d)))) return false;
+              }
+              return true;
+            };
+            for (const og of original.cropGroups) {
+              if (og.archived) continue;
+              let groupHasVisibleLot = false;
+              for (const ol of og.lots) {
+                let lotHasVisibleBid = false;
+                for (const ob of ol.bids) {
+                  if (!bidPassesFilter(ob)) { filterHiddenBidIds.add(ob.id); }
+                  else { lotHasVisibleBid = true; }
+                }
+                if (!lotHasVisibleBid && ol.bids.length > 0) { filterHiddenLotIds.add(ol.id); }
+                else { groupHasVisibleLot = true; }
+              }
+              if (!groupHasVisibleLot && og.lots.length > 0) { filterHiddenGroupIds.add(og.id); }
+            }
             const editedGroupMap = new Map(edited.cropGroups.map(g => [g.id, g]));
-            const mergedGroups = original.cropGroups.map(og => {
+            const mergedGroups: typeof original.cropGroups = [];
+            for (const og of original.cropGroups) {
+              if (filterHiddenGroupIds.has(og.id)) { mergedGroups.push(og); continue; }
               const eg = editedGroupMap.get(og.id);
-              if (!eg) return og;
+              if (!eg) continue;
               const editedLotMap = new Map(eg.lots.map(l => [l.id, l]));
-              const mergedLots = og.lots.map(ol => {
+              const mergedLots: typeof og.lots = [];
+              for (const ol of og.lots) {
+                if (filterHiddenLotIds.has(ol.id)) { mergedLots.push(ol); continue; }
                 const el = editedLotMap.get(ol.id);
-                if (!el) return ol;
+                if (!el) continue;
+                if (!ol.bids.some(b => filterHiddenBidIds.has(b.id))) { mergedLots.push(el); continue; }
                 const editedBidMap = new Map(el.bids.map(b => [b.id, b]));
-                const restoredBids = ol.bids.map(ob => editedBidMap.get(ob.id) ?? ob);
+                const mergedBids = ol.bids.filter(b => filterHiddenBidIds.has(b.id) || editedBidMap.has(b.id))
+                  .map(b => editedBidMap.get(b.id) ?? b);
                 const originalBidIds = new Set(ol.bids.map(b => b.id));
                 const newBids = el.bids.filter(b => !originalBidIds.has(b.id));
-                if (newBids.length === 0 && restoredBids.every((b, i) => b === el.bids[i])) return el;
-                return { ...el, bids: [...restoredBids, ...newBids] };
-              });
+                mergedLots.push({ ...el, bids: [...mergedBids, ...newBids] });
+              }
               const originalLotIds = new Set(og.lots.map(l => l.id));
               const newLots = eg.lots.filter(l => !originalLotIds.has(l.id));
-              return { ...eg, lots: [...mergedLots, ...newLots] };
-            });
+              mergedGroups.push({ ...eg, lots: [...mergedLots, ...newLots] });
+            }
             const originalGroupIds = new Set(original.cropGroups.map(g => g.id));
             const newGroups = edited.cropGroups.filter(g => !originalGroupIds.has(g.id));
             updateCard(idx, { ...edited, cropGroups: [...mergedGroups, ...newGroups] });
