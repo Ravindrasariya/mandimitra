@@ -1326,10 +1326,10 @@ export async function registerRoutes(
     const oldTx = await storage.getTransaction(txId, businessId);
     if (!oldTx) return res.status(404).json({ message: "Transaction not found" });
 
-    const txTrackFields = ["numberOfBags", "extraChargesFarmer", "extraTulaiFarmer", "extraBharaiFarmer", "extraKhadiKaraiFarmer", "extraThelaBhadaFarmer", "extraOthersFarmer", "extraChargesBuyer", "extraPerKgFarmer", "extraPerKgBuyer", "netWeight", "pricePerKg", "totalPayableToFarmer", "totalReceivableFromBuyer", "hammaliCharges", "freightCharges", "aadhatCharges", "mandiCharges", "muddatAnyaCharges"];
+    const txTrackFields: (keyof typeof oldTx)[] = ["numberOfBags", "extraChargesFarmer", "extraTulaiFarmer", "extraBharaiFarmer", "extraKhadiKaraiFarmer", "extraThelaBhadaFarmer", "extraOthersFarmer", "extraChargesBuyer", "extraPerKgFarmer", "extraPerKgBuyer", "netWeight", "pricePerKg", "totalPayableToFarmer", "totalReceivableFromBuyer", "hammaliCharges", "freightCharges", "aadhatCharges", "mandiCharges", "muddatAnyaCharges"];
     const hasFieldChange = txTrackFields.some(f => {
       if (req.body[f] === undefined) return false;
-      return String(req.body[f] ?? "") !== String((oldTx as any)[f] ?? "");
+      return String(req.body[f] ?? "") !== String(oldTx[f] ?? "");
     });
     if (hasFieldChange) {
       const [activeCashEntry] = await db.select({ id: cashEntries.id })
