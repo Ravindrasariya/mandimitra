@@ -27,7 +27,7 @@ import { format } from "date-fns";
 import { CROPS, SIZES, DISTRICTS } from "@shared/schema";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem, CommandGroup } from "@/components/ui/command";
-import { printReceipt, shareReceiptAsImage, generateBidCopyHtml, type BidCropSection } from "@/lib/receiptUtils";
+import { printReceipt, shareReceiptAsImage, generateBidCopyHtml, wrapWithDuplicate, type BidCropSection } from "@/lib/receiptUtils";
 import {
   generateFarmerReceiptHtml, generateBuyerReceiptHtml, generateCombinedBuyerReceiptHtml,
   generateAllBuyerReceiptHtml,
@@ -1511,6 +1511,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
   const { t } = useLanguage();
   const { toast } = useToast();
   const { user } = useAuth();
+  const [printBillMode] = usePersistedState<"show-all" | "hide-aadhat">("txn-printBillMode", "show-all");
   const [pendingDeleteLotIdx, setPendingDeleteLotIdx] = useState<number | null>(null);
   const [showHistory, setShowHistory] = useState(false);
   const [showReinstateConfirm, setShowReinstateConfirm] = useState(false);
@@ -1735,22 +1736,27 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
       const crop = entries[0].lot.crop;
       const customTmpl = receiptTemplates.find(tmpl => tmpl.templateType === "buyer" && tmpl.crop === crop)
         || receiptTemplates.find(tmpl => tmpl.templateType === "buyer" && tmpl.crop === "");
-      let html: string;
-      if (entries.length === 1) {
-        html = customTmpl
-          ? applyBuyerTemplate(customTmpl.templateHtml, entries[0].lot, data.sg.farmer, entries[0].tx, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo)
-          : generateBuyerReceiptHtml(entries[0].lot, data.sg.farmer, entries[0].tx, user?.businessName, user?.businessAddress);
-      } else {
-        html = customTmpl
-          ? applyCombinedBuyerTemplate(customTmpl.templateHtml, entries, data.sg.serialNumber, data.sg.date, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo, undefined, data.sg.farmer)
-          : generateCombinedBuyerReceiptHtml(entries, data.sg.serialNumber, data.sg.date, user?.businessName, user?.businessAddress, user?.businessPhone);
-      }
+      const genBuyerHtml = (hide?: boolean) => {
+        if (entries.length === 1) {
+          return customTmpl
+            ? applyBuyerTemplate(customTmpl.templateHtml, entries[0].lot, data.sg.farmer, entries[0].tx, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo)
+            : generateBuyerReceiptHtml(entries[0].lot, data.sg.farmer, entries[0].tx, user?.businessName, user?.businessAddress, hide);
+        } else {
+          return customTmpl
+            ? applyCombinedBuyerTemplate(customTmpl.templateHtml, entries, data.sg.serialNumber, data.sg.date, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo, undefined, data.sg.farmer)
+            : generateCombinedBuyerReceiptHtml(entries, data.sg.serialNumber, data.sg.date, user?.businessName, user?.businessAddress, user?.businessPhone, hide);
+        }
+      };
+      const copy1Html = genBuyerHtml(false);
       const safeName = buyerName.replace(/[^a-zA-Z0-9]/g, "_");
       const buyerFileName = `Buyer_Receipt_${safeName}_${crop}_${farmerDate}.pdf`;
       if (action === "print") {
-        await printReceipt(html, buyerFileName);
+        const shouldHideAadhat = printBillMode === "hide-aadhat";
+        const copy2Html = shouldHideAadhat ? genBuyerHtml(true) : undefined;
+        const printHtml = wrapWithDuplicate(copy1Html, copy2Html);
+        await printReceipt(printHtml, buyerFileName);
       } else {
-        await shareReceiptAsImage(html, buyerFileName);
+        await shareReceiptAsImage(copy1Html, buyerFileName);
       }
     } catch (err: any) {
       toast({ title: t("stock.receiptError"), description: err?.message, variant: "destructive" });
@@ -3365,6 +3371,7 @@ export default function StockPage() {
   const [farmerFilterId, setFarmerFilterId] = useState<number | null>(null);
   const [buyerFilter, setBuyerFilter] = useState("");
   const [cropFilter, setCropFilter] = useState("all");
+  const [printBillMode] = usePersistedState<"show-all" | "hide-aadhat">("txn-printBillMode", "show-all");
 
   const filteredCards = useMemo(() => {
     const anyDateFilter = yearFilter !== "all" || selectedMonths.length > 0 || selectedDays.length > 0;
@@ -4284,14 +4291,21 @@ export default function StockPage() {
     const overallTmpl = stockPageReceiptTemplates.find(tmpl => tmpl.templateType === "buyer-overall")
       || stockPageReceiptTemplates.find(tmpl => tmpl.templateType === "buyer" && tmpl.crop === cropFilter)
       || stockPageReceiptTemplates.find(tmpl => tmpl.templateType === "buyer" && tmpl.crop === "");
-    const fullHtml = overallTmpl
+    const copy1Html = overallTmpl
       ? applyCombinedBuyerTemplate(overallTmpl.templateHtml, entries, 0, receiptDate, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo, receiptSerialNumber)
       : generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress, receiptSerialNumber, false, user?.businessPhone);
 
     if (action === "share") {
-      await shareReceiptAsImage(fullHtml, buyerFileName);
+      await shareReceiptAsImage(copy1Html, buyerFileName);
     } else {
-      await printReceipt(fullHtml, buyerFileName);
+      const shouldHideAadhat = printBillMode === "hide-aadhat";
+      const copy2Html = shouldHideAadhat
+        ? (overallTmpl
+            ? applyCombinedBuyerTemplate(overallTmpl.templateHtml, entries, 0, receiptDate, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo, receiptSerialNumber)
+            : generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress, receiptSerialNumber, true, user?.businessPhone))
+        : undefined;
+      const printHtml = wrapWithDuplicate(copy1Html, copy2Html);
+      await printReceipt(printHtml, buyerFileName);
     }
   };
 
