@@ -4288,9 +4288,7 @@ export default function StockPage() {
     const safeBuyerName = buyerFilter.trim().replace(/[^a-zA-Z0-9]/g, "_");
     const buyerFileName = `Overall_Receipt_${safeBuyerName}_${cropFilter}_${receiptDate}.pdf`;
 
-    const overallTmpl = stockPageReceiptTemplates.find(tmpl => tmpl.templateType === "buyer-overall")
-      || stockPageReceiptTemplates.find(tmpl => tmpl.templateType === "buyer" && tmpl.crop === cropFilter)
-      || stockPageReceiptTemplates.find(tmpl => tmpl.templateType === "buyer" && tmpl.crop === "");
+    const overallTmpl = stockPageReceiptTemplates.find(tmpl => tmpl.templateType === "buyer-overall");
     const copy1Html = overallTmpl
       ? applyCombinedBuyerTemplate(overallTmpl.templateHtml, entries, 0, receiptDate, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo, receiptSerialNumber)
       : generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress, receiptSerialNumber, false, user?.businessPhone);
