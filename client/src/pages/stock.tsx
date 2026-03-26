@@ -798,8 +798,6 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
   const farmerGross = nw * (pricePerKg + epkFarmer);
   const buyerGross = nw * (pricePerKg + epkBuyer);
 
-  const tulaiFarmerRate = parseFloat(cs.tulaiFarmerPerBag) || 0;
-  const khadiKaraiFarmerRate = parseFloat(cs.khadiKaraiFarmerPerBag) || 0;
   const hammaliFarmerRate = parseFloat(cs.hammaliFarmerPerBag) || 0;
   const hammaliBuyerRate = parseFloat(cs.hammaliBuyerPerBag) || 0;
   const extraFarmer = parseFloat(txn.extraChargesFarmer) || 0;
@@ -991,7 +989,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
                     data-testid={`input-${field}`}
                     type="text" inputMode={field === "extraOthers" ? "text" : "decimal"}
                     value={val}
-                    onChange={e => updateExtraBreakdown(field, field === "extraOthers" ? e.target.value.replace(/[^0-9.\-]/g, "") : toNum(e.target.value))}
+                    onChange={e => { if (field === "extraOthers") { const raw = e.target.value; const cleaned = (raw.startsWith("-") ? "-" : "") + raw.replace(/[^0-9.]/g, ""); updateExtraBreakdown(field, cleaned); } else { updateExtraBreakdown(field, toNum(e.target.value)); } }}
                     onFocus={e => e.currentTarget.select()}
                     className="w-16 h-6 text-xs text-right p-1"
                   />
