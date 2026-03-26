@@ -2784,6 +2784,8 @@ function stockCardsToFarmerCards(apiCards: any[]): FarmerCard[] {
                 muddatAnyaBuyerPercent: txn.muddatAnyaBuyerPercent || "0",
                 hammaliFarmerPerBag: txn.hammaliFarmerPerBag || "0",
                 hammaliBuyerPerBag: txn.hammaliBuyerPerBag || "0",
+                tulaiFarmerPerBag: txn.tulaiFarmerPerBag || "0",
+                khadiKaraiFarmerPerBag: txn.khadiKaraiFarmerPerBag || "0",
               } : undefined,
               savedBuyerReceivable: txn?.totalReceivableFromBuyer != null ? parseFloat(txn.totalReceivableFromBuyer) : undefined,
               savedFarmerPayable: txn?.totalPayableToFarmer != null ? parseFloat(txn.totalPayableToFarmer) : undefined,
@@ -4078,6 +4080,8 @@ export default function StockPage() {
               muddatAnyaBuyerPercent: (bid.savedCharges || cs).muddatAnyaBuyerPercent,
               hammaliFarmerPerBag: (bid.savedCharges || cs).hammaliFarmerPerBag,
               hammaliBuyerPerBag: (bid.savedCharges || cs).hammaliBuyerPerBag,
+              tulaiFarmerPerBag: (bid.savedCharges || cs).tulaiFarmerPerBag,
+              khadiKaraiFarmerPerBag: (bid.savedCharges || cs).khadiKaraiFarmerPerBag,
             } : bid.savedCharges;
             updatedBids.push({ ...bid, bidDbId, txnDbId, savedCharges: savedChargesAfterSave, savedBuyerReceivable: savedBuyerReceivableAfterSave, savedFarmerPayable: savedFarmerPayableAfterSave });
           }
