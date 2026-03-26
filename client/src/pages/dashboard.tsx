@@ -929,8 +929,8 @@ export default function DashboardPage() {
                         <td className="p-1.5 text-right whitespace-nowrap">{h.aadhatCommissionFarmerPercent}/{h.aadhatCommissionBuyerPercent}</td>
                         <td className="p-1.5 text-right whitespace-nowrap">{h.muddatAnyaFarmerPercent}/{h.muddatAnyaBuyerPercent}</td>
                         <td className="p-1.5 text-right whitespace-nowrap">{h.hammaliFarmerPerBag}/{h.hammaliBuyerPerBag}</td>
-                        <td className="p-1.5 text-right whitespace-nowrap">{(h as any).tulaiFarmerPerBag || "0"}</td>
-                        <td className="p-1.5 text-right whitespace-nowrap">{(h as any).khadiKaraiFarmerPerBag || "0"}</td>
+                        <td className="p-1.5 text-right whitespace-nowrap">{h.tulaiFarmerPerBag || "0"}</td>
+                        <td className="p-1.5 text-right whitespace-nowrap">{h.khadiKaraiFarmerPerBag || "0"}</td>
                       </tr>
                     ))}
                   </tbody>
