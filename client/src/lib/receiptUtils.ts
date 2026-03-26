@@ -28,14 +28,26 @@ export function wrapWithDuplicate(html: string, altHtml?: string): string {
   }
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
-<style>
-@page { size: A4 landscape; margin: 5mm; }
-body { margin: 0; padding: 0; font-size: 11px; }
-.duplex-row { display: flex; flex-direction: row; width: 100%; box-sizing: border-box; }
-.copy-wrapper { width: 50%; box-sizing: border-box; padding: 4mm; page-break-inside: avoid; break-inside: avoid; overflow: hidden; }
-.cut-separator { width: 0; border-left: 1px dashed #999; margin: 4mm 0; }
-</style>
 ${headContent}
+<style>
+@page { size: A4 landscape; margin: 0 !important; }
+body { margin: 0 !important; padding: 5mm !important; font-size: 11px !important; }
+.duplex-row { display: flex; flex-direction: row; width: 100%; box-sizing: border-box; }
+.copy-wrapper { width: 50%; box-sizing: border-box; padding: 3mm; page-break-inside: avoid; break-inside: avoid; overflow: hidden; font-size: 11px !important; }
+.copy-wrapper .header { margin-bottom: 6px !important; }
+.copy-wrapper .firm-title { font-size: 15px !important; }
+.copy-wrapper .firm-address { font-size: 12px !important; }
+.copy-wrapper .tagline { font-size: 10px !important; }
+.copy-wrapper .page-info { font-size: 9px !important; }
+.copy-wrapper .buyer-row { font-size: 11px !important; }
+.copy-wrapper .buyer-row td { padding: 4px 5px !important; }
+.copy-wrapper table.items { font-size: 10px !important; }
+.copy-wrapper table.items th { font-size: 10px !important; }
+.copy-wrapper table.items th, .copy-wrapper table.items td { padding: 4px 4px !important; }
+.copy-wrapper .grand-total-row td { font-size: 11px !important; }
+.copy-wrapper .footer-notes { font-size: 10px !important; }
+.cut-separator { width: 0; border-left: 1px dashed #999; margin: 3mm 0; }
+</style>
 </head><body>
 <div class="duplex-row">
 <div class="copy-wrapper">${bodyContent}</div>
@@ -49,6 +61,12 @@ export async function printReceipt(html: string, fileName?: string) {
   const prevTitle = document.title;
   if (fileName) document.title = fileName.replace(/\.[^.]+$/, "");
 
+  const hasPageRule = html.includes("@page");
+  const noHeaderFooterStyle = hasPageRule
+    ? `<style>@page { margin: 0 !important; }</style>`
+    : `<style>@page { margin: 0 !important; } body { margin: 5mm !important; }</style>`;
+  const injectedHtml = html.replace("</head>", `${noHeaderFooterStyle}</head>`);
+
   const iframe = document.createElement("iframe");
   iframe.style.cssText =
     "position:fixed;top:-9999px;left:-9999px;width:1px;height:1px;opacity:0;border:none;";
@@ -57,7 +75,7 @@ export async function printReceipt(html: string, fileName?: string) {
   const doc = iframe.contentDocument ?? iframe.contentWindow?.document;
   if (doc) {
     doc.open();
-    doc.write(html);
+    doc.write(injectedHtml);
     doc.close();
   }
 
@@ -210,7 +228,7 @@ export async function shareReceiptAsImage(html: string, fileName: string): Promi
   const headStyles = extractHeadStyles(html);
 
   const container = document.createElement("div");
-  container.style.cssText = "position:fixed;left:-9999px;top:-9999px;z-index:-1;opacity:0;pointer-events:none;width:800px;";
+  container.style.cssText = "position:fixed;left:-9999px;top:-9999px;z-index:-1;opacity:0;pointer-events:none;width:800px;overflow:visible;";
 
   if (headStyles) {
     const styleEl = document.createElement("style");
@@ -219,6 +237,7 @@ export async function shareReceiptAsImage(html: string, fileName: string): Promi
   }
 
   const bodyWrapper = document.createElement("div");
+  bodyWrapper.style.cssText = "overflow:visible;padding-bottom:40px;";
   bodyWrapper.innerHTML = bodyHtml;
   container.appendChild(bodyWrapper);
 
@@ -226,12 +245,15 @@ export async function shareReceiptAsImage(html: string, fileName: string): Promi
 
   await new Promise(resolve => setTimeout(resolve, 300));
 
+  const fullHeight = bodyWrapper.scrollHeight;
+
   try {
     const canvas = await html2canvas(bodyWrapper, {
       scale: 2,
       useCORS: true,
       logging: false,
       windowWidth: 800,
+      height: fullHeight,
     });
 
     const pdfName = fileName.replace(/\.[^.]+$/, ".pdf");
