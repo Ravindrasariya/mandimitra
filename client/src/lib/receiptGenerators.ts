@@ -552,6 +552,11 @@ export function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[
   const txnRowsHtml = rows.map(r =>
     `<tr><td style="text-align:left">${r.crop}</td><td>${r.bags}</td><td>${r.nw.toFixed(2)}</td><td>${(r.rate * 100).toFixed(2)}</td><td>${r.gross.toFixed(2)}</td></tr>`
   ).join("");
+  const txnRowsFullHtml = rows.map(r => {
+    const rowAadhat = r.gross * aadhatPct / 100;
+    const rowMuddatAnya = r.gross * muddatAnyaPct / 100;
+    return `<tr><td style="text-align:left">${r.crop}</td><td>खुद</td><td>${r.bags}</td><td>${r.nw.toFixed(2)}</td><td>${(r.rate * 100).toFixed(2)}</td><td>${r.gross.toFixed(2)}</td><td>${rowAadhat.toFixed(2)}</td><td>${rowMuddatAnya.toFixed(2)}</td></tr>`;
+  }).join("");
   const summaryRowsHtml = rows.map(r =>
     `<tr><td>${r.gross.toFixed(2)}</td><td></td><td></td><td></td><td></td><td></td></tr>`
   ).join("");
@@ -591,6 +596,7 @@ export function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[
     "{{MUDDAT_ANYA_PCT}}": hideAadhat ? "" : String(muddatAnyaPct),
     "{{TOTAL_RECEIVABLE}}": hideAadhat ? "" : grandTotal.toFixed(2),
     "{{TXN_ROWS_HTML}}": txnRowsHtml,
+    "{{TXN_ROWS_FULL_HTML}}": txnRowsFullHtml,
     "{{SUMMARY_ROWS_HTML}}": summaryRowsHtml,
   };
   return Object.entries(replacements).reduce((html, [token, val]) => html.split(token).join(val), tmpl);
