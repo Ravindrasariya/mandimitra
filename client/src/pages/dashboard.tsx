@@ -39,6 +39,8 @@ type ChargeSettingsData = {
   muddatAnyaBuyerPercent: string;
   hammaliFarmerPerBag: string;
   hammaliBuyerPerBag: string;
+  tulaiFarmerPerBag: string;
+  khadiKaraiFarmerPerBag: string;
 };
 
 export default function DashboardPage() {
@@ -67,6 +69,8 @@ export default function DashboardPage() {
     muddatAnyaBuyerPercent: "0",
     hammaliFarmerPerBag: "0",
     hammaliBuyerPerBag: "0",
+    tulaiFarmerPerBag: "0",
+    khadiKaraiFarmerPerBag: "0",
   });
 
   const { data, isLoading } = useQuery<DashboardData>({
@@ -118,6 +122,8 @@ export default function DashboardPage() {
         muddatAnyaBuyerPercent: chargeSettings.muddatAnyaBuyerPercent || "0",
         hammaliFarmerPerBag: chargeSettings.hammaliFarmerPerBag || "0",
         hammaliBuyerPerBag: chargeSettings.hammaliBuyerPerBag || "0",
+        tulaiFarmerPerBag: chargeSettings.tulaiFarmerPerBag || "0",
+        khadiKaraiFarmerPerBag: chargeSettings.khadiKaraiFarmerPerBag || "0",
       });
     }
     setSettingsOpen(true);
@@ -827,6 +833,38 @@ export default function DashboardPage() {
             </div>
 
             <div className="space-y-2">
+              <Label className="text-sm font-semibold">Tulai (₹/bag)</Label>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">{t("dash.farmer")}</Label>
+                <Input
+                  data-testid="input-tulai-farmer"
+                  type="text"
+                  inputMode="decimal"
+                  value={chargeForm.tulaiFarmerPerBag}
+                  onChange={(e) => setChargeForm(f => ({ ...f, tulaiFarmerPerBag: e.target.value }))}
+                  onFocus={(e) => e.target.select()}
+                  className="mobile-touch-target"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold">Khadi Karai (₹/bag)</Label>
+              <div className="space-y-1">
+                <Label className="text-xs text-muted-foreground">{t("dash.farmer")}</Label>
+                <Input
+                  data-testid="input-khadi-karai-farmer"
+                  type="text"
+                  inputMode="decimal"
+                  value={chargeForm.khadiKaraiFarmerPerBag}
+                  onChange={(e) => setChargeForm(f => ({ ...f, khadiKaraiFarmerPerBag: e.target.value }))}
+                  onFocus={(e) => e.target.select()}
+                  className="mobile-touch-target"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
               <Label className="text-sm font-semibold">Overall Buyer Bill Mode</Label>
               <div className="flex h-9 rounded-md border text-sm overflow-hidden w-full">
                 <button
@@ -877,6 +915,8 @@ export default function DashboardPage() {
                       <th className="p-1.5 text-right font-medium">Aadhat F/B</th>
                       <th className="p-1.5 text-right font-medium">M+A F/B</th>
                       <th className="p-1.5 text-right font-medium">Hammali F/B</th>
+                      <th className="p-1.5 text-right font-medium">Tulai F</th>
+                      <th className="p-1.5 text-right font-medium">KK F</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -889,6 +929,8 @@ export default function DashboardPage() {
                         <td className="p-1.5 text-right whitespace-nowrap">{h.aadhatCommissionFarmerPercent}/{h.aadhatCommissionBuyerPercent}</td>
                         <td className="p-1.5 text-right whitespace-nowrap">{h.muddatAnyaFarmerPercent}/{h.muddatAnyaBuyerPercent}</td>
                         <td className="p-1.5 text-right whitespace-nowrap">{h.hammaliFarmerPerBag}/{h.hammaliBuyerPerBag}</td>
+                        <td className="p-1.5 text-right whitespace-nowrap">{(h as any).tulaiFarmerPerBag || "0"}</td>
+                        <td className="p-1.5 text-right whitespace-nowrap">{(h as any).khadiKaraiFarmerPerBag || "0"}</td>
                       </tr>
                     ))}
                   </tbody>

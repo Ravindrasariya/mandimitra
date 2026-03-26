@@ -1475,6 +1475,8 @@ export async function registerRoutes(
       muddatAnyaBuyerPercent: "0",
       hammaliFarmerPerBag: "0",
       hammaliBuyerPerBag: "0",
+      tulaiFarmerPerBag: "0",
+      khadiKaraiFarmerPerBag: "0",
     });
   });
 
@@ -1489,6 +1491,8 @@ export async function registerRoutes(
         muddatAnyaBuyerPercent: req.body.muddatAnyaBuyerPercent,
         hammaliFarmerPerBag: req.body.hammaliFarmerPerBag,
         hammaliBuyerPerBag: req.body.hammaliBuyerPerBag,
+        tulaiFarmerPerBag: req.body.tulaiFarmerPerBag,
+        khadiKaraiFarmerPerBag: req.body.khadiKaraiFarmerPerBag,
       });
       res.json(result);
     } catch (e: any) {

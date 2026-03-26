@@ -220,6 +220,8 @@ export const businessChargeSettings = pgTable("business_charge_settings", {
   muddatAnyaBuyerPercent: decimal("muddat_anya_buyer_percent", { precision: 5, scale: 2 }).default("0"),
   hammaliFarmerPerBag: decimal("hammali_farmer_per_bag", { precision: 10, scale: 2 }).default("0"),
   hammaliBuyerPerBag: decimal("hammali_buyer_per_bag", { precision: 10, scale: 2 }).default("0"),
+  tulaiFarmerPerBag: decimal("tulai_farmer_per_bag", { precision: 10, scale: 2 }).default("0"),
+  khadiKaraiFarmerPerBag: decimal("khadi_karai_farmer_per_bag", { precision: 10, scale: 2 }).default("0"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

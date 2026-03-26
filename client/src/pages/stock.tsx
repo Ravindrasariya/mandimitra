@@ -54,6 +54,8 @@ type ChargeSettings = {
   muddatAnyaBuyerPercent: string;
   hammaliFarmerPerBag: string;
   hammaliBuyerPerBag: string;
+  tulaiFarmerPerBag: string;
+  khadiKaraiFarmerPerBag: string;
 };
 
 const DEFAULT_CS: ChargeSettings = {
@@ -65,6 +67,8 @@ const DEFAULT_CS: ChargeSettings = {
   muddatAnyaBuyerPercent: "0",
   hammaliFarmerPerBag: "0",
   hammaliBuyerPerBag: "0",
+  tulaiFarmerPerBag: "0",
+  khadiKaraiFarmerPerBag: "0",
 };
 
 type TxnState = {
@@ -731,6 +735,43 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
   const { t } = useLanguage();
   const set = (field: keyof TxnState, val: any) => onChange({ ...txn, [field]: val });
 
+  const prevAutoRef = useRef({ bags, tulaiFRate: 0, kkFRate: 0 });
+  const tulaiFRate = parseFloat(cs.tulaiFarmerPerBag) || 0;
+  const kkFRate = parseFloat(cs.khadiKaraiFarmerPerBag) || 0;
+  useEffect(() => {
+    const prev = prevAutoRef.current;
+    if (bags > 0 && (tulaiFRate > 0 || kkFRate > 0)) {
+      const prevTulaiDefault = (prev.tulaiFRate * prev.bags).toFixed(2);
+      const prevKKDefault = (prev.kkFRate * prev.bags).toFixed(2);
+      const newTulai = (tulaiFRate * bags).toFixed(2);
+      const newKK = (kkFRate * bags).toFixed(2);
+      const curTulai = txn.extraTulai;
+      const curKK = txn.extraKhadiKarai;
+      const shouldUpdateTulai = tulaiFRate > 0 && (curTulai === "0" || curTulai === prevTulaiDefault || curTulai === "0.00");
+      const shouldUpdateKK = kkFRate > 0 && (curKK === "0" || curKK === prevKKDefault || curKK === "0.00");
+      if (shouldUpdateTulai || shouldUpdateKK) {
+        const nextTulai = shouldUpdateTulai ? newTulai : curTulai;
+        const nextKK = shouldUpdateKK ? newKK : curKK;
+        const sum = (parseFloat(nextTulai) || 0) + (parseFloat(txn.extraBharai) || 0) + (parseFloat(nextKK) || 0) + (parseFloat(txn.extraThelaBhada) || 0) + (parseFloat(txn.extraOthers) || 0);
+        onChange({ ...txn, extraTulai: nextTulai, extraKhadiKarai: nextKK, extraChargesFarmer: sum.toFixed(2) });
+      }
+    } else if (bags === 0) {
+      const prevTulaiDefault = (prev.tulaiFRate * prev.bags).toFixed(2);
+      const prevKKDefault = (prev.kkFRate * prev.bags).toFixed(2);
+      const curTulai = txn.extraTulai;
+      const curKK = txn.extraKhadiKarai;
+      const shouldResetTulai = curTulai === prevTulaiDefault && curTulai !== "0" && curTulai !== "0.00";
+      const shouldResetKK = curKK === prevKKDefault && curKK !== "0" && curKK !== "0.00";
+      if (shouldResetTulai || shouldResetKK) {
+        const nextTulai = shouldResetTulai ? "0" : curTulai;
+        const nextKK = shouldResetKK ? "0" : curKK;
+        const sum = (parseFloat(nextTulai) || 0) + (parseFloat(txn.extraBharai) || 0) + (parseFloat(nextKK) || 0) + (parseFloat(txn.extraThelaBhada) || 0) + (parseFloat(txn.extraOthers) || 0);
+        onChange({ ...txn, extraTulai: nextTulai, extraKhadiKarai: nextKK, extraChargesFarmer: sum.toFixed(2) });
+      }
+    }
+    prevAutoRef.current = { bags, tulaiFRate, kkFRate };
+  }, [bags, tulaiFRate, kkFRate]);
+
   // ── Weight calc ──
   const updateSample = (idx: number, val: string) => {
     const updated = [...txn.sampleWeights];
@@ -757,6 +798,8 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
   const farmerGross = nw * (pricePerKg + epkFarmer);
   const buyerGross = nw * (pricePerKg + epkBuyer);
 
+  const tulaiFarmerRate = parseFloat(cs.tulaiFarmerPerBag) || 0;
+  const khadiKaraiFarmerRate = parseFloat(cs.khadiKaraiFarmerPerBag) || 0;
   const hammaliFarmerRate = parseFloat(cs.hammaliFarmerPerBag) || 0;
   const hammaliBuyerRate = parseFloat(cs.hammaliBuyerPerBag) || 0;
   const extraFarmer = parseFloat(txn.extraChargesFarmer) || 0;
@@ -946,9 +989,9 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
                   <span className="text-muted-foreground">{label}:</span>
                   <Input
                     data-testid={`input-${field}`}
-                    type="text" inputMode="decimal"
+                    type="text" inputMode={field === "extraOthers" ? "text" : "decimal"}
                     value={val}
-                    onChange={e => updateExtraBreakdown(field, toNum(e.target.value))}
+                    onChange={e => updateExtraBreakdown(field, field === "extraOthers" ? e.target.value.replace(/[^0-9.\-]/g, "") : toNum(e.target.value))}
                     onFocus={e => e.currentTarget.select()}
                     className="w-16 h-6 text-xs text-right p-1"
                   />
