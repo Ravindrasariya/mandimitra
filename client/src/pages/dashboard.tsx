@@ -832,10 +832,9 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold">Tulai (₹/bag)</Label>
+            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">{t("dash.farmer")}</Label>
+                <Label className="text-sm font-semibold">Tulai (₹/bag)</Label>
                 <Input
                   data-testid="input-tulai-farmer"
                   type="text"
@@ -846,12 +845,8 @@ export default function DashboardPage() {
                   className="mobile-touch-target"
                 />
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold">Khadi Karai (₹/bag)</Label>
               <div className="space-y-1">
-                <Label className="text-xs text-muted-foreground">{t("dash.farmer")}</Label>
+                <Label className="text-sm font-semibold">Khadi Karai (₹/bag)</Label>
                 <Input
                   data-testid="input-khadi-karai-farmer"
                   type="text"
