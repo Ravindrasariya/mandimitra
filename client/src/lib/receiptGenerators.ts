@@ -280,7 +280,7 @@ export function applyFarmerTemplate(tmpl: string, sg: UnifiedSerialGroup, busine
   return Object.entries(replacements).reduce((html, [token, val]) => html.split(token).join(val), tmpl);
 }
 
-export function applyBuyerTemplate(tmpl: string, lot: Lot, farmer: Farmer, tx: TransactionWithDetails, businessName?: string, businessAddress?: string, businessInitials?: string, businessPhone?: string, businessLicenceNo?: string, businessShopNo?: string): string {
+export function applyBuyerTemplate(tmpl: string, lot: Lot, farmer: Farmer, tx: TransactionWithDetails, businessName?: string, businessAddress?: string, businessInitials?: string, businessPhone?: string, businessLicenceNo?: string, businessShopNo?: string, hideAadhat?: boolean): string {
   const nw = parseFloat(tx.netWeight || "0");
   const ppk = parseFloat(tx.pricePerKg || "0");
   const epkBuyer = parseFloat((tx as any).extraPerKgBuyer || "0");
@@ -324,11 +324,11 @@ export function applyBuyerTemplate(tmpl: string, lot: Lot, farmer: Farmer, tx: T
     "{{SUMMARY_ROWS_HTML}}": singleSummaryRowHtml,
     "{{HAMMALI}}": hammaliBuyer.toFixed(2),
     "{{EXTRA_CHARGES}}": extraBuyer.toFixed(2),
-    "{{AADHAT}}": aadhatBuyer.toFixed(2),
-    "{{AADHAT_PCT}}": tx.aadhatBuyerPercent || "0",
-    "{{MANDI_CHARGES}}": mandiBuyer.toFixed(2),
-    "{{MANDI_PCT}}": tx.mandiBuyerPercent || "0",
-    "{{TOTAL_RECEIVABLE}}": parseFloat(tx.totalReceivableFromBuyer || "0").toFixed(2),
+    "{{AADHAT}}": hideAadhat ? "" : aadhatBuyer.toFixed(2),
+    "{{AADHAT_PCT}}": hideAadhat ? "" : (tx.aadhatBuyerPercent || "0"),
+    "{{MANDI_CHARGES}}": hideAadhat ? "" : mandiBuyer.toFixed(2),
+    "{{MANDI_PCT}}": hideAadhat ? "" : (tx.mandiBuyerPercent || "0"),
+    "{{TOTAL_RECEIVABLE}}": hideAadhat ? "" : parseFloat(tx.totalReceivableFromBuyer || "0").toFixed(2),
   };
   return Object.entries(replacements).reduce((html, [token, val]) => html.split(token).join(val), tmpl);
 }
@@ -521,7 +521,7 @@ ${!hideAadhat ? `<div class="summary-row total"><span>Total Receivable from Buye
 </body></html>`;
 }
 
-export function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[], serialNumber: number, date: string, businessName?: string, businessAddress?: string, businessInitials?: string, businessPhone?: string, businessLicenceNo?: string, businessShopNo?: string, receiptSerialNumber?: number, farmer?: { name: string; village?: string }): string {
+export function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[], serialNumber: number, date: string, businessName?: string, businessAddress?: string, businessInitials?: string, businessPhone?: string, businessLicenceNo?: string, businessShopNo?: string, receiptSerialNumber?: number, farmer?: { name: string; village?: string }, hideAadhat?: boolean): string {
   const firstTx = entries[0].tx;
   const firstLot = entries[0].lot;
   const aadhatPct = parseFloat(firstTx.aadhatBuyerPercent || "0");
@@ -583,13 +583,13 @@ export function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[
     "{{TOTAL_GROSS_AMOUNT}}": totalGross.toFixed(2),
     "{{HAMMALI}}": totalHammali.toFixed(2),
     "{{EXTRA_CHARGES}}": totalExtra.toFixed(2),
-    "{{AADHAT}}": totalAadhat.toFixed(2),
-    "{{AADHAT_PCT}}": String(aadhatPct),
-    "{{MANDI_CHARGES}}": totalMandi.toFixed(2),
-    "{{MANDI_PCT}}": String(mandiPct),
-    "{{MUDDAT_ANYA}}": totalMuddatAnya.toFixed(2),
-    "{{MUDDAT_ANYA_PCT}}": String(muddatAnyaPct),
-    "{{TOTAL_RECEIVABLE}}": grandTotal.toFixed(2),
+    "{{AADHAT}}": hideAadhat ? "" : totalAadhat.toFixed(2),
+    "{{AADHAT_PCT}}": hideAadhat ? "" : String(aadhatPct),
+    "{{MANDI_CHARGES}}": hideAadhat ? "" : totalMandi.toFixed(2),
+    "{{MANDI_PCT}}": hideAadhat ? "" : String(mandiPct),
+    "{{MUDDAT_ANYA}}": hideAadhat ? "" : totalMuddatAnya.toFixed(2),
+    "{{MUDDAT_ANYA_PCT}}": hideAadhat ? "" : String(muddatAnyaPct),
+    "{{TOTAL_RECEIVABLE}}": hideAadhat ? "" : grandTotal.toFixed(2),
     "{{TXN_ROWS_HTML}}": txnRowsHtml,
     "{{SUMMARY_ROWS_HTML}}": summaryRowsHtml,
   };

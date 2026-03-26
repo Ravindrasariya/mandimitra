@@ -1739,11 +1739,11 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
       const genBuyerHtml = (hide?: boolean) => {
         if (entries.length === 1) {
           return customTmpl
-            ? applyBuyerTemplate(customTmpl.templateHtml, entries[0].lot, data.sg.farmer, entries[0].tx, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo)
+            ? applyBuyerTemplate(customTmpl.templateHtml, entries[0].lot, data.sg.farmer, entries[0].tx, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo, hide)
             : generateBuyerReceiptHtml(entries[0].lot, data.sg.farmer, entries[0].tx, user?.businessName, user?.businessAddress, hide);
         } else {
           return customTmpl
-            ? applyCombinedBuyerTemplate(customTmpl.templateHtml, entries, data.sg.serialNumber, data.sg.date, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo, undefined, data.sg.farmer)
+            ? applyCombinedBuyerTemplate(customTmpl.templateHtml, entries, data.sg.serialNumber, data.sg.date, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo, undefined, data.sg.farmer, hide)
             : generateCombinedBuyerReceiptHtml(entries, data.sg.serialNumber, data.sg.date, user?.businessName, user?.businessAddress, user?.businessPhone, hide);
         }
       };
@@ -4301,7 +4301,7 @@ export default function StockPage() {
       const shouldHideAadhat = printBillMode === "hide-aadhat";
       const copy2Html = shouldHideAadhat
         ? (overallTmpl
-            ? applyCombinedBuyerTemplate(overallTmpl.templateHtml, entries, 0, receiptDate, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo, receiptSerialNumber)
+            ? applyCombinedBuyerTemplate(overallTmpl.templateHtml, entries, 0, receiptDate, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo, receiptSerialNumber, undefined, true)
             : generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress, receiptSerialNumber, true, user?.businessPhone))
         : undefined;
       const printHtml = wrapWithDuplicate(copy1Html, copy2Html);
