@@ -555,7 +555,7 @@ export function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[
   const txnRowsFullHtml = rows.map(r => {
     const rowAadhat = r.gross * aadhatPct / 100;
     const rowMuddatAnya = r.gross * muddatAnyaPct / 100;
-    return `<tr><td style="text-align:left">${r.crop}</td><td>खुद</td><td>${r.bags}</td><td>${r.nw.toFixed(2)}</td><td>${(r.rate * 100).toFixed(2)}</td><td>${r.gross.toFixed(2)}</td><td>${rowAadhat.toFixed(2)}</td><td>${rowMuddatAnya.toFixed(2)}</td></tr>`;
+    return `<tr><td style="text-align:left">${r.crop}</td><td>खुद</td><td>${r.bags}</td><td>${r.nw.toFixed(2)}</td><td>${(r.rate * 100).toFixed(2)}</td><td>${r.gross.toFixed(2)}</td><td>${hideAadhat ? "" : rowAadhat.toFixed(2)}</td><td>${hideAadhat ? "" : rowMuddatAnya.toFixed(2)}</td></tr>`;
   }).join("");
   const summaryRowsHtml = rows.map(r =>
     `<tr><td>${r.gross.toFixed(2)}</td><td></td><td></td><td></td><td></td><td></td></tr>`
