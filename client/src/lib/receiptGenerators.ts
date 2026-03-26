@@ -236,14 +236,24 @@ export function applyFarmerTemplate(tmpl: string, sg: UnifiedSerialGroup, busine
   const totalNetWeight = allTxns.reduce((s, t) => s + parseFloat(t.netWeight || "0"), 0);
   const netPayable = totalGross - totalDeduction;
 
-  const txnRowsHtml = allTxns.map(t => {
+  const dataRows = allTxns.map(t => {
     const nw = parseFloat(t.netWeight || "0");
     const epk = parseFloat((t as any).extraPerKgFarmer || "0");
     const rate = parseFloat(t.pricePerKg || "0") + epk;
     const gross = nw * rate;
     const crop = t.lot?.crop || firstLot?.crop || "";
     return `<tr><td>${cropLabel[crop] || crop}</td><td>${t.numberOfBags || 0}</td><td>${nw.toFixed(2)}</td><td>${(rate * 100).toFixed(2)}</td><td>${gross.toFixed(2)}</td></tr>`;
-  }).join("");
+  });
+  const MIN_PRODUCE_ROWS = 7;
+  const blankRowCount = Math.max(0, MIN_PRODUCE_ROWS - dataRows.length);
+  const blankRow = `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>`;
+  const txnRowsHtml = dataRows.join("") + Array(blankRowCount).fill(blankRow).join("");
+
+  const bankParts: string[] = [];
+  if (farmer.bankAccountNumber) bankParts.push(`<span class="bold">खाता नं :</span> ${farmer.bankAccountNumber}`);
+  if (farmer.ifscCode) bankParts.push(`<span class="bold">IFSC :</span> ${farmer.ifscCode}`);
+  if (farmer.bankName) bankParts.push(`<span class="bold">बैंक :</span> ${farmer.bankName}`);
+  const farmerBankRow = bankParts.length > 0 ? bankParts.join(" &nbsp;&nbsp; ") : "";
 
   const replacements: Record<string, string> = {
     "{{BUSINESS_NAME}}": businessName || "",
@@ -258,6 +268,10 @@ export function applyFarmerTemplate(tmpl: string, sg: UnifiedSerialGroup, busine
     "{{FARMER_VILLAGE}}": farmer.village || "",
     "{{FARMER_TEHSIL}}": farmer.tehsil || "",
     "{{FARMER_DISTRICT}}": farmer.district || "",
+    "{{FARMER_BANK_ACCOUNT}}": farmer.bankAccountNumber || "",
+    "{{FARMER_IFSC}}": farmer.ifscCode || "",
+    "{{FARMER_BANK_NAME}}": farmer.bankName || "",
+    "{{FARMER_BANK_ROW}}": farmerBankRow,
     "{{VEHICLE_NUMBER}}": firstLot?.vehicleNumber || "",
     "{{TOTAL_BAGS}}": String(sg.totalBags),
     "{{NET_WEIGHT}}": totalNetWeight.toFixed(2),
