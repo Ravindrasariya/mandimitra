@@ -57,6 +57,22 @@ body { margin: 0 !important; padding: 5mm !important; font-size: 11px !important
 </body></html>`;
 }
 
+export function wrapPortraitSingle(html: string): string {
+  const headMatch = html.match(/<head[^>]*>([\s\S]*?)<\/head>/i);
+  const headContent = headMatch ? headMatch[1] : "";
+  const bodyContent = extractBodyHtml(html);
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8">
+${headContent}
+<style>
+@page { size: A4 portrait; margin: 0 !important; }
+body { margin: 0 !important; padding: 5mm !important; }
+</style>
+</head><body>
+${bodyContent}
+</body></html>`;
+}
+
 export async function printReceipt(html: string, fileName?: string) {
   const prevTitle = document.title;
   if (fileName) document.title = fileName.replace(/\.[^.]+$/, "");

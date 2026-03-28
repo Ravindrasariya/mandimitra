@@ -27,7 +27,7 @@ import { format } from "date-fns";
 import { CROPS, SIZES, DISTRICTS } from "@shared/schema";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem, CommandGroup } from "@/components/ui/command";
-import { printReceipt, shareReceiptAsImage, generateBidCopyHtml, wrapWithDuplicate, type BidCropSection } from "@/lib/receiptUtils";
+import { printReceipt, shareReceiptAsImage, generateBidCopyHtml, wrapWithDuplicate, wrapPortraitSingle, type BidCropSection } from "@/lib/receiptUtils";
 import {
   generateFarmerReceiptHtml, generateBuyerReceiptHtml, generateCombinedBuyerReceiptHtml,
   generateAllBuyerReceiptHtml,
@@ -1792,9 +1792,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
       const safeName = buyerName.replace(/[^a-zA-Z0-9]/g, "_");
       const buyerFileName = `Buyer_Receipt_${safeName}_${crop}_${farmerDate}.pdf`;
       if (action === "print") {
-        const shouldHideAadhat = printBillMode === "hide-aadhat";
-        const copy2Html = shouldHideAadhat ? genBuyerHtml(true) : undefined;
-        const printHtml = wrapWithDuplicate(copy1Html, copy2Html);
+        const printHtml = wrapPortraitSingle(copy1Html);
         await printReceipt(printHtml, buyerFileName);
       } else {
         await shareReceiptAsImage(copy1Html, buyerFileName);
