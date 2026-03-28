@@ -6,11 +6,7 @@
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: Arial, sans-serif; font-size: 13px; color: #000; }
-.page-wrapper { display: flex; flex-direction: column; min-height: 1100px; }
 .receipt-copy { width: 100%; padding: 12px 18px; }
-.receipt-copy.main-copy { flex: 1; display: flex; flex-direction: column; }
-.produce-wrap { flex: 1; display: flex; flex-direction: column; }
-table.produce { flex: 1; }
 .cut-line { text-align: center; padding: 4px 0; font-size: 10px; color: #555; border-top: 1.5px dashed #888; border-bottom: 1.5px dashed #888; margin: 6px 0; }
 .header { text-align: center; margin-bottom: 8px; }
 .firm-title { font-size: 18px; font-weight: bold; }
@@ -27,7 +23,6 @@ table.produce { width: 100%; border-collapse: collapse; font-size: 12.5px; margi
 table.produce th { border: 1px solid #000; padding: 6px 8px; text-align: center; background: #f0f0f0; }
 table.produce td { border-left: 1px solid #000; border-right: 1px solid #000; border-top: none; border-bottom: none; padding: 6px 8px; text-align: center; }
 table.produce td:first-child, table.produce th:first-child { text-align: left; }
-table.produce tbody td { vertical-align: top; }
 table.summary { width: 100%; border-collapse: collapse; font-size: 12px; margin: 6px 0; }
 table.summary th, table.summary td { border: 1px solid #000; padding: 6px 8px; text-align: center; font-size: 12px; }
 table.summary th { background: #f0f0f0; }
@@ -36,18 +31,13 @@ table.summary th { background: #f0f0f0; }
 .slip-table td { padding: 10px 10px; vertical-align: top; }
 .slip-table tr td { border-bottom: 1px solid #000; }
 .slip-table tr:last-child td { border-bottom: none; }
-@media print {
-  body { margin: 8mm; }
-  .page-wrapper { min-height: auto; height: 100vh; }
-}
+@media print { body { margin: 8mm; } }
 </style>
 </head>
 <body>
 
-<div class="page-wrapper">
-
 <!-- ========== COPY 1 (MAIN MANDI RECEIPT) ========== -->
-<div class="receipt-copy main-copy">
+<div class="receipt-copy">
   <div class="header">
     <div class="firm-title">{{BUSINESS_NAME}}</div>
     <div class="firm-address">देवी अहिल्या फल सब्जी मंडी, इंदौर (म.प्र.)</div>
@@ -87,25 +77,23 @@ table.summary th { background: #f0f0f0; }
     </tr>
   </table>
 
-  <div class="produce-wrap">
-    <table class="produce">
-      <thead>
-        <tr>
-          <th>कृषि उपज का नाम</th>
-          <th>संख्या</th>
-          <th>वास्तविक वजन</th>
-          <th>दर प्रति किंटल</th>
-          <th>कृषि उपज का मूल्य</th>
-        </tr>
-        <tr>
-          <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th>
-        </tr>
-      </thead>
-      <tbody>
-        {{TXN_ROWS_HTML}}
-      </tbody>
-    </table>
-  </div>
+  <table class="produce">
+    <thead>
+      <tr>
+        <th>कृषि उपज का नाम</th>
+        <th>संख्या</th>
+        <th>वास्तविक वजन</th>
+        <th>दर प्रति किंटल</th>
+        <th>कृषि उपज का मूल्य</th>
+      </tr>
+      <tr>
+        <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{TXN_ROWS_HTML}}
+    </tbody>
+  </table>
 
   <table class="summary">
     <thead>
@@ -186,8 +174,6 @@ table.summary th { background: #f0f0f0; }
     <div>{{FARMER_BANK_ROW}}</div>
     <div>विक्रेता /कृषक के भुगतान प्राप्ति के हस्ताक्षर</div>
   </div>
-</div>
-
 </div>
 
 </body>
