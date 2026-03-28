@@ -6,30 +6,30 @@
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 @page { size: A4 portrait; margin: 0; }
-body { font-family: Arial, sans-serif; font-size: 10.5px; color: #000; }
-.receipt-copy { width: 100%; padding: 8px 12px; }
-.cut-line { text-align: center; padding: 3px 0; font-size: 9px; color: #555; border-top: 1px dashed #888; border-bottom: 1px dashed #888; margin: 4px 0; }
-.header { text-align: center; margin-bottom: 6px; }
-.firm-title { font-size: 15px; font-weight: bold; }
-.firm-address { font-size: 11px; margin-bottom: 2px; }
-.mandi-line { font-size: 10px; margin: 1px 0; }
-.fields-row { display: flex; justify-content: space-between; align-items: center; margin: 5px 0; font-size: 10.5px; }
+body { font-family: Arial, sans-serif; font-size: 12px; color: #000; margin: 0; padding: 0; }
+.receipt-copy { width: 100%; height: 49%; padding: 8px 14px; display: flex; flex-direction: column; overflow: hidden; }
+.cut-line { text-align: center; padding: 2px 0; font-size: 9px; color: #555; border-top: 1px dashed #888; border-bottom: 1px dashed #888; height: 2%; }
+.header { text-align: center; margin-bottom: 5px; }
+.firm-title { font-size: 17px; font-weight: bold; }
+.firm-address { font-size: 13px; margin-bottom: 2px; }
+.mandi-line { font-size: 11px; margin: 1px 0; }
+.fields-row { display: flex; justify-content: space-between; align-items: center; margin: 4px 0; font-size: 12px; }
 .bold { font-weight: bold; }
-.info-grid { width: 100%; border-collapse: collapse; font-size: 10.5px; margin: 4px 0; }
-.info-grid td { padding: 2px 3px; vertical-align: middle; }
-.label-col { width: 140px; }
+.info-grid { width: 100%; border-collapse: collapse; font-size: 12px; margin: 3px 0; }
+.info-grid td { padding: 2px 4px; vertical-align: middle; }
+.label-col { width: 150px; }
 .colon-col { width: 8px; }
-.right-col { text-align: right; width: 160px; white-space: nowrap; }
-.duplicate-badge { border: 1.5px solid #000; padding: 1px 7px; font-size: 9px; font-weight: bold; }
-table.produce { width: 100%; border-collapse: collapse; font-size: 10px; margin: 5px 0; }
-table.produce th, table.produce td { border: 1px solid #000; padding: 3px 5px; text-align: center; }
+.right-col { text-align: right; width: 170px; white-space: nowrap; }
+.duplicate-badge { border: 1.5px solid #000; padding: 1px 7px; font-size: 10px; font-weight: bold; }
+table.produce { width: 100%; border-collapse: collapse; font-size: 11.5px; margin: 4px 0; flex: 1; }
+table.produce th, table.produce td { border: 1px solid #000; padding: 4px 5px; text-align: center; }
 table.produce th { background: #f0f0f0; }
 table.produce td:first-child, table.produce th:first-child { text-align: left; }
-table.summary { width: 100%; border-collapse: collapse; font-size: 10px; margin: 4px 0; }
-table.summary th, table.summary td { border: 1px solid #000; padding: 3px 5px; text-align: center; font-size: 10px; }
-table.summary th { background: #f0f0f0; }
-.footer-row { display: flex; justify-content: space-between; margin-top: 8px; font-size: 10.5px; }
-.note { font-size: 7.5px; line-height: 1.45; margin-top: 5px; text-align: justify; }
+table.summary { width: 100%; border-collapse: collapse; font-size: 11px; margin: 3px 0; }
+table.summary th, table.summary td { border: 1px solid #000; padding: 4px 5px; text-align: center; }
+table.summary th { background: #f0f0f0; font-size: 10px; }
+.footer-row { display: flex; justify-content: space-between; margin-top: 6px; font-size: 12px; }
+.note { font-size: 7.5px; line-height: 1.45; margin-top: 4px; text-align: justify; }
 @media print { body { margin: 5mm; } }
 </style>
 </head>
@@ -95,14 +95,14 @@ table.summary th { background: #f0f0f0; }
     <thead>
       <tr>
         <th rowspan="2" style="width:16%">कुल रकम</th>
-        <th rowspan="2" style="width:18%;font-size:8.5px">उपविधि अनुसार कुल हमाली आदि मदों में काटी जाएगी</th>
+        <th rowspan="2" style="width:18%">उपविधि अनुसार कुल हमाली आदि मदों में काटी जाएगी</th>
         <th rowspan="2" style="width:14%">ट्रक भाड़ा / अन्य</th>
-        <th rowspan="2" style="width:15%;font-size:8.5px">विक्रेता / कृषक को देय रकम</th>
+        <th rowspan="2" style="width:15%">विक्रेता / कृषक को देय रकम</th>
         <th colspan="2">विक्रेता/कृषक को भुगतान</th>
       </tr>
       <tr>
-        <th style="width:12%;font-size:8.5px">नगत भुगतान राशि</th>
-        <th style="font-size:8px">आरटीजीएस / एनईएफटी / ऑनलाइन भुगतान का यूटीआर</th>
+        <th style="width:12%">नगत भुगतान राशि</th>
+        <th>आरटीजीएस / एनईएफटी / ऑनलाइन भुगतान का यूटीआर</th>
       </tr>
       <tr>
         <th>6</th><th>7</th><th>8</th><th>9</th><th>10</th><th>11</th>
@@ -186,14 +186,14 @@ table.summary th { background: #f0f0f0; }
     <thead>
       <tr>
         <th rowspan="2" style="width:16%">कुल रकम</th>
-        <th rowspan="2" style="width:18%;font-size:8.5px">उपविधि अनुसार कुल हमाली आदि मदों में काटी जाएगी</th>
+        <th rowspan="2" style="width:18%">उपविधि अनुसार कुल हमाली आदि मदों में काटी जाएगी</th>
         <th rowspan="2" style="width:14%">ट्रक भाड़ा / अन्य</th>
-        <th rowspan="2" style="width:15%;font-size:8.5px">विक्रेता / कृषक को देय रकम</th>
+        <th rowspan="2" style="width:15%">विक्रेता / कृषक को देय रकम</th>
         <th colspan="2">विक्रेता/कृषक को भुगतान</th>
       </tr>
       <tr>
-        <th style="width:12%;font-size:8.5px">नगत भुगतान राशि</th>
-        <th style="font-size:8px">आरटीजीएस / एनईएफटी / ऑनलाइन भुगतान का यूटीआर</th>
+        <th style="width:12%">नगत भुगतान राशि</th>
+        <th>आरटीजीएस / एनईएफटी / ऑनलाइन भुगतान का यूटीआर</th>
       </tr>
       <tr>
         <th>6</th><th>7</th><th>8</th><th>9</th><th>10</th><th>11</th>
