@@ -307,11 +307,7 @@ export function applyBuyerTemplate(tmpl: string, lot: Lot, farmer: Farmer, tx: T
   const aadhatBuyer = grossAmount * parseFloat(tx.aadhatBuyerPercent || "0") / 100;
   const mandiBuyer = grossAmount * parseFloat(tx.mandiBuyerPercent || "0") / 100;
 
-  const MIN_PRODUCE_ROWS = 3;
-  const blankRow = `<tr><td style="text-align:left">&nbsp;</td><td></td><td></td><td></td><td></td></tr>`;
-  const dataRows = `<tr><td style="text-align:left">${lot.crop}</td><td>${bags}</td><td>${nw.toFixed(2)}</td><td>${ratePerQuintal.toFixed(2)}</td><td>${grossAmount.toFixed(2)}</td></tr>`;
-  const fillerCount = Math.max(0, MIN_PRODUCE_ROWS - 1);
-  const singleRowHtml = dataRows + blankRow.repeat(fillerCount);
+  const singleRowHtml = `<tr><td style="text-align:left">${lot.crop}</td><td>${bags}</td><td>${nw.toFixed(2)}</td><td>${ratePerQuintal.toFixed(2)}</td><td>${grossAmount.toFixed(2)}</td></tr>`;
   const singleSummaryRowHtml = `<tr><td>${grossAmount.toFixed(2)}</td><td></td><td></td><td></td><td></td><td></td></tr>`;
 
   const replacements: Record<string, string> = {
@@ -567,13 +563,9 @@ export function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[
   const grandTotal = totalGross + totalHammali + totalExtra + totalAadhat + totalMandi + totalMuddatAnya;
   const firstRatePerQuintal = rows[0].rate * 100;
 
-  const MIN_BUYER_ROWS = 3;
-  const blankRow5 = `<tr><td style="text-align:left">&nbsp;</td><td></td><td></td><td></td><td></td></tr>`;
-  const dataRowsHtml = rows.map(r =>
+  const txnRowsHtml = rows.map(r =>
     `<tr><td style="text-align:left">${r.crop}</td><td>${r.bags}</td><td>${r.nw.toFixed(2)}</td><td>${(r.rate * 100).toFixed(2)}</td><td>${r.gross.toFixed(2)}</td></tr>`
   ).join("");
-  const fillerNeeded = Math.max(0, MIN_BUYER_ROWS - rows.length);
-  const txnRowsHtml = dataRowsHtml + blankRow5.repeat(fillerNeeded);
   const txnRowsFullHtml = rows.map(r => {
     const rowAadhat = r.gross * aadhatPct / 100;
     const rowMuddatAnya = r.gross * muddatAnyaPct / 100;

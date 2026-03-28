@@ -6,30 +6,33 @@
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 @page { size: A4 portrait; margin: 0; }
-body { font-family: Arial, sans-serif; font-size: 12px; color: #000; margin: 0; padding: 0; }
-.receipt-copy { width: 100%; height: 49%; padding: 8px 14px; display: flex; flex-direction: column; overflow: hidden; }
-.cut-line { text-align: center; padding: 2px 0; font-size: 9px; color: #555; border-top: 1px dashed #888; border-bottom: 1px dashed #888; height: 2%; }
-.header { text-align: center; margin-bottom: 5px; }
-.firm-title { font-size: 17px; font-weight: bold; }
-.firm-address { font-size: 13px; margin-bottom: 2px; }
-.mandi-line { font-size: 11px; margin: 1px 0; }
-.fields-row { display: flex; justify-content: space-between; align-items: center; margin: 4px 0; font-size: 12px; }
+html, body { height: 100%; margin: 0; padding: 0; }
+body { font-family: Arial, sans-serif; font-size: 11.5px; color: #000; display: flex; flex-direction: column; }
+.receipt-copy { width: 100%; height: 49%; padding: 6px 14px; display: flex; flex-direction: column; overflow: hidden; }
+.cut-line { text-align: center; padding: 1px 0; font-size: 9px; color: #555; border-top: 1px dashed #888; border-bottom: 1px dashed #888; height: 2%; }
+.header { text-align: center; margin-bottom: 4px; }
+.firm-title { font-size: 16px; font-weight: bold; }
+.firm-address { font-size: 12px; margin-bottom: 1px; }
+.mandi-line { font-size: 10.5px; margin: 1px 0; }
+.fields-row { display: flex; justify-content: space-between; align-items: center; margin: 3px 0; font-size: 11.5px; }
 .bold { font-weight: bold; }
-.info-grid { width: 100%; border-collapse: collapse; font-size: 12px; margin: 3px 0; }
-.info-grid td { padding: 2px 4px; vertical-align: middle; }
+.info-grid { width: 100%; border-collapse: collapse; font-size: 11.5px; margin: 2px 0; }
+.info-grid td { padding: 1px 4px; vertical-align: middle; }
 .label-col { width: 150px; }
 .colon-col { width: 8px; }
 .right-col { text-align: right; width: 170px; white-space: nowrap; }
 .duplicate-badge { border: 1.5px solid #000; padding: 1px 7px; font-size: 10px; font-weight: bold; }
-table.produce { width: 100%; border-collapse: collapse; font-size: 11.5px; margin: 4px 0; flex: 1; }
-table.produce th, table.produce td { border: 1px solid #000; padding: 4px 5px; text-align: center; }
+.produce-wrap { flex: 1; display: flex; flex-direction: column; }
+table.produce { width: 100%; border-collapse: collapse; font-size: 11px; flex: 1; }
+table.produce th, table.produce td { border: 1px solid #000; padding: 3px 5px; text-align: center; }
 table.produce th { background: #f0f0f0; }
 table.produce td:first-child, table.produce th:first-child { text-align: left; }
-table.summary { width: 100%; border-collapse: collapse; font-size: 11px; margin: 3px 0; }
-table.summary th, table.summary td { border: 1px solid #000; padding: 4px 5px; text-align: center; }
-table.summary th { background: #f0f0f0; font-size: 10px; }
-.footer-row { display: flex; justify-content: space-between; margin-top: 6px; font-size: 12px; }
-.note { font-size: 7.5px; line-height: 1.45; margin-top: 4px; text-align: justify; }
+table.produce tbody td { vertical-align: top; }
+table.summary { width: 100%; border-collapse: collapse; font-size: 10.5px; margin: 2px 0; }
+table.summary th, table.summary td { border: 1px solid #000; padding: 3px 5px; text-align: center; }
+table.summary th { background: #f0f0f0; font-size: 9.5px; }
+.footer-row { display: flex; justify-content: space-between; margin-top: 4px; font-size: 11.5px; }
+.note { font-size: 7.5px; line-height: 1.45; margin-top: 3px; text-align: justify; }
 @media print { body { margin: 5mm; } }
 </style>
 </head>
@@ -73,23 +76,25 @@ table.summary th { background: #f0f0f0; font-size: 10px; }
     </tr>
   </table>
 
-  <table class="produce">
-    <thead>
-      <tr>
-        <th>कृषि उपज का नाम</th>
-        <th>सौदा नग</th>
-        <th>वास्तविक वजन</th>
-        <th>दर प्रति किंटल</th>
-        <th>कृषि उपज का मूल्य</th>
-      </tr>
-      <tr>
-        <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th>
-      </tr>
-    </thead>
-    <tbody>
-      {{TXN_ROWS_HTML}}
-    </tbody>
-  </table>
+  <div class="produce-wrap">
+    <table class="produce">
+      <thead>
+        <tr>
+          <th>कृषि उपज का नाम</th>
+          <th>सौदा नग</th>
+          <th>वास्तविक वजन</th>
+          <th>दर प्रति किंटल</th>
+          <th>कृषि उपज का मूल्य</th>
+        </tr>
+        <tr>
+          <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{TXN_ROWS_HTML}}
+      </tbody>
+    </table>
+  </div>
 
   <table class="summary">
     <thead>
@@ -164,23 +169,25 @@ table.summary th { background: #f0f0f0; font-size: 10px; }
     </tr>
   </table>
 
-  <table class="produce">
-    <thead>
-      <tr>
-        <th>कृषि उपज का नाम</th>
-        <th>सौदा नग</th>
-        <th>वास्तविक वजन</th>
-        <th>दर प्रति किंटल</th>
-        <th>कृषि उपज का मूल्य</th>
-      </tr>
-      <tr>
-        <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th>
-      </tr>
-    </thead>
-    <tbody>
-      {{TXN_ROWS_HTML}}
-    </tbody>
-  </table>
+  <div class="produce-wrap">
+    <table class="produce">
+      <thead>
+        <tr>
+          <th>कृषि उपज का नाम</th>
+          <th>सौदा नग</th>
+          <th>वास्तविक वजन</th>
+          <th>दर प्रति किंटल</th>
+          <th>कृषि उपज का मूल्य</th>
+        </tr>
+        <tr>
+          <th>1</th><th>2</th><th>3</th><th>4</th><th>5</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{TXN_ROWS_HTML}}
+      </tbody>
+    </table>
+  </div>
 
   <table class="summary">
     <thead>
