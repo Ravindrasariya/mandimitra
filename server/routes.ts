@@ -1686,9 +1686,75 @@ export async function registerRoutes(
       const filteredTxns = txns.filter((t: Transaction) => !t.isReversed && !t.isArchived);
       const filteredCash = cash.filter((c: CashEntry) => !c.isReversed && !c.isArchived);
 
+      const lotIds = [...new Set(filteredTxns.map((t: Transaction) => t.lotId))];
+      const lotMap = new Map<number, { serialNumber: number; crop: string }>();
+      const lotsForTxns = await Promise.all(lotIds.map(lid => storage.getLot(lid, businessId)));
+      for (let i = 0; i < lotIds.length; i++) {
+        const lot = lotsForTxns[i];
+        if (lot) lotMap.set(lotIds[i], { serialNumber: lot.serialNumber, crop: lot.crop });
+      }
+
+      const srToCrop = new Map<number, string>();
+      for (const v of lotMap.values()) {
+        srToCrop.set(v.serialNumber, v.crop);
+      }
+
+      const missingSrNums = new Set<number>();
+      for (const c of filteredCash) {
+        const sl = c.splitLog || "";
+        const matches = sl.match(/SR#(\d+)/g);
+        if (matches) {
+          for (const m of matches) {
+            const sr = parseInt(m.replace("SR#", ""), 10);
+            if (!isNaN(sr) && !srToCrop.has(sr)) missingSrNums.add(sr);
+          }
+        }
+      }
+      if (missingSrNums.size > 0) {
+        const allLots = await storage.getLots(businessId);
+        const fyLots = allLots.filter(l => l.date >= fyStart && l.date <= fyEnd);
+        for (const lot of fyLots) {
+          if (missingSrNums.has(lot.serialNumber) && !srToCrop.has(lot.serialNumber)) {
+            srToCrop.set(lot.serialNumber, lot.crop);
+          }
+        }
+      }
+
+      const buildPaymentParticulars = (c: CashEntry) => {
+        if (c.outflowType && c.outflowType !== "Buyer") {
+          return `Cash expense - ${c.outflowType}`;
+        }
+
+        const mode = c.paymentMode || "Cash";
+        const splitLog = c.splitLog || "";
+        const srMatches = splitLog.match(/SR#(\d+)/g) as string[] | null;
+        const hasPY = splitLog.includes("PY-");
+
+        const labels: string[] = [];
+        if (hasPY) labels.push("PY Payables");
+        if (srMatches) {
+          const seen = new Set<number>();
+          for (const m of srMatches) {
+            const sr = parseInt(m.replace("SR#", ""), 10);
+            if (!isNaN(sr) && !seen.has(sr)) {
+              seen.add(sr);
+              const crop = srToCrop.get(sr);
+              labels.push(crop ? `#${sr} - ${crop}` : `#${sr}`);
+            }
+          }
+        }
+
+        if (c.transactionId && labels.length === 0) {
+          const lot = lotMap.get(filteredTxns.find((t: Transaction) => t.id === c.transactionId)?.lotId || 0);
+          if (lot) labels.push(`#${lot.serialNumber} - ${lot.crop}`);
+        }
+
+        const detail = labels.length > 0 ? ` (${labels.join(", ")})` : "";
+        return `Payment (${mode})${detail}`;
+      };
+
       type LedgerEntry = {
         date: string;
-        refCode: string;
         particulars: string;
         dr: number;
         cr: number;
@@ -1697,19 +1763,21 @@ export async function registerRoutes(
       };
 
       const entries: LedgerEntry[] = [
-        ...filteredTxns.map((t: Transaction) => ({
-          date: t.date || fyStart,
-          refCode: t.transactionId,
-          particulars: "Purchase",
-          dr: parseFloat(t.totalReceivableFromBuyer || "0"),
-          cr: 0,
-          sourceType: "transaction" as const,
-          sourceId: t.id,
-        })),
+        ...filteredTxns.map((t: Transaction) => {
+          const lot = lotMap.get(t.lotId);
+          const label = lot ? `#${lot.serialNumber} - ${lot.crop}` : "";
+          return {
+            date: t.date || fyStart,
+            particulars: label ? `Purchase (${label})` : "Purchase",
+            dr: parseFloat(t.totalReceivableFromBuyer || "0"),
+            cr: 0,
+            sourceType: "transaction" as const,
+            sourceId: t.id,
+          };
+        }),
         ...filteredCash.map((c: CashEntry) => ({
           date: c.date,
-          refCode: c.cashFlowId || `CE${c.id}`,
-          particulars: `Payment (${c.paymentMode || "Cash"})`,
+          particulars: buildPaymentParticulars(c),
           dr: 0,
           cr: parseFloat(c.amount || "0"),
           sourceType: "payment" as const,

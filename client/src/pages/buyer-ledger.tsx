@@ -158,7 +158,6 @@ function generateBuyerListPrintHtml(buyers: BuyerWithDues[], summary: { total: n
 
 type LedgerEntry = {
   date: string;
-  refCode: string;
   particulars: string;
   dr: number;
   cr: number;
@@ -189,7 +188,6 @@ function BuyerLedgerSection({ buyer }: { buyer: BuyerWithDues }) {
       itemNo: number;
       date: string;
       particulars: string;
-      refCode: string;
       dr: number;
       cr: number;
       balance: number;
@@ -200,7 +198,6 @@ function BuyerLedgerSection({ buyer }: { buyer: BuyerWithDues }) {
       itemNo: 1,
       date: data.fyStart,
       particulars: "Opening Balance",
-      refCode: "",
       dr: openingBal > 0 ? openingBal : 0,
       cr: openingBal < 0 ? Math.abs(openingBal) : 0,
       balance: openingBal,
@@ -214,7 +211,6 @@ function BuyerLedgerSection({ buyer }: { buyer: BuyerWithDues }) {
         itemNo: result.length + 1,
         date: entry.date,
         particulars: entry.particulars,
-        refCode: entry.refCode,
         dr: entry.dr,
         cr: entry.cr,
         balance,
@@ -257,7 +253,6 @@ function BuyerLedgerSection({ buyer }: { buyer: BuyerWithDues }) {
       no: margin,
       date: margin + 10,
       particulars: margin + 30,
-      ref: margin + 80,
       dr: margin + 127,
       cr: margin + 150,
       bal: pageW - margin,
@@ -273,7 +268,6 @@ function BuyerLedgerSection({ buyer }: { buyer: BuyerWithDues }) {
     doc.text("#", cols.no, y - 1);
     doc.text("Date", cols.date, y - 1);
     doc.text("Particulars", cols.particulars, y - 1);
-    doc.text("Ref #", cols.ref, y - 1);
     doc.text("Dr", cols.dr, y - 1, { align: "right" });
     doc.text("Cr", cols.cr, y - 1, { align: "right" });
     doc.text("Balance", cols.bal, y - 1, { align: "right" });
@@ -300,10 +294,8 @@ function BuyerLedgerSection({ buyer }: { buyer: BuyerWithDues }) {
       doc.setFont("helvetica", row.isOpening ? "bold" : "normal");
       doc.text(String(row.itemNo), cols.no, y);
       doc.text(format(new Date(row.date + "T00:00:00"), "dd/MM/yy"), cols.date, y);
-      const partText = row.particulars.length > 28 ? row.particulars.substring(0, 27) + "…" : row.particulars;
+      const partText = row.particulars.length > 45 ? row.particulars.substring(0, 44) + "…" : row.particulars;
       doc.text(partText, cols.particulars, y);
-      const refText = (row.refCode || "-").length > 18 ? (row.refCode || "-").substring(0, 17) + "…" : (row.refCode || "-");
-      doc.text(refText, cols.ref, y);
       doc.text(row.dr > 0 ? fmtAmt(row.dr) : "-", cols.dr, y, { align: "right" });
       doc.text(row.cr > 0 ? fmtAmt(row.cr) : "-", cols.cr, y, { align: "right" });
       const balStr = (row.balance < 0 ? "(" : "") + fmtAmt(Math.abs(row.balance)) + (row.balance < 0 ? " Cr)" : row.balance > 0 ? " Dr" : "");
@@ -348,7 +340,6 @@ function BuyerLedgerSection({ buyer }: { buyer: BuyerWithDues }) {
                 <th className="p-1.5 font-medium w-7">#</th>
                 <th className="p-1.5 font-medium w-24">Date</th>
                 <th className="p-1.5 font-medium">Particulars</th>
-                <th className="p-1.5 font-medium hidden lg:table-cell">Ref #</th>
                 <th className="p-1.5 font-medium w-24 text-right text-red-700">Dr (Rs.)</th>
                 <th className="p-1.5 font-medium w-24 text-right text-green-700">Cr (Rs.)</th>
                 <th className="p-1.5 font-medium w-28 text-right">Balance</th>
@@ -366,12 +357,6 @@ function BuyerLedgerSection({ buyer }: { buyer: BuyerWithDues }) {
                   </td>
                   <td className="p-1.5">
                     <span>{row.particulars}</span>
-                    <span className="ml-1 text-muted-foreground font-mono text-[10px] lg:hidden">
-                      {row.refCode || ""}
-                    </span>
-                  </td>
-                  <td className="p-1.5 hidden lg:table-cell font-mono text-muted-foreground text-[10px]">
-                    {row.refCode || "-"}
                   </td>
                   <td className="p-1.5 text-right tabular-nums text-red-700">
                     {row.dr > 0 ? formatIndianCurrency(row.dr) : ""}
@@ -393,7 +378,7 @@ function BuyerLedgerSection({ buyer }: { buyer: BuyerWithDues }) {
               ))}
               {rows.length === 1 && (
                 <tr>
-                  <td colSpan={7} className="text-center py-3 text-muted-foreground text-xs">
+                  <td colSpan={6} className="text-center py-3 text-muted-foreground text-xs">
                     No transactions in this financial year
                   </td>
                 </tr>
