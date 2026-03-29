@@ -1807,6 +1807,161 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/farmers/:id/ledger", requireAuth, async (req, res) => {
+    try {
+      const businessId = req.user!.businessId;
+      const farmerId = paramId(req.params.id);
+
+      const business = await storage.getBusiness(businessId);
+
+      const today = new Date();
+      const defaultFyYear = today.getMonth() >= 3 ? today.getFullYear() : today.getFullYear() - 1;
+      const fyYear = req.query.fy ? parseInt(req.query.fy as string, 10) : defaultFyYear;
+      const fyStart = `${fyYear}-04-01`;
+      const fyEnd = `${fyYear + 1}-03-31`;
+
+      const ledger = await storage.getFarmerLedger(businessId, farmerId, fyStart, fyEnd);
+      const { farmer, transactions: txns, cashEntries: cash } = ledger;
+
+      const filteredTxns = txns.filter((t: Transaction) => !t.isReversed && !t.isArchived);
+      const filteredCash = cash.filter((c: CashEntry) => !c.isReversed && !c.isArchived);
+
+      const lotIds = [...new Set(filteredTxns.map((t: Transaction) => t.lotId))];
+      const lotMap = new Map<number, { serialNumber: number; crop: string }>();
+      const lotsForTxns = await Promise.all(lotIds.map(lid => storage.getLot(lid, businessId)));
+      for (let i = 0; i < lotIds.length; i++) {
+        const lot = lotsForTxns[i];
+        if (lot) lotMap.set(lotIds[i], { serialNumber: lot.serialNumber, crop: lot.crop });
+      }
+
+      const buyerIds = [...new Set(filteredTxns.map((t: Transaction) => t.buyerId))];
+      const buyerMap = new Map<number, string>();
+      const buyersForTxns = await Promise.all(buyerIds.map(bid => storage.getBuyer(bid, businessId)));
+      for (let i = 0; i < buyerIds.length; i++) {
+        const b = buyersForTxns[i];
+        if (b) buyerMap.set(buyerIds[i], b.name);
+      }
+
+      const srToCrop = new Map<number, string>();
+      for (const v of lotMap.values()) {
+        srToCrop.set(v.serialNumber, v.crop);
+      }
+
+      const missingSrNums = new Set<number>();
+      for (const c of filteredCash) {
+        const sl = c.splitLog || "";
+        const matches = sl.match(/SR#(\d+)/g);
+        if (matches) {
+          for (const m of matches) {
+            const sr = parseInt(m.replace("SR#", ""), 10);
+            if (!isNaN(sr) && !srToCrop.has(sr)) missingSrNums.add(sr);
+          }
+        }
+      }
+      if (missingSrNums.size > 0) {
+        const allLots = await storage.getLots(businessId);
+        const fyLots = allLots.filter(l => l.date >= fyStart && l.date <= fyEnd);
+        for (const lot of fyLots) {
+          if (missingSrNums.has(lot.serialNumber) && !srToCrop.has(lot.serialNumber)) {
+            srToCrop.set(lot.serialNumber, lot.crop);
+          }
+        }
+      }
+
+      const buildPaymentParticulars = (c: CashEntry) => {
+        const mode = c.paymentMode || "Cash";
+        const splitLog = c.splitLog || "";
+        const srMatches = splitLog.match(/SR#(\d+)/g) as string[] | null;
+        const hasPY = splitLog.includes("PY-");
+
+        const labels: string[] = [];
+        if (hasPY) labels.push("PY Payables");
+        if (srMatches) {
+          const seen = new Set<number>();
+          for (const m of srMatches) {
+            const sr = parseInt(m.replace("SR#", ""), 10);
+            if (!isNaN(sr) && !seen.has(sr)) {
+              seen.add(sr);
+              const crop = srToCrop.get(sr);
+              labels.push(crop ? `#${sr} - ${crop}` : `#${sr}`);
+            }
+          }
+        }
+
+        if (c.transactionId && labels.length === 0) {
+          const txn = filteredTxns.find((t: Transaction) => t.id === c.transactionId);
+          if (txn) {
+            const lot = lotMap.get(txn.lotId);
+            if (lot) labels.push(`#${lot.serialNumber} - ${lot.crop}`);
+          }
+        }
+
+        const detail = labels.length > 0 ? ` (${labels.join(", ")})` : "";
+        return `Payment (${mode})${detail}`;
+      };
+
+      type LedgerEntry = {
+        date: string;
+        particulars: string;
+        dr: number;
+        cr: number;
+        sourceType: "transaction" | "payment";
+        sourceId: number;
+      };
+
+      const entries: LedgerEntry[] = [
+        ...filteredTxns.map((t: Transaction) => {
+          const lot = lotMap.get(t.lotId);
+          const buyerName = buyerMap.get(t.buyerId) || "";
+          const lotLabel = lot ? `#${lot.serialNumber} - ${lot.crop}` : "";
+          const parts = [lotLabel, buyerName].filter(Boolean).join(", ");
+          return {
+            date: t.date || fyStart,
+            particulars: parts ? `Sale (${parts})` : "Sale",
+            dr: 0,
+            cr: parseFloat(t.totalPayableToFarmer || "0"),
+            sourceType: "transaction" as const,
+            sourceId: t.id,
+          };
+        }),
+        ...filteredCash.map((c: CashEntry) => ({
+          date: c.date,
+          particulars: buildPaymentParticulars(c),
+          dr: parseFloat(c.amount || "0"),
+          cr: 0,
+          sourceType: "payment" as const,
+          sourceId: c.id,
+        })),
+      ];
+
+      entries.sort((a, b) => {
+        if (a.date !== b.date) return a.date.localeCompare(b.date);
+        if (a.sourceType === b.sourceType) return 0;
+        return a.sourceType === "transaction" ? -1 : 1;
+      });
+
+      const allTxns = await storage.getFarmerLedger(businessId, farmerId);
+      const allFilteredTxns = allTxns.transactions.filter((t: Transaction) => !t.isReversed && !t.isArchived && t.date && t.date < fyStart);
+      const allFilteredCash = allTxns.cashEntries.filter((c: CashEntry) => !c.isReversed && !c.isArchived && c.date < fyStart);
+      const preFyCr = allFilteredTxns.reduce((s: number, t: Transaction) => s + parseFloat(t.totalPayableToFarmer || "0"), 0);
+      const preFyDr = allFilteredCash.reduce((s: number, c: CashEntry) => s + parseFloat(c.amount || "0"), 0);
+      const openingBalance = parseFloat(farmer.openingBalance || "0") + preFyCr - preFyDr;
+
+      res.json({
+        farmerName: farmer.name,
+        farmerId: farmer.farmerId,
+        businessName: business?.name || "",
+        businessAddress: business?.address || "",
+        openingBalance,
+        fyStart,
+        fyEnd,
+        entries,
+      });
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
   app.get("/api/buyers/:id/paana", requireAuth, async (req, res) => {
     try {
       const businessId = req.user!.businessId;

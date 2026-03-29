@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from "react";
+import { useState, useMemo, useRef, Fragment } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -17,7 +17,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import type { Farmer, FarmerEditHistory } from "@shared/schema";
 import { DISTRICTS } from "@shared/schema";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandGroup, CommandItem } from "@/components/ui/command";
-import { Users, Search, Pencil, RefreshCw, Printer, Archive, AlertTriangle, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, Calendar, Download, X, Check, ChevronsUpDown } from "lucide-react";
+import { Users, Search, Pencil, RefreshCw, Printer, Archive, AlertTriangle, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronRight, Calendar, Download, X, Check, ChevronsUpDown, FileText } from "lucide-react";
+import jsPDF from "jspdf";
 import { useKeyboardNav } from "@/hooks/use-keyboard-nav";
 import { format } from "date-fns";
 import { printReceipt } from "@/lib/receiptUtils";
@@ -72,6 +73,278 @@ ${rows}</table>
 </body></html>`;
 }
 
+type FarmerLedgerData = {
+  farmerName: string;
+  farmerId: string;
+  businessName: string;
+  businessAddress: string;
+  openingBalance: number;
+  fyStart: string;
+  fyEnd: string;
+  entries: { date: string; particulars: string; dr: number; cr: number; sourceType: string; sourceId: number }[];
+};
+
+function getFyOptions() {
+  const now = new Date();
+  const currentFy = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+  const options: { value: number; label: string }[] = [];
+  for (let fy = currentFy; fy >= currentFy - 4; fy--) {
+    options.push({ value: fy, label: `${fy}-${String(fy + 1).slice(2)}` });
+  }
+  return options;
+}
+
+function FarmerLedgerSection({ farmer }: { farmer: FarmerWithDues }) {
+  const fyOptions = useMemo(() => getFyOptions(), []);
+  const [selectedFy, setSelectedFy] = useState(fyOptions[0].value);
+
+  const { data, isLoading } = useQuery<FarmerLedgerData>({
+    queryKey: [`/api/farmers/${farmer.id}/ledger`, selectedFy],
+    queryFn: async () => {
+      const res = await fetch(`/api/farmers/${farmer.id}/ledger?fy=${selectedFy}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch ledger");
+      return res.json();
+    },
+  });
+
+  const rows = useMemo(() => {
+    if (!data) return [];
+    const openingBal = data.openingBalance;
+    const result: Array<{
+      itemNo: number;
+      date: string;
+      particulars: string;
+      dr: number;
+      cr: number;
+      balance: number;
+      isOpening?: boolean;
+    }> = [];
+
+    result.push({
+      itemNo: 1,
+      date: data.fyStart,
+      particulars: "Opening Balance",
+      dr: openingBal < 0 ? Math.abs(openingBal) : 0,
+      cr: openingBal > 0 ? openingBal : 0,
+      balance: openingBal,
+      isOpening: true,
+    });
+
+    let balance = openingBal;
+    let totalDr = openingBal < 0 ? Math.abs(openingBal) : 0;
+    let totalCr = openingBal > 0 ? openingBal : 0;
+    for (const entry of data.entries) {
+      balance = balance - entry.dr + entry.cr;
+      totalDr += entry.dr;
+      totalCr += entry.cr;
+      result.push({
+        itemNo: result.length + 1,
+        date: entry.date,
+        particulars: entry.particulars,
+        dr: entry.dr,
+        cr: entry.cr,
+        balance,
+      });
+    }
+
+    result.push({
+      itemNo: result.length + 1,
+      date: data.fyEnd,
+      particulars: "Closing Balance",
+      dr: totalDr,
+      cr: totalCr,
+      balance,
+      isOpening: true,
+    });
+
+    return result;
+  }, [data]);
+
+  const handleDownloadPdf = () => {
+    if (!data) return;
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const pageW = 210;
+    const margin = 12;
+    const contentW = pageW - margin * 2;
+    let y = 16;
+
+    doc.setFontSize(13);
+    doc.setFont("helvetica", "bold");
+    doc.text(data.businessName || "Mandi Mitra", pageW / 2, y, { align: "center" });
+    y += 5;
+    if (data.businessAddress) {
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.text(data.businessAddress, pageW / 2, y, { align: "center" });
+      y += 5;
+    }
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Farmer Ledger: ${data.farmerName} (${data.farmerId})`, margin, y);
+    y += 5;
+    const fyStartFmt = format(new Date(data.fyStart + "T00:00:00"), "dd MMM yyyy");
+    const fyEndFmt = format(new Date(data.fyEnd + "T00:00:00"), "dd MMM yyyy");
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "normal");
+    doc.text(`FY: ${fyStartFmt} to ${fyEndFmt}`, margin, y);
+    y += 8;
+
+    const cols = {
+      no: margin,
+      date: margin + 10,
+      particulars: margin + 30,
+      dr: margin + 127,
+      cr: margin + 150,
+      bal: pageW - margin,
+    };
+    const rowH = 6.5;
+    const headerH = 7;
+
+    doc.setFillColor(46, 125, 50);
+    doc.rect(margin, y - headerH + 1, contentW, headerH, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.text("#", cols.no, y - 1);
+    doc.text("Date", cols.date, y - 1);
+    doc.text("Particulars", cols.particulars, y - 1);
+    doc.text("Dr", cols.dr, y - 1, { align: "right" });
+    doc.text("Cr", cols.cr, y - 1, { align: "right" });
+    doc.text("Balance", cols.bal, y - 1, { align: "right" });
+    y += 3;
+
+    doc.setTextColor(0, 0, 0);
+    doc.setFontSize(7.5);
+
+    const fmtAmt = (n: number) =>
+      n.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+
+    for (const row of rows) {
+      if (y > 280) {
+        doc.addPage();
+        y = 14;
+      }
+      if (row.isOpening) {
+        doc.setFillColor(232, 245, 233);
+        doc.rect(margin, y - rowH + 1.5, contentW, rowH, "F");
+      } else if (row.itemNo % 2 === 0) {
+        doc.setFillColor(248, 248, 248);
+        doc.rect(margin, y - rowH + 1.5, contentW, rowH, "F");
+      }
+      doc.setFont("helvetica", row.isOpening ? "bold" : "normal");
+      doc.text(row.particulars === "Closing Balance" ? "–" : String(row.itemNo), cols.no, y);
+      doc.text(format(new Date(row.date + "T00:00:00"), "dd/MM/yy"), cols.date, y);
+      const partText = row.particulars.length > 45 ? row.particulars.substring(0, 44) + "…" : row.particulars;
+      doc.text(partText, cols.particulars, y);
+      doc.text(row.dr > 0 ? fmtAmt(row.dr) : "-", cols.dr, y, { align: "right" });
+      doc.text(row.cr > 0 ? fmtAmt(row.cr) : "-", cols.cr, y, { align: "right" });
+      const balStr = (row.balance < 0 ? "(" : "") + fmtAmt(Math.abs(row.balance)) + (row.balance < 0 ? " Dr)" : row.balance > 0 ? " Cr" : "");
+      doc.setTextColor(row.balance > 0 ? 22 : row.balance < 0 ? 185 : 0, row.balance > 0 ? 163 : row.balance < 0 ? 28 : 0, row.balance > 0 ? 74 : row.balance < 0 ? 28 : 0);
+      doc.text(balStr, cols.bal, y, { align: "right" });
+      doc.setTextColor(0, 0, 0);
+      y += rowH;
+      doc.setDrawColor(220, 220, 220);
+      doc.line(margin, y - rowH + 1.5, pageW - margin, y - rowH + 1.5);
+    }
+
+    y += 4;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(120, 120, 120);
+    doc.text("Generated by Mandi Mitra", pageW / 2, y, { align: "center" });
+
+    doc.save(`Farmer_Ledger_${data.farmerName.replace(/[^a-zA-Z0-9]/g, "_")}_FY${data.fyStart.substring(0, 4)}.pdf`);
+  };
+
+  return (
+    <div className="bg-muted/10 border-t px-4 py-3">
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs font-semibold text-muted-foreground">
+          Ledger
+        </p>
+        <div className="flex items-center gap-2">
+          <select
+            data-testid={`select-farmer-fy-${farmer.id}`}
+            className="text-xs border rounded px-1.5 py-0.5 bg-background text-foreground"
+            value={selectedFy}
+            onChange={(e) => setSelectedFy(Number(e.target.value))}
+          >
+            {fyOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+          <button
+            data-testid={`button-farmer-ledger-pdf-${farmer.id}`}
+            className="p-1 rounded hover:bg-muted text-muted-foreground disabled:opacity-40"
+            onClick={handleDownloadPdf}
+            title="Download PDF"
+            disabled={isLoading || !data}
+          >
+            <FileText className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+      {isLoading ? (
+        <div className="text-xs text-muted-foreground py-3 text-center">Loading…</div>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="bg-muted/50 text-left">
+                <th className="p-1.5 font-medium w-7">#</th>
+                <th className="p-1.5 font-medium w-24">Date</th>
+                <th className="p-1.5 font-medium">Particulars</th>
+                <th className="p-1.5 font-medium w-24 text-right text-red-700">Dr (Rs.)</th>
+                <th className="p-1.5 font-medium w-24 text-right text-green-700">Cr (Rs.)</th>
+                <th className="p-1.5 font-medium w-28 text-right">Balance</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr
+                  key={row.itemNo}
+                  className={`border-b border-border/50 ${row.isOpening ? "bg-green-50 dark:bg-green-900/10 font-semibold" : ""}`}
+                >
+                  <td className="p-1.5 text-muted-foreground">{row.particulars === "Closing Balance" ? "–" : row.itemNo}</td>
+                  <td className="p-1.5 tabular-nums">
+                    {format(new Date(row.date + "T00:00:00"), "dd/MM/yyyy")}
+                  </td>
+                  <td className="p-1.5">
+                    <span>{row.particulars}</span>
+                  </td>
+                  <td className="p-1.5 text-right tabular-nums text-red-700">
+                    {row.dr > 0 ? formatIndianCurrency(row.dr) : ""}
+                  </td>
+                  <td className="p-1.5 text-right tabular-nums text-green-700">
+                    {row.cr > 0 ? formatIndianCurrency(row.cr) : ""}
+                  </td>
+                  <td className={`p-1.5 text-right tabular-nums font-medium ${
+                    row.balance > 0 ? "text-green-600" : row.balance < 0 ? "text-red-600" : "text-muted-foreground"
+                  }`}>
+                    {formatIndianCurrency(Math.abs(row.balance))}
+                    {row.balance !== 0 && (
+                      <span className="text-[10px] ml-0.5 font-normal">
+                        {row.balance > 0 ? "Cr" : "Dr"}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+              {rows.length === 2 && (
+                <tr>
+                  <td colSpan={6} className="text-center py-3 text-muted-foreground text-xs">
+                    No transactions in this financial year
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function FarmerLedgerPage() {
   const { toast } = useToast();
   const { t } = useLanguage();
@@ -111,6 +384,8 @@ export default function FarmerLedgerPage() {
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
   const [monthPopoverOpen, setMonthPopoverOpen] = useState(false);
   const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
+
+  const [expandedFarmerId, setExpandedFarmerId] = useState<number | null>(null);
 
   const [sortField, setSortField] = usePersistedState<SortField>("fl-sortField", "totalDue");
   const [sortDir, setSortDir] = usePersistedState<SortDir>("fl-sortDir", "desc");
@@ -703,48 +978,63 @@ export default function FarmerLedgerPage() {
                 const fDues = filteredDuesByFarmer.get(farmer.id);
                 const displayPayable = fDues?.payable ?? parseFloat(farmer.totalPayable);
                 const due = fDues?.due ?? parseFloat(farmer.totalDue);
+                const isExpanded = expandedFarmerId === farmer.id;
                 return (
-                  <tr key={farmer.id} className="border-b hover:bg-muted/30 transition-colors" data-testid={`row-farmer-${farmer.id}`}>
-                    <td className="p-2">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0"
-                        onClick={() => openEditDialog(farmer)}
-                        data-testid={`button-edit-farmer-${farmer.id}`}
-                      >
-                        <Pencil className="w-3.5 h-3.5" />
-                      </Button>
-                    </td>
-                    <td className="p-2 font-mono text-xs text-muted-foreground">{farmer.farmerId}</td>
-                    <td className="p-2 font-medium">{farmer.name}</td>
-                    <td className="p-2 text-muted-foreground">{farmer.village || "-"}</td>
-                    <td className="p-2 text-muted-foreground">{farmer.phone}</td>
-                    <td className="p-2 text-right font-medium text-green-600">{formatIndianCurrency(String(displayPayable))}</td>
-                    <td className={`p-2 text-right font-bold ${due > 0 ? "text-red-600" : due < 0 ? "text-green-600" : "text-muted-foreground"}`}>
-                      {formatIndianCurrency(String(due))}
-                    </td>
-                    <td className="p-2 text-center">
-                      {farmer.redFlag && (
-                        <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
-                          <AlertTriangle className="w-3 h-3 mr-0.5" />
-                          Flag
-                        </Badge>
-                      )}
-                    </td>
-                    <td className="p-2 text-center">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
-                        onClick={() => handleToggleArchive(farmer)}
-                        title={farmer.isArchived ? t("farmerLedger.reinstate") : t("farmerLedger.archive")}
-                        data-testid={`button-archive-farmer-${farmer.id}`}
-                      >
-                        <Archive className="w-3.5 h-3.5" />
-                      </Button>
-                    </td>
-                  </tr>
+                  <Fragment key={farmer.id}>
+                    <tr
+                      className={`border-b hover:bg-muted/30 transition-colors cursor-pointer ${isExpanded ? "bg-muted/20" : ""}`}
+                      data-testid={`row-farmer-${farmer.id}`}
+                      onClick={() => setExpandedFarmerId(isExpanded ? null : farmer.id)}
+                    >
+                      <td className="p-2 flex items-center gap-1">
+                        {isExpanded ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" /> : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0"
+                          onClick={(e) => { e.stopPropagation(); openEditDialog(farmer); }}
+                          data-testid={`button-edit-farmer-${farmer.id}`}
+                        >
+                          <Pencil className="w-3.5 h-3.5" />
+                        </Button>
+                      </td>
+                      <td className="p-2 font-mono text-xs text-muted-foreground">{farmer.farmerId}</td>
+                      <td className="p-2 font-medium">{farmer.name}</td>
+                      <td className="p-2 text-muted-foreground">{farmer.village || "-"}</td>
+                      <td className="p-2 text-muted-foreground">{farmer.phone}</td>
+                      <td className="p-2 text-right font-medium text-green-600">{formatIndianCurrency(String(displayPayable))}</td>
+                      <td className={`p-2 text-right font-bold ${due > 0 ? "text-red-600" : due < 0 ? "text-green-600" : "text-muted-foreground"}`}>
+                        {formatIndianCurrency(String(due))}
+                      </td>
+                      <td className="p-2 text-center">
+                        {farmer.redFlag && (
+                          <Badge variant="destructive" className="text-[10px] px-1.5 py-0">
+                            <AlertTriangle className="w-3 h-3 mr-0.5" />
+                            Flag
+                          </Badge>
+                        )}
+                      </td>
+                      <td className="p-2 text-center">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 w-7 p-0 text-muted-foreground hover:text-destructive"
+                          onClick={(e) => { e.stopPropagation(); handleToggleArchive(farmer); }}
+                          title={farmer.isArchived ? t("farmerLedger.reinstate") : t("farmerLedger.archive")}
+                          data-testid={`button-archive-farmer-${farmer.id}`}
+                        >
+                          <Archive className="w-3.5 h-3.5" />
+                        </Button>
+                      </td>
+                    </tr>
+                    {isExpanded && (
+                      <tr>
+                        <td colSpan={9} className="p-0">
+                          <FarmerLedgerSection farmer={farmer} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 );
               })}
             </tbody>
