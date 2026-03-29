@@ -1676,7 +1676,8 @@ export async function registerRoutes(
       const business = await storage.getBusiness(businessId);
 
       const today = new Date();
-      const fyYear = today.getMonth() >= 3 ? today.getFullYear() : today.getFullYear() - 1;
+      const defaultFyYear = today.getMonth() >= 3 ? today.getFullYear() : today.getFullYear() - 1;
+      const fyYear = req.query.fy ? parseInt(req.query.fy as string, 10) : defaultFyYear;
       const fyStart = `${fyYear}-04-01`;
       const fyEnd = `${fyYear + 1}-03-31`;
 

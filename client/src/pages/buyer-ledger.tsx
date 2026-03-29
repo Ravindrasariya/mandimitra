@@ -176,9 +176,27 @@ type BuyerLedgerData = {
   entries: LedgerEntry[];
 };
 
+function getFyOptions() {
+  const now = new Date();
+  const currentFy = now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+  const options: { value: number; label: string }[] = [];
+  for (let fy = currentFy; fy >= currentFy - 4; fy--) {
+    options.push({ value: fy, label: `${fy}-${String(fy + 1).slice(2)}` });
+  }
+  return options;
+}
+
 function BuyerLedgerSection({ buyer }: { buyer: BuyerWithDues }) {
+  const fyOptions = useMemo(() => getFyOptions(), []);
+  const [selectedFy, setSelectedFy] = useState(fyOptions[0].value);
+
   const { data, isLoading } = useQuery<BuyerLedgerData>({
-    queryKey: [`/api/buyers/${buyer.id}/ledger`],
+    queryKey: [`/api/buyers/${buyer.id}/ledger`, selectedFy],
+    queryFn: async () => {
+      const res = await fetch(`/api/buyers/${buyer.id}/ledger?fy=${selectedFy}`, { credentials: "include" });
+      if (!res.ok) throw new Error("Failed to fetch ledger");
+      return res.json();
+    },
   });
 
   const rows = useMemo(() => {
@@ -205,8 +223,12 @@ function BuyerLedgerSection({ buyer }: { buyer: BuyerWithDues }) {
     });
 
     let balance = openingBal;
+    let totalDr = openingBal > 0 ? openingBal : 0;
+    let totalCr = openingBal < 0 ? Math.abs(openingBal) : 0;
     for (const entry of data.entries) {
       balance = balance + entry.dr - entry.cr;
+      totalDr += entry.dr;
+      totalCr += entry.cr;
       result.push({
         itemNo: result.length + 1,
         date: entry.date,
@@ -216,6 +238,16 @@ function BuyerLedgerSection({ buyer }: { buyer: BuyerWithDues }) {
         balance,
       });
     }
+
+    result.push({
+      itemNo: result.length + 1,
+      date: data.fyEnd,
+      particulars: "Closing Balance",
+      dr: totalDr,
+      cr: totalCr,
+      balance,
+      isOpening: true,
+    });
 
     return result;
   }, [data]);
@@ -292,7 +324,7 @@ function BuyerLedgerSection({ buyer }: { buyer: BuyerWithDues }) {
         doc.rect(margin, y - rowH + 1.5, contentW, rowH, "F");
       }
       doc.setFont("helvetica", row.isOpening ? "bold" : "normal");
-      doc.text(String(row.itemNo), cols.no, y);
+      doc.text(row.particulars === "Closing Balance" ? "–" : String(row.itemNo), cols.no, y);
       doc.text(format(new Date(row.date + "T00:00:00"), "dd/MM/yy"), cols.date, y);
       const partText = row.particulars.length > 45 ? row.particulars.substring(0, 44) + "…" : row.particulars;
       doc.text(partText, cols.particulars, y);
@@ -318,17 +350,29 @@ function BuyerLedgerSection({ buyer }: { buyer: BuyerWithDues }) {
     <div className="bg-muted/10 border-t px-4 py-3">
       <div className="flex items-center justify-between mb-2">
         <p className="text-xs font-semibold text-muted-foreground">
-          {isLoading ? "Loading ledger…" : `Ledger — FY ${data?.fyStart?.substring(0, 4)}-${data?.fyEnd?.substring(2, 4)}`}
+          Ledger
         </p>
-        <button
-          data-testid={`button-ledger-pdf-${buyer.id}`}
-          className="p-1 rounded hover:bg-muted text-muted-foreground disabled:opacity-40"
-          onClick={handleDownloadPdf}
-          title="Download PDF"
-          disabled={isLoading || !data}
-        >
-          <FileText className="w-4 h-4" />
-        </button>
+        <div className="flex items-center gap-2">
+          <select
+            data-testid={`select-fy-${buyer.id}`}
+            className="text-xs border rounded px-1.5 py-0.5 bg-background text-foreground"
+            value={selectedFy}
+            onChange={(e) => setSelectedFy(Number(e.target.value))}
+          >
+            {fyOptions.map((opt) => (
+              <option key={opt.value} value={opt.value}>{opt.label}</option>
+            ))}
+          </select>
+          <button
+            data-testid={`button-ledger-pdf-${buyer.id}`}
+            className="p-1 rounded hover:bg-muted text-muted-foreground disabled:opacity-40"
+            onClick={handleDownloadPdf}
+            title="Download PDF"
+            disabled={isLoading || !data}
+          >
+            <FileText className="w-4 h-4" />
+          </button>
+        </div>
       </div>
       {isLoading ? (
         <div className="text-xs text-muted-foreground py-3 text-center">Loading…</div>
@@ -351,7 +395,7 @@ function BuyerLedgerSection({ buyer }: { buyer: BuyerWithDues }) {
                   key={row.itemNo}
                   className={`border-b border-border/50 ${row.isOpening ? "bg-green-50 dark:bg-green-900/10 font-semibold" : ""}`}
                 >
-                  <td className="p-1.5 text-muted-foreground">{row.itemNo}</td>
+                  <td className="p-1.5 text-muted-foreground">{row.particulars === "Closing Balance" ? "–" : row.itemNo}</td>
                   <td className="p-1.5 tabular-nums">
                     {format(new Date(row.date + "T00:00:00"), "dd/MM/yyyy")}
                   </td>
@@ -376,7 +420,7 @@ function BuyerLedgerSection({ buyer }: { buyer: BuyerWithDues }) {
                   </td>
                 </tr>
               ))}
-              {rows.length === 1 && (
+              {rows.length === 2 && (
                 <tr>
                   <td colSpan={6} className="text-center py-3 text-muted-foreground text-xs">
                     No transactions in this financial year
