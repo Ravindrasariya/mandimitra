@@ -649,7 +649,7 @@ function calcBidTotals(bid: BidRow, cs: ChargeSettings, vehicleBhadaRate: number
   const nw = parseFloat(txn.netWeightInput) || 0;
   const epkFarmer = parseFloat(txn.extraPerKgFarmer) || 0;
   const epkBuyer = parseFloat(txn.extraPerKgBuyer) || 0;
-  const farmerGross = nw * (pricePerKg + epkFarmer);
+  const farmerGross = Math.round(nw * (pricePerKg + epkFarmer));
   const buyerGross = nw * (pricePerKg + epkBuyer);
   const ecs = bid.savedCharges || cs;
   const hfRate = parseFloat(ecs.hammaliFarmerPerBag) || 0;
@@ -664,9 +664,10 @@ function calcBidTotals(bid: BidRow, cs: ChargeSettings, vehicleBhadaRate: number
   const mandiBPct = parseFloat(ecs.mandiCommissionBuyerPercent) || 0;
   const muddatAnyaFPct = parseFloat(ecs.muddatAnyaFarmerPercent) || 0;
   const muddatAnyaBPct = parseFloat(ecs.muddatAnyaBuyerPercent) || 0;
-  const freight = totalBagsInVehicle > 0 ? (vehicleBhadaRate * bidBags) / totalBagsInVehicle : 0;
+  const freight = totalBagsInVehicle > 0 ? Math.round((vehicleBhadaRate * bidBags) / totalBagsInVehicle) : 0;
   const muddatAnyaBuyer = (buyerGross * muddatAnyaBPct) / 100;
-  const farmerDed = hfRate * bidBags + extraFarmer + (farmerGross * aadhatFPct) / 100 + (farmerGross * mandiFPct) / 100 + (farmerGross * muddatAnyaFPct) / 100 + freight;
+  const hammaliFarmerTotal = Math.round(hfRate * bidBags);
+  const farmerDed = hammaliFarmerTotal + extraFarmer + (farmerGross * aadhatFPct) / 100 + (farmerGross * mandiFPct) / 100 + (farmerGross * muddatAnyaFPct) / 100 + freight;
   const buyerAdd = hbRate * bidBags + extraBuyer + (buyerGross * aadhatBPct) / 100 + (buyerGross * mandiBPct) / 100 + muddatAnyaBuyer;
   const aadhatBuyer = (buyerGross * aadhatBPct) / 100;
   return {
@@ -746,14 +747,16 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
   useEffect(() => {
     const prev = prevAutoRef.current;
     if (bags > 0 && (tulaiFRate > 0 || kkFRate > 0)) {
-      const prevTulaiDefault = (prev.tulaiFRate * prev.bags).toFixed(2);
-      const prevKKDefault = (prev.kkFRate * prev.bags).toFixed(2);
-      const newTulai = (tulaiFRate * bags).toFixed(2);
-      const newKK = (kkFRate * bags).toFixed(2);
+      const prevTulaiDefault = Math.round(prev.tulaiFRate * prev.bags).toString();
+      const prevKKDefault = Math.round(prev.kkFRate * prev.bags).toString();
+      const prevTulaiDefaultOld = (prev.tulaiFRate * prev.bags).toFixed(2);
+      const prevKKDefaultOld = (prev.kkFRate * prev.bags).toFixed(2);
+      const newTulai = Math.round(tulaiFRate * bags).toString();
+      const newKK = Math.round(kkFRate * bags).toString();
       const curTulai = txn.extraTulai;
       const curKK = txn.extraKhadiKarai;
-      const shouldUpdateTulai = tulaiFRate > 0 && (curTulai === "0" || curTulai === prevTulaiDefault || curTulai === "0.00");
-      const shouldUpdateKK = kkFRate > 0 && (curKK === "0" || curKK === prevKKDefault || curKK === "0.00");
+      const shouldUpdateTulai = tulaiFRate > 0 && (curTulai === "0" || curTulai === prevTulaiDefault || curTulai === prevTulaiDefaultOld || curTulai === "0.00");
+      const shouldUpdateKK = kkFRate > 0 && (curKK === "0" || curKK === prevKKDefault || curKK === prevKKDefaultOld || curKK === "0.00");
       if (shouldUpdateTulai || shouldUpdateKK) {
         const nextTulai = shouldUpdateTulai ? newTulai : curTulai;
         const nextKK = shouldUpdateKK ? newKK : curKK;
@@ -761,12 +764,14 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
         onChange({ ...txn, extraTulai: nextTulai, extraKhadiKarai: nextKK, extraChargesFarmer: sum.toFixed(2) });
       }
     } else if (bags === 0) {
-      const prevTulaiDefault = (prev.tulaiFRate * prev.bags).toFixed(2);
-      const prevKKDefault = (prev.kkFRate * prev.bags).toFixed(2);
+      const prevTulaiDefault = Math.round(prev.tulaiFRate * prev.bags).toString();
+      const prevKKDefault = Math.round(prev.kkFRate * prev.bags).toString();
+      const prevTulaiDefaultOld = (prev.tulaiFRate * prev.bags).toFixed(2);
+      const prevKKDefaultOld = (prev.kkFRate * prev.bags).toFixed(2);
       const curTulai = txn.extraTulai;
       const curKK = txn.extraKhadiKarai;
-      const shouldResetTulai = curTulai === prevTulaiDefault && curTulai !== "0" && curTulai !== "0.00";
-      const shouldResetKK = curKK === prevKKDefault && curKK !== "0" && curKK !== "0.00";
+      const shouldResetTulai = (curTulai === prevTulaiDefault || curTulai === prevTulaiDefaultOld) && curTulai !== "0" && curTulai !== "0.00";
+      const shouldResetKK = (curKK === prevKKDefault || curKK === prevKKDefaultOld) && curKK !== "0" && curKK !== "0.00";
       if (shouldResetTulai || shouldResetKK) {
         const nextTulai = shouldResetTulai ? "0" : curTulai;
         const nextKK = shouldResetKK ? "0" : curKK;
@@ -800,7 +805,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
   const nw = parseFloat(txn.netWeightInput) || 0;
   const epkFarmer = parseFloat(txn.extraPerKgFarmer) || 0;
   const epkBuyer = parseFloat(txn.extraPerKgBuyer) || 0;
-  const farmerGross = nw * (pricePerKg + epkFarmer);
+  const farmerGross = Math.round(nw * (pricePerKg + epkFarmer));
   const buyerGross = nw * (pricePerKg + epkBuyer);
 
   const hammaliFarmerRate = parseFloat(cs.hammaliFarmerPerBag) || 0;
@@ -814,9 +819,9 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
   const muddatAnyaFarmerPct = parseFloat(cs.muddatAnyaFarmerPercent) || 0;
   const muddatAnyaBuyerPct = parseFloat(cs.muddatAnyaBuyerPercent) || 0;
 
-  const freightFarmerTotal = totalBagsInVehicle > 0 ? (vehicleBhadaRate * bags) / totalBagsInVehicle : 0;
+  const freightFarmerTotal = totalBagsInVehicle > 0 ? Math.round((vehicleBhadaRate * bags) / totalBagsInVehicle) : 0;
 
-  const hammaliFarmerTotal = hammaliFarmerRate * bags;
+  const hammaliFarmerTotal = Math.round(hammaliFarmerRate * bags);
   const hammaliBuyerTotal = hammaliBuyerRate * bags;
   const aadhatFarmer = (farmerGross * aadhatFarmerPct) / 100;
   const aadhatBuyer = (buyerGross * aadhatBuyerPct) / 100;
@@ -959,7 +964,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
           <div className="flex justify-between"><span>{t("stock.hammali")}:</span><span>₹{hammaliFarmerRate}/bag</span></div>
           {freightFarmerTotal > 0 && (
             <div className="flex justify-between text-muted-foreground">
-              <span>{t("stock.freightAuto")}:</span><span>₹{freightFarmerTotal.toFixed(2)}</span>
+              <span>{t("stock.freightAuto")}:</span><span>₹{freightFarmerTotal.toFixed(0)}</span>
             </div>
           )}
           <div className="flex items-center justify-between">
@@ -1019,13 +1024,13 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
             <div className="border-t pt-1.5 mt-1.5 bg-green-50 dark:bg-green-950/30 rounded-md p-2 -mx-0.5 space-y-0.5">
               <div className="flex justify-between gap-1">
                 <span className="min-w-0 flex-1">{t("stock.gross")} ({nw.toFixed(0)} × ₹{(pricePerKg + epkFarmer).toFixed(2)}):</span>
-                <span className="shrink-0 font-medium">₹{farmerGross.toFixed(2)}</span>
+                <span className="shrink-0 font-medium">₹{farmerGross.toFixed(0)}</span>
               </div>
               <p className="text-muted-foreground font-semibold mt-0.5">{t("stock.deductions")}:</p>
               {hammaliFarmerRate > 0 && (
                 <div className="flex justify-between gap-1 text-muted-foreground pl-2">
                   <span className="min-w-0 flex-1">{t("stock.hammali")} ({bags}×₹{hammaliFarmerRate}):</span>
-                  <span className="shrink-0">-₹{hammaliFarmerTotal.toFixed(2)}</span>
+                  <span className="shrink-0">-₹{hammaliFarmerTotal.toFixed(0)}</span>
                 </div>
               )}
               {extraFarmer > 0 && (
@@ -1055,13 +1060,13 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
               {freightFarmerTotal > 0 && (
                 <div className="flex justify-between gap-1 text-muted-foreground pl-2">
                   <span className="min-w-0 flex-1">{t("stock.freight")}:</span>
-                  <span className="shrink-0">-₹{freightFarmerTotal.toFixed(2)}</span>
+                  <span className="shrink-0">-₹{freightFarmerTotal.toFixed(0)}</span>
                 </div>
               )}
               {farmerDeductions === 0 && <div className="text-muted-foreground italic pl-2">{t("stock.noDeductions")}</div>}
               <div className="flex justify-between gap-1 font-bold text-green-700 border-t pt-1 mt-0.5">
                 <span className="min-w-0 flex-1">{t("stock.farmerPayable")}:</span>
-                <span className="shrink-0">₹{farmerPayable.toFixed(2)}</span>
+                <span className="shrink-0">₹{farmerPayable.toFixed(0)}</span>
               </div>
             </div>
           )}
@@ -3983,7 +3988,7 @@ export default function StockPage() {
               const ppk = parseFloat(bid.pricePerKg) || 0;
               const epkF = parseFloat(bid.txn.extraPerKgFarmer) || 0;
               const epkB = parseFloat(bid.txn.extraPerKgBuyer) || 0;
-              const farmerGross = nw * (ppk + epkF);
+              const farmerGross = Math.round(nw * (ppk + epkF));
               const buyerGross = nw * (ppk + epkB);
               const effectiveCs = bid.savedCharges || cs;
               const hfRate = parseFloat(effectiveCs.hammaliFarmerPerBag) || 0;
@@ -4001,8 +4006,8 @@ export default function StockPage() {
               const mandiBPct = parseFloat(effectiveCs.mandiCommissionBuyerPercent) || 0;
               const muddatAnyaFPct = parseFloat(effectiveCs.muddatAnyaFarmerPercent) || 0;
               const muddatAnyaBPct = parseFloat(effectiveCs.muddatAnyaBuyerPercent) || 0;
-              const freight = totalBIV > 0 ? (vehicleBR * bidBags) / totalBIV : 0;
-              const hammaliFarmerTotal = hfRate * bidBags;
+              const freight = totalBIV > 0 ? Math.round((vehicleBR * bidBags) / totalBIV) : 0;
+              const hammaliFarmerTotal = Math.round(hfRate * bidBags);
               const hammaliBuyerTotal = hbRate * bidBags;
               const aadhatFarmer = (farmerGross * aadhatFPct) / 100;
               const mandiFarmer = (farmerGross * mandiFPct) / 100;
@@ -4033,8 +4038,8 @@ export default function StockPage() {
                 extraKhadiKaraiFarmer: (parseFloat(bid.txn.extraKhadiKarai) || 0).toFixed(2),
                 extraThelaBhadaFarmer: (parseFloat(bid.txn.extraThelaBhada) || 0).toFixed(2),
                 extraOthersFarmer: (parseFloat(bid.txn.extraOthers) || 0).toFixed(2),
-                hammaliCharges: hammaliFarmerTotal.toFixed(2),
-                freightCharges: freight.toFixed(2),
+                hammaliCharges: hammaliFarmerTotal.toFixed(0),
+                freightCharges: freight.toFixed(0),
                 aadhatCharges: aadhatBuyer.toFixed(2),
                 mandiCharges: mandiBuyer.toFixed(2),
                 muddatAnyaCharges: muddatAnyaBuyer.toFixed(2),
@@ -4046,7 +4051,7 @@ export default function StockPage() {
                 muddatAnyaBuyerPercent: muddatAnyaBPct.toFixed(2),
                 hammaliFarmerPerBag: hfRate.toFixed(2),
                 hammaliBuyerPerBag: hbRate.toFixed(2),
-                totalPayableToFarmer: farmerPayable.toFixed(2),
+                totalPayableToFarmer: farmerPayable.toFixed(0),
                 totalReceivableFromBuyer: buyerReceivable.toFixed(2),
                 date: bid.txnDate || card.date,
               };
@@ -4504,7 +4509,7 @@ export default function StockPage() {
               bid.txn.extraChargesFarmer || "0", bid.txn.extraChargesBuyer || "0",
               bid.txn.extraPerKgFarmer || "0", bid.txn.extraPerKgBuyer || "0",
               freight,
-              bt.farmerPayable.toFixed(2), bt.buyerReceivable.toFixed(2),
+              bt.farmerPayable.toFixed(0), bt.buyerReceivable.toFixed(2),
               fStat, bStat,
               archiveStatus,
             ].map(escCSV).join(","));
