@@ -117,6 +117,7 @@ type BidRow = {
   buyerName: string;
   pricePerKg: string;
   numberOfBags: string;
+  haste: string;
   paymentType: string;
   advanceAmount: string;
   txnDate: string;
@@ -482,6 +483,7 @@ const emptyBid = (date?: string): BidRow => ({
   buyerName: "",
   pricePerKg: "",
   numberOfBags: "",
+  haste: "KHUD",
   paymentType: "Credit",
   advanceAmount: "500",
   txnDate: date || format(new Date(), "yyyy-MM-dd"),
@@ -1200,7 +1202,7 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
             ? <ChevronDown className="w-[18px] h-[18px] text-blue-500" strokeWidth={3} />
             : <ChevronRight className="w-[18px] h-[18px] text-blue-500" strokeWidth={3} />}
           <span className="text-xs font-bold text-blue-600 uppercase tracking-wide">
-            {buyerLabel} {bags > 0 && `· ${bags} ${t("common.bags")}`}
+            {buyerLabel} {bags > 0 && `· ${bags} ${t("common.bags")}`} {bid.haste && bid.haste !== "KHUD" && `· ${bid.haste}`}
           </span>
           {!bid.bidOpen && totals.hasData && (
             <span className="flex items-center gap-2 text-xs">
@@ -1254,7 +1256,7 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
             <div className="col-span-2 sm:col-span-1 relative">
               <Label className="text-xs text-muted-foreground">{t("stock.buyer")}</Label>
               <div className="relative">
@@ -1329,6 +1331,16 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
                   <AlertTriangle className="w-3 h-3" /> {t("stock.exceedsLotBags")}
                 </p>
               )}
+            </div>
+            <div>
+              <Label className="text-xs text-muted-foreground">Haste</Label>
+              <Input
+                data-testid={`input-haste-${bidIndex}`}
+                placeholder="KHUD"
+                value={bid.haste}
+                onChange={e => onChange({ ...bid, haste: e.target.value.toUpperCase() })}
+                className="h-8 text-sm"
+              />
             </div>
             <div>
               <Label className="text-xs text-muted-foreground">{t("stock.payment")}</Label>
@@ -2770,6 +2782,7 @@ function stockCardsToFarmerCards(apiCards: any[]): FarmerCard[] {
               buyerName: b.buyerName || "",
               pricePerKg: b.pricePerKg?.toString() || "",
               numberOfBags: b.numberOfBags?.toString() || "",
+              haste: b.haste || "KHUD",
               paymentType: b.paymentType || "Credit",
               advanceAmount: b.advanceAmount?.toString() || "0",
               txnDate: txn?.date || lot.date || c.date || format(new Date(), "yyyy-MM-dd"),
@@ -3910,6 +3923,7 @@ export default function StockPage() {
                   buyerId: bid.buyerId,
                   pricePerKg: bid.pricePerKg,
                   numberOfBags: parseInt(bid.numberOfBags),
+                  haste: bid.haste || "KHUD",
                   paymentType: bid.paymentType || "Credit",
                   advanceAmount: bid.advanceAmount || "0",
                 });
@@ -3926,6 +3940,7 @@ export default function StockPage() {
                 savedBid.buyerId !== bid.buyerId ||
                 savedBid.pricePerKg !== bid.pricePerKg ||
                 savedBid.numberOfBags !== bid.numberOfBags ||
+                savedBid.haste !== bid.haste ||
                 savedBid.paymentType !== bid.paymentType ||
                 savedBid.advanceAmount !== bid.advanceAmount;
               if (changed) {
@@ -3934,6 +3949,7 @@ export default function StockPage() {
                     buyerId: bid.buyerId,
                     pricePerKg: bid.pricePerKg,
                     numberOfBags: parseInt(bid.numberOfBags),
+                    haste: bid.haste || "KHUD",
                     paymentType: bid.paymentType || "Credit",
                     advanceAmount: bid.advanceAmount || "0",
                   });
@@ -4025,6 +4041,7 @@ export default function StockPage() {
                 bidId: bidDbId,
                 buyerId: bid.buyerId,
                 farmerId: currentFarmerId!,
+                haste: bid.haste || "KHUD",
                 netWeight: nw.toFixed(2),
                 totalWeight: nw.toFixed(2),
                 numberOfBags: bidBags,
@@ -4244,6 +4261,7 @@ export default function StockPage() {
               pricePerKg: ppk,
               grossAmount: nw * ppk,
               paymentType: bid.paymentType,
+              haste: bid.haste || "KHUD",
               aadhatBuyerPercent: parseFloat(bid.savedCharges?.aadhatCommissionBuyerPercent ?? cs.aadhatCommissionBuyerPercent ?? "0"),
               muddatAnyaBuyerPercent: parseFloat(bid.savedCharges?.muddatAnyaBuyerPercent ?? cs.muddatAnyaBuyerPercent ?? "0"),
               mandiBuyerPercent: parseFloat(bid.savedCharges?.mandiCommissionBuyerPercent ?? cs.mandiCommissionBuyerPercent ?? "0"),
@@ -4472,7 +4490,7 @@ export default function StockPage() {
     const headers = [
       "Transaction ID", "Date", "Lot ID", "SR#", "Crop", "Variety",
       "Farmer Name", "Phone", "Village",
-      "Buyer Name",
+      "Buyer Name", "Haste",
       "Vehicle #", "Driver Name", "Driver Contact", "Advance/Credit",
       "# Bags", "Price/kg (₹)", "Net Weight (kg)",
       "Extra Charges (Farmer)", "Extra Charges (Buyer)",
@@ -4503,7 +4521,7 @@ export default function StockPage() {
             rows.push([
               bid.txnDbId, bid.txnDate, lot.lotId || lot.dbId?.toString() || "", g.srNumber, g.crop, lot.variety || "",
               card.farmerName, card.farmerPhone, card.village,
-              bid.buyerName,
+              bid.buyerName, bid.haste || "KHUD",
               card.vehicleNumber, card.driverName, card.driverContact, card.freightType || "",
               bid.numberOfBags, bid.pricePerKg, bid.txn.netWeightInput || "0",
               bid.txn.extraChargesFarmer || "0", bid.txn.extraChargesBuyer || "0",
