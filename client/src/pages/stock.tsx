@@ -44,7 +44,7 @@ const capFirst = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 const toNum = (v: string) => v.replace(/[^0-9.]/g, "");
 
 const noScrollProps = {
-  onWheel: (e: React.WheelEvent<HTMLInputElement>) => { (e.target as HTMLInputElement).blur(); },
+  onWheel: (e: React.WheelEvent<HTMLInputElement>) => { e.currentTarget.blur(); },
   onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault(); },
 };
 
