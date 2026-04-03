@@ -244,7 +244,7 @@ export function applyFarmerTemplate(tmpl: string, sg: UnifiedSerialGroup, busine
     const crop = t.lot?.crop || firstLot?.crop || "";
     return `<tr><td>${(cropLabel[crop] || crop)} Pkt</td><td>${t.numberOfBags || 0}</td><td>${nw.toFixed(2)}</td><td>${(rate * 100).toFixed(2)}</td><td>${gross.toFixed(2)}</td></tr>`;
   });
-  const MIN_PRODUCE_ROWS = 5;
+  const MIN_PRODUCE_ROWS = 6;
   const blankRowCount = Math.max(0, MIN_PRODUCE_ROWS - dataRows.length);
   const blankRow = `<tr><td>&nbsp;</td><td></td><td></td><td></td><td></td></tr>`;
   const txnRowsHtml = dataRows.join("") + Array(blankRowCount).fill(blankRow).join("");
