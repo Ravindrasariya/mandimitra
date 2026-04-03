@@ -862,6 +862,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
             value={txn.netWeightInput}
             onChange={e => set("netWeightInput", toNum(e.target.value))}
             onFocus={e => e.currentTarget.select()}
+            {...noScrollProps}
             className="h-8 text-sm flex-1"
           />
           <Button
@@ -2538,7 +2539,7 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
               </div>
               <div>
                 <Label className="text-[10px] sm:text-xs text-muted-foreground">{t("stock.freightBhada")} <span className="text-destructive">*</span></Label>
-                <Input data-testid="input-bhada-rate" type="text" inputMode="decimal" placeholder="0.00" value={card.vehicleBhadaRate} onChange={e => set("vehicleBhadaRate", toNum(e.target.value))} onFocus={e => e.target.select()} className="h-8 text-sm" />
+                <Input data-testid="input-bhada-rate" type="text" inputMode="decimal" placeholder="0.00" value={card.vehicleBhadaRate} onChange={e => set("vehicleBhadaRate", toNum(e.target.value))} onFocus={e => e.target.select()} {...noScrollProps} className="h-8 text-sm" />
               </div>
               <div>
                 <Label className="text-[10px] sm:text-xs text-muted-foreground">{t("stock.advanceCredit")} <span className="text-destructive">*</span></Label>
