@@ -57,7 +57,7 @@ table.summary th { background: #f0f0f0; }
   </div>
 
   <div class="fields-row">
-    <div><span class="bold">क्रमांक :</span> {{SERIAL_NUMBER}}</div>
+    <div><span class="bold">क्रमांक :</span> <span style="font-size:26px;font-weight:bold">{{SERIAL_NUMBER}}</span></div>
     <div><span class="bold">बुक क्रमांक :</span> &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</div>
     <div><span class="bold">दिनांक</span> &nbsp; {{DATE}}</div>
   </div>
@@ -87,6 +87,7 @@ table.summary th { background: #f0f0f0; }
     </tr>
   </table>
 
+  <div style="text-align:right;font-size:14px;font-weight:bold;margin-bottom:2px">{{CROP_BAGS_LABEL}}</div>
   <div class="produce-wrap">
     <table class="produce">
       <thead>
@@ -159,7 +160,7 @@ table.summary th { background: #f0f0f0; }
       <td style="width:25%;text-align:right"><span class="bold">दिनांक</span> : {{DATE}}</td>
     </tr>
     <tr>
-      <td colspan="2"><span class="bold">{{FARMER_NAME}}</span></td>
+      <td colspan="2"><span class="bold">{{FARMER_NAME}}</span>&nbsp;&ndash;&nbsp;{{FARMER_VILLAGE}}</td>
       <td style="text-align:right"><span class="bold">कुल योग :</span> {{GROSS_AMOUNT}}</td>
     </tr>
     <tr>
@@ -182,7 +183,8 @@ table.summary th { background: #f0f0f0; }
     </tr>
   </table>
 
-  <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:18px;font-size:13px">
+  <div style="font-size:14px;font-weight:bold;margin-top:10px">{{CROP_BAGS_LABEL}}</div>
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:8px;font-size:13px">
     <div>{{FARMER_BANK_ROW}}</div>
     <div>विक्रेता /कृषक के भुगतान प्राप्ति के हस्ताक्षर</div>
   </div>

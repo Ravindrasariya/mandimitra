@@ -242,7 +242,7 @@ export function applyFarmerTemplate(tmpl: string, sg: UnifiedSerialGroup, busine
     const rate = parseFloat(t.pricePerKg || "0") + epk;
     const gross = nw * rate;
     const crop = t.lot?.crop || firstLot?.crop || "";
-    return `<tr><td>${cropLabel[crop] || crop}</td><td>${t.numberOfBags || 0}</td><td>${nw.toFixed(2)}</td><td>${(rate * 100).toFixed(2)}</td><td>${gross.toFixed(2)}</td></tr>`;
+    return `<tr><td>${(cropLabel[crop] || crop)} Pkt</td><td>${t.numberOfBags || 0}</td><td>${nw.toFixed(2)}</td><td>${(rate * 100).toFixed(2)}</td><td>${gross.toFixed(2)}</td></tr>`;
   });
   const MIN_PRODUCE_ROWS = 7;
   const blankRowCount = Math.max(0, MIN_PRODUCE_ROWS - dataRows.length);
@@ -289,6 +289,7 @@ export function applyFarmerTemplate(tmpl: string, sg: UnifiedSerialGroup, busine
     "{{TOTAL_DEDUCTION}}": totalDeduction.toFixed(2),
     "{{NET_PAYABLE}}": netPayable.toFixed(2),
     "{{CROP}}": firstLot?.crop || "",
+    "{{CROP_BAGS_LABEL}}": `(${firstLot?.crop || ""} - ${sg.totalBags})`,
     "{{TXN_ROWS_HTML}}": txnRowsHtml,
   };
   return Object.entries(replacements).reduce((html, [token, val]) => html.split(token).join(val), tmpl);
