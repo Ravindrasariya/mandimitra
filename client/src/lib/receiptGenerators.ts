@@ -640,6 +640,8 @@ export type AadhatNakalBid = {
   khadiKaraiFarmerAmount: number;
   thelaBhadaFarmerAmount: number;
   freightAmount: number;
+  savedAadhatCharges: number;
+  savedMuddatAnyaCharges: number;
 };
 
 export function generateAadhatNakalHtml(
@@ -699,8 +701,8 @@ export function generateAadhatNakalHtml(
     fs.totalWeight += b.netWeight;
     fs.totalPayable += b.farmerPayable;
 
-    expCommission += (b.grossAmount * b.aadhatBuyerPercent) / 100;
-    expMuddat += (b.grossAmount * (b.muddatAnyaBuyerPercent + b.mandiBuyerPercent)) / 100;
+    expCommission += b.savedAadhatCharges;
+    expMuddat += b.savedMuddatAnyaCharges;
     expHammali += b.hammaliFarmerAmount;
     expTulai += b.tulaiFarmerAmount;
     expBharai += b.bharaiFarmerAmount;
@@ -724,24 +726,31 @@ export function generateAadhatNakalHtml(
     const firstSR = srList[0];
     const remainingSRs = srList.slice(1).map(sr =>
       `<tr>
-        <td style="${td}font-weight:bold;">${fs.farmerName}</td>
+        <td style="${td}">&nbsp;</td>
         <td style="${td}">BN #${sr.srNumber} Qty ${sr.bags} Bags Wght ${sr.netWeight.toFixed(2)}</td>
         <td style="${td}text-align:right;">${sr.farmerPayable.toFixed(2)}</td>
       </tr>`
     ).join("");
+
+    const farmerSubtotalRow = `<tr style="background:#f0f0f0;font-weight:bold;">
+      <td style="${td}">Total</td>
+      <td style="${td}">Qty: ${fs.totalBags} Bags &nbsp;&nbsp;&nbsp; Weight: ${fs.totalWeight.toFixed(2)}</td>
+      <td style="${td}text-align:right;">${fs.totalPayable.toFixed(2)}</td>
+    </tr>`;
 
     return `<tr style="border-top:2px solid #333;">
       <td style="${td}font-weight:bold;">${fs.farmerName}</td>
       <td style="${td}">BN #${firstSR.srNumber} Qty ${firstSR.bags} Bags Wght ${firstSR.netWeight.toFixed(2)}</td>
       <td style="${td}text-align:right;">${firstSR.farmerPayable.toFixed(2)}</td>
     </tr>
-    ${remainingSRs}`;
+    ${remainingSRs}
+    ${farmerSubtotalRow}`;
   }).join("");
 
-  const farmerTotalRow = `<tr style="background:#f0f0f0;font-weight:bold;">
-    <td style="${td}">&nbsp;</td>
-    <td style="${td}">Qty ${creditFarmerBags} Bags &nbsp;&nbsp;&nbsp; Weight ${creditFarmerWeight.toFixed(2)}</td>
-    <td style="${td}text-align:right;">${creditFarmerPayable.toFixed(2)}</td>
+  const farmerGrandTotalRow = `<tr style="background:#e8e8e8;font-weight:bold;">
+    <td style="${td}font-weight:bold;">Farmer Total</td>
+    <td style="${td}font-weight:bold;">Qty: ${creditFarmerBags} Bags &nbsp;&nbsp;&nbsp; Weight: ${creditFarmerWeight.toFixed(2)}</td>
+    <td style="${td}text-align:right;font-weight:bold;">${creditFarmerPayable.toFixed(2)}</td>
   </tr>`;
 
   const expTotal = expCommission + expMuddat + expHammali + expTulai + expBharai + expKhadiKarai + expThelaBhada + expMotorBhada;
@@ -935,7 +944,7 @@ table { width: 100%; border-collapse: collapse; }
       <td style="${td}font-weight:bold;" colspan="3">BILLS (FARMERS/GENERAL CREDITORS)-Baaki</td>
     </tr>
     ${farmerRows}
-    ${farmerTotalRow}
+    ${farmerGrandTotalRow}
     ${expenseRows}
     ${creditTotalRow}
     ${sectionRows}

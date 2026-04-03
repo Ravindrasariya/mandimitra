@@ -128,6 +128,9 @@ type BidRow = {
   farmerPaidAmount?: string;
   savedBuyerReceivable?: number;
   savedFarmerPayable?: number;
+  savedAadhatCharges?: number;
+  savedMuddatAnyaCharges?: number;
+  savedFreightCharges?: number;
   paidAmount?: string;
 };
 
@@ -2815,6 +2818,9 @@ function stockCardsToFarmerCards(apiCards: any[]): FarmerCard[] {
               } : undefined,
               savedBuyerReceivable: txn?.totalReceivableFromBuyer != null ? parseFloat(txn.totalReceivableFromBuyer) : undefined,
               savedFarmerPayable: txn?.totalPayableToFarmer != null ? parseFloat(txn.totalPayableToFarmer) : undefined,
+              savedAadhatCharges: txn?.aadhatCharges != null ? parseFloat(txn.aadhatCharges) : undefined,
+              savedMuddatAnyaCharges: txn?.muddatAnyaCharges != null ? parseFloat(txn.muddatAnyaCharges) : undefined,
+              savedFreightCharges: txn?.freightCharges != null ? parseFloat(txn.freightCharges) : undefined,
               paymentStatus: txn?.paymentStatus || "due",
               farmerPaymentStatus: txn?.farmerPaymentStatus || "due",
               farmerPaidAmount: txn?.farmerPaidAmount?.toString() || "0",
@@ -3997,6 +4003,9 @@ export default function StockPage() {
 
             let savedBuyerReceivableAfterSave = bid.savedBuyerReceivable;
             let savedFarmerPayableAfterSave = bid.savedFarmerPayable;
+            let savedAadhatChargesAfterSave = bid.savedAadhatCharges;
+            let savedMuddatAnyaChargesAfterSave = bid.savedMuddatAnyaCharges;
+            let savedFreightChargesAfterSave = bid.savedFreightCharges;
             if (bidDbId && nw > 0) {
               const vehicleBR = parseFloat(card.vehicleBhadaRate) || 0;
               const totalBIV = parseInt(card.totalBagsInVehicle) || 0;
@@ -4080,6 +4089,9 @@ export default function StockPage() {
                   txnDbId = createdTxn.id;
                   savedBuyerReceivableAfterSave = buyerReceivable;
                   savedFarmerPayableAfterSave = farmerPayable;
+                  savedAadhatChargesAfterSave = aadhatBuyer;
+                  savedMuddatAnyaChargesAfterSave = muddatAnyaBuyer;
+                  savedFreightChargesAfterSave = freight;
                 } catch (err: any) {
                   toast({ title: t("stock.warning"), description: `${t("stock.failedCreateTxn")}: ${err.message}`, variant: "destructive" });
                 }
@@ -4088,6 +4100,9 @@ export default function StockPage() {
                   await apiRequest("PATCH", `/api/transactions/${txnDbId}`, txnPayload);
                   savedBuyerReceivableAfterSave = buyerReceivable;
                   savedFarmerPayableAfterSave = farmerPayable;
+                  savedAadhatChargesAfterSave = aadhatBuyer;
+                  savedMuddatAnyaChargesAfterSave = muddatAnyaBuyer;
+                  savedFreightChargesAfterSave = freight;
                 } catch (err: any) {
                   toast({ title: t("stock.warning"), description: `${t("stock.failedUpdateTxn")}: ${err.message}`, variant: "destructive" });
                 }
@@ -4113,7 +4128,7 @@ export default function StockPage() {
               tulaiFarmerPerBag: (bid.savedCharges || cs).tulaiFarmerPerBag,
               khadiKaraiFarmerPerBag: (bid.savedCharges || cs).khadiKaraiFarmerPerBag,
             } : bid.savedCharges;
-            updatedBids.push({ ...bid, bidDbId, txnDbId, savedCharges: savedChargesAfterSave, savedBuyerReceivable: savedBuyerReceivableAfterSave, savedFarmerPayable: savedFarmerPayableAfterSave });
+            updatedBids.push({ ...bid, bidDbId, txnDbId, savedCharges: savedChargesAfterSave, savedBuyerReceivable: savedBuyerReceivableAfterSave, savedFarmerPayable: savedFarmerPayableAfterSave, savedAadhatCharges: savedAadhatChargesAfterSave, savedMuddatAnyaCharges: savedMuddatAnyaChargesAfterSave, savedFreightCharges: savedFreightChargesAfterSave });
           }
 
           finalGroups = finalGroups.map((fg, gi) =>
@@ -4255,7 +4270,7 @@ export default function StockPage() {
             const hfRate = parseFloat(bid.savedCharges?.hammaliFarmerPerBag ?? cs.hammaliFarmerPerBag ?? "0");
             const vbr = parseFloat(card.vehicleBhadaRate) || 0;
             const tbi = parseInt(card.totalBagsInVehicle) || 0;
-            const freight = tbi > 0 ? Math.round((vbr * bidBags) / tbi) : 0;
+            const freightFallback = tbi > 0 ? Math.round((vbr * bidBags) / tbi) : 0;
             nakalBids.push({
               buyerName: bid.buyerName,
               buyerId: bid.buyerId ?? undefined,
@@ -4279,7 +4294,9 @@ export default function StockPage() {
               bharaiFarmerAmount: parseFloat(bid.txn.extraBharai) || 0,
               khadiKaraiFarmerAmount: parseFloat(bid.txn.extraKhadiKarai) || 0,
               thelaBhadaFarmerAmount: parseFloat(bid.txn.extraThelaBhada) || 0,
-              freightAmount: freight,
+              freightAmount: bid.savedFreightCharges ?? freightFallback,
+              savedAadhatCharges: bid.savedAadhatCharges ?? 0,
+              savedMuddatAnyaCharges: bid.savedMuddatAnyaCharges ?? 0,
             });
           }
         }
