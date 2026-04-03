@@ -631,6 +631,15 @@ export type AadhatNakalBid = {
   mandiBuyerPercent: number;
   buyerReceivable: number;
   licenceNo: string;
+  haste: string;
+  farmerName: string;
+  farmerPayable: number;
+  hammaliFarmerAmount: number;
+  tulaiFarmerAmount: number;
+  bharaiFarmerAmount: number;
+  khadiKaraiFarmerAmount: number;
+  thelaBhadaFarmerAmount: number;
+  freightAmount: number;
 };
 
 export function generateAadhatNakalHtml(
@@ -646,7 +655,154 @@ export function generateAadhatNakalHtml(
   const dateDisplay = `${dy}/${mo}/${yr}`;
   const fullDateDisplay = `${dayName}, ${parseInt(dy)} ${monthNames[parseInt(mo)-1]}, ${yr}`;
 
-  type Section = {
+  const td = "padding:4px 6px;border:1px solid #555;vertical-align:top;font-size:11px;";
+
+  type FarmerSR = {
+    srNumber: string;
+    bags: number;
+    netWeight: number;
+    farmerPayable: number;
+  };
+  type FarmerSection = {
+    farmerName: string;
+    srEntries: Map<string, FarmerSR>;
+    totalBags: number;
+    totalWeight: number;
+    totalPayable: number;
+  };
+
+  const farmerMap = new Map<string, FarmerSection>();
+  let expCommission = 0;
+  let expMuddat = 0;
+  let expHammali = 0;
+  let expTulai = 0;
+  let expBharai = 0;
+  let expKhadiKarai = 0;
+  let expThelaBhada = 0;
+  let expMotorBhada = 0;
+
+  for (const b of bids) {
+    const fKey = b.farmerName.toLowerCase();
+    if (!farmerMap.has(fKey)) {
+      farmerMap.set(fKey, { farmerName: b.farmerName, srEntries: new Map(), totalBags: 0, totalWeight: 0, totalPayable: 0 });
+    }
+    const fs = farmerMap.get(fKey)!;
+    const srKey = b.srNumber;
+    if (!fs.srEntries.has(srKey)) {
+      fs.srEntries.set(srKey, { srNumber: srKey, bags: 0, netWeight: 0, farmerPayable: 0 });
+    }
+    const sr = fs.srEntries.get(srKey)!;
+    sr.bags += b.bags;
+    sr.netWeight += b.netWeight;
+    sr.farmerPayable += b.farmerPayable;
+    fs.totalBags += b.bags;
+    fs.totalWeight += b.netWeight;
+    fs.totalPayable += b.farmerPayable;
+
+    expCommission += (b.grossAmount * b.aadhatBuyerPercent) / 100;
+    expMuddat += (b.grossAmount * (b.muddatAnyaBuyerPercent + b.mandiBuyerPercent)) / 100;
+    expHammali += b.hammaliFarmerAmount;
+    expTulai += b.tulaiFarmerAmount;
+    expBharai += b.bharaiFarmerAmount;
+    expKhadiKarai += b.khadiKaraiFarmerAmount;
+    expThelaBhada += b.thelaBhadaFarmerAmount;
+    expMotorBhada += b.freightAmount;
+  }
+
+  const farmers = Array.from(farmerMap.values()).sort((a, b) => a.farmerName.localeCompare(b.farmerName));
+
+  let creditFarmerBags = 0;
+  let creditFarmerWeight = 0;
+  let creditFarmerPayable = 0;
+
+  const farmerRows = farmers.map(fs => {
+    creditFarmerBags += fs.totalBags;
+    creditFarmerWeight += fs.totalWeight;
+    creditFarmerPayable += fs.totalPayable;
+
+    const srList = Array.from(fs.srEntries.values());
+    const firstSR = srList[0];
+    const remainingSRs = srList.slice(1).map(sr =>
+      `<tr>
+        <td style="${td}font-weight:bold;">${fs.farmerName}</td>
+        <td style="${td}">BN #${sr.srNumber} Qty ${sr.bags} Bags Wght ${sr.netWeight.toFixed(2)}</td>
+        <td style="${td}text-align:right;">${sr.farmerPayable.toFixed(2)}</td>
+      </tr>`
+    ).join("");
+
+    return `<tr style="border-top:2px solid #333;">
+      <td style="${td}font-weight:bold;">${fs.farmerName}</td>
+      <td style="${td}">BN #${firstSR.srNumber} Qty ${firstSR.bags} Bags Wght ${firstSR.netWeight.toFixed(2)}</td>
+      <td style="${td}text-align:right;">${firstSR.farmerPayable.toFixed(2)}</td>
+    </tr>
+    ${remainingSRs}`;
+  }).join("");
+
+  const farmerTotalRow = `<tr style="background:#f0f0f0;font-weight:bold;">
+    <td style="${td}">&nbsp;</td>
+    <td style="${td}">Qty ${creditFarmerBags} Bags &nbsp;&nbsp;&nbsp; Weight ${creditFarmerWeight.toFixed(2)}</td>
+    <td style="${td}text-align:right;">${creditFarmerPayable.toFixed(2)}</td>
+  </tr>`;
+
+  const expTotal = expCommission + expMuddat + expHammali + expTulai + expBharai + expKhadiKarai + expThelaBhada + expMotorBhada;
+
+  const expenseRows = `<tr style="border-top:2px solid #333;">
+      <td style="${td}font-weight:bold;" colspan="3">EXPENSES</td>
+    </tr>
+    <tr>
+      <td style="${td}font-weight:bold;">Commission</td>
+      <td style="${td}">&nbsp;</td>
+      <td style="${td}text-align:right;">${expCommission.toFixed(2)}</td>
+    </tr>
+    <tr>
+      <td style="${td}font-weight:bold;">Muddat</td>
+      <td style="${td}">&nbsp;</td>
+      <td style="${td}text-align:right;">${expMuddat.toFixed(2)}</td>
+    </tr>
+    <tr>
+      <td style="${td}font-weight:bold;">Hammali</td>
+      <td style="${td}">&nbsp;</td>
+      <td style="${td}text-align:right;">${expHammali.toFixed(2)}</td>
+    </tr>
+    <tr>
+      <td style="${td}font-weight:bold;">Tulai</td>
+      <td style="${td}">&nbsp;</td>
+      <td style="${td}text-align:right;">${expTulai.toFixed(2)}</td>
+    </tr>
+    <tr>
+      <td style="${td}font-weight:bold;">Bharai</td>
+      <td style="${td}">&nbsp;</td>
+      <td style="${td}text-align:right;">${expBharai.toFixed(2)}</td>
+    </tr>
+    <tr>
+      <td style="${td}font-weight:bold;">Khadi Karai</td>
+      <td style="${td}">&nbsp;</td>
+      <td style="${td}text-align:right;">${expKhadiKarai.toFixed(2)}</td>
+    </tr>
+    <tr>
+      <td style="${td}font-weight:bold;">Thela Bhada</td>
+      <td style="${td}">&nbsp;</td>
+      <td style="${td}text-align:right;">${expThelaBhada.toFixed(2)}</td>
+    </tr>
+    <tr>
+      <td style="${td}font-weight:bold;">Motor Bhada</td>
+      <td style="${td}">&nbsp;</td>
+      <td style="${td}text-align:right;">${expMotorBhada.toFixed(2)}</td>
+    </tr>
+    <tr style="background:#f0f0f0;font-weight:bold;">
+      <td style="${td}">&nbsp;</td>
+      <td style="${td}">Qty 0 &nbsp;&nbsp;&nbsp; Weight 0.0</td>
+      <td style="${td}text-align:right;">${expTotal.toFixed(2)}</td>
+    </tr>`;
+
+  const creditTotal = creditFarmerPayable + expTotal;
+  const creditTotalRow = `<tr style="border-top:3px double #333;font-weight:bold;font-size:12px;background:#e0e0e0;">
+    <td style="${td}font-weight:bold;">Credit Total</td>
+    <td style="${td}font-weight:bold;">Qty ${creditFarmerBags} Bags &nbsp;&nbsp;&nbsp; Weight ${creditFarmerWeight.toFixed(2)}</td>
+    <td style="${td}text-align:right;font-weight:bold;">${creditTotal.toFixed(2)}</td>
+  </tr>`;
+
+  type DebitSection = {
     buyerLabel: string;
     sortKey: string;
     licenceNo: string;
@@ -662,7 +818,7 @@ export function generateAadhatNakalHtml(
     srNumbers: string[];
   };
 
-  const sectionMap = new Map<string, Section>();
+  const sectionMap = new Map<string, DebitSection>();
   for (const b of bids) {
     const isCash = b.paymentType === "Cash";
     const displayName = isCash ? `${b.buyerName} (Cash)` : b.buyerName;
@@ -703,8 +859,6 @@ export function generateAadhatNakalHtml(
   let grandTotalBags = 0;
   let grandTotalWeight = 0;
   let grandTotalReceivable = 0;
-
-  const td = "padding:4px 6px;border:1px solid #555;vertical-align:top;font-size:11px;";
 
   const sectionRows = sections.map(sec => {
     grandTotalBags += sec.totalBags;
@@ -777,6 +931,13 @@ table { width: 100%; border-collapse: collapse; }
     </tr>
   </thead>
   <tbody>
+    <tr style="border-top:2px solid #333;">
+      <td style="${td}font-weight:bold;" colspan="3">BILLS (FARMERS/GENERAL CREDITORS)-Baaki</td>
+    </tr>
+    ${farmerRows}
+    ${farmerTotalRow}
+    ${expenseRows}
+    ${creditTotalRow}
     ${sectionRows}
     <tr style="border-top:3px double #333;font-weight:bold;font-size:12px;background:#e0e0e0;">
       <td style="${td}font-weight:bold;">Debit Total</td>

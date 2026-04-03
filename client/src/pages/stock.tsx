@@ -4251,12 +4251,17 @@ export default function StockPage() {
             const buyerData = pageBuyersList.find(b => b.id === bid.buyerId);
             const nw = parseFloat(bid.txn.netWeightInput) || 0;
             const ppk = parseFloat(bid.pricePerKg) || 0;
+            const bidBags = parseInt(bid.numberOfBags) || 0;
+            const hfRate = parseFloat(bid.savedCharges?.hammaliFarmerPerBag ?? cs.hammaliFarmerPerBag ?? "0");
+            const vbr = parseFloat(card.vehicleBhadaRate) || 0;
+            const tbi = parseInt(card.totalBagsInVehicle) || 0;
+            const freight = tbi > 0 ? Math.round((vbr * bidBags) / tbi) : 0;
             nakalBids.push({
               buyerName: bid.buyerName,
               buyerId: bid.buyerId ?? undefined,
               crop: g.crop,
               srNumber: g.srNumber || "",
-              bags: parseInt(bid.numberOfBags) || 0,
+              bags: bidBags,
               netWeight: nw,
               pricePerKg: ppk,
               grossAmount: nw * ppk,
@@ -4267,6 +4272,14 @@ export default function StockPage() {
               mandiBuyerPercent: parseFloat(bid.savedCharges?.mandiCommissionBuyerPercent ?? cs.mandiCommissionBuyerPercent ?? "0"),
               buyerReceivable: savedBid?.savedBuyerReceivable ?? 0,
               licenceNo: buyerData?.licenceNo ?? "",
+              farmerName: card.farmerName,
+              farmerPayable: bid.savedFarmerPayable ?? 0,
+              hammaliFarmerAmount: Math.round(hfRate * bidBags),
+              tulaiFarmerAmount: parseFloat(bid.txn.extraTulai) || 0,
+              bharaiFarmerAmount: parseFloat(bid.txn.extraBharai) || 0,
+              khadiKaraiFarmerAmount: parseFloat(bid.txn.extraKhadiKarai) || 0,
+              thelaBhadaFarmerAmount: parseFloat(bid.txn.extraThelaBhada) || 0,
+              freightAmount: freight,
             });
           }
         }
