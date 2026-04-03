@@ -650,7 +650,7 @@ function calcBidTotals(bid: BidRow, cs: ChargeSettings, vehicleBhadaRate: number
   const epkFarmer = parseFloat(txn.extraPerKgFarmer) || 0;
   const epkBuyer = parseFloat(txn.extraPerKgBuyer) || 0;
   const farmerGross = Math.round(nw * (pricePerKg + epkFarmer));
-  const buyerGross = nw * (pricePerKg + epkBuyer);
+  const buyerGross = Math.round(nw * (pricePerKg + epkBuyer));
   const ecs = bid.savedCharges || cs;
   const hfRate = parseFloat(ecs.hammaliFarmerPerBag) || 0;
   const hbRate = parseFloat(ecs.hammaliBuyerPerBag) || 0;
@@ -665,11 +665,11 @@ function calcBidTotals(bid: BidRow, cs: ChargeSettings, vehicleBhadaRate: number
   const muddatAnyaFPct = parseFloat(ecs.muddatAnyaFarmerPercent) || 0;
   const muddatAnyaBPct = parseFloat(ecs.muddatAnyaBuyerPercent) || 0;
   const freight = totalBagsInVehicle > 0 ? Math.round((vehicleBhadaRate * bidBags) / totalBagsInVehicle) : 0;
-  const muddatAnyaBuyer = (buyerGross * muddatAnyaBPct) / 100;
+  const muddatAnyaBuyer = Math.round((buyerGross * muddatAnyaBPct) / 100);
   const hammaliFarmerTotal = Math.round(hfRate * bidBags);
   const farmerDed = hammaliFarmerTotal + extraFarmer + (farmerGross * aadhatFPct) / 100 + (farmerGross * mandiFPct) / 100 + (farmerGross * muddatAnyaFPct) / 100 + freight;
-  const buyerAdd = hbRate * bidBags + extraBuyer + (buyerGross * aadhatBPct) / 100 + (buyerGross * mandiBPct) / 100 + muddatAnyaBuyer;
-  const aadhatBuyer = (buyerGross * aadhatBPct) / 100;
+  const aadhatBuyer = Math.round((buyerGross * aadhatBPct) / 100);
+  const buyerAdd = hbRate * bidBags + extraBuyer + aadhatBuyer + (buyerGross * mandiBPct) / 100 + muddatAnyaBuyer;
   return {
     bidBags,
     farmerPayable: farmerGross - farmerDed,
@@ -806,7 +806,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
   const epkFarmer = parseFloat(txn.extraPerKgFarmer) || 0;
   const epkBuyer = parseFloat(txn.extraPerKgBuyer) || 0;
   const farmerGross = Math.round(nw * (pricePerKg + epkFarmer));
-  const buyerGross = nw * (pricePerKg + epkBuyer);
+  const buyerGross = Math.round(nw * (pricePerKg + epkBuyer));
 
   const hammaliFarmerRate = parseFloat(cs.hammaliFarmerPerBag) || 0;
   const hammaliBuyerRate = parseFloat(cs.hammaliBuyerPerBag) || 0;
@@ -824,11 +824,11 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
   const hammaliFarmerTotal = Math.round(hammaliFarmerRate * bags);
   const hammaliBuyerTotal = hammaliBuyerRate * bags;
   const aadhatFarmer = (farmerGross * aadhatFarmerPct) / 100;
-  const aadhatBuyer = (buyerGross * aadhatBuyerPct) / 100;
+  const aadhatBuyer = Math.round((buyerGross * aadhatBuyerPct) / 100);
   const mandiFarmer = (farmerGross * mandiFarmerPct) / 100;
   const mandiBuyer = (buyerGross * mandiBuyerPct) / 100;
   const muddatAnyaFarmer = (farmerGross * muddatAnyaFarmerPct) / 100;
-  const muddatAnyaBuyer = (buyerGross * muddatAnyaBuyerPct) / 100;
+  const muddatAnyaBuyer = Math.round((buyerGross * muddatAnyaBuyerPct) / 100);
 
   const farmerDeductions = hammaliFarmerTotal + extraFarmer + aadhatFarmer + mandiFarmer + muddatAnyaFarmer + freightFarmerTotal;
   const buyerAdditions = hammaliBuyerTotal + extraBuyer + aadhatBuyer + mandiBuyer + muddatAnyaBuyer;
@@ -1106,13 +1106,13 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
             <div className="border-t pt-1.5 mt-1.5 bg-blue-50 dark:bg-blue-950/30 rounded-md p-2 -mx-0.5 space-y-0.5">
               <div className="flex justify-between gap-1">
                 <span className="min-w-0 flex-1">{t("stock.gross")} ({nw.toFixed(0)} × ₹{(pricePerKg + epkBuyer).toFixed(2)}):</span>
-                <span className="shrink-0 font-medium">₹{buyerGross.toFixed(2)}</span>
+                <span className="shrink-0 font-medium">₹{buyerGross.toFixed(0)}</span>
               </div>
               <p className="text-muted-foreground font-semibold mt-0.5">{t("stock.additions")}:</p>
               {hammaliBuyerRate > 0 && (
                 <div className="flex justify-between gap-1 text-muted-foreground pl-2">
                   <span className="min-w-0 flex-1">{t("stock.hammali")} ({bags}×₹{hammaliBuyerRate}):</span>
-                  <span className="shrink-0">+₹{hammaliBuyerTotal.toFixed(2)}</span>
+                  <span className="shrink-0">+₹{hammaliBuyerTotal.toFixed(0)}</span>
                 </div>
               )}
               {extraBuyer > 0 && (
@@ -1124,25 +1124,25 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
               {aadhatBuyerPct > 0 && (
                 <div className="flex justify-between gap-1 text-muted-foreground pl-2">
                   <span className="min-w-0 flex-1">{t("stock.aadhat")} ({aadhatBuyerPct}%):</span>
-                  <span className="shrink-0">+₹{aadhatBuyer.toFixed(2)}</span>
+                  <span className="shrink-0">+₹{aadhatBuyer.toFixed(0)}</span>
                 </div>
               )}
               {muddatAnyaBuyerPct > 0 && (
                 <div className="flex justify-between gap-1 text-muted-foreground pl-2">
                   <span className="min-w-0 flex-1">{t("stock.muddatAnya")} ({muddatAnyaBuyerPct}%):</span>
-                  <span className="shrink-0">+₹{muddatAnyaBuyer.toFixed(2)}</span>
+                  <span className="shrink-0">+₹{muddatAnyaBuyer.toFixed(0)}</span>
                 </div>
               )}
               {mandiBuyerPct > 0 && (
                 <div className="flex justify-between gap-1 text-muted-foreground pl-2">
                   <span className="min-w-0 flex-1">{t("stock.mandi")} ({mandiBuyerPct}%):</span>
-                  <span className="shrink-0">+₹{mandiBuyer.toFixed(2)}</span>
+                  <span className="shrink-0">+₹{mandiBuyer.toFixed(0)}</span>
                 </div>
               )}
               {buyerAdditions === 0 && <div className="text-muted-foreground italic pl-2">{t("stock.noAdditions")}</div>}
               <div className="flex justify-between gap-1 font-bold text-blue-700 border-t pt-1 mt-0.5">
                 <span className="min-w-0 flex-1">{t("stock.buyerReceivable")}:</span>
-                <span className="shrink-0">₹{buyerReceivable.toFixed(2)}</span>
+                <span className="shrink-0">₹{buyerReceivable.toFixed(0)}</span>
               </div>
             </div>
           )}
@@ -3989,7 +3989,7 @@ export default function StockPage() {
               const epkF = parseFloat(bid.txn.extraPerKgFarmer) || 0;
               const epkB = parseFloat(bid.txn.extraPerKgBuyer) || 0;
               const farmerGross = Math.round(nw * (ppk + epkF));
-              const buyerGross = nw * (ppk + epkB);
+              const buyerGross = Math.round(nw * (ppk + epkB));
               const effectiveCs = bid.savedCharges || cs;
               const hfRate = parseFloat(effectiveCs.hammaliFarmerPerBag) || 0;
               const hbRate = parseFloat(effectiveCs.hammaliBuyerPerBag) || 0;
@@ -4012,9 +4012,9 @@ export default function StockPage() {
               const aadhatFarmer = (farmerGross * aadhatFPct) / 100;
               const mandiFarmer = (farmerGross * mandiFPct) / 100;
               const muddatAnyaFarmer = (farmerGross * muddatAnyaFPct) / 100;
-              const aadhatBuyer = (buyerGross * aadhatBPct) / 100;
+              const aadhatBuyer = Math.round((buyerGross * aadhatBPct) / 100);
               const mandiBuyer = (buyerGross * mandiBPct) / 100;
-              const muddatAnyaBuyer = (buyerGross * muddatAnyaBPct) / 100;
+              const muddatAnyaBuyer = Math.round((buyerGross * muddatAnyaBPct) / 100);
               const farmerDed = hammaliFarmerTotal + extraF + aadhatFarmer + mandiFarmer + muddatAnyaFarmer + freight;
               const buyerAdd = hammaliBuyerTotal + extraB + aadhatBuyer + mandiBuyer + muddatAnyaBuyer;
               const farmerPayable = farmerGross - farmerDed;
@@ -4040,9 +4040,9 @@ export default function StockPage() {
                 extraOthersFarmer: (parseFloat(bid.txn.extraOthers) || 0).toFixed(2),
                 hammaliCharges: hammaliFarmerTotal.toFixed(0),
                 freightCharges: freight.toFixed(0),
-                aadhatCharges: aadhatBuyer.toFixed(2),
-                mandiCharges: mandiBuyer.toFixed(2),
-                muddatAnyaCharges: muddatAnyaBuyer.toFixed(2),
+                aadhatCharges: aadhatBuyer.toFixed(0),
+                mandiCharges: mandiBuyer.toFixed(0),
+                muddatAnyaCharges: muddatAnyaBuyer.toFixed(0),
                 aadhatFarmerPercent: aadhatFPct.toFixed(2),
                 mandiFarmerPercent: mandiFPct.toFixed(2),
                 muddatAnyaFarmerPercent: muddatAnyaFPct.toFixed(2),
@@ -4052,7 +4052,7 @@ export default function StockPage() {
                 hammaliFarmerPerBag: hfRate.toFixed(2),
                 hammaliBuyerPerBag: hbRate.toFixed(2),
                 totalPayableToFarmer: farmerPayable.toFixed(0),
-                totalReceivableFromBuyer: buyerReceivable.toFixed(2),
+                totalReceivableFromBuyer: buyerReceivable.toFixed(0),
                 date: bid.txnDate || card.date,
               };
 
@@ -4310,7 +4310,7 @@ export default function StockPage() {
               aadhatBuyerPercent: String(aadhatBPct),
               mandiBuyerPercent: ecs.mandiCommissionBuyerPercent || "0",
               muddatAnyaBuyerPercent: ecs.muddatAnyaBuyerPercent || "0",
-              totalReceivableFromBuyer: bt.buyerReceivable.toFixed(2),
+              totalReceivableFromBuyer: bt.buyerReceivable.toFixed(0),
               buyer: fakeBuyer,
               farmer: { name: card.farmerName, village: card.village || "" },
             } as any;
@@ -4509,7 +4509,7 @@ export default function StockPage() {
               bid.txn.extraChargesFarmer || "0", bid.txn.extraChargesBuyer || "0",
               bid.txn.extraPerKgFarmer || "0", bid.txn.extraPerKgBuyer || "0",
               freight,
-              bt.farmerPayable.toFixed(0), bt.buyerReceivable.toFixed(2),
+              bt.farmerPayable.toFixed(0), bt.buyerReceivable.toFixed(0),
               fStat, bStat,
               archiveStatus,
             ].map(escCSV).join(","));
