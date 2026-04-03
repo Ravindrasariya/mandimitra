@@ -4323,6 +4323,7 @@ export default function StockPage() {
               pricePerKg: bid.pricePerKg,
               extraPerKgBuyer: bid.txn.extraPerKgBuyer || "0",
               numberOfBags: bidBags,
+              haste: bid.haste || "KHUD",
               hammaliBuyerPerBag: ecs.hammaliBuyerPerBag || "0",
               extraChargesBuyer: bid.txn.extraChargesBuyer || "0",
               aadhatBuyerPercent: String(aadhatBPct),
