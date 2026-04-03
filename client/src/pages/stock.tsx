@@ -43,6 +43,11 @@ import type { Lot, Farmer, Transaction, Bid, Buyer, ReceiptTemplate } from "@sha
 const capFirst = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 const toNum = (v: string) => v.replace(/[^0-9.]/g, "");
 
+const noScrollProps = {
+  onWheel: (e: React.WheelEvent<HTMLInputElement>) => { (e.target as HTMLInputElement).blur(); },
+  onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault(); },
+};
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type ChargeSettings = {
@@ -1299,6 +1304,7 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
                 type="number" placeholder="0.00"
                 value={bid.pricePerKg}
                 onChange={e => onChange({ ...bid, pricePerKg: toNum(e.target.value) })}
+                {...noScrollProps}
                 className="h-8 text-sm"
               />
             </div>
@@ -1309,6 +1315,7 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
                 type="number" placeholder="0"
                 value={bid.numberOfBags}
                 onChange={e => onChange({ ...bid, numberOfBags: e.target.value.replace(/\D/g, "") })}
+                {...noScrollProps}
                 className={`h-8 text-sm ${overBag ? "border-red-400 focus-visible:ring-red-400" : ""}`}
               />
               {overBag && (
@@ -1346,6 +1353,7 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
                 type="number"
                 value={bid.advanceAmount}
                 onChange={e => onChange({ ...bid, advanceAmount: toNum(e.target.value) })}
+                {...noScrollProps}
                 className="h-7 w-24 text-sm"
               />
             </div>
@@ -1454,6 +1462,7 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
                 type="number" placeholder="0"
                 value={lot.numberOfBags}
                 onChange={e => setField("numberOfBags", e.target.value.replace(/\D/g, ""))}
+                {...noScrollProps}
                 className="h-8 text-sm"
               />
             </div>
@@ -2485,7 +2494,7 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">{t("stock.farmerAdvance")}</Label>
-                  <Input data-testid="input-farmer-advance" type="number" placeholder="0" value={card.advanceAmount} onChange={e => set("advanceAmount", e.target.value)} className="h-8 text-sm" />
+                  <Input data-testid="input-farmer-advance" type="number" placeholder="0" value={card.advanceAmount} onChange={e => set("advanceAmount", e.target.value)} {...noScrollProps} className="h-8 text-sm" />
                 </div>
                 <div>
                   <Label className="text-xs text-muted-foreground">{t("stock.mode")}</Label>
