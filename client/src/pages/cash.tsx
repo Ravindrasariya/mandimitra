@@ -14,7 +14,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import type { Farmer, Buyer, CashEntry, BankAccount } from "@shared/schema";
 import { ASSET_CATEGORIES, ASSET_DEPRECIATION_RATES } from "@shared/schema";
-import { Wallet, Settings, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Download, RotateCcw, Trash2, Plus, Filter, X, Search, ChevronsUpDown, Pencil, Check, Save } from "lucide-react";
+import { Wallet, Settings, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Download, RotateCcw, Trash2, Plus, Filter, X, Search, ChevronsUpDown, Pencil, Check, Save, Calendar, ChevronDown } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 
 type CashEntryWithTxn = CashEntry & { srNumber: number | null; txnCode: string | null };
@@ -63,7 +65,8 @@ export default function CashPage() {
   const [filterBuyer, setFilterBuyer] = usePersistedState("cash-filterBuyer", "all");
   const [filterFarmer, setFilterFarmer] = usePersistedState("cash-filterFarmer", "all");
   const [filterRemarks, setFilterRemarks] = usePersistedState("cash-filterRemarks", "all");
-  const [filterMonth, setFilterMonth] = usePersistedState("cash-filterMonth", "all");
+  const [selectedMonths, setSelectedMonths] = useState<string[]>([]);
+  const [selectedDays, setSelectedDays] = useState<string[]>([]);
   const [filterYear, setFilterYear] = usePersistedState("cash-filterYear", String(now.getFullYear()));
 
   const [inwardPartyType, setInwardPartyType, clearInwardPartyType] = usePersistedState("cash-inwardPartyType", "Buyer");
@@ -140,10 +143,9 @@ export default function CashPage() {
   const queryParams = useMemo(() => {
     const params = new URLSearchParams();
     if (filterCategory !== "all") params.set("category", filterCategory);
-    if (filterMonth !== "all") params.set("month", filterMonth);
     if (filterYear !== "all") params.set("year", filterYear);
     return params.toString() ? `?${params.toString()}` : "";
-  }, [filterCategory, filterMonth, filterYear]);
+  }, [filterCategory, filterYear]);
 
   const { data: allEntries = [], isLoading } = useQuery<CashEntryWithTxn[]>({
     queryKey: [`/api/cash-entries${queryParams}`],
@@ -186,7 +188,7 @@ export default function CashPage() {
     return uniqueRemarks.filter(r => r.toLowerCase().includes(lower));
   };
 
-  const hasActiveFilters = filterCategory !== "all" || filterPaymentMode !== "all" || filterOutflowType !== "all" || filterBuyer !== "all" || filterFarmer !== "all" || filterRemarks !== "all" || filterMonth !== "all" || filterYear !== String(now.getFullYear());
+  const hasActiveFilters = filterCategory !== "all" || filterPaymentMode !== "all" || filterOutflowType !== "all" || filterBuyer !== "all" || filterFarmer !== "all" || filterRemarks !== "all" || selectedMonths.length > 0 || selectedDays.length > 0 || filterYear !== String(now.getFullYear());
 
   const clearAllFilters = () => {
     setFilterCategory("all");
@@ -196,12 +198,22 @@ export default function CashPage() {
     setFilterFarmer("all");
     setFilterRemarks("all");
     setFilterRemarksSearch("");
-    setFilterMonth("all");
+    setSelectedMonths([]);
+    setSelectedDays([]);
     setFilterYear(String(now.getFullYear()));
   };
 
   const filteredEntries = useMemo(() => {
     let result = allEntries;
+    if (selectedMonths.length > 0 || selectedDays.length > 0) {
+      result = result.filter(e => {
+        if (!e.date) return false;
+        const [, m, d] = e.date.split("-");
+        if (selectedMonths.length > 0 && !selectedMonths.includes(String(parseInt(m)))) return false;
+        if (selectedDays.length > 0 && !selectedDays.includes(String(parseInt(d)))) return false;
+        return true;
+      });
+    }
     if (filterPaymentMode !== "all") {
       result = result.filter(e => e.paymentMode === filterPaymentMode);
     }
@@ -218,7 +230,7 @@ export default function CashPage() {
       result = result.filter(e => e.notes && e.notes.trim() === filterRemarks);
     }
     return result;
-  }, [allEntries, filterPaymentMode, filterOutflowType, filterBuyer, filterFarmer, filterRemarks]);
+  }, [allEntries, selectedMonths, selectedDays, filterPaymentMode, filterOutflowType, filterBuyer, filterFarmer, filterRemarks]);
 
   const filteredTotals = useMemo(() => {
     let totalInflow = 0, totalOutflow = 0;
@@ -834,7 +846,37 @@ export default function CashPage() {
     URL.revokeObjectURL(url);
   };
 
-  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const [monthPopoverOpen, setMonthPopoverOpen] = useState(false);
+  const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
+
+  const daysInMonths = useMemo(() => {
+    if (selectedMonths.length === 0) return 31;
+    const year = filterYear !== "all" ? parseInt(filterYear) : new Date().getFullYear();
+    return Math.max(...selectedMonths.map(m => new Date(year, parseInt(m), 0).getDate()));
+  }, [selectedMonths, filterYear]);
+
+  const toggleMonth = (month: string) => {
+    setSelectedMonths((prev: string[]) => prev.includes(month) ? prev.filter(m => m !== month) : [...prev, month]);
+    setSelectedDays([]);
+  };
+  const selectAllMonths = () => { setSelectedMonths([]); setSelectedDays([]); setMonthPopoverOpen(false); };
+  const toggleDay = (day: string) => {
+    setSelectedDays((prev: string[]) => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
+  };
+  const selectAllDays = () => { setSelectedDays([]); setDayPopoverOpen(false); };
+
+  const monthLabel = selectedMonths.length === 0
+    ? "All Months"
+    : selectedMonths.length === 1
+      ? MONTH_LABELS[parseInt(selectedMonths[0]) - 1]
+      : `${selectedMonths.length} Months`;
+
+  const dayLabel = selectedDays.length === 0
+    ? "All Days"
+    : selectedDays.length === 1
+      ? selectedDays[0]
+      : `${selectedDays.length} Days`;
 
   const dueHammali = (txAggregates?.totalHammali || 0) - (txAggregates?.paidHammali || 0);
   const dueExtraCharges = (txAggregates?.totalExtraCharges || 0) - (txAggregates?.paidExtraCharges || 0);
@@ -1014,15 +1056,83 @@ export default function CashPage() {
               </>
             )}
           </div>
-          <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="h-8 w-[90px] text-xs rounded-md border border-input bg-background px-2" data-testid="filter-month">
-            <option value="all">All</option>
-            {MONTHS.map((m, i) => <option key={i} value={String(i + 1)}>{m}</option>)}
-          </select>
-          <select value={filterYear} onChange={(e) => setFilterYear(e.target.value)} className="h-8 w-[80px] text-xs rounded-md border border-input bg-background px-2" data-testid="filter-year">
-            {Array.from({ length: 5 }, (_, i) => String(now.getFullYear() - i)).map(y => (
-              <option key={y} value={y}>{y}</option>
-            ))}
-          </select>
+          <Select value={filterYear} onValueChange={(v) => { setFilterYear(v); setSelectedMonths([]); setSelectedDays([]); }}>
+            <SelectTrigger className="w-[90px] h-8 text-xs" data-testid="filter-year">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Years</SelectItem>
+              {Array.from({ length: 5 }, (_, i) => String(now.getFullYear() - i)).map(y => (
+                <SelectItem key={y} value={y}>{y}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Popover open={monthPopoverOpen} onOpenChange={setMonthPopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 text-xs min-w-[65px] justify-between px-2 shrink-0" data-testid="filter-month">
+                {monthLabel}
+                <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-2" align="start">
+              <button
+                className="flex items-center gap-2 px-2 py-1.5 rounded text-sm w-full text-left border-b mb-1"
+                data-testid="cash-month-select-all"
+                onClick={selectAllMonths}
+              >
+                <Checkbox checked={selectedMonths.length === 0} />
+                <span>All Months</span>
+              </button>
+              <div className="grid grid-cols-4 gap-0.5">
+                {MONTH_LABELS.map((m, i) => {
+                  const val = String(i + 1);
+                  return (
+                    <button
+                      key={val}
+                      className={`flex items-center justify-center rounded text-xs p-1.5 ${selectedMonths.includes(val) ? "bg-primary text-primary-foreground" : ""}`}
+                      data-testid={`cash-month-option-${val}`}
+                      onClick={() => toggleMonth(val)}
+                    >
+                      {m}
+                    </button>
+                  );
+                })}
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          <Popover open={dayPopoverOpen} onOpenChange={setDayPopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="h-8 text-xs min-w-[65px] justify-between px-2 shrink-0" data-testid="filter-day">
+                <Calendar className="w-3 h-3 mr-1" />
+                {dayLabel}
+                <ChevronDown className="w-3 h-3 ml-1 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-56 p-2" align="start">
+              <button
+                className="flex items-center gap-2 px-2 py-1.5 rounded text-sm w-full text-left border-b mb-1"
+                data-testid="cash-day-select-all"
+                onClick={selectAllDays}
+              >
+                <Checkbox checked={selectedDays.length === 0} />
+                <span>All Days</span>
+              </button>
+              <div className="grid grid-cols-7 gap-0.5">
+                {Array.from({ length: daysInMonths }, (_, i) => String(i + 1)).map(d => (
+                  <button
+                    key={d}
+                    className={`flex items-center justify-center rounded text-xs p-1.5 ${selectedDays.includes(d) ? "bg-primary text-primary-foreground" : ""}`}
+                    data-testid={`cash-day-option-${d}`}
+                    onClick={() => toggleDay(d)}
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
           {hasActiveFilters && (
             <Button variant="ghost" size="sm" className="h-8 text-xs text-destructive hover:text-destructive" onClick={clearAllFilters} data-testid="button-remove-filters">
               <X className="w-3.5 h-3.5 mr-1" />
