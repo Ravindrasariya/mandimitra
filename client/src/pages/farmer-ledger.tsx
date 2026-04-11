@@ -200,29 +200,33 @@ function FarmerLedgerSection({ farmer }: { farmer: FarmerWithDues }) {
     const rowH = 6.5;
     const headerH = 7;
 
-    doc.setFillColor(46, 125, 50);
-    doc.rect(margin, y - headerH + 1, contentW, headerH, "F");
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "bold");
-    doc.text("#", cols.no, y - 1);
-    doc.text("Date", cols.date, y - 1);
-    doc.text("Particulars", cols.particulars, y - 1);
-    doc.text("Dr", cols.dr, y - 1, { align: "right" });
-    doc.text("Cr", cols.cr, y - 1, { align: "right" });
-    doc.text("Balance", cols.bal, y - 1, { align: "right" });
-    y += 3;
+    const drawHeader = (startY: number) => {
+      doc.setFillColor(46, 125, 50);
+      doc.rect(margin, startY, contentW, headerH, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "bold");
+      const textY = startY + headerH - 2;
+      doc.text("#", cols.no, textY);
+      doc.text("Date", cols.date, textY);
+      doc.text("Particulars", cols.particulars, textY);
+      doc.text("Dr", cols.dr, textY, { align: "right" });
+      doc.text("Cr", cols.cr, textY, { align: "right" });
+      doc.text("Balance", cols.bal, textY, { align: "right" });
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(7.5);
+      return startY + headerH + 1;
+    };
 
-    doc.setTextColor(0, 0, 0);
-    doc.setFontSize(7.5);
+    y = drawHeader(y);
 
     const fmtAmt = (n: number) =>
       n.toLocaleString("en-IN", { maximumFractionDigits: 0 });
 
     for (const row of rows) {
-      if (y > 280) {
+      if (y > 275) {
         doc.addPage();
-        y = 14;
+        y = drawHeader(14);
       }
       if (row.isOpening) {
         doc.setFillColor(232, 245, 233);
