@@ -307,7 +307,7 @@ function BuyerLedgerSection({ buyer }: { buyer: BuyerWithDues }) {
       doc.text("Balance", cols.bal, textY, { align: "right" });
       doc.setTextColor(0, 0, 0);
       doc.setFontSize(7.5);
-      return startY + headerH + 1;
+      return startY + headerH + rowH - 1.5;
     };
 
     y = drawHeader(y);
