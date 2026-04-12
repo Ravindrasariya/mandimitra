@@ -177,14 +177,20 @@ export default function DashboardPage() {
     return true;
   };
 
+  const archivedBuyerIds = useMemo(() => {
+    if (!data) return new Set<number>();
+    return new Set(data.buyersWithDues.filter(b => b.isArchived).map(b => b.id));
+  }, [data]);
+
   const filteredTxns = useMemo(() => {
     if (!data) return [];
     return data.transactions.filter(t => {
       if (t.isReversed) return false;
+      if (archivedBuyerIds.has(t.buyerId)) return false;
       if (cropFilter !== "all" && t.crop !== cropFilter) return false;
       return matchesDateFilter(t.date || "");
     });
-  }, [data, cropFilter, selectedYears, selectedMonths, selectedDays]);
+  }, [data, archivedBuyerIds, cropFilter, selectedYears, selectedMonths, selectedDays]);
 
   const filteredLots = useMemo(() => {
     if (!data) return [];

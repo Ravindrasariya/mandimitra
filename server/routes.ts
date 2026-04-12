@@ -1792,12 +1792,19 @@ export async function registerRoutes(
         return a.sourceType === "transaction" ? -1 : 1;
       });
 
+      const allData = await storage.getBuyerLedger(businessId, buyerId);
+      const allFilteredTxns = allData.transactions.filter((t: Transaction) => !t.isReversed && !t.isArchived && t.date && t.date < fyStart);
+      const allFilteredCash = allData.cashEntries.filter((c: CashEntry) => !c.isReversed && !c.isArchived && c.date < fyStart);
+      const preFyDr = allFilteredTxns.reduce((s: number, t: Transaction) => s + parseFloat(t.totalReceivableFromBuyer || "0"), 0);
+      const preFyCr = allFilteredCash.reduce((s: number, c: CashEntry) => s + parseFloat(c.amount || "0"), 0);
+      const openingBalance = parseFloat(buyer.openingBalance || "0") + preFyDr - preFyCr;
+
       res.json({
         buyerName: buyer.name,
         buyerId: buyer.buyerId,
         businessName: business?.name || "",
         businessAddress: business?.address || "",
-        openingBalance: parseFloat(buyer.openingBalance || "0"),
+        openingBalance,
         fyStart,
         fyEnd,
         entries,
