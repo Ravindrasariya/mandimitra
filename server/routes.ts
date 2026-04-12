@@ -1564,6 +1564,12 @@ export async function registerRoutes(
       }
 
       if (data.paymentMode === "Sales Loss") {
+        if (data.category !== "inward" || !data.buyerId) {
+          return res.status(400).json({ message: "Sales Loss is only valid for inward buyer payments" });
+        }
+        if (!allocations || !Array.isArray(allocations) || allocations.length === 0) {
+          return res.status(400).json({ message: "Sales Loss requires at least one transaction allocation" });
+        }
         data.bankAccountId = null;
         data.advanceAmount = "0";
       }
