@@ -16,7 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import type { Buyer, BuyerEditHistory } from "@shared/schema";
-import { ShoppingBag, Search, Plus, Pencil, ArrowUpDown, ArrowUp, ArrowDown, Printer, RefreshCw, ChevronDown, ChevronRight, Calendar, Share2, AlertTriangle, FileText } from "lucide-react";
+import { ShoppingBag, Search, Plus, Pencil, ArrowUpDown, ArrowUp, ArrowDown, Printer, RefreshCw, ChevronDown, ChevronRight, Calendar, Share2, AlertTriangle, FileText, Archive } from "lucide-react";
 import { format } from "date-fns";
 import { printReceipt, shareReceiptAsImage } from "@/lib/receiptUtils";
 import jsPDF from "jspdf";
@@ -477,6 +477,7 @@ export default function BuyerLedgerPage() {
   const [selectedDays, setSelectedDays] = useState<string[]>([]);
   const [monthPopoverOpen, setMonthPopoverOpen] = useState(false);
   const [dayPopoverOpen, setDayPopoverOpen] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
 
   const buyerQueryParams = `?withDues=true${searchTerm ? `&search=${encodeURIComponent(searchTerm)}` : ""}`;
   const { data: buyers = [], isLoading } = useQuery<BuyerWithDues[]>({
@@ -547,28 +548,12 @@ export default function BuyerLedgerPage() {
     },
   });
 
-  const toggleActiveMutation = useMutation({
-    mutationFn: async ({ id, isActive }: { id: number; isActive: boolean }) => {
-      const res = await apiRequest("PATCH", `/api/buyers/${id}`, { isActive });
-      return res.json();
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ predicate: (query) => {
-        const key = query.queryKey[0];
-        return typeof key === "string" && key.startsWith("/api/buyers");
-      }});
-      queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/bids"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
-      queryClient.invalidateQueries({ predicate: (query) => {
-        const key = query.queryKey[0];
-        return typeof key === "string" && key.startsWith("/api/cash-entries");
-      }});
-      queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/transaction-aggregates"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
-    },
-  });
+  const handleToggleArchive = (buyer: BuyerWithDues) => {
+    updateBuyerMutation.mutate({
+      id: buyer.id,
+      data: { isArchived: !buyer.isArchived },
+    });
+  };
 
   const mergeBuyersMutation = useMutation({
     mutationFn: async (data: { keepId: number; mergeId: number }) => {
@@ -653,6 +638,8 @@ export default function BuyerLedgerPage() {
 
   const filteredBuyers = useMemo(() => {
     return buyers.filter(b => {
+      if (!showArchived && b.isArchived) return false;
+      if (showArchived && !b.isArchived) return false;
       if (yearFilter !== "all" || selectedMonths.length > 0 || selectedDays.length > 0) {
         const buyerTxns = allTransactions.filter(t => t.buyerId === b.id && !t.isReversed);
         if (buyerTxns.length === 0) return true;
@@ -1020,6 +1007,14 @@ export default function BuyerLedgerPage() {
             className="pl-8 w-[160px] h-9"
           />
         </div>
+        <div className="flex items-center gap-1.5">
+          <Switch
+            data-testid="switch-show-archived"
+            checked={showArchived}
+            onCheckedChange={setShowArchived}
+          />
+          <span className="text-xs text-muted-foreground whitespace-nowrap">{t("buyerLedger.showArchived")}</span>
+        </div>
         <Button
           data-testid="button-add-buyer"
           onClick={() => setShowAddDialog(true)}
@@ -1078,7 +1073,7 @@ export default function BuyerLedgerPage() {
       {isLoading ? (
         <div className="text-center py-8 text-muted-foreground">{t("app.loading")}</div>
       ) : sortedBuyers.length === 0 ? (
-        <div className="text-center py-8 text-muted-foreground">{t("buyerLedger.noBuyers")}</div>
+        <div className="text-center py-8 text-muted-foreground">{showArchived ? t("buyerLedger.noArchived") : t("buyerLedger.noBuyers")}</div>
       ) : (
         <>
           <div className="hidden md:block overflow-x-auto">
@@ -1104,7 +1099,6 @@ export default function BuyerLedgerPage() {
                       <th className="text-left p-3 font-medium">{t("buyerLedger.mandiCode")}</th>
                       <th className="text-left p-3 font-medium">{t("common.contact")}</th>
                       <th className="text-center p-3 font-medium">{t("buyerLedger.redFlag")}</th>
-                      <th className="text-center p-3 font-medium">{t("common.active")}</th>
                       <th
                         className="text-right p-3 font-medium cursor-pointer select-none"
                         onClick={() => toggleSort("overallDue")}
@@ -1128,7 +1122,7 @@ export default function BuyerLedgerPage() {
                       <Fragment key={buyer.id}>
                         <tr
                           data-testid={`row-buyer-${buyer.id}`}
-                          className="border-b hover:bg-muted/30 transition-colors cursor-pointer"
+                          className={`border-b hover:bg-muted/30 transition-colors cursor-pointer ${buyer.isArchived ? "opacity-50" : ""}`}
                           onClick={() => setExpandedBuyerId(prev => prev === buyer.id ? null : buyer.id)}
                         >
                           <td className="p-3" onClick={(e) => e.stopPropagation()}>
@@ -1152,15 +1146,6 @@ export default function BuyerLedgerPage() {
                                 Flag
                               </Badge>
                             )}
-                          </td>
-                          <td className="p-3 text-center" onClick={(e) => e.stopPropagation()}>
-                            <Switch
-                              data-testid={`switch-active-${buyer.id}`}
-                              checked={buyer.isActive}
-                              onCheckedChange={(checked) =>
-                                toggleActiveMutation.mutate({ id: buyer.id, isActive: checked })
-                              }
-                            />
                           </td>
                           <td className="p-3 text-right font-medium">
                             {formatIndianCurrency(filteredDuesByBuyer.get(buyer.id)?.overall ?? parseFloat(buyer.overallDue))}
@@ -1192,12 +1177,20 @@ export default function BuyerLedgerPage() {
                                   : <ChevronRight className="w-4 h-4 text-muted-foreground opacity-60" />
                                 }
                               </button>
+                              <button
+                                data-testid={`button-archive-buyer-${buyer.id}`}
+                                className="p-1.5 rounded hover:bg-muted"
+                                onClick={(e) => { e.stopPropagation(); handleToggleArchive(buyer); }}
+                                title={buyer.isArchived ? t("buyerLedger.reinstate") : t("buyerLedger.archive")}
+                              >
+                                <Archive className="w-3.5 h-3.5 text-muted-foreground" />
+                              </button>
                             </div>
                           </td>
                         </tr>
                         {expandedBuyerId === buyer.id && (
                           <tr data-testid={`row-ledger-${buyer.id}`}>
-                            <td colSpan={12} className="p-0 border-b">
+                            <td colSpan={11} className="p-0 border-b">
                               <BuyerLedgerSection buyer={buyer} />
                             </td>
                           </tr>
@@ -1213,7 +1206,7 @@ export default function BuyerLedgerPage() {
                   <div key={buyer.id}>
                     <Card
                       data-testid={`card-buyer-${buyer.id}`}
-                      className={expandedBuyerId === buyer.id ? "rounded-b-none border-b-0" : ""}
+                      className={`${expandedBuyerId === buyer.id ? "rounded-b-none border-b-0" : ""} ${buyer.isArchived ? "opacity-50" : ""}`}
                     >
                       <CardContent className="pt-3 pb-3">
                         <div className="flex items-start justify-between gap-2">
@@ -1221,7 +1214,6 @@ export default function BuyerLedgerPage() {
                             <div className="flex items-center gap-2">
                               <span className="font-mono text-xs text-muted-foreground">{buyer.buyerId}</span>
                               {buyer.redFlag && <Badge variant="destructive" className="text-xs">{t("buyerLedger.redFlag")}</Badge>}
-                              {!buyer.isActive && <Badge variant="secondary" className="text-xs">{t("common.inactive")}</Badge>}
                             </div>
                             <p className="font-medium">{buyer.name}</p>
                             {buyer.address && <p className="text-xs text-muted-foreground">{buyer.address}</p>}
@@ -1260,14 +1252,15 @@ export default function BuyerLedgerPage() {
                                   : <ChevronRight className="w-4 h-4 text-muted-foreground" />
                                 }
                               </button>
+                              <button
+                                data-testid={`button-archive-buyer-mobile-${buyer.id}`}
+                                className="p-1.5 rounded hover:bg-muted"
+                                onClick={() => handleToggleArchive(buyer)}
+                                title={buyer.isArchived ? t("buyerLedger.reinstate") : t("buyerLedger.archive")}
+                              >
+                                <Archive className="w-3.5 h-3.5 text-muted-foreground" />
+                              </button>
                             </div>
-                            <Switch
-                              data-testid={`switch-active-mobile-${buyer.id}`}
-                              checked={buyer.isActive}
-                              onCheckedChange={(checked) =>
-                                toggleActiveMutation.mutate({ id: buyer.id, isActive: checked })
-                              }
-                            />
                           </div>
                         </div>
                       </CardContent>

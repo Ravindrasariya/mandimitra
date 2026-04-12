@@ -205,7 +205,7 @@ export default function DashboardPage() {
 
   const filteredBuyersWithDues = useMemo(() => {
     if (!data) return [];
-    return data.buyersWithDues.filter(b => uniqueBuyerIdsFromTxns.has(b.id));
+    return data.buyersWithDues.filter(b => !b.isArchived && uniqueBuyerIdsFromTxns.has(b.id));
   }, [data, uniqueBuyerIdsFromTxns]);
 
   const summary = useMemo(() => {

@@ -990,7 +990,7 @@ export default function CashPage() {
           </select>
           <select value={filterBuyer} onChange={(e) => setFilterBuyer(e.target.value)} className="h-8 w-[150px] text-xs rounded-md border border-input bg-background px-2" data-testid="filter-buyer">
             <option value="all">Buyer: All</option>
-            {buyers.map(b => <option key={b.id} value={b.id.toString()}>{b.name}</option>)}
+            {buyers.filter(b => !b.isArchived).map(b => <option key={b.id} value={b.id.toString()}>{b.name}</option>)}
           </select>
           <div className="relative" data-testid="filter-farmer-wrapper">
             {filterFarmer !== "all" ? (
@@ -1231,12 +1231,12 @@ export default function CashPage() {
                     <SelectTrigger className="h-9 text-sm" data-testid="inward-buyer"><SelectValue placeholder={t("cash.selectBuyer")} /></SelectTrigger>
                     <SelectContent>
                       {inwardPaymentMode === "Advance Adj"
-                        ? buyersWithDues.filter(b => parseFloat(b.advanceBalance || "0") > 0).map(b => (
+                        ? buyersWithDues.filter(b => !b.isArchived && parseFloat(b.advanceBalance || "0") > 0).map(b => (
                             <SelectItem key={b.id} value={b.id.toString()}>
                               {b.name} - Adv: ₹{parseFloat(b.advanceBalance).toLocaleString("en-IN")} | Due: ₹{parseFloat(b.overallDue).toLocaleString("en-IN")}
                             </SelectItem>
                           ))
-                        : buyersWithDues.filter(b => parseFloat(b.overallDue) > 0).map(b => (
+                        : buyersWithDues.filter(b => !b.isArchived && parseFloat(b.overallDue) > 0).map(b => (
                             <SelectItem key={b.id} value={b.id.toString()}>
                               {b.name} - Due: ₹{parseFloat(b.overallDue).toLocaleString("en-IN")}
                             </SelectItem>

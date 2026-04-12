@@ -2097,7 +2097,7 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
   const { data: buyersData = [] } = useQuery<any[]>({
     queryKey: ["/api/buyers?withDues=true"],
   });
-  const buyersList = buyersData.map((b: any) => ({ id: b.id, name: b.name, phone: b.phone || "", aadhatCommissionPercent: b.aadhatCommissionPercent || null, overallDue: b.overallDue ?? "0", limitAmount: b.limitAmount ?? null }));
+  const buyersList = buyersData.filter((b: any) => !b.isArchived).map((b: any) => ({ id: b.id, name: b.name, phone: b.phone || "", aadhatCommissionPercent: b.aadhatCommissionPercent || null, overallDue: b.overallDue ?? "0", limitAmount: b.limitAmount ?? null }));
 
   const filteredVillages = (locationData?.villages || []).filter(
     (v) => card.village.length >= 1 && v.toLowerCase().includes(card.village.toLowerCase()) && v.toLowerCase() !== card.village.toLowerCase()

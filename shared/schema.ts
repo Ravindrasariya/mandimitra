@@ -66,7 +66,7 @@ export const buyers = pgTable("buyers", {
   address: text("address"),
   licenceNo: text("licence_no"),
   redFlag: boolean("negative_flag").notNull().default(false),
-  isActive: boolean("is_active").notNull().default(true),
+  isArchived: boolean("is_archived").notNull().default(false),
   openingBalance: decimal("opening_balance", { precision: 12, scale: 2 }).default("0"),
   aadhatCommissionPercent: decimal("aadhat_commission_percent", { precision: 5, scale: 2 }),
   limitAmount: bigint("limit_amount", { mode: "number" }),

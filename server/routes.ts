@@ -539,7 +539,7 @@ export async function registerRoutes(
         address: "Address",
         licenceNo: "Licence No",
         redFlag: "Red Flag",
-        isActive: "Active Status",
+        isArchived: "Archived",
         openingBalance: "Opening Balance",
         aadhatCommissionPercent: "Aadhat Commission %",
         limitAmount: "Credit Limit",
@@ -2032,7 +2032,7 @@ export async function registerRoutes(
           id: f.id, name: f.name, totalPayable: f.totalPayable, totalDue: f.totalDue, totalAdvance: f.totalAdvance, advanceEntries: f.advanceEntries,
         })),
         buyersWithDues: buyersWithDues.map(b => ({
-          id: b.id, name: b.name, receivableDue: b.receivableDue, overallDue: b.overallDue, openingBalance: b.openingBalance,
+          id: b.id, name: b.name, receivableDue: b.receivableDue, overallDue: b.overallDue, openingBalance: b.openingBalance, isArchived: b.isArchived,
         })),
         txAggregates,
       });
