@@ -2010,7 +2010,7 @@ export async function registerRoutes(
 
       res.json({
         businessName: business?.name || "Mandi Mitra",
-        lots: allLots.map(l => ({
+        lots: allLots.filter(l => !l.isArchived).map(l => ({
           id: l.id, lotId: l.lotId, crop: l.crop, date: l.date,
           numberOfBags: l.numberOfBags, actualNumberOfBags: l.actualNumberOfBags, remainingBags: l.remainingBags,
           farmerId: l.farmerId, farmerName: l.farmer.name,
