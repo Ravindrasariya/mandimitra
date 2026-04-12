@@ -569,6 +569,8 @@ const translations: Record<string, Record<Language, string>> = {
   "stock.farmerLotsTxns": { en: "Farmers / Lots / Txns", hi: "किसान / लॉट / लेनदेन" },
   "stock.aadhatComm": { en: "Aadhat Comm.", hi: "आढ़त कमीशन" },
   "stock.earnedViaBuyerDues": { en: "Earned (via Buyer Dues)", hi: "अर्जित (खरीदार बकाया से)" },
+  "stock.hammaliExtras": { en: "Hammali | Extras", hi: "हम्माली | एक्स्ट्रा" },
+  "stock.hammaliExtrasSub": { en: "Farmer+Buyer combined", hi: "किसान+खरीदार सम्मिलित" },
   "stock.cropGroupReinstated": { en: "Crop group reinstated", hi: "फसल समूह बहाल किया गया" },
   "stock.cropGroupArchived": { en: "Crop group archived", hi: "फसल समूह अभिलेखित किया गया" },
   "stock.farmerReinstated": { en: "Farmer reinstated", hi: "किसान बहाल किया गया" },

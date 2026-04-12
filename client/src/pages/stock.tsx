@@ -19,7 +19,7 @@ import {
   Plus, Trash2, ChevronDown, ChevronRight, Truck, User,
   AlertTriangle, AlertCircle, Scale, Wheat, ChevronsUpDown, X, Calculator,
   Archive, History, Save, Check, Printer, Share2, Loader2,
-  Layers, Landmark, ShoppingBag, Calendar, Search, Filter, RotateCcw, Download, ClipboardList, FileText,
+  Layers, Landmark, ShoppingBag, Calendar, Search, Filter, RotateCcw, Download, ClipboardList, FileText, Hammer,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -3314,6 +3314,7 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
   let farmerPayableTotal = 0, farmerDue = 0;
   let buyerReceivableTotal = 0, buyerDue = 0;
   let aadhatTotal = 0;
+  let hammaliTotal = 0, extrasTotal = 0;
 
   for (const card of cards) {
     if (card.archived || !savedCardMap.has(card.id)) continue;
@@ -3335,6 +3336,12 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
           const buyerAadhat = buyerData?.aadhatCommissionPercent != null && buyerData.aadhatCommissionPercent !== ""
             ? parseFloat(buyerData.aadhatCommissionPercent) || 0 : null;
           const bt = calcBidTotals(bid, cs, vbr, tbi, buyerAadhat);
+          const ecs = bid.savedCharges || cs;
+          const bidBags = parseInt(bid.numberOfBags) || 0;
+          hammaliTotal += Math.round((parseFloat(ecs.hammaliFarmerPerBag) || 0) * bidBags)
+            + Math.round((parseFloat(ecs.hammaliBuyerPerBag) || 0) * bidBags);
+          extrasTotal += (parseFloat(bid.txn.extraChargesFarmer) || 0)
+            + (parseFloat(bid.txn.extraChargesBuyer) || 0);
           if (bid.farmerPaymentStatus !== "paid") {
             const farmerPaid = parseFloat(bid.farmerPaidAmount || "0");
             cardFarmerDue += Math.max(0, bt.farmerPayable - farmerPaid);
@@ -3350,7 +3357,7 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-2" data-testid="stock-summary-bar">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-2" data-testid="stock-summary-bar">
       <div className="rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 px-4 py-3">
         <div className="flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 mb-1">
           <Layers className="w-3.5 h-3.5" /> {t("stock.farmerLotsTxns")}
@@ -3388,6 +3395,22 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
           ₹{Math.round(aadhatTotal).toLocaleString("en-IN")}
         </div>
         <div className="text-xs text-green-600 dark:text-green-400 font-medium">{t("stock.earnedViaBuyer")}</div>
+      </div>
+
+      <div className="rounded-xl border border-teal-200 dark:border-teal-800 bg-teal-50 dark:bg-teal-950/30 px-4 py-3">
+        <div className="flex items-center gap-1.5 text-xs font-medium text-teal-600 dark:text-teal-400 mb-1">
+          <Hammer className="w-3.5 h-3.5" /> {t("stock.hammaliExtras")}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-bold text-teal-700 dark:text-teal-300" data-testid="text-hammali-total">
+            ₹{Math.round(hammaliTotal).toLocaleString("en-IN")}
+          </span>
+          <span className="text-muted-foreground text-xs">|</span>
+          <span className="text-sm font-bold text-purple-700 dark:text-purple-300" data-testid="text-extras-total">
+            ₹{Math.round(extrasTotal).toLocaleString("en-IN")}
+          </span>
+        </div>
+        <div className="text-xs text-muted-foreground font-medium">{t("stock.hammaliExtrasSub")}</div>
       </div>
     </div>
   );
