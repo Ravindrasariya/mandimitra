@@ -666,7 +666,7 @@ export default function BuyerLedgerPage() {
       }
       return true;
     });
-  }, [buyers, yearFilter, selectedMonths, selectedDays, cropFilter, allTransactions]);
+  }, [buyers, showArchived, yearFilter, selectedMonths, selectedDays, cropFilter, allTransactions]);
 
   const anyFilterActive = yearFilter !== "all" || selectedMonths.length > 0 || selectedDays.length > 0 || cropFilter !== "all";
 
