@@ -3410,7 +3410,6 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
             ₹{Math.round(extrasTotal).toLocaleString("en-IN")}
           </span>
         </div>
-        <div className="text-xs text-muted-foreground font-medium">{t("stock.hammaliExtrasSub")}</div>
       </div>
     </div>
   );
