@@ -1563,6 +1563,11 @@ export async function registerRoutes(
         data.advanceAmount = "0";
       }
 
+      if (data.paymentMode === "Sales Loss") {
+        data.bankAccountId = null;
+        data.advanceAmount = "0";
+      }
+
       const isBuyerInward = allocations && Array.isArray(allocations) && allocations.length > 0 && data.category === "inward" && data.buyerId;
       const isFarmerOutward = allocations && Array.isArray(allocations) && allocations.length > 0 && data.category === "outward" && data.farmerId;
 
@@ -1751,6 +1756,7 @@ export async function registerRoutes(
         }
 
         const detail = labels.length > 0 ? ` (${labels.join(", ")})` : "";
+        if (mode === "Sales Loss") return `Sales Loss${detail}`;
         return `Payment (${mode})${detail}`;
       };
 

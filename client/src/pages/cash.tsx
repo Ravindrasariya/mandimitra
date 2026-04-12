@@ -254,7 +254,7 @@ export default function CashPage() {
 
     allEntries.filter(e => !e.isReversed).forEach(e => {
       const amt = parseFloat(e.amount || "0");
-      if (e.paymentMode === "Advance Adj") return;
+      if (e.paymentMode === "Advance Adj" || e.paymentMode === "Sales Loss") return;
       if (e.category === "inward") {
         if (e.paymentMode === "Cash") cashReceived += amt;
         else if (e.bankAccountId) {
@@ -515,7 +515,7 @@ export default function CashPage() {
       toast({ title: t("common.error"), description: "Select a buyer", variant: "destructive" });
       return;
     }
-    if (inwardPaymentMode !== "Cash" && inwardPaymentMode !== "Advance Adj" && !inwardBankAccountId) {
+    if (inwardPaymentMode !== "Cash" && inwardPaymentMode !== "Advance Adj" && inwardPaymentMode !== "Sales Loss" && !inwardBankAccountId) {
       toast({ title: t("common.error"), description: "Select bank account", variant: "destructive" });
       return;
     }
@@ -569,7 +569,7 @@ export default function CashPage() {
         amount: inwardAmount,
         date: inwardDate,
         paymentMode: inwardPaymentMode,
-        bankAccountId: inwardPaymentMode !== "Cash" && inwardPaymentMode !== "Advance Adj" ? parseInt(inwardBankAccountId) : null,
+        bankAccountId: inwardPaymentMode !== "Cash" && inwardPaymentMode !== "Advance Adj" && inwardPaymentMode !== "Sales Loss" ? parseInt(inwardBankAccountId) : null,
         notes: inwardNotes || null,
         splitLog: buildSplitLog(),
         advanceAmount: advanceAlloc ? advanceAlloc.amount : "0",
@@ -595,7 +595,7 @@ export default function CashPage() {
         amount: inwardAmount,
         date: inwardDate,
         paymentMode: inwardPaymentMode,
-        bankAccountId: inwardPaymentMode !== "Cash" ? parseInt(inwardBankAccountId) : null,
+        bankAccountId: inwardPaymentMode !== "Cash" && inwardPaymentMode !== "Sales Loss" ? parseInt(inwardBankAccountId) : null,
         notes: inwardNotes || null,
       }, { onSuccess: clearInwardForm });
     }
@@ -983,6 +983,7 @@ export default function CashPage() {
             <option value="Online">Account</option>
             <option value="Cheque">Cheque</option>
             <option value="Advance Adj">Advance Adj</option>
+            <option value="Sales Loss">Sales Loss</option>
           </select>
           <select value={filterOutflowType} onChange={(e) => setFilterOutflowType(e.target.value)} className="h-8 w-[150px] text-xs rounded-md border border-input bg-background px-2" data-testid="filter-outflow-type">
             <option value="all">Outflow: All</option>
@@ -1192,17 +1193,18 @@ export default function CashPage() {
             <div className="space-y-3 p-3 bg-background rounded-lg">
               <div className="space-y-1">
                 <Label className="text-xs">{t("cash.paymentMode")}</Label>
-                <Select value={inwardPaymentMode} onValueChange={(v) => { setInwardPaymentMode(v); setInwardAllocations([]); setAllocationSearch(""); if (v === "Advance Adj") { setInwardBankAccountId(""); setInwardPartyType("Buyer"); } }}>
+                <Select value={inwardPaymentMode} onValueChange={(v) => { setInwardPaymentMode(v); setInwardAllocations([]); setAllocationSearch(""); if (v === "Advance Adj" || v === "Sales Loss") { setInwardBankAccountId(""); setInwardPartyType("Buyer"); } }}>
                   <SelectTrigger className="h-9 text-sm" data-testid="inward-payment-mode"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="Cash">Cash</SelectItem>
                     {hasBankAccounts && <SelectItem value="Online">Account/Online</SelectItem>}
                     {hasBankAccounts && <SelectItem value="Cheque">Cheque</SelectItem>}
                     <SelectItem value="Advance Adj">Advance Adj</SelectItem>
+                    <SelectItem value="Sales Loss">Sales Loss</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-              {inwardPaymentMode !== "Cash" && inwardPaymentMode !== "Advance Adj" && hasBankAccounts && (
+              {inwardPaymentMode !== "Cash" && inwardPaymentMode !== "Advance Adj" && inwardPaymentMode !== "Sales Loss" && hasBankAccounts && (
                 <div className="space-y-1">
                   <Label className="text-xs">{t("cash.selectAccount")}</Label>
                   <Select value={inwardBankAccountId} onValueChange={setInwardBankAccountId}>
@@ -1213,7 +1215,7 @@ export default function CashPage() {
                   </Select>
                 </div>
               )}
-              {inwardPaymentMode !== "Advance Adj" && (
+              {inwardPaymentMode !== "Advance Adj" && inwardPaymentMode !== "Sales Loss" && (
               <div className="space-y-1">
                 <Label className="text-xs">{t("cash.partyType")}</Label>
                 <Select value={inwardPartyType} onValueChange={setInwardPartyType}>
@@ -1227,7 +1229,7 @@ export default function CashPage() {
               )}
               {inwardPartyType === "Buyer" && (
                 <div className="space-y-1">
-                  <Label className="text-xs">{inwardPaymentMode === "Advance Adj" ? "Buyer (with Advance)" : t("cash.buyerWithDues")}</Label>
+                  <Label className="text-xs">{inwardPaymentMode === "Advance Adj" ? "Buyer (with Advance)" : inwardPaymentMode === "Sales Loss" ? "Buyer (with Dues)" : t("cash.buyerWithDues")}</Label>
                   <Select value={inwardBuyerId} onValueChange={(v) => { setInwardBuyerId(v); setInwardAllocations([]); setAllocationSearch(""); }}>
                     <SelectTrigger className="h-9 text-sm" data-testid="inward-buyer"><SelectValue placeholder={t("cash.selectBuyer")} /></SelectTrigger>
                     <SelectContent>
@@ -1296,7 +1298,7 @@ export default function CashPage() {
                         const s = allocationSearch.toLowerCase();
                         return String(pt.serialNumber).includes(s) || pt.date.toLowerCase().includes(s) || (pt.crop || "").toLowerCase().includes(s);
                       });
-                      const showAdvanceOption = inwardPaymentMode !== "Advance Adj" && !hasAdvance && (!allocationSearch || "advance".includes(allocationSearch.toLowerCase()));
+                      const showAdvanceOption = inwardPaymentMode !== "Advance Adj" && inwardPaymentMode !== "Sales Loss" && !hasAdvance && (!allocationSearch || "advance".includes(allocationSearch.toLowerCase()));
                       if (filtered.length === 0 && !showAdvanceOption) return null;
                       return (
                         <div className="absolute z-50 w-full mt-1 max-h-48 overflow-y-auto bg-popover border rounded-md shadow-lg">

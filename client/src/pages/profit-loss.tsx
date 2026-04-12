@@ -39,6 +39,7 @@ export default function ProfitLossPage() {
     rows.push(["Expenses", "Salary", String(data.expenses.salaryExpense)]);
     rows.push(["Expenses", "General Expenses", String(data.expenses.generalExpense)]);
     rows.push(["Expenses", "TDS", String(data.expenses.tdsExpense)]);
+    rows.push(["Expenses", "Sales Loss", String(data.expenses.salesLossExpense)]);
     rows.push(["Expenses", "Total", String(data.expenses.total)]);
     rows.push(["Net Profit/Loss", "", String(data.netProfitLoss)]);
 
@@ -101,6 +102,7 @@ export default function ProfitLossPage() {
               <IncomeRow label="Salary" value={data.expenses.salaryExpense} testId="text-exp-salary" />
               <IncomeRow label="General Expenses" value={data.expenses.generalExpense} testId="text-exp-general" />
               <IncomeRow label="TDS" value={data.expenses.tdsExpense} testId="text-exp-tds" />
+              <IncomeRow label="Sales Loss" value={data.expenses.salesLossExpense} testId="text-exp-sales-loss" />
               <div className="flex justify-between text-sm font-semibold border-t pt-1">
                 <span>{t("pnl.totalExpenses")}</span>
                 <span data-testid="text-exp-total" className="text-red-600">{fmt(data.expenses.total)}</span>
