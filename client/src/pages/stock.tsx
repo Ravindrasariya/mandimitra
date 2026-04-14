@@ -2225,20 +2225,16 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
     const dateParam = card.date || new Date().toISOString().slice(0, 10);
     if (bbNumber === "—") {
       try {
-        const resp = await fetch(`/api/lots/next-bill-book?date=${dateParam}`);
-        if (resp.ok) {
-          const data = await resp.json();
-          bbNumber = String(data.billBookNumber || 1);
-          srNumber = String(data.nextSerialNumber || 1);
-        }
+        const resp = await apiRequest("GET", `/api/lots/next-bill-book?date=${dateParam}`);
+        const data = await resp.json();
+        bbNumber = String(data.billBookNumber || 1);
+        srNumber = String(data.nextSerialNumber || 1);
       } catch { /* fallback to — */ }
     } else {
       try {
-        const resp = await fetch(`/api/lots/next-bill-book?date=${dateParam}&bb=${bbNumber}`);
-        if (resp.ok) {
-          const data = await resp.json();
-          srNumber = String(data.nextSerialNumber || 1);
-        }
+        const resp = await apiRequest("GET", `/api/lots/next-bill-book?date=${dateParam}&bb=${bbNumber}`);
+        const data = await resp.json();
+        srNumber = String(data.nextSerialNumber || 1);
       } catch { /* fallback */ }
     }
     const existingNewCrops = card.cropGroups.filter(g => !g.persisted).map(g => g.crop);
@@ -2261,19 +2257,18 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
   const handleBBChange = async (newBB: string) => {
     const bbNum = parseInt(newBB);
     let nextSr = 1;
+    const dateParam = card.date || new Date().toISOString().slice(0, 10);
     try {
-      const resp = await fetch(`/api/lots/next-bill-book?date=${card.date || new Date().toISOString().slice(0, 10)}&bb=${bbNum}`);
-      if (resp.ok) {
-        const data = await resp.json();
-        nextSr = data.nextSerialNumber || 1;
-        const maxResp = await fetch(`/api/lots/next-bill-book?date=${card.date || new Date().toISOString().slice(0, 10)}`);
-        if (maxResp.ok) {
-          const maxData = await maxResp.json();
-          if (bbNum < maxData.billBookNumber) {
-            toast({ title: "Warning", description: `BB# ${newBB} is less than current FY maximum (${maxData.billBookNumber})`, variant: "destructive" });
-          }
+      const resp = await apiRequest("GET", `/api/lots/next-bill-book?date=${dateParam}&bb=${bbNum}`);
+      const data = await resp.json();
+      nextSr = data.nextSerialNumber || 1;
+      try {
+        const maxResp = await apiRequest("GET", `/api/lots/next-bill-book?date=${dateParam}`);
+        const maxData = await maxResp.json();
+        if (bbNum < maxData.billBookNumber) {
+          toast({ title: "Warning", description: `BB# ${newBB} is less than current FY maximum (${maxData.billBookNumber})`, variant: "destructive" });
         }
-      }
+      } catch { /* ignore max check failure */ }
     } catch { /* fallback */ }
     let srOffset = 0;
     const assignedSr = new Map<string, number>();
@@ -4014,10 +4009,10 @@ export default function StockPage() {
             const update = groupUpdates.find(u => u.lotIdx === lIdx);
             return update ? { ...lot, dbId: update.dbId } : lot;
           });
-          if ((updatedSrNumber === "—" || updatedSrNumber === "XX") && groupUpdates[0]?.srNumber) {
+          if (groupUpdates[0]?.srNumber) {
             updatedSrNumber = groupUpdates[0].srNumber;
           }
-          if ((updatedBbNumber === "—") && groupUpdates[0]?.bbNumber) {
+          if (groupUpdates[0]?.bbNumber) {
             updatedBbNumber = groupUpdates[0].bbNumber;
           }
         }
