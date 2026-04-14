@@ -112,8 +112,8 @@ ${receiptHeaderImage ? `<div style="text-align:center;margin-bottom:6px"><img sr
   ${businessName ? `<div style="font-size:1.2em;font-weight:bold;text-decoration:underline">${businessName}</div>` : ""}
   ${businessAddress ? `<div style="font-size:0.9em;margin-top:2px;text-decoration:underline">${businessAddress}</div>` : ""}
   <div style="margin-top:5px;font-size:0.88em">आलू, प्याज, लहसुन आदि के कमीशन एजेंट एवं थोक विक्रेता</div>
-  <div style="margin-top:4px;font-weight:bold;font-size:1.05em;text-decoration:underline">किसान बुक</div>
 </div>`}
+<div style="text-align:center;font-weight:bold;font-size:1.05em;text-decoration:underline;margin-bottom:8px">किसान बुक</div>
 
 <table style="border:none;margin-bottom:8px">
   <tr>
@@ -497,8 +497,8 @@ ${receiptHeaderImage ? `<div style="text-align:center;margin-bottom:4px"><img sr
 <div class="header">
 ${businessName ? `<div style="font-weight:bold;font-size:1.05em;margin-bottom:1px">${businessName}</div>` : ""}
 ${businessAddress ? `<p style="font-size:0.82em;color:#555;margin:1px 0">${businessAddress}</p>` : ""}
-<h3 style="margin:2px 0 3px 0;font-size:1.05em">Buyer Receipt</h3>
 </div>`}
+<div style="text-align:center;font-weight:bold;font-size:1.05em;text-decoration:underline;margin-bottom:4px">व्यापारी बुक</div>
 <table class="info-table" style="margin-bottom:6px">
 <tr><td>${receiptSerialNumber ? `<strong>Bill no.:</strong> ${receiptSerialNumber}` : ""}</td><td style="text-align:center">${billBookNumber ? `<strong>Bill Book No.:</strong> ${billBookNumber}` : ""}</td><td style="text-align:right"><strong>Licence No:</strong> ${buyer.licenceNo || "-"}</td></tr>
 <tr><td><strong>Buyer:</strong> ${buyer.name}</td><td></td><td style="text-align:right"><strong>Date:</strong> ${format(new Date(), "dd/MM/yyyy")}</td></tr>
