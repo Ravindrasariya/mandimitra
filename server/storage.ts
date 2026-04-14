@@ -144,7 +144,7 @@ export interface IStorage {
   upsertReceiptTemplate(businessId: number, templateType: string, crop: string, templateHtml: string): Promise<ReceiptTemplate>;
   deleteReceiptTemplate(id: number, businessId: number): Promise<void>;
 
-  getOrCreateBuyerReceiptSerial(businessId: number, buyerId: number, date: string, crop: string): Promise<number>;
+  getOrCreateBuyerReceiptSerial(businessId: number, buyerId: number, date: string, crop: string): Promise<{ serialNumber: number; billBookNumber: number }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1986,7 +1986,7 @@ export class DatabaseStorage implements IStorage {
     );
   }
 
-  async getOrCreateBuyerReceiptSerial(businessId: number, buyerId: number, date: string, crop: string): Promise<number> {
+  async getOrCreateBuyerReceiptSerial(businessId: number, buyerId: number, date: string, crop: string): Promise<{ serialNumber: number; billBookNumber: number }> {
     const d = new Date(date);
     const month = d.getMonth();
     const year = d.getFullYear();
@@ -2004,18 +2004,19 @@ export class DatabaseStorage implements IStorage {
       RETURNING serial_number
     `);
 
-    const inserted = result.rows[0];
-    if (inserted) return inserted.serial_number;
+    const globalSerial = result.rows[0]?.serial_number
+      ?? (await db.select({ serialNumber: buyerReceiptSerials.serialNumber })
+          .from(buyerReceiptSerials)
+          .where(and(
+            eq(buyerReceiptSerials.businessId, businessId),
+            eq(buyerReceiptSerials.buyerId, buyerId),
+            eq(buyerReceiptSerials.date, date),
+            eq(buyerReceiptSerials.crop, crop)
+          )))[0]!.serialNumber;
 
-    const [existing] = await db.select({ serialNumber: buyerReceiptSerials.serialNumber })
-      .from(buyerReceiptSerials)
-      .where(and(
-        eq(buyerReceiptSerials.businessId, businessId),
-        eq(buyerReceiptSerials.buyerId, buyerId),
-        eq(buyerReceiptSerials.date, date),
-        eq(buyerReceiptSerials.crop, crop)
-      ));
-    return existing!.serialNumber;
+    const billBookNumber = Math.floor((globalSerial - 1) / 100) + 1;
+    const serialNumber = ((globalSerial - 1) % 100) + 1;
+    return { serialNumber, billBookNumber };
   }
 }
 

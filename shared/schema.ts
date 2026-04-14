@@ -453,6 +453,7 @@ export const buyerReceiptSerials = pgTable("buyer_receipt_serials", {
   date: date("date").notNull(),
   crop: text("crop").notNull().default(""),
   serialNumber: integer("serial_number").notNull(),
+  billBookNumber: integer("bill_book_number").notNull().default(1),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   uniqueBuyerReceiptSerial: uniqueIndex("buyer_receipt_serials_business_buyer_date_crop_unique").on(table.businessId, table.buyerId, table.date, table.crop),

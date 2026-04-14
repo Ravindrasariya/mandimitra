@@ -442,7 +442,7 @@ ${!hideAadhat ? `<div class="summary-row total"><span>Total Receivable from Buye
 </body></html>`;
 }
 
-export function generateAllBuyerReceiptHtml(entries: BuyerLotEntry[], businessName?: string, businessAddress?: string, receiptSerialNumber?: number, hideAadhat?: boolean, businessPhone?: string, receiptHeaderImage?: string | null): string {
+export function generateAllBuyerReceiptHtml(entries: BuyerLotEntry[], businessName?: string, businessAddress?: string, receiptSerialNumber?: number, hideAadhat?: boolean, businessPhone?: string, receiptHeaderImage?: string | null, billBookNumber?: number): string {
   if (entries.length === 0) return "";
   const firstTx = entries[0].tx;
   const buyer = firstTx.buyer;
@@ -500,8 +500,8 @@ ${businessAddress ? `<p style="font-size:0.82em;color:#555;margin:1px 0">${busin
 <h3 style="margin:2px 0 3px 0;font-size:1.05em">Buyer Receipt</h3>
 </div>`}
 <table class="info-table" style="margin-bottom:6px">
-<tr><td>${receiptSerialNumber ? `<strong>Bill no.:</strong> ${receiptSerialNumber}` : ""}</td><td style="text-align:right"><strong>Licence No:</strong> ${buyer.licenceNo || "-"}</td></tr>
-<tr><td><strong>Buyer:</strong> ${buyer.name}</td><td style="text-align:right"><strong>Date:</strong> ${format(new Date(), "dd/MM/yyyy")}</td></tr>
+<tr><td>${receiptSerialNumber ? `<strong>Bill no.:</strong> ${receiptSerialNumber}` : ""}</td><td style="text-align:center">${billBookNumber ? `<strong>Book No.:</strong> ${billBookNumber}` : ""}</td><td style="text-align:right"><strong>Licence No:</strong> ${buyer.licenceNo || "-"}</td></tr>
+<tr><td><strong>Buyer:</strong> ${buyer.name}</td><td></td><td style="text-align:right"><strong>Date:</strong> ${format(new Date(), "dd/MM/yyyy")}</td></tr>
 </table>
 <table>
 <thead>

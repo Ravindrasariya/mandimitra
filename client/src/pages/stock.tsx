@@ -4511,12 +4511,14 @@ export default function StockPage() {
     const receiptDate = `${yearFilter}-${mm}-${dd}`;
 
     let receiptSerialNumber: number | undefined;
+    let receiptBillBookNumber: number | undefined;
     if (buyerId) {
       try {
         const res = await apiRequest("POST", "/api/buyer-receipt-serial", { buyerId, date: receiptDate, crop: cropFilter });
         if (!res.ok) throw new Error("Failed");
         const data = await res.json();
         receiptSerialNumber = data.serialNumber;
+        receiptBillBookNumber = data.billBookNumber;
       } catch {
         toast({ title: t("stock.receiptSerialFailed"), variant: "destructive" });
         return;
@@ -4529,7 +4531,7 @@ export default function StockPage() {
     const overallTmpl = stockPageReceiptTemplates.find(tmpl => tmpl.templateType === "buyer-overall");
     const copy1Html = overallTmpl
       ? applyCombinedBuyerTemplate(overallTmpl.templateHtml, entries, 0, receiptDate, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo, receiptSerialNumber)
-      : generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress, receiptSerialNumber, false, user?.businessPhone, user?.receiptHeaderImage);
+      : generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress, receiptSerialNumber, false, user?.businessPhone, user?.receiptHeaderImage, receiptBillBookNumber);
 
     if (action === "share") {
       await shareReceiptAsImage(copy1Html, buyerFileName);
@@ -4538,7 +4540,7 @@ export default function StockPage() {
       const copy2Html = shouldHideAadhat
         ? (overallTmpl
             ? applyCombinedBuyerTemplate(overallTmpl.templateHtml, entries, 0, receiptDate, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo, receiptSerialNumber, undefined, true)
-            : generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress, receiptSerialNumber, true, user?.businessPhone, user?.receiptHeaderImage))
+            : generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress, receiptSerialNumber, true, user?.businessPhone, user?.receiptHeaderImage, receiptBillBookNumber))
         : undefined;
       const printHtml = wrapWithDuplicate(copy1Html, copy2Html);
       await printReceipt(printHtml, buyerFileName);
