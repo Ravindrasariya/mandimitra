@@ -1744,7 +1744,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
 
       const sg: UnifiedSerialGroup = {
         serialNumber: parseInt(group.srNumber) || 0,
-        billBookNumber: group.bbNumber || 1,
+        billBookNumber: parseInt(group.bbNumber) || 1,
         date: farmerCard.date,
         farmer,
         lotGroups,
@@ -1902,7 +1902,24 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
           <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
             {group.groupOpen ? <ChevronDown className="w-5 h-5 shrink-0" strokeWidth={3} /> : <ChevronRight className="w-5 h-5 shrink-0" strokeWidth={3} />}
             <Wheat className="w-4 h-4 shrink-0" />
-            <span className="font-bold text-sm truncate">BB# {group.bbNumber} SR# {group.srNumber} {group.crop}</span>
+            {!group.persisted && group.bbNumber !== "—" ? (
+              <span className="font-bold text-sm truncate flex items-center gap-1">
+                BB#<input
+                  type="number"
+                  min={1}
+                  value={group.bbNumber}
+                  onClick={e => e.stopPropagation()}
+                  onChange={e => {
+                    const val = e.target.value;
+                    if (val === "" || parseInt(val) >= 1) onUpdate({ ...group, bbNumber: val });
+                  }}
+                  className="w-12 px-1 py-0 h-5 text-sm font-bold border rounded text-center bg-background"
+                  data-testid={`input-bb-${group.crop.toLowerCase()}`}
+                /> SR# {group.srNumber} {group.crop}
+              </span>
+            ) : (
+              <span className="font-bold text-sm truncate">BB# {group.bbNumber} SR# {group.srNumber} {group.crop}</span>
+            )}
             <Badge variant="outline" className={`text-xs ${badgeCls} shrink-0`}>
               {group.lots.length} {t("stock.lots")}
             </Badge>
@@ -2194,9 +2211,22 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
     set("cardOpen", !card.cardOpen);
   };
 
-  const addCrop = (crop: string) => onChange({
-    ...card, cropGroups: [...card.cropGroups, emptyCropGroup(crop, card.date)],
-  });
+  const addCrop = async (crop: string) => {
+    const existingBB = card.cropGroups.find(g => g.bbNumber && g.bbNumber !== "—")?.bbNumber;
+    let bbNumber = existingBB || "—";
+    if (bbNumber === "—") {
+      try {
+        const resp = await fetch(`/api/lots/next-bill-book?date=${card.date || new Date().toISOString().slice(0, 10)}`);
+        if (resp.ok) {
+          const data = await resp.json();
+          bbNumber = String(data.billBookNumber || 1);
+        }
+      } catch { /* fallback to — */ }
+    }
+    const group = emptyCropGroup(crop, card.date);
+    group.bbNumber = bbNumber;
+    onChange({ ...card, cropGroups: [...card.cropGroups, group] });
+  };
   const updateGroup = (idx: number, g: CropGroup) =>
     onChange({ ...card, cropGroups: card.cropGroups.map((gg, i) => (i === idx ? g : gg)) });
   const deleteGroup = (idx: number) =>

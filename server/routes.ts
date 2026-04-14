@@ -986,6 +986,9 @@ export async function registerRoutes(
       }
 
       const bb = billBookNumber ? parseInt(billBookNumber) : (await storage.getNextBillBookNumber(businessId, dateStr)).billBookNumber;
+      if (!Number.isFinite(bb) || bb < 1) {
+        return res.status(400).json({ message: "Bill Book Number must be a positive integer" });
+      }
       const baseSerial = await storage.getNextSerialNumber(businessId, dateStr, bb);
       const dateFormatted = dateStr.replace(/-/g, "");
       const createdLots = [];
