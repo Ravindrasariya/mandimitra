@@ -3509,18 +3509,22 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
 }
 
 function sortCardsByMaxSr(cards: FarmerCard[]): FarmerCard[] {
+  const cardKey = (c: FarmerCard) => {
+    const bb = Math.max(0, ...c.cropGroups.map(g => parseInt(g.bbNumber) || 0));
+    const sr = bb > 0
+      ? Math.max(0, ...c.cropGroups.filter(g => (parseInt(g.bbNumber) || 0) === bb).map(g => parseInt(g.srNumber) || 0))
+      : Math.max(0, ...c.cropGroups.map(g => parseInt(g.srNumber) || 0));
+    return { bb, sr };
+  };
   return [...cards].sort((a, b) => {
-    const maxBb = (c: FarmerCard) => Math.max(0, ...c.cropGroups.map(g => parseInt(g.bbNumber) || 0));
-    const maxSr = (c: FarmerCard) => Math.max(0, ...c.cropGroups.map(g => parseInt(g.srNumber) || 0));
-    const bbA = maxBb(a); const bbB = maxBb(b);
-    const srA = maxSr(a); const srB = maxSr(b);
-    const unsavedA = bbA === 0 && srA === 0;
-    const unsavedB = bbB === 0 && srB === 0;
+    const ka = cardKey(a); const kb = cardKey(b);
+    const unsavedA = ka.bb === 0 && ka.sr === 0;
+    const unsavedB = kb.bb === 0 && kb.sr === 0;
     if (unsavedA && unsavedB) return 0;
     if (unsavedA) return -1;
     if (unsavedB) return 1;
-    if (bbA !== bbB) return bbB - bbA;
-    return srB - srA;
+    if (ka.bb !== kb.bb) return kb.bb - ka.bb;
+    return kb.sr - ka.sr;
   });
 }
 
