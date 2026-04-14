@@ -105,7 +105,7 @@ export interface IStorage {
   getCashSettings(businessId: number): Promise<CashSettings | undefined>;
   upsertCashSettings(businessId: number, cashInHandOpening: string): Promise<CashSettings>;
 
-  getCashEntries(businessId: number, filters?: { category?: string; outflowType?: string; farmerId?: number; buyerId?: number; month?: string; year?: string }): Promise<(CashEntry & { srNumber: number | null; txnCode: string | null })[]>;
+  getCashEntries(businessId: number, filters?: { category?: string; outflowType?: string; farmerId?: number; buyerId?: number; month?: string; year?: string }): Promise<(CashEntry & { srNumber: number | null; bbNumber: number | null; txnCode: string | null })[]>;
   createCashEntry(entry: InsertCashEntry): Promise<CashEntry>;
   reverseCashEntry(id: number, businessId: number, reason?: string | null): Promise<CashEntry | undefined>;
 
@@ -741,16 +741,34 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async getNextSerialNumber(businessId: number, date: string): Promise<number> {
+  async getNextSerialNumber(businessId: number, date: string, billBookNumber?: number): Promise<number> {
     const d = new Date(date);
-    const month = d.getMonth(); // 0-indexed, April = 3
+    const month = d.getMonth();
     const year = d.getFullYear();
     const fyStart = month >= 3 ? `${year}-04-01` : `${year - 1}-04-01`;
     const fyEnd = month >= 3 ? `${year + 1}-03-31` : `${year}-03-31`;
+    const conditions = [eq(lots.businessId, businessId), gte(lots.date, fyStart), lte(lots.date, fyEnd)];
+    if (billBookNumber != null) {
+      conditions.push(eq(lots.billBookNumber, billBookNumber));
+    }
     const [result] = await db.select({ max: sql<string>`coalesce(max(${lots.serialNumber}), 0)` })
       .from(lots)
-      .where(and(eq(lots.businessId, businessId), gte(lots.date, fyStart), lte(lots.date, fyEnd)));
+      .where(and(...conditions));
     return parseInt(result?.max || "0", 10) + 1;
+  }
+
+  async getNextBillBookNumber(businessId: number, date: string): Promise<{ billBookNumber: number; nextSerialNumber: number }> {
+    const d = new Date(date);
+    const month = d.getMonth();
+    const year = d.getFullYear();
+    const fyStart = month >= 3 ? `${year}-04-01` : `${year - 1}-04-01`;
+    const fyEnd = month >= 3 ? `${year + 1}-03-31` : `${year}-03-31`;
+    const [result] = await db.select({ max: sql<string>`coalesce(max(${lots.billBookNumber}), 0)` })
+      .from(lots)
+      .where(and(eq(lots.businessId, businessId), gte(lots.date, fyStart), lte(lots.date, fyEnd)));
+    const bb = Math.max(1, parseInt(result?.max || "0", 10));
+    const nextSr = await this.getNextSerialNumber(businessId, date, bb);
+    return { billBookNumber: bb, nextSerialNumber: nextSr };
   }
 
   async getNextLotSequence(businessId: number, crop: string, date: string): Promise<number> {
@@ -876,6 +894,7 @@ export class DatabaseStorage implements IStorage {
           id: r.transaction.id,
           transactionId: r.transaction.transactionId,
           serialNumber: r.lot.serialNumber,
+          billBookNumber: r.lot.billBookNumber,
           date: r.transaction.date,
           numberOfBags: r.transaction.numberOfBags,
           crop: r.lot.crop,
@@ -906,6 +925,7 @@ export class DatabaseStorage implements IStorage {
           id: 0,
           transactionId: "PY_OPENING",
           serialNumber: 0,
+          billBookNumber: 0,
           date: "Previous Year",
           numberOfBags: 0,
           crop: "",
@@ -944,6 +964,7 @@ export class DatabaseStorage implements IStorage {
         return {
           id: r.transaction.id,
           serialNumber: r.lot.serialNumber,
+          billBookNumber: r.lot.billBookNumber,
           date: r.transaction.date,
           numberOfBags: r.transaction.numberOfBags,
           crop: r.lot.crop,
@@ -956,6 +977,7 @@ export class DatabaseStorage implements IStorage {
 
     const grouped: Record<string, {
       serialNumber: number;
+      billBookNumber: number;
       date: string;
       crops: string[];
       totalBags: number;
@@ -966,10 +988,11 @@ export class DatabaseStorage implements IStorage {
     }> = {};
 
     for (const t of txnItems) {
-      const key = `${t.serialNumber}_${t.date || ""}`;
+      const key = `${t.billBookNumber}_${t.serialNumber}_${t.date || ""}`;
       if (!grouped[key]) {
         grouped[key] = {
           serialNumber: t.serialNumber,
+          billBookNumber: t.billBookNumber,
           date: t.date || "",
           crops: [],
           totalBags: 0,
@@ -991,8 +1014,9 @@ export class DatabaseStorage implements IStorage {
     const pendingGroups = Object.values(grouped)
       .filter(g => g.totalDue > 0.005)
       .map(g => ({
-        groupKey: `${g.serialNumber}_${g.date}`,
+        groupKey: `${g.billBookNumber}_${g.serialNumber}_${g.date}`,
         serialNumber: g.serialNumber,
+        billBookNumber: g.billBookNumber,
         date: g.date,
         crops: g.crops.join(", "),
         numberOfBags: g.totalBags,
@@ -1022,6 +1046,7 @@ export class DatabaseStorage implements IStorage {
         pendingGroups.unshift({
           groupKey: "PY_OPENING",
           serialNumber: 0,
+          billBookNumber: 0,
           date: "Previous Year",
           crops: "",
           numberOfBags: 0,
@@ -1144,7 +1169,7 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async getCashEntries(businessId: number, filters?: { category?: string; outflowType?: string; farmerId?: number; buyerId?: number; month?: string; year?: string }): Promise<(CashEntry & { srNumber: number | null; txnCode: string | null })[]> {
+  async getCashEntries(businessId: number, filters?: { category?: string; outflowType?: string; farmerId?: number; buyerId?: number; month?: string; year?: string }): Promise<(CashEntry & { srNumber: number | null; bbNumber: number | null; txnCode: string | null })[]> {
     let conditions = [eq(cashEntries.businessId, businessId)];
     if (filters?.category) conditions.push(eq(cashEntries.category, filters.category));
     if (filters?.outflowType) conditions.push(eq(cashEntries.outflowType, filters.outflowType));
@@ -1169,6 +1194,7 @@ export class DatabaseStorage implements IStorage {
       .select({
         ...getTableColumns(cashEntries),
         srNumber: lots.serialNumber,
+        bbNumber: lots.billBookNumber,
         txnCode: transactions.transactionId,
       })
       .from(cashEntries)
@@ -1177,7 +1203,7 @@ export class DatabaseStorage implements IStorage {
       .where(and(...conditions))
       .orderBy(desc(cashEntries.createdAt));
 
-    return results as (CashEntry & { srNumber: number | null; txnCode: string | null })[];
+    return results as (CashEntry & { srNumber: number | null; bbNumber: number | null; txnCode: string | null })[];
   }
 
   private async validateAllocationDues(

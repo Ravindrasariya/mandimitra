@@ -19,7 +19,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
 
-type CashEntryWithTxn = CashEntry & { srNumber: number | null; txnCode: string | null };
+type CashEntryWithTxn = CashEntry & { srNumber: number | null; bbNumber: number | null; txnCode: string | null };
 type BuyerWithDues = Buyer & { receivableDue: string; overallDue: string; advanceBalance: string };
 type FarmerWithDues = Farmer & { totalPayable: string; totalDue: string; salesCount: number };
 type TransactionAggregates = {
@@ -76,7 +76,7 @@ export default function CashPage() {
   const [inwardPaymentMode, setInwardPaymentMode, clearInwardPaymentMode] = usePersistedState("cash-inwardPaymentMode", "Cash");
   const [inwardBankAccountId, setInwardBankAccountId, clearInwardBankAccountId] = usePersistedState("cash-inwardBankAccountId", "");
   const [inwardNotes, setInwardNotes, clearInwardNotes] = usePersistedState("cash-inwardNotes", "");
-  const [inwardAllocations, setInwardAllocations, clearInwardAllocations] = usePersistedState<{ txnId: number | null | -999; txnLabel: string; serialNumber: number; date: string; numberOfBags: number; crop: string; due: number; dueDays: number; amount: string; discountPercent: string; pettyAdj: string }[]>("cash-inwardAllocations", []);
+  const [inwardAllocations, setInwardAllocations, clearInwardAllocations] = usePersistedState<{ txnId: number | null | -999; txnLabel: string; serialNumber: number; billBookNumber: number; date: string; numberOfBags: number; crop: string; due: number; dueDays: number; amount: string; discountPercent: string; pettyAdj: string }[]>("cash-inwardAllocations", []);
   const [allocationSearch, setAllocationSearch] = useState("");
   const [allocationDropdownOpen, setAllocationDropdownOpen] = useState(false);
   const allocationDropdownRef = useRef<HTMLDivElement>(null);
@@ -97,7 +97,7 @@ export default function CashPage() {
   const [outwardPaymentMode, setOutwardPaymentMode, clearOutwardPaymentMode] = usePersistedState("cash-outwardPaymentMode", "Cash");
   const [outwardBankAccountId, setOutwardBankAccountId, clearOutwardBankAccountId] = usePersistedState("cash-outwardBankAccountId", "");
   const [outwardNotes, setOutwardNotes, clearOutwardNotes] = usePersistedState("cash-outwardNotes", "");
-  const [farmerAllocations, setFarmerAllocations, clearFarmerAllocations] = usePersistedState<{ groupKey: string; txnLabel: string; serialNumber: number; date: string; numberOfBags: number; crops: string; due: number; amount: string; transactionIds: { id: number; due: number }[] }[]>("cash-farmerAllocations", []);
+  const [farmerAllocations, setFarmerAllocations, clearFarmerAllocations] = usePersistedState<{ groupKey: string; txnLabel: string; serialNumber: number; billBookNumber: number; date: string; numberOfBags: number; crops: string; due: number; amount: string; transactionIds: { id: number; due: number }[] }[]>("cash-farmerAllocations", []);
   const [farmerAllocationSearch, setFarmerAllocationSearch] = useState("");
   const [farmerAllocationDropdownOpen, setFarmerAllocationDropdownOpen] = useState(false);
   const farmerAllocationDropdownRef = useRef<HTMLDivElement>(null);
@@ -160,14 +160,14 @@ export default function CashPage() {
 
   const { data: farmersWithDues = [] } = useQuery<FarmerWithDues[]>({ queryKey: ["/api/farmers-with-dues"] });
 
-  type PendingTxn = { id: number; transactionId: string; serialNumber: number; date: string; numberOfBags: number; crop: string; totalReceivableFromBuyer: string; paidAmount: string; due: string; bidCreatedAt: string };
+  type PendingTxn = { id: number; transactionId: string; serialNumber: number; billBookNumber: number; date: string; numberOfBags: number; crop: string; totalReceivableFromBuyer: string; paidAmount: string; due: string; bidCreatedAt: string };
   const { data: pendingTransactions = [] } = useQuery<PendingTxn[]>({
     queryKey: ["/api/buyers", inwardBuyerId, "pending-transactions"],
     queryFn: () => inwardBuyerId ? fetch(`/api/buyers/${inwardBuyerId}/pending-transactions`, { credentials: "include" }).then(r => r.json()) : Promise.resolve([]),
     enabled: inwardPartyType === "Buyer" && !!inwardBuyerId,
   });
 
-  type FarmerPendingTxn = { groupKey: string; serialNumber: number; date: string; numberOfBags: number; crops: string; totalPayableToFarmer: string; farmerPaidAmount: string; due: string; transactionIds: { id: number; due: number }[] };
+  type FarmerPendingTxn = { groupKey: string; serialNumber: number; billBookNumber: number; date: string; numberOfBags: number; crops: string; totalPayableToFarmer: string; farmerPaidAmount: string; due: string; transactionIds: { id: number; due: number }[] };
   const { data: farmerPendingTransactions = [] } = useQuery<FarmerPendingTxn[]>({
     queryKey: ["/api/farmers", outwardFarmerId, "pending-transactions"],
     queryFn: () => outwardFarmerId ? fetch(`/api/farmers/${outwardFarmerId}/pending-transactions`, { credentials: "include" }).then(r => r.json()) : Promise.resolve([]),
@@ -550,7 +550,7 @@ export default function CashPage() {
         return;
       }
       const buildSplitLog = () => {
-        const label = (a: typeof inwardAllocations[0]) => a.txnId === null ? "PY" : `SR#${a.serialNumber}`;
+        const label = (a: typeof inwardAllocations[0]) => a.txnId === null ? "PY" : `BB#${a.billBookNumber}-SR#${a.serialNumber}`;
         const amtParts = inwardAllocations.map(a => `${label(a)}-${parseFloat(a.amount || "0").toFixed(2)}`);
         const discParts = inwardAllocations.filter(a => parseFloat(a.discountPercent || "0") > 0).map(a => `${label(a)}-${a.discountPercent}%`);
         const pettyParts = inwardAllocations.filter(a => parseFloat(a.pettyAdj || "0") > 0).map(a => `${label(a)}-${parseFloat(a.pettyAdj || "0").toFixed(2)}`);
@@ -811,6 +811,7 @@ export default function CashPage() {
       "Receiver/Party": e.partyName || (e.buyerId ? getBuyerName(e.buyerId) : e.farmerId ? getFarmerName(e.farmerId) : ""),
       "Buyer": e.buyerId ? getBuyerName(e.buyerId) : "",
       "Farmer": e.farmerId ? getFarmerName(e.farmerId) : "",
+      "BB#": e.bbNumber != null ? String(e.bbNumber) : "",
       "SR#": e.srNumber != null ? String(e.srNumber) : "",
       "Transaction ID": e.txnCode || "",
       "Amount": e.amount,
@@ -1318,8 +1319,9 @@ export default function CashPage() {
                                     const autoPetty = Math.min(1000, Math.max(0, due - autoAmt));
                                     return [...prev, {
                                       txnId: pt.id === 0 ? null : pt.id,
-                                      txnLabel: pt.transactionId === "PY_OPENING" ? "PY Opening Balance" : `SR #${pt.serialNumber}`,
+                                      txnLabel: pt.transactionId === "PY_OPENING" ? "PY Opening Balance" : `BB#${pt.billBookNumber} SR#${pt.serialNumber}`,
                                       serialNumber: pt.serialNumber,
+                                      billBookNumber: pt.billBookNumber,
                                       date: pt.date,
                                       numberOfBags: pt.numberOfBags,
                                       crop: pt.crop,
@@ -1337,7 +1339,7 @@ export default function CashPage() {
                               >
                                 <div className="flex justify-between">
                                   <span className="font-medium">
-                                    {pt.transactionId === "PY_OPENING" ? "PY Opening Balance" : `SR #${pt.serialNumber} | ${pt.crop}`}
+                                    {pt.transactionId === "PY_OPENING" ? "PY Opening Balance" : `BB#${pt.billBookNumber} SR#${pt.serialNumber} | ${pt.crop}`}
                                   </span>
                                   <span className="text-orange-600 font-semibold">₹{parseFloat(pt.due).toLocaleString("en-IN")}</span>
                                 </div>
@@ -1359,6 +1361,7 @@ export default function CashPage() {
                                     txnId: -999,
                                     txnLabel: "Advance",
                                     serialNumber: 0,
+                                    billBookNumber: 0,
                                     date: inwardDate,
                                     numberOfBags: 0,
                                     crop: "",
@@ -1722,8 +1725,9 @@ export default function CashPage() {
                                     onClick={() => {
                                       setFarmerAllocations(prev => [...prev, {
                                         groupKey: pt.groupKey,
-                                        txnLabel: pt.groupKey === "PY_OPENING" ? "PY Opening Balance" : `SR #${pt.serialNumber}`,
+                                        txnLabel: pt.groupKey === "PY_OPENING" ? "PY Opening Balance" : `BB#${pt.billBookNumber} SR#${pt.serialNumber}`,
                                         serialNumber: pt.serialNumber,
+                                        billBookNumber: pt.billBookNumber,
                                         date: pt.date,
                                         numberOfBags: pt.numberOfBags,
                                         crops: pt.crops,
@@ -1738,7 +1742,7 @@ export default function CashPage() {
                                   >
                                     <div className="flex justify-between">
                                       <span className="font-medium">
-                                        {pt.groupKey === "PY_OPENING" ? "PY Opening Balance" : `SR #${pt.serialNumber}${pt.crops ? ` | ${pt.crops}` : ""}`}
+                                        {pt.groupKey === "PY_OPENING" ? "PY Opening Balance" : `BB#${pt.billBookNumber} SR#${pt.serialNumber}${pt.crops ? ` | ${pt.crops}` : ""}`}
                                       </span>
                                       <span className="text-orange-600 font-semibold">₹{parseFloat(pt.due).toLocaleString("en-IN")}</span>
                                     </div>

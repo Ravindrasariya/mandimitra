@@ -192,7 +192,7 @@ function dbRecordToEditEntry(rec: { fieldChanged: string; oldValue: string | nul
 }
 
 type CropGroup = {
-  id: string; crop: string; srNumber: string; groupOpen: boolean; lots: LotRow[];
+  id: string; crop: string; srNumber: string; bbNumber: string; groupOpen: boolean; lots: LotRow[];
   archived: boolean;
   persisted: boolean;
   editHistory: EditEntry[];
@@ -534,7 +534,7 @@ const emptyCard = (): FarmerCard => ({
 });
 
 const emptyCropGroup = (crop: string, date?: string): CropGroup => ({
-  id: uid(), crop, srNumber: "—", groupOpen: true,
+  id: uid(), crop, srNumber: "—", bbNumber: "—", groupOpen: true,
   lots: [emptyLot(date)], archived: false, persisted: false, editHistory: [],
 });
 
@@ -1744,6 +1744,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
 
       const sg: UnifiedSerialGroup = {
         serialNumber: parseInt(group.srNumber) || 0,
+        billBookNumber: group.bbNumber || 1,
         date: farmerCard.date,
         farmer,
         lotGroups,
@@ -1840,7 +1841,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
             <div className="flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 font-medium opacity-60">
               <Archive className="w-3.5 h-3.5 shrink-0" />
               <Wheat className="w-3.5 h-3.5 shrink-0" />
-              <span>SR# {group.srNumber} {group.crop}</span>
+              <span>BB# {group.bbNumber} SR# {group.srNumber} {group.crop}</span>
               <span className="italic font-normal">— {t("stock.archived")}</span>
             </div>
             <Button type="button" variant="outline" size="sm"
@@ -1853,7 +1854,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
         </div>
         <ReinstateDialog
           open={showReinstateConfirm}
-          title={`${t("stock.reinstate")} ${group.crop} (SR# ${group.srNumber})?`}
+          title={`${t("stock.reinstate")} ${group.crop} (BB# ${group.bbNumber} SR# ${group.srNumber})?`}
           description={t("stock.reinstateDesc")}
           onConfirm={async () => {
             setShowReinstateConfirm(false);
@@ -1901,7 +1902,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
           <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
             {group.groupOpen ? <ChevronDown className="w-5 h-5 shrink-0" strokeWidth={3} /> : <ChevronRight className="w-5 h-5 shrink-0" strokeWidth={3} />}
             <Wheat className="w-4 h-4 shrink-0" />
-            <span className="font-bold text-sm truncate">SR# {group.srNumber} {group.crop}</span>
+            <span className="font-bold text-sm truncate">BB# {group.bbNumber} SR# {group.srNumber} {group.crop}</span>
             <Badge variant="outline" className={`text-xs ${badgeCls} shrink-0`}>
               {group.lots.length} {t("stock.lots")}
             </Badge>
@@ -2040,7 +2041,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
 
       <EditHistoryDialog
         open={showHistory}
-        crop={`${group.crop} (SR# ${group.srNumber})`}
+        crop={`${group.crop} (BB# ${group.bbNumber} SR# ${group.srNumber})`}
         history={group.editHistory}
         onClose={() => setShowHistory(false)}
       />
@@ -2763,6 +2764,7 @@ function stockCardsToFarmerCards(apiCards: any[]): FarmerCard[] {
         id: uid(),
         crop: cg.crop,
         srNumber: cg.srNumber || "—",
+        bbNumber: cg.billBookNumber?.toString() || "1",
         groupOpen: false,
         lots: (cg.lots || []).map((lot: any) => ({
           id: uid(),
@@ -3769,7 +3771,7 @@ export default function StockPage() {
 
       const newLots: { groupIdx: number; lotIdx: number; lotData: any }[] = [];
       const existingLots: { dbId: number; lotData: any }[] = [];
-      const dbIdUpdates: { groupIdx: number; lotIdx: number; dbId: number; srNumber?: string }[] = [];
+      const dbIdUpdates: { groupIdx: number; lotIdx: number; dbId: number; srNumber?: string; bbNumber?: string }[] = [];
 
       for (let gIdx = 0; gIdx < card.cropGroups.length; gIdx++) {
         const group = card.cropGroups[gIdx];
@@ -3875,6 +3877,8 @@ export default function StockPage() {
       }
 
       if (newLots.length > 0) {
+        const firstNewGroup = card.cropGroups[newLots[0].groupIdx];
+        const batchBB = firstNewGroup?.bbNumber && firstNewGroup.bbNumber !== "—" ? parseInt(firstNewGroup.bbNumber) : undefined;
         const batchRes = await apiRequest("POST", "/api/lots/batch", {
           farmerId: currentFarmerId,
           date: card.date,
@@ -3887,6 +3891,7 @@ export default function StockPage() {
           farmerAdvanceAmount: card.advanceAmount || null,
           farmerAdvanceMode: card.advanceMode || null,
           isAddingToExistingCard: existingLots.length > 0,
+          billBookNumber: batchBB,
           lots: newLots.map(nl => ({
             crop: nl.lotData.crop,
             variety: nl.lotData.variety,
@@ -3904,6 +3909,7 @@ export default function StockPage() {
               lotIdx: nl.lotIdx,
               dbId: createdLots[i].id,
               srNumber: createdLots[i].serialNumber?.toString(),
+              bbNumber: createdLots[i].billBookNumber?.toString(),
             });
           }
         });
@@ -3912,6 +3918,7 @@ export default function StockPage() {
       let finalGroups = card.cropGroups.map((g, gIdx) => {
         let updatedLots = g.lots;
         let updatedSrNumber = g.srNumber;
+        let updatedBbNumber = g.bbNumber;
         const groupUpdates = dbIdUpdates.filter(u => u.groupIdx === gIdx);
         if (groupUpdates.length > 0) {
           updatedLots = g.lots.map((lot, lIdx) => {
@@ -3921,8 +3928,11 @@ export default function StockPage() {
           if ((updatedSrNumber === "—" || updatedSrNumber === "XX") && groupUpdates[0]?.srNumber) {
             updatedSrNumber = groupUpdates[0].srNumber;
           }
+          if ((updatedBbNumber === "—") && groupUpdates[0]?.bbNumber) {
+            updatedBbNumber = groupUpdates[0].bbNumber;
+          }
         }
-        return { ...g, lots: updatedLots, srNumber: updatedSrNumber };
+        return { ...g, lots: updatedLots, srNumber: updatedSrNumber, bbNumber: updatedBbNumber };
       });
 
       for (let gIdx = 0; gIdx < finalGroups.length; gIdx++) {
@@ -4501,7 +4511,7 @@ export default function StockPage() {
 
   const exportStockCsv = () => {
     const headers = [
-      "SR#", "Lot ID", "Date", "Crop", "Variety", "Size", "Bag Marka",
+      "BB#", "SR#", "Lot ID", "Date", "Crop", "Variety", "Size", "Bag Marka",
       "Farmer Name", "Phone", "Village", "Tehsil", "District",
       "Vehicle #", "Driver Name", "Driver Contact", "Advance/Credit", "Total # of Bags",
       "# Bags", "Proportionate Freight (₹)",
@@ -4519,7 +4529,7 @@ export default function StockPage() {
           const lotBags = parseInt(lot.numberOfBags) || 0;
           const freight = tbi > 0 ? ((vbr * lotBags) / tbi).toFixed(2) : "0";
           rows.push([
-            g.srNumber, lot.lotId || lot.dbId?.toString() || "", card.date, g.crop, lot.variety || "", lot.size || "None", lot.bagMarka || "",
+            g.bbNumber, g.srNumber, lot.lotId || lot.dbId?.toString() || "", card.date, g.crop, lot.variety || "", lot.size || "None", lot.bagMarka || "",
             card.farmerName, card.farmerPhone, card.village, card.tehsil, card.district,
             card.vehicleNumber, card.driverName, card.driverContact, card.freightType || "", card.totalBagsInVehicle || "",
             lot.numberOfBags, freight,
@@ -4541,7 +4551,7 @@ export default function StockPage() {
 
   const exportTxnCsv = () => {
     const headers = [
-      "Transaction ID", "Date", "Lot ID", "SR#", "Crop", "Variety",
+      "Transaction ID", "Date", "Lot ID", "BB#", "SR#", "Crop", "Variety",
       "Farmer Name", "Phone", "Village",
       "Buyer Name", "Haste",
       "Vehicle #", "Driver Name", "Driver Contact", "Advance/Credit",
@@ -4572,7 +4582,7 @@ export default function StockPage() {
             const bStat = bid.paymentStatus === "paid" ? "Paid" : bid.paymentStatus === "partial" ? "Partial" : "Due";
             const archiveStatus = (card.archived || g.archived || lot.isArchived) ? "Archived" : "Active";
             rows.push([
-              bid.txnDbId, bid.txnDate, lot.lotId || lot.dbId?.toString() || "", g.srNumber, g.crop, lot.variety || "",
+              bid.txnDbId, bid.txnDate, lot.lotId || lot.dbId?.toString() || "", g.bbNumber, g.srNumber, g.crop, lot.variety || "",
               card.farmerName, card.farmerPhone, card.village,
               bid.buyerName, bid.haste,
               card.vehicleNumber, card.driverName, card.driverContact, card.freightType || "",

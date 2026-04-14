@@ -124,6 +124,7 @@ export const lots = pgTable("lots", {
   businessId: integer("business_id").notNull().references(() => businesses.id),
   lotId: text("lot_id").notNull(),
   serialNumber: integer("serial_number").notNull(),
+  billBookNumber: integer("bill_book_number").notNull().default(1),
   farmerId: integer("farmer_id").notNull().references(() => farmers.id),
   date: date("date").notNull(),
   crop: text("crop").notNull(),

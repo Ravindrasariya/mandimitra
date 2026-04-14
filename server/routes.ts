@@ -700,7 +700,7 @@ export async function registerRoutes(
         farmerAdvanceAmount: string | null;
         farmerAdvanceMode: string | null;
         latestCreatedAt: Date;
-        cropMap: Map<string, { lots: StockCardLot[]; srNumber: string }>;
+        cropMap: Map<string, { lots: StockCardLot[]; srNumber: string; billBookNumber: number }>;
       }>();
 
       for (const lotRow of allLots) {
@@ -735,6 +735,7 @@ export async function registerRoutes(
           card.cropMap.set(cropKey, {
             lots: [],
             srNumber: lot.serialNumber.toString(),
+            billBookNumber: lot.billBookNumber,
           });
         }
         card.cropMap.get(cropKey)!.lots.push({
@@ -834,6 +835,7 @@ export async function registerRoutes(
         const cropGroups = Array.from(card.cropMap.entries()).map(([crop, group]) => ({
           crop,
           srNumber: group.srNumber,
+          billBookNumber: group.billBookNumber,
           isArchived: group.lots.every((l) => l.isArchived),
           lots: group.lots,
         }));
@@ -941,10 +943,21 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/lots/next-bill-book", requireAuth, async (req, res) => {
+    try {
+      const businessId = req.user!.businessId;
+      const date = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
+      const result = await storage.getNextBillBookNumber(businessId, date);
+      res.json(result);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
   app.post("/api/lots/batch", requireAuth, async (req, res) => {
     try {
       const businessId = req.user!.businessId;
-      const { farmerId, date, vehicleNumber, driverName, driverContact, vehicleBhadaRate, freightType, totalBagsInVehicle, farmerAdvanceAmount, farmerAdvanceMode, isAddingToExistingCard, lots: lotItems } = req.body;
+      const { farmerId, date, vehicleNumber, driverName, driverContact, vehicleBhadaRate, freightType, totalBagsInVehicle, farmerAdvanceAmount, farmerAdvanceMode, isAddingToExistingCard, billBookNumber, lots: lotItems } = req.body;
       const dateStr = date || format(new Date(), "yyyy-MM-dd");
 
       if (!lotItems || !Array.isArray(lotItems) || lotItems.length === 0) {
@@ -972,11 +985,11 @@ export async function registerRoutes(
         return res.status(409).json({ message: "A card for this farmer already exists on this date with the same vehicle number." });
       }
 
-      const baseSerial = await storage.getNextSerialNumber(businessId, dateStr);
+      const bb = billBookNumber ? parseInt(billBookNumber) : (await storage.getNextBillBookNumber(businessId, dateStr)).billBookNumber;
+      const baseSerial = await storage.getNextSerialNumber(businessId, dateStr, bb);
       const dateFormatted = dateStr.replace(/-/g, "");
       const createdLots = [];
 
-      // Assign a unique SR# per unique crop, in order of first appearance
       const cropSerialMap: Record<string, number> = {};
       let serialOffset = 0;
       for (const item of lotItems) {
@@ -997,6 +1010,7 @@ export async function registerRoutes(
           businessId,
           lotId,
           serialNumber: cropSerialMap[crop],
+          billBookNumber: bb,
           date: dateStr,
           farmerId: parseInt(farmerId),
           crop,
@@ -1699,38 +1713,91 @@ export async function registerRoutes(
       const filteredCash = cash.filter((c: CashEntry) => !c.isReversed && !c.isArchived);
 
       const lotIds = [...new Set(filteredTxns.map((t: Transaction) => t.lotId))];
-      const lotMap = new Map<number, { serialNumber: number; crop: string }>();
+      const lotMap = new Map<number, { serialNumber: number; billBookNumber: number; crop: string }>();
       const lotsForTxns = await Promise.all(lotIds.map(lid => storage.getLot(lid, businessId)));
       for (let i = 0; i < lotIds.length; i++) {
         const lot = lotsForTxns[i];
-        if (lot) lotMap.set(lotIds[i], { serialNumber: lot.serialNumber, crop: lot.crop });
+        if (lot) lotMap.set(lotIds[i], { serialNumber: lot.serialNumber, billBookNumber: lot.billBookNumber, crop: lot.crop });
       }
 
-      const srToCrop = new Map<number, string>();
+      const srKeyToCrop = new Map<string, string>();
       for (const v of lotMap.values()) {
-        srToCrop.set(v.serialNumber, v.crop);
+        srKeyToCrop.set(`${v.billBookNumber}_${v.serialNumber}`, v.crop);
       }
 
-      const missingSrNums = new Set<number>();
+      const missingSrKeys = new Set<string>();
       for (const c of filteredCash) {
         const sl = c.splitLog || "";
-        const matches = sl.match(/SR#(\d+)/g);
-        if (matches) {
-          for (const m of matches) {
+        const newMatches = sl.match(/BB#(\d+)-SR#(\d+)/g);
+        if (newMatches) {
+          for (const m of newMatches) {
+            const parts = m.match(/BB#(\d+)-SR#(\d+)/);
+            if (parts) {
+              const key = `${parts[1]}_${parts[2]}`;
+              if (!srKeyToCrop.has(key)) missingSrKeys.add(key);
+            }
+          }
+        }
+        const oldMatches = sl.replace(/BB#\d+-SR#\d+/g, "").match(/SR#(\d+)/g);
+        if (oldMatches) {
+          for (const m of oldMatches) {
             const sr = parseInt(m.replace("SR#", ""), 10);
-            if (!isNaN(sr) && !srToCrop.has(sr)) missingSrNums.add(sr);
+            if (!isNaN(sr)) {
+              const key = `1_${sr}`;
+              if (!srKeyToCrop.has(key)) missingSrKeys.add(key);
+            }
           }
         }
       }
-      if (missingSrNums.size > 0) {
+      if (missingSrKeys.size > 0) {
         const allLots = await storage.getLots(businessId);
         const fyLots = allLots.filter(l => l.date >= fyStart && l.date <= fyEnd);
         for (const lot of fyLots) {
-          if (missingSrNums.has(lot.serialNumber) && !srToCrop.has(lot.serialNumber)) {
-            srToCrop.set(lot.serialNumber, lot.crop);
+          const key = `${lot.billBookNumber}_${lot.serialNumber}`;
+          if (missingSrKeys.has(key) && !srKeyToCrop.has(key)) {
+            srKeyToCrop.set(key, lot.crop);
           }
         }
       }
+
+      const parseSplitLogLabels = (splitLog: string) => {
+        const labels: string[] = [];
+        const hasPY = splitLog.includes("PY-");
+        if (hasPY) labels.push("PY Payables");
+        const seen = new Set<string>();
+        const newMatches = splitLog.match(/BB#(\d+)-SR#(\d+)/g);
+        if (newMatches) {
+          for (const m of newMatches) {
+            const parts = m.match(/BB#(\d+)-SR#(\d+)/);
+            if (parts) {
+              const bb = parseInt(parts[1], 10);
+              const sr = parseInt(parts[2], 10);
+              const key = `${bb}_${sr}`;
+              if (!seen.has(key)) {
+                seen.add(key);
+                const crop = srKeyToCrop.get(key);
+                labels.push(crop ? `BB#${bb} #${sr} - ${crop}` : `BB#${bb} #${sr}`);
+              }
+            }
+          }
+        }
+        const cleanedLog = splitLog.replace(/BB#\d+-SR#\d+/g, "");
+        const oldMatches = cleanedLog.match(/SR#(\d+)/g);
+        if (oldMatches) {
+          for (const m of oldMatches) {
+            const sr = parseInt(m.replace("SR#", ""), 10);
+            if (!isNaN(sr)) {
+              const key = `1_${sr}`;
+              if (!seen.has(key)) {
+                seen.add(key);
+                const crop = srKeyToCrop.get(key);
+                labels.push(crop ? `#${sr} - ${crop}` : `#${sr}`);
+              }
+            }
+          }
+        }
+        return labels;
+      };
 
       const buildPaymentParticulars = (c: CashEntry) => {
         if (c.outflowType && c.outflowType !== "Buyer") {
@@ -1739,26 +1806,11 @@ export async function registerRoutes(
 
         const mode = c.paymentMode || "Cash";
         const splitLog = c.splitLog || "";
-        const srMatches = splitLog.match(/SR#(\d+)/g) as string[] | null;
-        const hasPY = splitLog.includes("PY-");
-
-        const labels: string[] = [];
-        if (hasPY) labels.push("PY Payables");
-        if (srMatches) {
-          const seen = new Set<number>();
-          for (const m of srMatches) {
-            const sr = parseInt(m.replace("SR#", ""), 10);
-            if (!isNaN(sr) && !seen.has(sr)) {
-              seen.add(sr);
-              const crop = srToCrop.get(sr);
-              labels.push(crop ? `#${sr} - ${crop}` : `#${sr}`);
-            }
-          }
-        }
+        const labels = parseSplitLogLabels(splitLog);
 
         if (c.transactionId && labels.length === 0) {
           const lot = lotMap.get(filteredTxns.find((t: Transaction) => t.id === c.transactionId)?.lotId || 0);
-          if (lot) labels.push(`#${lot.serialNumber} - ${lot.crop}`);
+          if (lot) labels.push(`BB#${lot.billBookNumber} #${lot.serialNumber} - ${lot.crop}`);
         }
 
         const detail = labels.length > 0 ? ` (${labels.join(", ")})` : "";
@@ -1778,7 +1830,7 @@ export async function registerRoutes(
       const entries: LedgerEntry[] = [
         ...filteredTxns.map((t: Transaction) => {
           const lot = lotMap.get(t.lotId);
-          const label = lot ? `#${lot.serialNumber} - ${lot.crop}` : "";
+          const label = lot ? `BB#${lot.billBookNumber} #${lot.serialNumber} - ${lot.crop}` : "";
           return {
             date: t.date || fyStart,
             particulars: label ? `Purchase (${label})` : "Purchase",
@@ -1846,11 +1898,11 @@ export async function registerRoutes(
       const filteredCash = cash.filter((c: CashEntry) => !c.isReversed && !c.isArchived);
 
       const lotIds = [...new Set(filteredTxns.map((t: Transaction) => t.lotId))];
-      const lotMap = new Map<number, { serialNumber: number; crop: string }>();
+      const lotMap = new Map<number, { serialNumber: number; billBookNumber: number; crop: string }>();
       const lotsForTxns = await Promise.all(lotIds.map(lid => storage.getLot(lid, businessId)));
       for (let i = 0; i < lotIds.length; i++) {
         const lot = lotsForTxns[i];
-        if (lot) lotMap.set(lotIds[i], { serialNumber: lot.serialNumber, crop: lot.crop });
+        if (lot) lotMap.set(lotIds[i], { serialNumber: lot.serialNumber, billBookNumber: lot.billBookNumber, crop: lot.crop });
       }
 
       const buyerIds = [...new Set(filteredTxns.map((t: Transaction) => t.buyerId))];
@@ -1861,57 +1913,95 @@ export async function registerRoutes(
         if (b) buyerMap.set(buyerIds[i], b.name);
       }
 
-      const srToCrop = new Map<number, string>();
+      const srKeyToCrop = new Map<string, string>();
       for (const v of lotMap.values()) {
-        srToCrop.set(v.serialNumber, v.crop);
+        srKeyToCrop.set(`${v.billBookNumber}_${v.serialNumber}`, v.crop);
       }
 
-      const missingSrNums = new Set<number>();
+      const missingSrKeys = new Set<string>();
       for (const c of filteredCash) {
         const sl = c.splitLog || "";
-        const matches = sl.match(/SR#(\d+)/g);
-        if (matches) {
-          for (const m of matches) {
+        const newMatches = sl.match(/BB#(\d+)-SR#(\d+)/g);
+        if (newMatches) {
+          for (const m of newMatches) {
+            const parts = m.match(/BB#(\d+)-SR#(\d+)/);
+            if (parts) {
+              const key = `${parts[1]}_${parts[2]}`;
+              if (!srKeyToCrop.has(key)) missingSrKeys.add(key);
+            }
+          }
+        }
+        const oldMatches = sl.replace(/BB#\d+-SR#\d+/g, "").match(/SR#(\d+)/g);
+        if (oldMatches) {
+          for (const m of oldMatches) {
             const sr = parseInt(m.replace("SR#", ""), 10);
-            if (!isNaN(sr) && !srToCrop.has(sr)) missingSrNums.add(sr);
+            if (!isNaN(sr)) {
+              const key = `1_${sr}`;
+              if (!srKeyToCrop.has(key)) missingSrKeys.add(key);
+            }
           }
         }
       }
-      if (missingSrNums.size > 0) {
+      if (missingSrKeys.size > 0) {
         const allLots = await storage.getLots(businessId);
         const fyLots = allLots.filter(l => l.date >= fyStart && l.date <= fyEnd);
         for (const lot of fyLots) {
-          if (missingSrNums.has(lot.serialNumber) && !srToCrop.has(lot.serialNumber)) {
-            srToCrop.set(lot.serialNumber, lot.crop);
+          const key = `${lot.billBookNumber}_${lot.serialNumber}`;
+          if (missingSrKeys.has(key) && !srKeyToCrop.has(key)) {
+            srKeyToCrop.set(key, lot.crop);
           }
         }
       }
+
+      const parseSplitLogLabels = (splitLog: string) => {
+        const labels: string[] = [];
+        const hasPY = splitLog.includes("PY-");
+        if (hasPY) labels.push("PY Payables");
+        const seen = new Set<string>();
+        const newMatches = splitLog.match(/BB#(\d+)-SR#(\d+)/g);
+        if (newMatches) {
+          for (const m of newMatches) {
+            const parts = m.match(/BB#(\d+)-SR#(\d+)/);
+            if (parts) {
+              const bb = parseInt(parts[1], 10);
+              const sr = parseInt(parts[2], 10);
+              const key = `${bb}_${sr}`;
+              if (!seen.has(key)) {
+                seen.add(key);
+                const crop = srKeyToCrop.get(key);
+                labels.push(crop ? `BB#${bb} #${sr} - ${crop}` : `BB#${bb} #${sr}`);
+              }
+            }
+          }
+        }
+        const cleanedLog = splitLog.replace(/BB#\d+-SR#\d+/g, "");
+        const oldMatches = cleanedLog.match(/SR#(\d+)/g);
+        if (oldMatches) {
+          for (const m of oldMatches) {
+            const sr = parseInt(m.replace("SR#", ""), 10);
+            if (!isNaN(sr)) {
+              const key = `1_${sr}`;
+              if (!seen.has(key)) {
+                seen.add(key);
+                const crop = srKeyToCrop.get(key);
+                labels.push(crop ? `#${sr} - ${crop}` : `#${sr}`);
+              }
+            }
+          }
+        }
+        return labels;
+      };
 
       const buildPaymentParticulars = (c: CashEntry) => {
         const mode = c.paymentMode || "Cash";
         const splitLog = c.splitLog || "";
-        const srMatches = splitLog.match(/SR#(\d+)/g) as string[] | null;
-        const hasPY = splitLog.includes("PY-");
-
-        const labels: string[] = [];
-        if (hasPY) labels.push("PY Payables");
-        if (srMatches) {
-          const seen = new Set<number>();
-          for (const m of srMatches) {
-            const sr = parseInt(m.replace("SR#", ""), 10);
-            if (!isNaN(sr) && !seen.has(sr)) {
-              seen.add(sr);
-              const crop = srToCrop.get(sr);
-              labels.push(crop ? `#${sr} - ${crop}` : `#${sr}`);
-            }
-          }
-        }
+        const labels = parseSplitLogLabels(splitLog);
 
         if (c.transactionId && labels.length === 0) {
           const txn = filteredTxns.find((t: Transaction) => t.id === c.transactionId);
           if (txn) {
             const lot = lotMap.get(txn.lotId);
-            if (lot) labels.push(`#${lot.serialNumber} - ${lot.crop}`);
+            if (lot) labels.push(`BB#${lot.billBookNumber} #${lot.serialNumber} - ${lot.crop}`);
           }
         }
 
@@ -1932,7 +2022,7 @@ export async function registerRoutes(
         ...filteredTxns.map((t: Transaction) => {
           const lot = lotMap.get(t.lotId);
           const buyerName = buyerMap.get(t.buyerId) || "";
-          const lotLabel = lot ? `#${lot.serialNumber} - ${lot.crop}` : "";
+          const lotLabel = lot ? `BB#${lot.billBookNumber} #${lot.serialNumber} - ${lot.crop}` : "";
           const parts = [lotLabel, buyerName].filter(Boolean).join(", ");
           return {
             date: t.date || fyStart,

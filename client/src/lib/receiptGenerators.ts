@@ -13,6 +13,7 @@ export type UnifiedLotGroup = {
 
 export type UnifiedSerialGroup = {
   serialNumber: number;
+  billBookNumber: number;
   date: string;
   farmer: Farmer;
   lotGroups: UnifiedLotGroup[];
@@ -117,6 +118,7 @@ table{width:100%;border-collapse:collapse}
 <table style="border:none;margin-bottom:8px">
   <tr>
     <td style="border:none;padding:2px 0">बिल क्र : <strong>${sg.serialNumber}</strong></td>
+    <td style="border:none;padding:2px 0;text-align:center">बुक क्र. : <strong>${sg.billBookNumber || 1}</strong></td>
     <td style="border:none;padding:2px 0;text-align:right">दिनांक : <strong>${dateDisplay}</strong></td>
   </tr>
   <tr>
@@ -262,6 +264,7 @@ export function applyFarmerTemplate(tmpl: string, sg: UnifiedSerialGroup, busine
     "{{BUSINESS_LICENCE}}": businessLicenceNo || "",
     "{{BUSINESS_SHOP_NO}}": businessShopNo || "",
     "{{SERIAL_NUMBER}}": String(sg.serialNumber),
+    "{{BILL_BOOK_NUMBER}}": String(sg.billBookNumber || 1),
     "{{DATE}}": sg.date || format(new Date(), "yyyy-MM-dd"),
     "{{FARMER_NAME}}": farmer.name,
     "{{FARMER_PHONE}}": farmer.phone || "",
