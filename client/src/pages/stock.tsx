@@ -1568,9 +1568,10 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
 
 // ─── Crop group ───────────────────────────────────────────────────────────────
 
-function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, vehicleBhadaRate, totalBagsInVehicle, totalAllocatedAllGroups, cs, farmerDate, farmerName, currentUsername, onSyncSaved, buyersList, farmerCard }: {
+function CropGroupSection({ group, onChange, onArchive, onDelete, onBBChange, isPersisted, vehicleBhadaRate, totalBagsInVehicle, totalAllocatedAllGroups, cs, farmerDate, farmerName, currentUsername, onSyncSaved, buyersList, farmerCard }: {
   group: CropGroup;
   onChange: (g: CropGroup) => void; onArchive: () => void; onDelete: () => void;
+  onBBChange?: (newBB: string) => void;
   isPersisted: boolean;
   vehicleBhadaRate: number; totalBagsInVehicle: number; totalAllocatedAllGroups: number;
   cs: ChargeSettings; farmerDate: string; farmerName: string;
@@ -1909,20 +1910,13 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
                   min={1}
                   value={group.bbNumber}
                   onClick={e => e.stopPropagation()}
-                  onChange={async e => {
+                  onChange={e => {
                     const val = e.target.value;
                     if (val === "" || parseInt(val) >= 1) {
-                      onUpdate({ ...group, bbNumber: val });
-                      if (val && parseInt(val) >= 1) {
-                        try {
-                          const resp = await fetch(`/api/lots/next-bill-book?date=${card.date || new Date().toISOString().slice(0, 10)}`);
-                          if (resp.ok) {
-                            const data = await resp.json();
-                            if (parseInt(val) < data.billBookNumber) {
-                              toast({ title: "Warning", description: `BB# ${val} is less than current FY maximum (${data.billBookNumber})`, variant: "destructive" });
-                            }
-                          }
-                        } catch { /* ignore */ }
+                      if (onBBChange && val && parseInt(val) >= 1) {
+                        onBBChange(val);
+                      } else {
+                        onChange({ ...group, bbNumber: val });
                       }
                     }
                   }}
@@ -2227,21 +2221,72 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
   const addCrop = async (crop: string) => {
     const existingBB = card.cropGroups.find(g => g.bbNumber && g.bbNumber !== "—")?.bbNumber;
     let bbNumber = existingBB || "—";
+    let srNumber = "—";
+    const dateParam = card.date || new Date().toISOString().slice(0, 10);
     if (bbNumber === "—") {
       try {
-        const resp = await fetch(`/api/lots/next-bill-book?date=${card.date || new Date().toISOString().slice(0, 10)}`);
+        const resp = await fetch(`/api/lots/next-bill-book?date=${dateParam}`);
         if (resp.ok) {
           const data = await resp.json();
           bbNumber = String(data.billBookNumber || 1);
+          srNumber = String(data.nextSerialNumber || 1);
         }
       } catch { /* fallback to — */ }
+    } else {
+      try {
+        const resp = await fetch(`/api/lots/next-bill-book?date=${dateParam}&bb=${bbNumber}`);
+        if (resp.ok) {
+          const data = await resp.json();
+          srNumber = String(data.nextSerialNumber || 1);
+        }
+      } catch { /* fallback */ }
+    }
+    const existingNewCrops = card.cropGroups.filter(g => !g.persisted).map(g => g.crop);
+    if (existingNewCrops.includes(crop)) {
+      const maxSr = Math.max(...card.cropGroups.filter(g => !g.persisted).map(g => parseInt(g.srNumber) || 0));
+      srNumber = String(maxSr + 1);
+    } else {
+      const newGroupSrNums = card.cropGroups.filter(g => !g.persisted && g.srNumber !== "—").map(g => parseInt(g.srNumber) || 0);
+      if (newGroupSrNums.length > 0) {
+        srNumber = String(Math.max(...newGroupSrNums) + 1);
+      }
     }
     const group = emptyCropGroup(crop, card.date);
     group.bbNumber = bbNumber;
+    group.srNumber = srNumber;
     onChange({ ...card, cropGroups: [...card.cropGroups, group] });
   };
   const updateGroup = (idx: number, g: CropGroup) =>
     onChange({ ...card, cropGroups: card.cropGroups.map((gg, i) => (i === idx ? g : gg)) });
+  const handleBBChange = async (newBB: string) => {
+    const bbNum = parseInt(newBB);
+    let nextSr = 1;
+    try {
+      const resp = await fetch(`/api/lots/next-bill-book?date=${card.date || new Date().toISOString().slice(0, 10)}&bb=${bbNum}`);
+      if (resp.ok) {
+        const data = await resp.json();
+        nextSr = data.nextSerialNumber || 1;
+        const maxResp = await fetch(`/api/lots/next-bill-book?date=${card.date || new Date().toISOString().slice(0, 10)}`);
+        if (maxResp.ok) {
+          const maxData = await maxResp.json();
+          if (bbNum < maxData.billBookNumber) {
+            toast({ title: "Warning", description: `BB# ${newBB} is less than current FY maximum (${maxData.billBookNumber})`, variant: "destructive" });
+          }
+        }
+      }
+    } catch { /* fallback */ }
+    let srOffset = 0;
+    const assignedSr = new Map<string, number>();
+    const updatedGroups = card.cropGroups.map(g => {
+      if (g.persisted) return g;
+      if (!assignedSr.has(g.crop)) {
+        assignedSr.set(g.crop, nextSr + srOffset);
+        srOffset++;
+      }
+      return { ...g, bbNumber: newBB, srNumber: String(assignedSr.get(g.crop)!) };
+    });
+    onChange({ ...card, cropGroups: updatedGroups });
+  };
   const deleteGroup = (idx: number) =>
     onChange({ ...card, cropGroups: card.cropGroups.filter((_, i) => i !== idx) });
   const archiveGroup = (idx: number) => setPendingArchiveGroupIdx(idx);
@@ -2650,6 +2695,7 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
                 onChange={g => updateGroup(idx, g)}
                 onArchive={() => archiveGroup(idx)}
                 onDelete={() => deleteGroup(idx)}
+                onBBChange={handleBBChange}
                 isPersisted={group.persisted}
                 vehicleBhadaRate={vehicleBhadaRate}
                 totalBagsInVehicle={totalBagsInVehicle}

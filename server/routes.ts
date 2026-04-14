@@ -947,6 +947,15 @@ export async function registerRoutes(
     try {
       const businessId = req.user!.businessId;
       const date = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
+      const bbParam = req.query.bb as string | undefined;
+      if (bbParam) {
+        const bb = parseInt(bbParam);
+        if (!Number.isFinite(bb) || bb < 1) {
+          return res.status(400).json({ message: "Invalid bill book number" });
+        }
+        const nextSr = await storage.getNextSerialNumber(businessId, date, bb);
+        return res.json({ billBookNumber: bb, nextSerialNumber: nextSr });
+      }
       const result = await storage.getNextBillBookNumber(businessId, date);
       res.json(result);
     } catch (e: any) {
