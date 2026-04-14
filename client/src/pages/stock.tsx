@@ -2677,7 +2677,7 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
             </div>
           )}
 
-          {/* Crop groups — sorted ascending by SR# (unsaved/sentinel last) */}
+          {/* Crop groups — sorted ascending by BB# then SR# (unsaved/sentinel last) */}
           <div className="space-y-3 pt-1">
             {(() => {
               return card.cropGroups.map((group, idx) => ({ group, idx }))
