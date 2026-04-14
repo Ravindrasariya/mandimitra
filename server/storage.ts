@@ -78,7 +78,8 @@ export interface IStorage {
   getLot(id: number, businessId: number): Promise<(Lot & { farmer: Farmer }) | undefined>;
   createLot(lot: InsertLot): Promise<Lot>;
   updateLot(id: number, businessId: number, data: Partial<InsertLot>): Promise<Lot | undefined>;
-  getNextSerialNumber(businessId: number, date: string): Promise<number>;
+  getNextSerialNumber(businessId: number, date: string, billBookNumber?: number): Promise<number>;
+  getNextBillBookNumber(businessId: number, date: string): Promise<{ billBookNumber: number; nextSerialNumber: number }>;
   getNextLotSequence(businessId: number, crop: string, date: string): Promise<number>;
   getBids(businessId: number, lotId?: number): Promise<(Bid & { buyer: Buyer; lot: Lot; farmer: Farmer; hasTransaction: boolean })[]>;
   getBid(id: number, businessId: number): Promise<Bid | undefined>;

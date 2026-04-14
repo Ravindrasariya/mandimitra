@@ -1909,9 +1909,22 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, isPersisted, v
                   min={1}
                   value={group.bbNumber}
                   onClick={e => e.stopPropagation()}
-                  onChange={e => {
+                  onChange={async e => {
                     const val = e.target.value;
-                    if (val === "" || parseInt(val) >= 1) onUpdate({ ...group, bbNumber: val });
+                    if (val === "" || parseInt(val) >= 1) {
+                      onUpdate({ ...group, bbNumber: val });
+                      if (val && parseInt(val) >= 1) {
+                        try {
+                          const resp = await fetch(`/api/lots/next-bill-book?date=${card.date || new Date().toISOString().slice(0, 10)}`);
+                          if (resp.ok) {
+                            const data = await resp.json();
+                            if (parseInt(val) < data.billBookNumber) {
+                              toast({ title: "Warning", description: `BB# ${val} is less than current FY maximum (${data.billBookNumber})`, variant: "destructive" });
+                            }
+                          }
+                        } catch { /* ignore */ }
+                      }
+                    }
                   }}
                   className="w-12 px-1 py-0 h-5 text-sm font-bold border rounded text-center bg-background"
                   data-testid={`input-bb-${group.crop.toLowerCase()}`}

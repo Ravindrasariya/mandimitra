@@ -985,9 +985,13 @@ export async function registerRoutes(
         return res.status(409).json({ message: "A card for this farmer already exists on this date with the same vehicle number." });
       }
 
-      const bb = billBookNumber ? parseInt(billBookNumber) : (await storage.getNextBillBookNumber(businessId, dateStr)).billBookNumber;
+      const nextBBInfo = await storage.getNextBillBookNumber(businessId, dateStr);
+      const bb = billBookNumber ? parseInt(billBookNumber) : nextBBInfo.billBookNumber;
       if (!Number.isFinite(bb) || bb < 1) {
         return res.status(400).json({ message: "Bill Book Number must be a positive integer" });
+      }
+      if (billBookNumber && bb < nextBBInfo.billBookNumber) {
+        return res.status(400).json({ message: `Bill Book Number cannot be less than current FY maximum (${nextBBInfo.billBookNumber})` });
       }
       const baseSerial = await storage.getNextSerialNumber(businessId, dateStr, bb);
       const dateFormatted = dateStr.replace(/-/g, "");
