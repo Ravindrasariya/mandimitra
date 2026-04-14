@@ -493,7 +493,7 @@ th:first-child{text-align:left}
 .totals-row td{font-weight:bold;background:#f0f0f0;padding:5px;border:1px solid #ccc}
 @media print{body{margin:6mm}.no-print{display:none!important}}
 </style></head><body>
-${receiptHeaderImage ? `<div style="text-align:center;margin-bottom:4px"><img src="${receiptHeaderImage}" style="max-width:80%;height:auto;margin:0 auto" /></div>` : `<div style="display:flex;justify-content:flex-end;font-size:12px;margin-bottom:1px">${businessPhone ? `&#9742; ${businessPhone}` : ""}</div>
+${receiptHeaderImage ? `<div style="text-align:center;margin-bottom:4px"><img src="${receiptHeaderImage}" style="width:100%;max-width:100%;height:auto" /></div>` : `<div style="display:flex;justify-content:flex-end;font-size:12px;margin-bottom:1px">${businessPhone ? `&#9742; ${businessPhone}` : ""}</div>
 <div class="header">
 ${businessName ? `<div style="font-weight:bold;font-size:1.05em;margin-bottom:1px">${businessName}</div>` : ""}
 ${businessAddress ? `<p style="font-size:0.82em;color:#555;margin:1px 0">${businessAddress}</p>` : ""}
