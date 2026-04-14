@@ -1993,30 +1993,41 @@ export class DatabaseStorage implements IStorage {
     const fyStart = month >= 3 ? `${year}-04-01` : `${year - 1}-04-01`;
     const fyEnd = month >= 3 ? `${year + 1}-03-31` : `${year}-03-31`;
 
-    const result = await db.execute<{ serial_number: number }>(sql`
-      INSERT INTO buyer_receipt_serials (business_id, buyer_id, date, crop, serial_number)
+    const result = await db.execute<{ serial_number: number; bill_book_number: number }>(sql`
+      WITH next_counter AS (
+        SELECT COALESCE(
+          (SELECT MAX((bill_book_number - 1) * 100 + serial_number)
+           FROM buyer_receipt_serials
+           WHERE business_id = ${businessId}
+             AND date >= ${fyStart}::date
+             AND date <= ${fyEnd}::date), 0
+        ) + 1 AS val
+      )
+      INSERT INTO buyer_receipt_serials (business_id, buyer_id, date, crop, serial_number, bill_book_number)
       SELECT ${businessId}, ${buyerId}, ${date}::date, ${crop},
-             COALESCE((SELECT MAX(serial_number) FROM buyer_receipt_serials
-                       WHERE business_id = ${businessId}
-                         AND date >= ${fyStart}::date
-                         AND date <= ${fyEnd}::date), 0) + 1
+             ((nc.val - 1) % 100) + 1,
+             ((nc.val - 1) / 100) + 1
+      FROM next_counter nc
       ON CONFLICT DO NOTHING
-      RETURNING serial_number
+      RETURNING serial_number, bill_book_number
     `);
 
-    const globalSerial = result.rows[0]?.serial_number
-      ?? (await db.select({ serialNumber: buyerReceiptSerials.serialNumber })
-          .from(buyerReceiptSerials)
-          .where(and(
-            eq(buyerReceiptSerials.businessId, businessId),
-            eq(buyerReceiptSerials.buyerId, buyerId),
-            eq(buyerReceiptSerials.date, date),
-            eq(buyerReceiptSerials.crop, crop)
-          )))[0]!.serialNumber;
+    if (result.rows[0]) {
+      return { serialNumber: result.rows[0].serial_number, billBookNumber: result.rows[0].bill_book_number };
+    }
 
-    const billBookNumber = Math.floor((globalSerial - 1) / 100) + 1;
-    const serialNumber = ((globalSerial - 1) % 100) + 1;
-    return { serialNumber, billBookNumber };
+    const [existing] = await db.select({
+        serialNumber: buyerReceiptSerials.serialNumber,
+        billBookNumber: buyerReceiptSerials.billBookNumber,
+      })
+      .from(buyerReceiptSerials)
+      .where(and(
+        eq(buyerReceiptSerials.businessId, businessId),
+        eq(buyerReceiptSerials.buyerId, buyerId),
+        eq(buyerReceiptSerials.date, date),
+        eq(buyerReceiptSerials.crop, crop)
+      ));
+    return { serialNumber: existing!.serialNumber, billBookNumber: existing!.billBookNumber };
   }
 }
 
