@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/select";
 import {
   Building2, Users as UsersIcon, Plus, Search, Pencil, Power, Archive, RotateCcw,
-  Trash2, KeyRound, LogOut, AlertTriangle, PlayCircle, Upload, X, FileText, ChevronDown, ChevronRight,
+  Trash2, KeyRound, LogOut, AlertTriangle, PlayCircle, Upload, X, FileText, ChevronDown, ChevronRight, ImageIcon,
 } from "lucide-react";
 import type { Business, User, DemoVideo, ReceiptTemplate } from "@shared/schema";
 import { CROPS } from "@shared/schema";
@@ -567,6 +567,86 @@ const BUYER_PLACEHOLDERS = [
   { token: "{{RECEIPT_SERIAL}}", desc: "Bill no. (auto-assigned per buyer/date/crop/FY)" },
 ];
 
+function ReceiptHeaderImageSection({ biz }: { biz: Business }) {
+  const { toast } = useToast();
+  const [currentImage, setCurrentImage] = useState<string | null>(biz.receiptHeaderImage || null);
+  const [uploading, setUploading] = useState(false);
+
+  const handleUpload = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "image/png,image/jpeg,image/jpg";
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      setUploading(true);
+      try {
+        const formData = new FormData();
+        formData.append("image", file);
+        const res = await fetch(`/api/admin/receipt-header/${biz.id}`, {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
+        if (!res.ok) throw new Error((await res.json()).message || "Upload failed");
+        const data = await res.json();
+        setCurrentImage(data.receiptHeaderImage);
+        queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+        toast({ title: "Header image uploaded", variant: "success" });
+      } catch (err: any) {
+        toast({ title: "Upload failed", description: err.message, variant: "destructive" });
+      } finally {
+        setUploading(false);
+      }
+    };
+    input.click();
+  };
+
+  const handleDelete = async () => {
+    try {
+      await apiRequest("DELETE", `/api/admin/receipt-header/${biz.id}`);
+      setCurrentImage(null);
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      toast({ title: "Header image removed", variant: "success" });
+    } catch (err: any) {
+      toast({ title: "Error", description: err.message, variant: "destructive" });
+    }
+  };
+
+  return (
+    <div className="border rounded-lg p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="font-medium text-sm flex items-center gap-2">
+            <ImageIcon className="w-4 h-4 text-purple-600" />
+            Receipt Header Image
+          </p>
+          <p className="text-xs text-muted-foreground">Appears at the top of all default receipts (farmer, buyer, overall). Upload a grayscale logo/banner image (PNG or JPG).</p>
+        </div>
+      </div>
+      {currentImage ? (
+        <div className="space-y-2">
+          <div className="border rounded overflow-hidden bg-white p-2">
+            <img src={currentImage} alt="Receipt header" className="w-full h-auto" style={{ maxHeight: "120px", objectFit: "contain" }} />
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleUpload} disabled={uploading} data-testid="button-replace-receipt-header">
+              <Upload className="w-3 h-3 mr-1" /> Replace
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleDelete} data-testid="button-delete-receipt-header">
+              <Trash2 className="w-3 h-3 mr-1 text-destructive" /> Remove
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <Button variant="outline" size="sm" onClick={handleUpload} disabled={uploading} data-testid="button-upload-receipt-header">
+          <Upload className="w-3 h-3 mr-1" /> Upload Image
+        </Button>
+      )}
+    </div>
+  );
+}
+
 function ReceiptTemplatesDialog({ biz, onClose }: { biz: Business; onClose: () => void }) {
   const { toast } = useToast();
   const [buyerCrop, setBuyerCrop] = useState<string>("");
@@ -779,6 +859,8 @@ function ReceiptTemplatesDialog({ biz, onClose }: { biz: Business; onClose: () =
                 </p>
               )}
             </div>
+
+            <ReceiptHeaderImageSection biz={biz} />
 
             <Collapsible open={showPlaceholders} onOpenChange={setShowPlaceholders}>
               <CollapsibleTrigger asChild>

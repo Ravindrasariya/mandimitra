@@ -178,6 +178,7 @@ export async function setupAuth(app: Express): Promise<void> {
           businessPhone: business?.phone || "",
           businessLicenceNo: business?.licenceNo || "",
           businessShopNo: business?.shopNo || "",
+          receiptHeaderImage: business?.receiptHeaderImage || null,
           allBusinesses,
         });
       });
@@ -204,6 +205,7 @@ export async function setupAuth(app: Express): Promise<void> {
       businessPhone: business?.phone || "",
       businessLicenceNo: business?.licenceNo || "",
       businessShopNo: business?.shopNo || "",
+      receiptHeaderImage: business?.receiptHeaderImage || null,
       allBusinesses,
     });
   });
@@ -238,6 +240,7 @@ export async function setupAuth(app: Express): Promise<void> {
       businessPhone: business.phone || "",
       businessLicenceNo: business.licenceNo || "",
       businessShopNo: business.shopNo || "",
+      receiptHeaderImage: business.receiptHeaderImage || null,
       allBusinesses,
     });
   });

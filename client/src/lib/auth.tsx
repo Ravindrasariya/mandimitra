@@ -29,6 +29,7 @@ type AuthUser = {
   businessPhone: string;
   businessLicenceNo: string;
   businessShopNo: string;
+  receiptHeaderImage: string | null;
   allBusinesses: BusinessEntry[];
 };
 

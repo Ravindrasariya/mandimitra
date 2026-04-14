@@ -18,6 +18,7 @@ export const businesses = pgTable("businesses", {
   phone: text("phone"),
   licenceNo: text("licence_no"),
   shopNo: text("shop_no"),
+  receiptHeaderImage: text("receipt_header_image"),
   status: text("status").notNull().default("active"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

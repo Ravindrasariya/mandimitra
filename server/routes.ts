@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import express from "express";
 import { createServer, type Server } from "http";
 import { z } from "zod";
 import { storage } from "./storage";
@@ -8,12 +9,28 @@ import multer from "multer";
 import path from "path";
 import fs from "fs";
 import { db } from "./db";
-import { transactions, bids, buyers, lots, farmers, cashEntries, transactionEditHistory, lotEditHistory, insertAssetSchema, insertLiabilitySchema, type Farmer, type Transaction, type CashEntry } from "@shared/schema";
+import { transactions, bids, buyers, lots, farmers, cashEntries, transactionEditHistory, lotEditHistory, insertAssetSchema, insertLiabilitySchema, businesses, type Farmer, type Transaction, type CashEntry } from "@shared/schema";
 import { eq, and, inArray, notInArray, sql, isNull } from "drizzle-orm";
 import { addSseClient, removeSseClient, broadcastBusinessEvent } from "./sse";
 
 const uploadsDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
+const imageUpload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadsDir),
+    filename: (_req, file, cb) => {
+      const uniqueName = `receipt-header-${Date.now()}${path.extname(file.originalname).toLowerCase()}`;
+      cb(null, uniqueName);
+    },
+  }),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = [".png", ".jpg", ".jpeg"];
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(null, allowed.includes(ext));
+  },
+});
 
 const videoUpload = multer({
   storage: multer.diskStorage({
@@ -39,6 +56,7 @@ export async function registerRoutes(
   app: Express
 ): Promise<Server> {
   await setupAuth(app);
+  app.use("/uploads", express.static(uploadsDir));
 
   app.get("/api/recaptcha-config", (_req, res) => {
     res.json({ siteKey: process.env.RECAPTCHA_SITE_KEY || null });
@@ -268,6 +286,36 @@ export async function registerRoutes(
   app.get("/api/receipt-templates", requireAuth, async (req, res) => {
     const templates = await storage.listReceiptTemplates(req.user!.businessId);
     res.json(templates);
+  });
+
+  app.post("/api/admin/receipt-header/:businessId", requireAdmin, (req, res) => {
+    imageUpload.single("image")(req, res, async (err) => {
+      if (err) return res.status(400).json({ message: err.message || "Upload failed" });
+      if (!req.file) return res.status(400).json({ message: "No image file uploaded" });
+      try {
+        const businessId = paramId(req.params.businessId);
+        const imagePath = `/uploads/${req.file.filename}`;
+        await db.update(businesses).set({ receiptHeaderImage: imagePath }).where(eq(businesses.id, businessId));
+        res.json({ receiptHeaderImage: imagePath });
+      } catch (e: any) {
+        res.status(500).json({ message: e.message || "Failed to save image" });
+      }
+    });
+  });
+
+  app.delete("/api/admin/receipt-header/:businessId", requireAdmin, async (req, res) => {
+    try {
+      const businessId = paramId(req.params.businessId);
+      const [biz] = await db.select({ receiptHeaderImage: businesses.receiptHeaderImage }).from(businesses).where(eq(businesses.id, businessId));
+      if (biz?.receiptHeaderImage) {
+        const filePath = path.join(process.cwd(), biz.receiptHeaderImage.replace(/^\//, ""));
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      }
+      await db.update(businesses).set({ receiptHeaderImage: null }).where(eq(businesses.id, businessId));
+      res.json({ message: "Deleted" });
+    } catch (e: any) {
+      res.status(500).json({ message: e.message || "Failed to delete image" });
+    }
   });
 
   app.get("/api/farmers", requireAuth, async (req, res) => {

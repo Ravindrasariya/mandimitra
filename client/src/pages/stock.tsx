@@ -1778,7 +1778,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, onBBChange, is
         || receiptTemplates.find(tmpl => tmpl.templateType === "farmer" && tmpl.crop === "");
       const html = customTmpl
         ? applyFarmerTemplate(customTmpl.templateHtml, data.sg, user?.businessName, user?.businessAddress, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo)
-        : generateFarmerReceiptHtml(data.sg, user?.businessName, user?.businessAddress, user?.businessPhone);
+        : generateFarmerReceiptHtml(data.sg, user?.businessName, user?.businessAddress, user?.businessPhone, user?.receiptHeaderImage);
       const firstName = farmerName.trim().split(/\s+/)[0] || farmerName.trim();
       const [, mo, dy] = farmerDate.split("-");
       const day = parseInt(dy, 10);
@@ -1813,11 +1813,11 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, onBBChange, is
         if (entries.length === 1) {
           return customTmpl
             ? applyBuyerTemplate(customTmpl.templateHtml, entries[0].lot, data.sg.farmer, entries[0].tx, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo, hide)
-            : generateBuyerReceiptHtml(entries[0].lot, data.sg.farmer, entries[0].tx, user?.businessName, user?.businessAddress, hide);
+            : generateBuyerReceiptHtml(entries[0].lot, data.sg.farmer, entries[0].tx, user?.businessName, user?.businessAddress, hide, user?.receiptHeaderImage);
         } else {
           return customTmpl
             ? applyCombinedBuyerTemplate(customTmpl.templateHtml, entries, data.sg.serialNumber, data.sg.date, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo, undefined, data.sg.farmer, hide)
-            : generateCombinedBuyerReceiptHtml(entries, data.sg.serialNumber, data.sg.date, user?.businessName, user?.businessAddress, user?.businessPhone, hide);
+            : generateCombinedBuyerReceiptHtml(entries, data.sg.serialNumber, data.sg.date, user?.businessName, user?.businessAddress, user?.businessPhone, hide, user?.receiptHeaderImage);
         }
       };
       const copy1Html = genBuyerHtml(false);
@@ -4529,7 +4529,7 @@ export default function StockPage() {
     const overallTmpl = stockPageReceiptTemplates.find(tmpl => tmpl.templateType === "buyer-overall");
     const copy1Html = overallTmpl
       ? applyCombinedBuyerTemplate(overallTmpl.templateHtml, entries, 0, receiptDate, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo, receiptSerialNumber)
-      : generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress, receiptSerialNumber, false, user?.businessPhone);
+      : generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress, receiptSerialNumber, false, user?.businessPhone, user?.receiptHeaderImage);
 
     if (action === "share") {
       await shareReceiptAsImage(copy1Html, buyerFileName);
@@ -4538,7 +4538,7 @@ export default function StockPage() {
       const copy2Html = shouldHideAadhat
         ? (overallTmpl
             ? applyCombinedBuyerTemplate(overallTmpl.templateHtml, entries, 0, receiptDate, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo, receiptSerialNumber, undefined, true)
-            : generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress, receiptSerialNumber, true, user?.businessPhone))
+            : generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress, receiptSerialNumber, true, user?.businessPhone, user?.receiptHeaderImage))
         : undefined;
       const printHtml = wrapWithDuplicate(copy1Html, copy2Html);
       await printReceipt(printHtml, buyerFileName);
