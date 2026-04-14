@@ -2219,7 +2219,10 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
   };
 
   const addCrop = async (crop: string) => {
-    const existingBB = card.cropGroups.find(g => g.bbNumber && g.bbNumber !== "—")?.bbNumber;
+    const bbNumbers = card.cropGroups
+      .map(g => parseInt(g.bbNumber))
+      .filter(n => !isNaN(n));
+    const existingBB = bbNumbers.length > 0 ? String(Math.max(...bbNumbers)) : undefined;
     let bbNumber = existingBB || "—";
     let srNumber = "—";
     const dateParam = card.date || new Date().toISOString().slice(0, 10);
