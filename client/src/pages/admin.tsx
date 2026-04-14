@@ -592,6 +592,7 @@ function ReceiptHeaderImageSection({ biz }: { biz: Business }) {
         const data = await res.json();
         setCurrentImage(data.receiptHeaderImage);
         queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+        queryClient.invalidateQueries({ queryKey: ["/api/admin/businesses"] });
         toast({ title: "Header image uploaded", variant: "success" });
       } catch (err: any) {
         toast({ title: "Upload failed", description: err.message, variant: "destructive" });
@@ -607,6 +608,7 @@ function ReceiptHeaderImageSection({ biz }: { biz: Business }) {
       await apiRequest("DELETE", `/api/admin/receipt-header/${biz.id}`);
       setCurrentImage(null);
       queryClient.invalidateQueries({ queryKey: ["/api/auth/me"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/businesses"] });
       toast({ title: "Header image removed", variant: "success" });
     } catch (err: any) {
       toast({ title: "Error", description: err.message, variant: "destructive" });
