@@ -2682,6 +2682,10 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
             {(() => {
               return card.cropGroups.map((group, idx) => ({ group, idx }))
               .sort((a, b) => {
+                const bbA = parseInt(a.group.bbNumber); const bbB = parseInt(b.group.bbNumber);
+                const bA = isNaN(bbA) ? Infinity : bbA;
+                const bB = isNaN(bbB) ? Infinity : bbB;
+                if (bA !== bB) return bA - bB;
                 const srA = parseInt(a.group.srNumber); const srB = parseInt(b.group.srNumber);
                 const nA = isNaN(srA) ? Infinity : srA;
                 const nB = isNaN(srB) ? Infinity : srB;
@@ -3506,12 +3510,16 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
 
 function sortCardsByMaxSr(cards: FarmerCard[]): FarmerCard[] {
   return [...cards].sort((a, b) => {
+    const maxBb = (c: FarmerCard) => Math.max(0, ...c.cropGroups.map(g => parseInt(g.bbNumber) || 0));
     const maxSr = (c: FarmerCard) => Math.max(0, ...c.cropGroups.map(g => parseInt(g.srNumber) || 0));
-    const srA = maxSr(a);
-    const srB = maxSr(b);
-    if (srA === 0 && srB === 0) return 0;
-    if (srA === 0) return -1;
-    if (srB === 0) return 1;
+    const bbA = maxBb(a); const bbB = maxBb(b);
+    const srA = maxSr(a); const srB = maxSr(b);
+    const unsavedA = bbA === 0 && srA === 0;
+    const unsavedB = bbB === 0 && srB === 0;
+    if (unsavedA && unsavedB) return 0;
+    if (unsavedA) return -1;
+    if (unsavedB) return 1;
+    if (bbA !== bbB) return bbB - bbA;
     return srB - srA;
   });
 }
