@@ -294,6 +294,11 @@ export async function registerRoutes(
       if (!req.file) return res.status(400).json({ message: "No image file uploaded" });
       try {
         const businessId = paramId(req.params.businessId);
+        const [existing] = await db.select({ receiptHeaderImage: businesses.receiptHeaderImage }).from(businesses).where(eq(businesses.id, businessId));
+        if (existing?.receiptHeaderImage) {
+          const oldPath = path.join(process.cwd(), existing.receiptHeaderImage.replace(/^\//, ""));
+          if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath);
+        }
         const imagePath = `/uploads/${req.file.filename}`;
         await db.update(businesses).set({ receiptHeaderImage: imagePath }).where(eq(businesses.id, businessId));
         res.json({ receiptHeaderImage: imagePath });
