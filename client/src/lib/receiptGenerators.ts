@@ -106,15 +106,14 @@ table{width:100%;border-collapse:collapse}
 @media print{body{margin:8mm}.no-print{display:none!important}}
 </style></head><body>
 
-${receiptHeaderImage ? `<div style="text-align:center;margin-bottom:6px"><img src="${receiptHeaderImage}" style="width:100%;max-width:100%;height:auto" /></div>` : ""}
-<div style="text-align:right;font-size:12px;margin-bottom:2px">${businessPhone ? `&#9742; ${businessPhone}` : "&nbsp;"}</div>
+${receiptHeaderImage ? `<div style="text-align:center;margin-bottom:6px"><img src="${receiptHeaderImage}" style="width:100%;max-width:100%;height:auto" /></div>` : `<div style="text-align:right;font-size:12px;margin-bottom:2px">${businessPhone ? `&#9742; ${businessPhone}` : "&nbsp;"}</div>
 
 <div style="text-align:center;margin-bottom:10px">
   ${businessName ? `<div style="font-size:1.2em;font-weight:bold;text-decoration:underline">${businessName}</div>` : ""}
   ${businessAddress ? `<div style="font-size:0.9em;margin-top:2px;text-decoration:underline">${businessAddress}</div>` : ""}
   <div style="margin-top:5px;font-size:0.88em">आलू, प्याज, लहसुन आदि के कमीशन एजेंट एवं थोक विक्रेता</div>
   <div style="margin-top:4px;font-weight:bold;font-size:1.05em;text-decoration:underline">किसान बुक</div>
-</div>
+</div>`}
 
 <table style="border:none;margin-bottom:8px">
   <tr>
@@ -180,12 +179,11 @@ h2{text-align:center;margin-bottom:5px}
 .total{font-weight:bold;font-size:1.1em;color:#dc2626;border-top:2px solid #333;padding-top:8px;margin-top:8px}
 @media print{body{margin:10mm}.no-print{display:none!important}}
 </style></head><body>
-${receiptHeaderImage ? `<div style="text-align:center;margin-bottom:6px"><img src="${receiptHeaderImage}" style="width:100%;max-width:100%;height:auto" /></div>` : ""}
-<div class="header">
+${receiptHeaderImage ? `<div style="text-align:center;margin-bottom:6px"><img src="${receiptHeaderImage}" style="width:100%;max-width:100%;height:auto" /></div>` : `<div class="header">
 ${businessName ? `<h2 style="margin-bottom:2px">${businessName}</h2>` : ""}
 ${businessAddress ? `<p style="font-size:0.85em;color:#555;margin:2px 0">${businessAddress}</p>` : ""}
 <h3 style="margin:8px 0 5px 0;font-size:1.1em">Buyer Receipt</h3>
-</div>
+</div>`}
 <table class="detail-table">
 <tr><td><strong>Buyer:</strong> ${tx.buyer.name}</td><td style="text-align:right"><strong>Licence No:</strong> ${tx.buyer.licenceNo || "-"}</td></tr>
 <tr><td><strong>Crop:</strong> ${lot.crop}</td><td><strong>Date:</strong> ${dateStr}</td></tr>
@@ -402,13 +400,12 @@ th:first-child{text-align:left}
 .totals-row td{font-weight:bold;background:#f0f0f0;padding:5px;border:1px solid #ccc}
 @media print{body{margin:6mm}.no-print{display:none!important}}
 </style></head><body>
-${receiptHeaderImage ? `<div style="text-align:center;margin-bottom:4px"><img src="${receiptHeaderImage}" style="width:100%;max-width:100%;height:auto" /></div>` : ""}
-<div style="display:flex;justify-content:flex-end;font-size:12px;margin-bottom:1px">${businessPhone ? `&#9742; ${businessPhone}` : ""}</div>
+${receiptHeaderImage ? `<div style="text-align:center;margin-bottom:4px"><img src="${receiptHeaderImage}" style="width:100%;max-width:100%;height:auto" /></div>` : `<div style="display:flex;justify-content:flex-end;font-size:12px;margin-bottom:1px">${businessPhone ? `&#9742; ${businessPhone}` : ""}</div>
 <div class="header">
 ${businessName ? `<div style="font-weight:bold;font-size:1.05em;margin-bottom:1px">${businessName}</div>` : ""}
 ${businessAddress ? `<p style="font-size:0.82em;color:#555;margin:1px 0">${businessAddress}</p>` : ""}
 <h3 style="margin:2px 0 3px 0;font-size:1.05em">Buyer Receipt</h3>
-</div>
+</div>`}
 <table class="info-table" style="margin-bottom:6px">
 <tr><td><strong>SR #:</strong> ${serialNumber}</td><td style="text-align:right"><strong>Licence No:</strong> ${firstTx.buyer.licenceNo || "-"}</td></tr>
 <tr><td><strong>Buyer:</strong> ${firstTx.buyer.name}</td><td style="text-align:right"><strong>Date:</strong> ${date}</td></tr>
@@ -496,13 +493,12 @@ th:first-child{text-align:left}
 .totals-row td{font-weight:bold;background:#f0f0f0;padding:5px;border:1px solid #ccc}
 @media print{body{margin:6mm}.no-print{display:none!important}}
 </style></head><body>
-${receiptHeaderImage ? `<div style="text-align:center;margin-bottom:4px"><img src="${receiptHeaderImage}" style="max-width:80%;height:auto;margin:0 auto" /></div>` : ""}
-<div style="display:flex;justify-content:flex-end;font-size:12px;margin-bottom:1px">${businessPhone ? `&#9742; ${businessPhone}` : ""}</div>
+${receiptHeaderImage ? `<div style="text-align:center;margin-bottom:4px"><img src="${receiptHeaderImage}" style="max-width:80%;height:auto;margin:0 auto" /></div>` : `<div style="display:flex;justify-content:flex-end;font-size:12px;margin-bottom:1px">${businessPhone ? `&#9742; ${businessPhone}` : ""}</div>
 <div class="header">
 ${businessName ? `<div style="font-weight:bold;font-size:1.05em;margin-bottom:1px">${businessName}</div>` : ""}
 ${businessAddress ? `<p style="font-size:0.82em;color:#555;margin:1px 0">${businessAddress}</p>` : ""}
 <h3 style="margin:2px 0 3px 0;font-size:1.05em">Buyer Receipt</h3>
-</div>
+</div>`}
 <table class="info-table" style="margin-bottom:6px">
 <tr><td>${receiptSerialNumber ? `<strong>Bill no.:</strong> ${receiptSerialNumber}` : ""}</td><td style="text-align:right"><strong>Licence No:</strong> ${buyer.licenceNo || "-"}</td></tr>
 <tr><td><strong>Buyer:</strong> ${buyer.name}</td><td style="text-align:right"><strong>Date:</strong> ${format(new Date(), "dd/MM/yyyy")}</td></tr>
