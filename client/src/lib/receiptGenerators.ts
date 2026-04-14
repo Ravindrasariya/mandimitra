@@ -97,11 +97,11 @@ export function generateFarmerReceiptHtml(sg: UnifiedSerialGroup, businessName?:
   </tr>`;
 
   const th = (label: string) =>
-    `<th style="padding:6px 7px;border:1px solid #444;background:#f0f0f0;font-weight:bold;text-align:center;font-size:13px">${label}</th>`;
+    `<th style="padding:6px 7px;border:1px solid #444;background:#f0f0f0;font-weight:bold;text-align:center">${label}</th>`;
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>किसान बुक</title>
 <style>
-body{font-family:'Noto Sans Devanagari',Arial,sans-serif;margin:18px 22px;color:#111;font-size:13px}
+body{font-family:'Noto Sans Devanagari',Arial,sans-serif;margin:18px 22px;color:#111}
 table{width:100%;border-collapse:collapse}
 @media print{body{margin:8mm}.no-print{display:none!important}}
 </style></head><body>
