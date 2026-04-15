@@ -1175,6 +1175,19 @@ export async function registerRoutes(
             return res.status(400).json({ message: `All lots in an update must share the same date` });
           }
         }
+        const hasCashEntries = await db
+          .select({ count: sql<string>`count(*)` })
+          .from(cashEntries)
+          .innerJoin(transactions, eq(cashEntries.transactionId, transactions.id))
+          .where(and(
+            inArray(transactions.lotId, upd.lotIds),
+            eq(cashEntries.businessId, businessId),
+            eq(cashEntries.isReversed, false),
+          ));
+        if (parseInt(hasCashEntries[0]?.count || "0", 10) > 0) {
+          return res.status(409).json({ message: "Cannot change BB#/SR# — payments already exist for this crop group. Reverse all payments first." });
+        }
+
         const allExcludeIds = updates.flatMap(u => u.lotIds);
         const isDuplicate = await storage.checkDuplicateBBSR(businessId, lotDate, bb, sr, allExcludeIds);
         if (isDuplicate) {
@@ -1203,6 +1216,21 @@ export async function registerRoutes(
 
     const lot = await storage.getLot(lotId, businessId);
     if (!lot) return res.status(404).json({ message: "Lot not found" });
+
+    if (data.billBookNumber !== undefined || data.serialNumber !== undefined) {
+      const hasCE = await db
+        .select({ count: sql<string>`count(*)` })
+        .from(cashEntries)
+        .innerJoin(transactions, eq(cashEntries.transactionId, transactions.id))
+        .where(and(
+          eq(transactions.lotId, lotId),
+          eq(cashEntries.businessId, businessId),
+          eq(cashEntries.isReversed, false),
+        ));
+      if (parseInt(hasCE[0]?.count || "0", 10) > 0) {
+        return res.status(409).json({ message: "Cannot change BB#/SR# — payments already exist. Reverse all payments first." });
+      }
+    }
 
     const oldActual = lot.actualNumberOfBags ?? lot.numberOfBags;
 

@@ -19,7 +19,7 @@ import {
   Plus, Trash2, ChevronDown, ChevronRight, Truck, User,
   AlertTriangle, AlertCircle, Scale, Wheat, ChevronsUpDown, X, Calculator,
   Archive, History, Save, Check, Printer, Share2, Loader2,
-  Layers, Landmark, ShoppingBag, Calendar, Search, Filter, RotateCcw, Download, ClipboardList, FileText, Hammer,
+  Layers, Landmark, ShoppingBag, Calendar, Search, Filter, RotateCcw, Download, ClipboardList, FileText, Hammer, Lock,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
@@ -1595,6 +1595,11 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, onBBChange, is
   });
 
   const hasTransactions = isPersisted && group.lots.some(l => l.bids.some(b => b.txnDbId));
+  const hasPayments = isPersisted && group.lots.some(l => l.bids.some(b => b.txnDbId && (
+    b.paymentStatus === "paid" || b.paymentStatus === "partial" ||
+    b.farmerPaymentStatus === "paid" || b.farmerPaymentStatus === "partial"
+  )));
+  const bbSrLocked = hasPayments;
 
   const headerCls = CROP_HEADER[group.crop] || "bg-muted border-border";
   const badgeCls = CROP_COLORS[group.crop] || "bg-muted border-border text-foreground";
@@ -1905,11 +1910,14 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, onBBChange, is
             <Wheat className="w-4 h-4 shrink-0" />
             {group.bbNumber !== "—" ? (
               <span className="font-bold text-sm truncate flex items-center gap-1">
+                {bbSrLocked && <Lock className="w-3 h-3 shrink-0 text-muted-foreground" />}
                 BB#<input
                   type="number"
                   min={1}
                   value={group.bbNumber}
                   onClick={e => e.stopPropagation()}
+                  disabled={bbSrLocked}
+                  title={bbSrLocked ? "BB#/SR# locked — payments exist. Reverse all payments to edit." : undefined}
                   onChange={e => {
                     const val = e.target.value;
                     if (val === "" || parseInt(val) >= 1) {
@@ -1920,20 +1928,22 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, onBBChange, is
                       }
                     }
                   }}
-                  className="w-12 px-1 py-0 h-5 text-sm font-bold border rounded text-center bg-background"
+                  className={`w-12 px-1 py-0 h-5 text-sm font-bold border rounded text-center ${bbSrLocked ? "bg-muted text-muted-foreground cursor-not-allowed" : "bg-background"}`}
                   data-testid={`input-bb-${group.crop.toLowerCase()}`}
                 /> SR#<input
                   type="number"
                   min={1}
                   value={group.srNumber}
                   onClick={e => e.stopPropagation()}
+                  disabled={bbSrLocked}
+                  title={bbSrLocked ? "BB#/SR# locked — payments exist. Reverse all payments to edit." : undefined}
                   onChange={e => {
                     const val = e.target.value;
                     if (val === "" || parseInt(val) >= 1) {
                       onChange({ ...group, srNumber: val });
                     }
                   }}
-                  className="w-12 px-1 py-0 h-5 text-sm font-bold border rounded text-center bg-background"
+                  className={`w-12 px-1 py-0 h-5 text-sm font-bold border rounded text-center ${bbSrLocked ? "bg-muted text-muted-foreground cursor-not-allowed" : "bg-background"}`}
                   data-testid={`input-sr-${group.crop.toLowerCase()}`}
                 /> {group.crop}
               </span>
