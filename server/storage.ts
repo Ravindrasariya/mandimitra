@@ -80,6 +80,7 @@ export interface IStorage {
   updateLot(id: number, businessId: number, data: Partial<InsertLot>): Promise<Lot | undefined>;
   getNextSerialNumber(businessId: number, date: string, billBookNumber?: number): Promise<number>;
   getNextBillBookNumber(businessId: number, date: string): Promise<{ billBookNumber: number; nextSerialNumber: number }>;
+  checkDuplicateBBSR(businessId: number, date: string, billBookNumber: number, serialNumber: number, excludeLotIds: number[]): Promise<boolean>;
   getNextLotSequence(businessId: number, crop: string, date: string): Promise<number>;
   getBids(businessId: number, lotId?: number): Promise<(Bid & { buyer: Buyer; lot: Lot; farmer: Farmer; hasTransaction: boolean })[]>;
   getBid(id: number, businessId: number): Promise<Bid | undefined>;
@@ -740,6 +741,28 @@ export class DatabaseStorage implements IStorage {
   async updateLot(id: number, businessId: number, data: Partial<InsertLot>): Promise<Lot | undefined> {
     const [updated] = await db.update(lots).set(data).where(and(eq(lots.id, id), eq(lots.businessId, businessId))).returning();
     return updated;
+  }
+
+  async checkDuplicateBBSR(businessId: number, date: string, billBookNumber: number, serialNumber: number, excludeLotIds: number[]): Promise<boolean> {
+    const d = new Date(date);
+    const month = d.getMonth();
+    const year = d.getFullYear();
+    const fyStart = month >= 3 ? `${year}-04-01` : `${year - 1}-04-01`;
+    const fyEnd = month >= 3 ? `${year + 1}-03-31` : `${year}-03-31`;
+    const conditions = [
+      eq(lots.businessId, businessId),
+      gte(lots.date, fyStart),
+      lte(lots.date, fyEnd),
+      eq(lots.billBookNumber, billBookNumber),
+      eq(lots.serialNumber, serialNumber),
+    ];
+    if (excludeLotIds.length > 0) {
+      conditions.push(sql`${lots.id} NOT IN (${sql.join(excludeLotIds.map(id => sql`${id}`), sql`, `)})`);
+    }
+    const [result] = await db.select({ count: sql<string>`count(*)` })
+      .from(lots)
+      .where(and(...conditions));
+    return parseInt(result?.count || "0", 10) > 0;
   }
 
   async getNextSerialNumber(businessId: number, date: string, billBookNumber?: number): Promise<number> {

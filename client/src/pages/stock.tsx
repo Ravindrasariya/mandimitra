@@ -1903,7 +1903,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, onBBChange, is
           <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
             {group.groupOpen ? <ChevronDown className="w-5 h-5 shrink-0" strokeWidth={3} /> : <ChevronRight className="w-5 h-5 shrink-0" strokeWidth={3} />}
             <Wheat className="w-4 h-4 shrink-0" />
-            {!group.persisted && group.bbNumber !== "—" ? (
+            {group.bbNumber !== "—" ? (
               <span className="font-bold text-sm truncate flex items-center gap-1">
                 BB#<input
                   type="number"
@@ -1913,7 +1913,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, onBBChange, is
                   onChange={e => {
                     const val = e.target.value;
                     if (val === "" || parseInt(val) >= 1) {
-                      if (onBBChange && val && parseInt(val) >= 1) {
+                      if (!group.persisted && onBBChange && val && parseInt(val) >= 1) {
                         onBBChange(val);
                       } else {
                         onChange({ ...group, bbNumber: val });
@@ -1922,7 +1922,20 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, onBBChange, is
                   }}
                   className="w-12 px-1 py-0 h-5 text-sm font-bold border rounded text-center bg-background"
                   data-testid={`input-bb-${group.crop.toLowerCase()}`}
-                /> SR# {group.srNumber} {group.crop}
+                /> SR#<input
+                  type="number"
+                  min={1}
+                  value={group.srNumber}
+                  onClick={e => e.stopPropagation()}
+                  onChange={e => {
+                    const val = e.target.value;
+                    if (val === "" || parseInt(val) >= 1) {
+                      onChange({ ...group, srNumber: val });
+                    }
+                  }}
+                  className="w-12 px-1 py-0 h-5 text-sm font-bold border rounded text-center bg-background"
+                  data-testid={`input-sr-${group.crop.toLowerCase()}`}
+                /> {group.crop}
               </span>
             ) : (
               <span className="font-bold text-sm truncate">BB# {group.bbNumber} SR# {group.srNumber} {group.crop}</span>
@@ -3975,6 +3988,28 @@ export default function StockPage() {
         await apiRequest("PATCH", `/api/lots/${dbId}`, lotData);
       }
 
+      const prevSaved = savedCardMap.get(card.id);
+      const bbSrUpdates: { lotIds: number[]; billBookNumber: number; serialNumber: number; date: string }[] = [];
+      for (const group of card.cropGroups) {
+        if (!group.persisted) continue;
+        const lotIds = group.lots.filter(l => l.dbId).map(l => l.dbId!);
+        if (lotIds.length === 0) continue;
+        const savedGroup = prevSaved?.cropGroups.find(sg => sg.id === group.id);
+        if (!savedGroup) continue;
+        const bbChanged = group.bbNumber !== savedGroup.bbNumber;
+        const srChanged = group.srNumber !== savedGroup.srNumber;
+        if (bbChanged || srChanged) {
+          const bb = parseInt(group.bbNumber);
+          const sr = parseInt(group.srNumber);
+          if (bb >= 1 && sr >= 1) {
+            bbSrUpdates.push({ lotIds, billBookNumber: bb, serialNumber: sr, date: card.date });
+          }
+        }
+      }
+      if (bbSrUpdates.length > 0) {
+        await apiRequest("PATCH", "/api/lots/update-bb-sr", { updates: bbSrUpdates });
+      }
+
       if (newLots.length > 0) {
         const firstNewGroup = card.cropGroups[newLots[0].groupIdx];
         const batchBB = firstNewGroup?.bbNumber && firstNewGroup.bbNumber !== "—" ? parseInt(firstNewGroup.bbNumber) : undefined;
@@ -3991,13 +4026,18 @@ export default function StockPage() {
           farmerAdvanceMode: card.advanceMode || null,
           isAddingToExistingCard: existingLots.length > 0,
           billBookNumber: batchBB,
-          lots: newLots.map(nl => ({
-            crop: nl.lotData.crop,
-            variety: nl.lotData.variety,
-            numberOfBags: nl.lotData.numberOfBags,
-            size: nl.lotData.size,
-            bagMarka: nl.lotData.bagMarka,
-          })),
+          lots: newLots.map(nl => {
+            const group = card.cropGroups[nl.groupIdx];
+            const sr = group?.srNumber && group.srNumber !== "—" ? parseInt(group.srNumber) : undefined;
+            return {
+              crop: nl.lotData.crop,
+              variety: nl.lotData.variety,
+              numberOfBags: nl.lotData.numberOfBags,
+              size: nl.lotData.size,
+              bagMarka: nl.lotData.bagMarka,
+              ...(sr && sr >= 1 ? { serialNumber: sr } : {}),
+            };
+          }),
         });
         const createdLots = await batchRes.json();
 

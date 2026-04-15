@@ -1063,7 +1063,11 @@ export async function registerRoutes(
       let serialOffset = 0;
       for (const item of lotItems) {
         if (!(item.crop in cropSerialMap)) {
-          cropSerialMap[item.crop] = baseSerial + serialOffset;
+          if (item.serialNumber != null && parseInt(item.serialNumber) >= 1) {
+            cropSerialMap[item.crop] = parseInt(item.serialNumber);
+          } else {
+            cropSerialMap[item.crop] = baseSerial + serialOffset;
+          }
           serialOffset++;
         }
       }
@@ -1105,6 +1109,49 @@ export async function registerRoutes(
 
       broadcastBusinessEvent(businessId);
       res.status(201).json(createdLots);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  app.patch("/api/lots/update-bb-sr", requireAuth, async (req, res) => {
+    try {
+      const businessId = req.user!.businessId;
+      const { updates } = req.body as { updates: { lotIds: number[]; billBookNumber: number; serialNumber: number; date: string }[] };
+      if (!Array.isArray(updates) || updates.length === 0) {
+        return res.status(400).json({ message: "No updates provided" });
+      }
+      const seenKeys = new Set<string>();
+      for (const upd of updates) {
+        const bb = upd.billBookNumber;
+        const sr = upd.serialNumber;
+        if (!Number.isFinite(bb) || bb < 1 || !Number.isFinite(sr) || sr < 1) {
+          return res.status(400).json({ message: "BB# and SR# must be positive integers" });
+        }
+        if (!Array.isArray(upd.lotIds) || upd.lotIds.length === 0) {
+          return res.status(400).json({ message: "Each update must have at least one lot ID" });
+        }
+        const key = `${bb}_${sr}`;
+        if (seenKeys.has(key)) {
+          return res.status(409).json({ message: `Duplicate BB# ${bb} SR# ${sr} within the same request` });
+        }
+        seenKeys.add(key);
+        const allExcludeIds = updates.flatMap(u => u.lotIds);
+        const isDuplicate = await storage.checkDuplicateBBSR(businessId, upd.date, bb, sr, allExcludeIds);
+        if (isDuplicate) {
+          return res.status(409).json({ message: `BB# ${bb} SR# ${sr} already exists on another crop card` });
+        }
+      }
+      for (const upd of updates) {
+        for (const lotId of upd.lotIds) {
+          await storage.updateLot(lotId, businessId, {
+            billBookNumber: upd.billBookNumber,
+            serialNumber: upd.serialNumber,
+          });
+        }
+      }
+      broadcastBusinessEvent(businessId);
+      res.json({ success: true });
     } catch (e: any) {
       res.status(400).json({ message: e.message });
     }
