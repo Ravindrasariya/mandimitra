@@ -1072,6 +1072,19 @@ export async function registerRoutes(
         }
       }
 
+      let existingCardLotIds: number[] = [];
+      if (isAddingToExistingCard) {
+        const cardLots = await db
+          .select({ id: lots.id })
+          .from(lots)
+          .where(and(
+            eq(lots.businessId, businessId),
+            eq(lots.farmerId, parseInt(farmerId)),
+            eq(lots.date, dateStr),
+          ));
+        existingCardLotIds = cardLots.map(l => l.id);
+      }
+
       const usedSerials = Object.values(cropSerialMap);
       const serialSet = new Set<number>();
       for (const sr of usedSerials) {
@@ -1079,7 +1092,7 @@ export async function registerRoutes(
           return res.status(409).json({ message: `Duplicate SR# ${sr} within the same batch for BB# ${bb}` });
         }
         serialSet.add(sr);
-        const isDuplicate = await storage.checkDuplicateBBSR(businessId, dateStr, bb, sr, []);
+        const isDuplicate = await storage.checkDuplicateBBSR(businessId, dateStr, bb, sr, existingCardLotIds);
         if (isDuplicate) {
           return res.status(409).json({ message: `BB# ${bb} SR# ${sr} already exists on another crop card` });
         }
@@ -1149,11 +1162,14 @@ export async function registerRoutes(
           return res.status(409).json({ message: `Duplicate BB# ${bb} SR# ${sr} within the same request` });
         }
         seenKeys.add(key);
-        const firstLot = await storage.getLot(upd.lotIds[0], businessId);
-        if (!firstLot) {
-          return res.status(404).json({ message: `Lot ${upd.lotIds[0]} not found` });
+        let lotDate = "";
+        for (const lid of upd.lotIds) {
+          const lotCheck = await storage.getLot(lid, businessId);
+          if (!lotCheck) {
+            return res.status(404).json({ message: `Lot ${lid} not found` });
+          }
+          if (!lotDate) lotDate = lotCheck.date;
         }
-        const lotDate = firstLot.date;
         const allExcludeIds = updates.flatMap(u => u.lotIds);
         const isDuplicate = await storage.checkDuplicateBBSR(businessId, lotDate, bb, sr, allExcludeIds);
         if (isDuplicate) {
