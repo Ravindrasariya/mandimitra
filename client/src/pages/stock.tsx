@@ -4633,8 +4633,12 @@ export default function StockPage() {
   const handleBBSROverrideConfirm = async () => {
     if (!bbSROverride) return;
     const { action, buyerId, receiptDate, crop, buyerFileName, entries, autoBB, autoSR, editBB, editSR } = bbSROverride;
-    const bb = parseInt(editBB) || autoBB;
-    const sr = parseInt(editSR) || autoSR;
+    const bb = parseInt(editBB);
+    const sr = parseInt(editSR);
+    if (!bb || bb < 1 || !sr || sr < 1) {
+      toast({ title: "BB# and SR# must be valid numbers (≥ 1)", variant: "destructive" });
+      return;
+    }
     setBBSROverride(null);
     if (bb !== autoBB || sr !== autoSR) {
       try {

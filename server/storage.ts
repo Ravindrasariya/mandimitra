@@ -2011,14 +2011,18 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateBuyerReceiptSerial(businessId: number, buyerId: number, date: string, crop: string, billBookNumber: number, serialNumber: number): Promise<void> {
-    await db.update(buyerReceiptSerials)
+    const result = await db.update(buyerReceiptSerials)
       .set({ billBookNumber, serialNumber })
       .where(and(
         eq(buyerReceiptSerials.businessId, businessId),
         eq(buyerReceiptSerials.buyerId, buyerId),
         eq(buyerReceiptSerials.date, date),
         eq(buyerReceiptSerials.crop, crop),
-      ));
+      ))
+      .returning();
+    if (result.length === 0) {
+      await db.insert(buyerReceiptSerials).values({ businessId, buyerId, date, crop, billBookNumber, serialNumber });
+    }
   }
 
   async getOrCreateBuyerReceiptSerial(businessId: number, buyerId: number, date: string, crop: string): Promise<{ serialNumber: number; billBookNumber: number }> {
