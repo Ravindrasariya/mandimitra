@@ -534,7 +534,7 @@ const emptyCard = (): FarmerCard => ({
 });
 
 const emptyCropGroup = (crop: string, date?: string): CropGroup => ({
-  id: uid(), crop, srNumber: "—", bbNumber: "—", groupOpen: true,
+  id: uid(), crop, srNumber: "", bbNumber: "", groupOpen: true,
   lots: [emptyLot(date)], archived: false, persisted: false, editHistory: [],
 });
 
@@ -1908,48 +1908,46 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, onBBChange, is
           <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
             {group.groupOpen ? <ChevronDown className="w-5 h-5 shrink-0" strokeWidth={3} /> : <ChevronRight className="w-5 h-5 shrink-0" strokeWidth={3} />}
             <Wheat className="w-4 h-4 shrink-0" />
-            {group.bbNumber !== "—" ? (
-              <span className="font-bold text-sm truncate flex items-center gap-1">
-                {bbSrLocked && <Lock className="w-3 h-3 shrink-0 text-muted-foreground" />}
-                BB#<input
-                  type="number"
-                  min={1}
-                  value={group.bbNumber}
-                  onClick={e => e.stopPropagation()}
-                  disabled={bbSrLocked}
-                  title={bbSrLocked ? "BB#/SR# locked — payments exist. Reverse all payments to edit." : undefined}
-                  onChange={e => {
-                    const val = e.target.value;
-                    if (val === "" || parseInt(val) >= 1) {
-                      if (!group.persisted && onBBChange && val && parseInt(val) >= 1) {
-                        onBBChange(val);
-                      } else {
-                        onChange({ ...group, bbNumber: val });
-                      }
+            <span className="font-bold text-sm truncate flex items-center gap-1">
+              {bbSrLocked && <Lock className="w-3 h-3 shrink-0 text-muted-foreground" />}
+              BB#<input
+                type="number"
+                min={1}
+                value={group.bbNumber}
+                placeholder="BB#"
+                onClick={e => e.stopPropagation()}
+                disabled={bbSrLocked}
+                title={bbSrLocked ? "BB#/SR# locked — payments exist. Reverse all payments to edit." : undefined}
+                onChange={e => {
+                  const val = e.target.value;
+                  if (val === "" || parseInt(val) >= 1) {
+                    if (!group.persisted && onBBChange && val && parseInt(val) >= 1) {
+                      onBBChange(val);
+                    } else {
+                      onChange({ ...group, bbNumber: val });
                     }
-                  }}
-                  className={`w-12 px-1 py-0 h-5 text-sm font-bold border rounded text-center ${bbSrLocked ? "bg-muted text-muted-foreground cursor-not-allowed" : "bg-background"}`}
-                  data-testid={`input-bb-${group.crop.toLowerCase()}`}
-                /> SR#<input
-                  type="number"
-                  min={1}
-                  value={group.srNumber}
-                  onClick={e => e.stopPropagation()}
-                  disabled={bbSrLocked}
-                  title={bbSrLocked ? "BB#/SR# locked — payments exist. Reverse all payments to edit." : undefined}
-                  onChange={e => {
-                    const val = e.target.value;
-                    if (val === "" || parseInt(val) >= 1) {
-                      onChange({ ...group, srNumber: val });
-                    }
-                  }}
-                  className={`w-12 px-1 py-0 h-5 text-sm font-bold border rounded text-center ${bbSrLocked ? "bg-muted text-muted-foreground cursor-not-allowed" : "bg-background"}`}
-                  data-testid={`input-sr-${group.crop.toLowerCase()}`}
-                /> {group.crop}
-              </span>
-            ) : (
-              <span className="font-bold text-sm truncate">BB# {group.bbNumber} SR# {group.srNumber} {group.crop}</span>
-            )}
+                  }
+                }}
+                className={`w-12 px-1 py-0 h-5 text-sm font-bold border rounded text-center ${bbSrLocked ? "bg-muted text-muted-foreground cursor-not-allowed" : "bg-background"}`}
+                data-testid={`input-bb-${group.crop.toLowerCase()}`}
+              /> SR#<input
+                type="number"
+                min={1}
+                value={group.srNumber}
+                placeholder="SR#"
+                onClick={e => e.stopPropagation()}
+                disabled={bbSrLocked}
+                title={bbSrLocked ? "BB#/SR# locked — payments exist. Reverse all payments to edit." : undefined}
+                onChange={e => {
+                  const val = e.target.value;
+                  if (val === "" || parseInt(val) >= 1) {
+                    onChange({ ...group, srNumber: val });
+                  }
+                }}
+                className={`w-12 px-1 py-0 h-5 text-sm font-bold border rounded text-center ${bbSrLocked ? "bg-muted text-muted-foreground cursor-not-allowed" : "bg-background"}`}
+                data-testid={`input-sr-${group.crop.toLowerCase()}`}
+              /> {group.crop}
+            </span>
             <Badge variant="outline" className={`text-xs ${badgeCls} shrink-0`}>
               {group.lots.length} {t("stock.lots")}
             </Badge>
@@ -2246,32 +2244,36 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
       .map(g => parseInt(g.bbNumber))
       .filter(n => !isNaN(n));
     const existingBB = bbNumbers.length > 0 ? String(Math.max(...bbNumbers)) : undefined;
-    let bbNumber = existingBB || "—";
-    let srNumber = "—";
+    let bbNumber = existingBB || "";
+    let srNumber = "";
+    let apiFailed = false;
     const dateParam = card.date || new Date().toISOString().slice(0, 10);
-    if (bbNumber === "—") {
+    if (!bbNumber) {
       try {
         const resp = await apiRequest("GET", `/api/lots/next-bill-book?date=${dateParam}`);
         const data = await resp.json();
         bbNumber = String(data.billBookNumber || 1);
         srNumber = String(data.nextSerialNumber || 1);
-      } catch { /* fallback to — */ }
+      } catch { apiFailed = true; }
     } else {
       try {
         const resp = await apiRequest("GET", `/api/lots/next-bill-book?date=${dateParam}&bb=${bbNumber}`);
         const data = await resp.json();
         srNumber = String(data.nextSerialNumber || 1);
-      } catch { /* fallback */ }
+      } catch { apiFailed = true; }
     }
     const existingNewCrops = card.cropGroups.filter(g => !g.persisted).map(g => g.crop);
     if (existingNewCrops.includes(crop)) {
       const maxSr = Math.max(...card.cropGroups.filter(g => !g.persisted).map(g => parseInt(g.srNumber) || 0));
       srNumber = String(maxSr + 1);
     } else {
-      const newGroupSrNums = card.cropGroups.filter(g => !g.persisted && g.srNumber !== "—").map(g => parseInt(g.srNumber) || 0);
-      if (newGroupSrNums.length > 0) {
-        srNumber = String(Math.max(...newGroupSrNums) + 1);
+      const allSrNums = card.cropGroups.filter(g => g.srNumber && parseInt(g.srNumber) > 0).map(g => parseInt(g.srNumber) || 0);
+      if (allSrNums.length > 0) {
+        srNumber = String(Math.max(...allSrNums) + 1);
       }
+    }
+    if (apiFailed) {
+      toast({ title: "Auto-population failed", description: "Could not fetch next BB#/SR#. Please enter values manually.", variant: "destructive" });
     }
     const group = emptyCropGroup(crop, card.date);
     group.bbNumber = bbNumber;
@@ -2877,7 +2879,7 @@ function stockCardsToFarmerCards(apiCards: any[]): FarmerCard[] {
       cropGroups: (c.cropGroups || []).map((cg: any) => ({
         id: uid(),
         crop: cg.crop,
-        srNumber: cg.srNumber || "—",
+        srNumber: cg.srNumber?.toString() || "",
         bbNumber: cg.billBookNumber?.toString() || "1",
         groupOpen: false,
         lots: (cg.lots || []).map((lot: any) => ({
@@ -4022,7 +4024,7 @@ export default function StockPage() {
 
       if (newLots.length > 0) {
         const firstNewGroup = card.cropGroups[newLots[0].groupIdx];
-        const batchBB = firstNewGroup?.bbNumber && firstNewGroup.bbNumber !== "—" ? parseInt(firstNewGroup.bbNumber) : undefined;
+        const batchBB = firstNewGroup?.bbNumber && parseInt(firstNewGroup.bbNumber) >= 1 ? parseInt(firstNewGroup.bbNumber) : undefined;
         const batchRes = await apiRequest("POST", "/api/lots/batch", {
           farmerId: currentFarmerId,
           date: card.date,
@@ -4038,7 +4040,7 @@ export default function StockPage() {
           billBookNumber: batchBB,
           lots: newLots.map(nl => {
             const group = card.cropGroups[nl.groupIdx];
-            const sr = group?.srNumber && group.srNumber !== "—" ? parseInt(group.srNumber) : undefined;
+            const sr = group?.srNumber && parseInt(group.srNumber) >= 1 ? parseInt(group.srNumber) : undefined;
             return {
               crop: nl.lotData.crop,
               variety: nl.lotData.variety,
