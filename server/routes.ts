@@ -1081,6 +1081,7 @@ export async function registerRoutes(
             eq(lots.businessId, businessId),
             eq(lots.farmerId, parseInt(farmerId)),
             eq(lots.date, dateStr),
+            incomingVehicle ? eq(lots.vehicleNumber, incomingVehicle) : isNull(lots.vehicleNumber),
           ));
         existingCardLotIds = cardLots.map(l => l.id);
       }
