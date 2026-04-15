@@ -1072,8 +1072,13 @@ export async function registerRoutes(
         }
       }
 
-      const usedSerials = new Set(Object.values(cropSerialMap));
+      const usedSerials = Object.values(cropSerialMap);
+      const serialSet = new Set<number>();
       for (const sr of usedSerials) {
+        if (serialSet.has(sr)) {
+          return res.status(409).json({ message: `Duplicate SR# ${sr} within the same batch for BB# ${bb}` });
+        }
+        serialSet.add(sr);
         const isDuplicate = await storage.checkDuplicateBBSR(businessId, dateStr, bb, sr, []);
         if (isDuplicate) {
           return res.status(409).json({ message: `BB# ${bb} SR# ${sr} already exists on another crop card` });
