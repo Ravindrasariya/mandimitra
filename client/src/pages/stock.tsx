@@ -3584,6 +3584,20 @@ export default function StockPage() {
     queryKey: ["/api/receipt-templates"],
   });
 
+  const [bbSROverride, setBBSROverride] = useState<{
+    open: boolean;
+    action: "print" | "share";
+    buyerId: number;
+    receiptDate: string;
+    crop: string;
+    buyerFileName: string;
+    entries: any[];
+    autoBB: number;
+    autoSR: number;
+    editBB: string;
+    editSR: string;
+  } | null>(null);
+
   const cs = chargeSettings || DEFAULT_CS;
 
   const [dateMode, setDateMode] = useState<"stock" | "txn">("stock");
@@ -4579,8 +4593,25 @@ export default function StockPage() {
 
     const safeBuyerName = buyerFilter.trim().replace(/[^a-zA-Z0-9]/g, "_");
     const buyerFileName = `Overall_Receipt_${safeBuyerName}_${cropFilter}_${receiptDate}.pdf`;
-
     const overallTmpl = stockPageReceiptTemplates.find(tmpl => tmpl.templateType === "buyer-overall");
+
+    if (!overallTmpl && buyerId && receiptSerialNumber !== undefined && receiptBillBookNumber !== undefined) {
+      setBBSROverride({
+        open: true,
+        action,
+        buyerId,
+        receiptDate,
+        crop: cropFilter,
+        buyerFileName,
+        entries,
+        autoBB: receiptBillBookNumber,
+        autoSR: receiptSerialNumber,
+        editBB: String(receiptBillBookNumber),
+        editSR: String(receiptSerialNumber),
+      });
+      return;
+    }
+
     const copy1Html = overallTmpl
       ? applyCombinedBuyerTemplate(overallTmpl.templateHtml, entries, 0, receiptDate, user?.businessName, user?.businessAddress, user?.businessInitials, user?.businessPhone, user?.businessLicenceNo, user?.businessShopNo, receiptSerialNumber)
       : generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress, receiptSerialNumber, false, user?.businessPhone, user?.receiptHeaderImage, receiptBillBookNumber);
@@ -4596,6 +4627,32 @@ export default function StockPage() {
         : undefined;
       const printHtml = wrapWithDuplicate(copy1Html, copy2Html);
       await printReceipt(printHtml, buyerFileName);
+    }
+  };
+
+  const handleBBSROverrideConfirm = async () => {
+    if (!bbSROverride) return;
+    const { action, buyerId, receiptDate, crop, buyerFileName, entries, autoBB, autoSR, editBB, editSR } = bbSROverride;
+    const bb = parseInt(editBB) || autoBB;
+    const sr = parseInt(editSR) || autoSR;
+    setBBSROverride(null);
+    if (bb !== autoBB || sr !== autoSR) {
+      try {
+        await apiRequest("PATCH", "/api/buyer-receipt-serial", { buyerId, date: receiptDate, crop, billBookNumber: bb, serialNumber: sr });
+      } catch {
+        toast({ title: "Failed to save BB#/SR# override", variant: "destructive" });
+        return;
+      }
+    }
+    const copy1Html = generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress, sr, false, user?.businessPhone, user?.receiptHeaderImage, bb);
+    if (action === "share") {
+      await shareReceiptAsImage(copy1Html, buyerFileName);
+    } else {
+      const shouldHideAadhat = printBillMode === "hide-aadhat";
+      const copy2Html = shouldHideAadhat
+        ? generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress, sr, true, user?.businessPhone, user?.receiptHeaderImage, bb)
+        : undefined;
+      await printReceipt(wrapWithDuplicate(copy1Html, copy2Html), buyerFileName);
     }
   };
 
@@ -4899,6 +4956,48 @@ export default function StockPage() {
           );
         })}
       </div>
+      {bbSROverride && (
+        <AlertDialog open={bbSROverride.open} onOpenChange={v => { if (!v) setBBSROverride(null); }}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>व्यापारी बुक — BB# / SR#</AlertDialogTitle>
+              <AlertDialogDescription>
+                Auto-assigned BB# and SR# are shown below. You can change them before generating the receipt.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="flex items-center gap-4 py-2">
+              <div className="flex flex-col gap-1 flex-1">
+                <label className="text-sm font-medium">BB# (Bill Book)</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={bbSROverride.editBB}
+                  onChange={e => setBBSROverride(prev => prev ? { ...prev, editBB: e.target.value } : null)}
+                  className="border rounded px-2 py-1 text-sm w-full"
+                  data-testid="input-override-bb"
+                />
+              </div>
+              <div className="flex flex-col gap-1 flex-1">
+                <label className="text-sm font-medium">SR# (Serial)</label>
+                <input
+                  type="number"
+                  min={1}
+                  value={bbSROverride.editSR}
+                  onChange={e => setBBSROverride(prev => prev ? { ...prev, editSR: e.target.value } : null)}
+                  className="border rounded px-2 py-1 text-sm w-full"
+                  data-testid="input-override-sr"
+                />
+              </div>
+            </div>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={handleBBSROverrideConfirm} data-testid="button-override-confirm">
+                Generate Receipt
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }

@@ -2647,6 +2647,22 @@ export async function registerRoutes(
     } catch (e: any) { res.status(400).json({ message: e.message }); }
   });
 
+  app.patch("/api/buyer-receipt-serial", requireAuth, async (req, res) => {
+    try {
+      const { buyerId, date, crop, billBookNumber, serialNumber } = z.object({
+        buyerId: z.number(),
+        date: z.string(),
+        crop: z.string(),
+        billBookNumber: z.number().int().min(1),
+        serialNumber: z.number().int().min(1),
+      }).parse(req.body);
+      const buyer = await storage.getBuyer(buyerId, req.user!.businessId);
+      if (!buyer) return res.status(403).json({ message: "Buyer not found" });
+      await storage.updateBuyerReceiptSerial(req.user!.businessId, buyerId, date, crop, billBookNumber, serialNumber);
+      res.json({ success: true });
+    } catch (e: any) { res.status(400).json({ message: e.message }); }
+  });
+
   app.get("/api/books/profit-and-loss", requireAuth, async (req, res) => {
     try {
       const fy = (req.query.fy as string) || getCurrentFY();
