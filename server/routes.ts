@@ -924,6 +924,26 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/lots/next-bill-book", requireAuth, async (req, res) => {
+    try {
+      const businessId = req.user!.businessId;
+      const date = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
+      const bbParam = req.query.bb as string | undefined;
+      if (bbParam) {
+        const bb = parseInt(bbParam);
+        if (!Number.isFinite(bb) || bb < 1) {
+          return res.status(400).json({ message: "Invalid bill book number" });
+        }
+        const nextSr = await storage.getNextSerialNumber(businessId, date, bb);
+        return res.json({ billBookNumber: bb, nextSerialNumber: nextSr });
+      }
+      const result = await storage.getNextBillBookNumber(businessId, date);
+      res.json(result);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
   app.get("/api/lots/:id", requireAuth, async (req, res) => {
     const lot = await storage.getLot(paramId(req.params.id), req.user!.businessId);
     if (!lot) return res.status(404).json({ message: "Lot not found" });
@@ -991,26 +1011,6 @@ export async function registerRoutes(
         .where(idsToExclude.length > 0 ? and(baseConditions, notInArray(lots.id, idsToExclude)) : baseConditions)
         .limit(1);
       res.json({ conflict: existing.length > 0 });
-    } catch (e: any) {
-      res.status(400).json({ message: e.message });
-    }
-  });
-
-  app.get("/api/lots/next-bill-book", requireAuth, async (req, res) => {
-    try {
-      const businessId = req.user!.businessId;
-      const date = (req.query.date as string) || format(new Date(), "yyyy-MM-dd");
-      const bbParam = req.query.bb as string | undefined;
-      if (bbParam) {
-        const bb = parseInt(bbParam);
-        if (!Number.isFinite(bb) || bb < 1) {
-          return res.status(400).json({ message: "Invalid bill book number" });
-        }
-        const nextSr = await storage.getNextSerialNumber(businessId, date, bb);
-        return res.json({ billBookNumber: bb, nextSerialNumber: nextSr });
-      }
-      const result = await storage.getNextBillBookNumber(businessId, date);
-      res.json(result);
     } catch (e: any) {
       res.status(400).json({ message: e.message });
     }
