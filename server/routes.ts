@@ -2658,6 +2658,8 @@ export async function registerRoutes(
       }).parse(req.body);
       const buyer = await storage.getBuyer(buyerId, req.user!.businessId);
       if (!buyer) return res.status(403).json({ message: "Buyer not found" });
+      const isDuplicate = await storage.checkDuplicateBuyerReceiptSerial(req.user!.businessId, buyerId, date, crop, billBookNumber, serialNumber);
+      if (isDuplicate) return res.status(409).json({ message: `BB#${billBookNumber} / SR#${serialNumber} is already assigned to another buyer receipt in this fiscal year` });
       await storage.updateBuyerReceiptSerial(req.user!.businessId, buyerId, date, crop, billBookNumber, serialNumber);
       res.json({ success: true });
     } catch (e: any) { res.status(400).json({ message: e.message }); }

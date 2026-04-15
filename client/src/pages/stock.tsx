@@ -4639,15 +4639,20 @@ export default function StockPage() {
       toast({ title: "BB# and SR# must be valid numbers (≥ 1)", variant: "destructive" });
       return;
     }
-    setBBSROverride(null);
     if (bb !== autoBB || sr !== autoSR) {
       try {
-        await apiRequest("PATCH", "/api/buyer-receipt-serial", { buyerId, date: receiptDate, crop, billBookNumber: bb, serialNumber: sr });
+        const patchRes = await apiRequest("PATCH", "/api/buyer-receipt-serial", { buyerId, date: receiptDate, crop, billBookNumber: bb, serialNumber: sr });
+        if (!patchRes.ok) {
+          const errData = await patchRes.json().catch(() => ({}));
+          toast({ title: errData.message || "Failed to save BB#/SR# override", variant: "destructive" });
+          return;
+        }
       } catch {
         toast({ title: "Failed to save BB#/SR# override", variant: "destructive" });
         return;
       }
     }
+    setBBSROverride(null);
     const copy1Html = generateAllBuyerReceiptHtml(entries, user?.businessName, user?.businessAddress, sr, false, user?.businessPhone, user?.receiptHeaderImage, bb);
     if (action === "share") {
       await shareReceiptAsImage(copy1Html, buyerFileName);

@@ -147,6 +147,7 @@ export interface IStorage {
 
   getOrCreateBuyerReceiptSerial(businessId: number, buyerId: number, date: string, crop: string): Promise<{ serialNumber: number; billBookNumber: number }>;
   updateBuyerReceiptSerial(businessId: number, buyerId: number, date: string, crop: string, billBookNumber: number, serialNumber: number): Promise<void>;
+  checkDuplicateBuyerReceiptSerial(businessId: number, buyerId: number, date: string, crop: string, billBookNumber: number, serialNumber: number): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -2023,6 +2024,25 @@ export class DatabaseStorage implements IStorage {
     if (result.length === 0) {
       await db.insert(buyerReceiptSerials).values({ businessId, buyerId, date, crop, billBookNumber, serialNumber });
     }
+  }
+
+  async checkDuplicateBuyerReceiptSerial(businessId: number, buyerId: number, date: string, crop: string, billBookNumber: number, serialNumber: number): Promise<boolean> {
+    const d = new Date(date);
+    const month = d.getMonth();
+    const year = d.getFullYear();
+    const fyStart = month >= 3 ? `${year}-04-01` : `${year - 1}-04-01`;
+    const fyEnd = month >= 3 ? `${year + 1}-03-31` : `${year}-03-31`;
+    const [result] = await db.select({ count: sql<string>`count(*)` })
+      .from(buyerReceiptSerials)
+      .where(and(
+        eq(buyerReceiptSerials.businessId, businessId),
+        gte(buyerReceiptSerials.date, fyStart),
+        lte(buyerReceiptSerials.date, fyEnd),
+        eq(buyerReceiptSerials.billBookNumber, billBookNumber),
+        eq(buyerReceiptSerials.serialNumber, serialNumber),
+        sql`NOT (${buyerReceiptSerials.buyerId} = ${buyerId} AND ${buyerReceiptSerials.date} = ${date} AND ${buyerReceiptSerials.crop} = ${crop})`,
+      ));
+    return parseInt(result?.count || "0", 10) > 0;
   }
 
   async getOrCreateBuyerReceiptSerial(businessId: number, buyerId: number, date: string, crop: string): Promise<{ serialNumber: number; billBookNumber: number }> {
