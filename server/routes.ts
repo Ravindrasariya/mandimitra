@@ -1072,6 +1072,14 @@ export async function registerRoutes(
         }
       }
 
+      const usedSerials = new Set(Object.values(cropSerialMap));
+      for (const sr of usedSerials) {
+        const isDuplicate = await storage.checkDuplicateBBSR(businessId, dateStr, bb, sr, []);
+        if (isDuplicate) {
+          return res.status(409).json({ message: `BB# ${bb} SR# ${sr} already exists on another crop card` });
+        }
+      }
+
       for (const item of lotItems) {
         const crop = item.crop;
         const lotSeq = await storage.getNextLotSequence(businessId, crop, dateStr);
@@ -1117,7 +1125,7 @@ export async function registerRoutes(
   app.patch("/api/lots/update-bb-sr", requireAuth, async (req, res) => {
     try {
       const businessId = req.user!.businessId;
-      const { updates } = req.body as { updates: { lotIds: number[]; billBookNumber: number; serialNumber: number; date: string }[] };
+      const { updates } = req.body as { updates: { lotIds: number[]; billBookNumber: number; serialNumber: number }[] };
       if (!Array.isArray(updates) || updates.length === 0) {
         return res.status(400).json({ message: "No updates provided" });
       }
@@ -1136,8 +1144,13 @@ export async function registerRoutes(
           return res.status(409).json({ message: `Duplicate BB# ${bb} SR# ${sr} within the same request` });
         }
         seenKeys.add(key);
+        const firstLot = await storage.getLot(upd.lotIds[0], businessId);
+        if (!firstLot) {
+          return res.status(404).json({ message: `Lot ${upd.lotIds[0]} not found` });
+        }
+        const lotDate = firstLot.date;
         const allExcludeIds = updates.flatMap(u => u.lotIds);
-        const isDuplicate = await storage.checkDuplicateBBSR(businessId, upd.date, bb, sr, allExcludeIds);
+        const isDuplicate = await storage.checkDuplicateBBSR(businessId, lotDate, bb, sr, allExcludeIds);
         if (isDuplicate) {
           return res.status(409).json({ message: `BB# ${bb} SR# ${sr} already exists on another crop card` });
         }

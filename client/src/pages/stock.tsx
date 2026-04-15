@@ -3989,7 +3989,7 @@ export default function StockPage() {
       }
 
       const prevSaved = savedCardMap.get(card.id);
-      const bbSrUpdates: { lotIds: number[]; billBookNumber: number; serialNumber: number; date: string }[] = [];
+      const bbSrUpdates: { lotIds: number[]; billBookNumber: number; serialNumber: number }[] = [];
       for (const group of card.cropGroups) {
         if (!group.persisted) continue;
         const lotIds = group.lots.filter(l => l.dbId).map(l => l.dbId!);
@@ -4002,7 +4002,7 @@ export default function StockPage() {
           const bb = parseInt(group.bbNumber);
           const sr = parseInt(group.srNumber);
           if (bb >= 1 && sr >= 1) {
-            bbSrUpdates.push({ lotIds, billBookNumber: bb, serialNumber: sr, date: card.date });
+            bbSrUpdates.push({ lotIds, billBookNumber: bb, serialNumber: sr });
           }
         }
       }
