@@ -2266,7 +2266,7 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
     if (existingNewCrops.includes(crop)) {
       const maxSr = Math.max(...card.cropGroups.filter(g => !g.persisted).map(g => parseInt(g.srNumber) || 0));
       srNumber = String(maxSr + 1);
-    } else {
+    } else if (apiFailed || !srNumber) {
       const allSrNums = card.cropGroups.filter(g => g.srNumber && parseInt(g.srNumber) > 0).map(g => parseInt(g.srNumber) || 0);
       if (allSrNums.length > 0) {
         srNumber = String(Math.max(...allSrNums) + 1);
