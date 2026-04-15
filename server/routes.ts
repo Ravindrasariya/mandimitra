@@ -1169,7 +1169,11 @@ export async function registerRoutes(
           if (!lotCheck) {
             return res.status(404).json({ message: `Lot ${lid} not found` });
           }
-          if (!lotDate) lotDate = lotCheck.date;
+          if (!lotDate) {
+            lotDate = lotCheck.date;
+          } else if (lotCheck.date !== lotDate) {
+            return res.status(400).json({ message: `All lots in an update must share the same date` });
+          }
         }
         const allExcludeIds = updates.flatMap(u => u.lotIds);
         const isDuplicate = await storage.checkDuplicateBBSR(businessId, lotDate, bb, sr, allExcludeIds);
