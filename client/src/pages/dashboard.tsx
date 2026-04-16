@@ -524,7 +524,7 @@ export default function DashboardPage() {
             <div className="flex items-center gap-2" data-testid="text-hammali-extra-due">
               <div className="text-sm font-bold text-teal-700 dark:text-teal-400">₹{summary.totalHammali.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
               <span className="text-muted-foreground text-xs">|</span>
-              <div className="text-sm font-bold text-purple-700 dark:text-purple-400">₹{summary.extraChargesDue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
+              <div className="text-sm font-bold text-purple-700 dark:text-purple-400">₹{summary.totalExtraCharges.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
             </div>
           </CardContent>
         </Card>
