@@ -3449,17 +3449,18 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
         buyerReceivableTotal += lt.buyerReceivable;
         aadhatTotal += lt.aadhatBuyer;
         for (const bid of lot.bids) {
+          if (!bid.txnDbId) continue;
+          if (bid.txn?.isReversed) continue;
           totalTxns++;
           const buyerData = buyersList.find(b => b.id === bid.buyerId);
           const buyerAadhat = buyerData?.aadhatCommissionPercent != null && buyerData.aadhatCommissionPercent !== ""
             ? parseFloat(buyerData.aadhatCommissionPercent) || 0 : null;
           const bt = calcBidTotals(bid, cs, vbr, tbi, buyerAadhat);
-          const ecs = bid.savedCharges || cs;
           const bidBags = parseInt(bid.numberOfBags) || 0;
-          hammaliTotal += Math.round((parseFloat(ecs.hammaliFarmerPerBag) || 0) * bidBags)
-            + Math.round((parseFloat(ecs.hammaliBuyerPerBag) || 0) * bidBags);
-          extrasTotal += (parseFloat(bid.txn.extraChargesFarmer) || 0)
-            + (parseFloat(bid.txn.extraChargesBuyer) || 0);
+          hammaliTotal += parseFloat(bid.txn?.hammaliCharges || "0")
+            + Math.round((parseFloat(bid.txn?.hammaliBuyerPerBag || "0")) * bidBags);
+          extrasTotal += (parseFloat(bid.txn?.extraChargesFarmer || "0"))
+            + (parseFloat(bid.txn?.extraChargesBuyer || "0"));
           if (bid.farmerPaymentStatus !== "paid") {
             const farmerPaid = parseFloat(bid.farmerPaidAmount || "0");
             cardFarmerDue += Math.max(0, bt.farmerPayable - farmerPaid);

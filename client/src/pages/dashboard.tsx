@@ -22,7 +22,7 @@ import {
 type DashboardData = {
   businessName: string;
   lots: { id: number; lotId: string; crop: string; date: string; numberOfBags: number; remainingBags: number; farmerId: number; farmerName: string }[];
-  transactions: { id: number; transactionId: string; date: string; crop: string; lotId: string; farmerId: number; farmerName: string; buyerId: number; buyerName: string; totalPayableToFarmer: string; totalReceivableFromBuyer: string; paidAmount: string; farmerPaidAmount: string; mandiCharges: string; aadhatCharges: string; hammaliCharges: string; extraChargesFarmer: string; extraChargesBuyer: string; netWeight: string; numberOfBags: number; isReversed: boolean }[];
+  transactions: { id: number; transactionId: string; date: string; crop: string; lotId: string; farmerId: number; farmerName: string; buyerId: number; buyerName: string; totalPayableToFarmer: string; totalReceivableFromBuyer: string; paidAmount: string; farmerPaidAmount: string; mandiCharges: string; aadhatCharges: string; hammaliCharges: string; hammaliBuyerPerBag: string | null; extraChargesFarmer: string; extraChargesBuyer: string; netWeight: string; numberOfBags: number; isReversed: boolean }[];
   farmersWithDues: { id: number; name: string; totalPayable: string; totalDue: string; totalAdvance: string; advanceEntries: { date: string; amount: string }[] }[];
   buyersWithDues: { id: number; name: string; receivableDue: string; overallDue: string; openingBalance: string; isArchived: boolean }[];
   txAggregates: { totalHammali: number; totalExtraCharges: number; totalMandiCommission: number; paidHammali: number; paidExtraCharges: number; paidMandiCommission: number };
@@ -224,7 +224,8 @@ export default function DashboardPage() {
     const totalReceivable = txnReceivable + openingBalanceTotal;
     const totalMandi = filteredTxns.reduce((s, t) => s + parseFloat(t.mandiCharges || "0"), 0);
     const totalAadhat = filteredTxns.reduce((s, t) => s + parseFloat(t.aadhatCharges || "0"), 0);
-    const totalHammali = filteredTxns.reduce((s, t) => s + parseFloat(t.hammaliCharges || "0"), 0);
+    const totalHammali = filteredTxns.reduce((s, t) =>
+      s + parseFloat(t.hammaliCharges || "0") + Math.round(parseFloat(t.hammaliBuyerPerBag || "0") * (t.numberOfBags || 0)), 0);
     const totalExtraCharges = filteredTxns.reduce((s, t) => s + parseFloat(t.extraChargesFarmer || "0") + parseFloat(t.extraChargesBuyer || "0"), 0);
 
     const farmerDue = filteredFarmersWithDues.reduce((s, f) => s + parseFloat(f.totalDue || "0"), 0);
