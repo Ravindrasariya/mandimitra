@@ -3456,9 +3456,10 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
           const buyerAadhat = buyerData?.aadhatCommissionPercent != null && buyerData.aadhatCommissionPercent !== ""
             ? parseFloat(buyerData.aadhatCommissionPercent) || 0 : null;
           const bt = calcBidTotals(bid, cs, vbr, tbi, buyerAadhat);
+          const ecs = bid.savedCharges || cs;
           const bidBags = parseInt(bid.numberOfBags) || 0;
-          hammaliTotal += parseFloat(bid.txn?.hammaliCharges || "0")
-            + Math.round((parseFloat(bid.txn?.hammaliBuyerPerBag || "0")) * bidBags);
+          hammaliTotal += Math.round((parseFloat(ecs.hammaliFarmerPerBag) || 0) * bidBags)
+            + Math.round((parseFloat(ecs.hammaliBuyerPerBag) || 0) * bidBags);
           extrasTotal += (parseFloat(bid.txn?.extraChargesFarmer || "0"))
             + (parseFloat(bid.txn?.extraChargesBuyer || "0"));
           if (bid.farmerPaymentStatus !== "paid") {
