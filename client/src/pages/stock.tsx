@@ -4775,6 +4775,7 @@ export default function StockPage() {
       "Buyer Name", "Haste",
       "Vehicle #", "Driver Name", "Driver Contact", "Advance/Credit",
       "# Bags", "Price/kg (₹)", "Net Weight (kg)",
+      "Hammali/bag Farmer (₹)", "Hammali/bag Buyer (₹)",
       "Extra Charges (Farmer)", "Extra Charges (Buyer)",
       "Extra/kg (Farmer)", "Extra/kg (Buyer)",
       "Proportionate Freight (₹)",
@@ -4800,12 +4801,14 @@ export default function StockPage() {
             const fStat = bid.farmerPaymentStatus === "paid" ? "Paid" : bid.farmerPaymentStatus === "partial" ? "Partial" : "Due";
             const bStat = bid.paymentStatus === "paid" ? "Paid" : bid.paymentStatus === "partial" ? "Partial" : "Due";
             const archiveStatus = (card.archived || g.archived || lot.isArchived) ? "Archived" : "Active";
+            const ecs = bid.savedCharges || cs;
             rows.push([
               bid.txnDbId, bid.txnDate, lot.lotId || lot.dbId?.toString() || "", g.bbNumber, g.srNumber, g.crop, lot.variety || "",
               card.farmerName, card.farmerPhone, card.village,
               bid.buyerName, bid.haste,
               card.vehicleNumber, card.driverName, card.driverContact, card.freightType || "",
               bid.numberOfBags, bid.pricePerKg, bid.txn.netWeightInput || "0",
+              ecs.hammaliFarmerPerBag || "0", ecs.hammaliBuyerPerBag || "0",
               bid.txn.extraChargesFarmer || "0", bid.txn.extraChargesBuyer || "0",
               bid.txn.extraPerKgFarmer || "0", bid.txn.extraPerKgBuyer || "0",
               freight,

@@ -230,10 +230,9 @@ export default function DashboardPage() {
     const farmerDue = filteredFarmersWithDues.reduce((s, f) => s + parseFloat(f.totalDue || "0"), 0);
     const buyerDue = filteredBuyersWithDues.reduce((s, b) => s + parseFloat(b.overallDue || "0"), 0);
 
-    const hammaliDue = (data?.txAggregates?.totalHammali || 0) - (data?.txAggregates?.paidHammali || 0);
     const extraChargesDue = (data?.txAggregates?.totalExtraCharges || 0) - (data?.txAggregates?.paidExtraCharges || 0);
 
-    return { farmersCount, lotsCount, txnCount, totalPayable, totalReceivable, totalMandi, totalAadhat, totalHammali, totalExtraCharges, farmerDue, buyerDue, hammaliDue, extraChargesDue };
+    return { farmersCount, lotsCount, txnCount, totalPayable, totalReceivable, totalMandi, totalAadhat, totalHammali, totalExtraCharges, farmerDue, buyerDue, extraChargesDue };
   }, [filteredTxns, filteredLots, uniqueFarmerIds, filteredFarmersWithDues, filteredBuyersWithDues, data]);
 
   const cropDistribution = useMemo(() => {
@@ -522,7 +521,7 @@ export default function DashboardPage() {
               <span className="text-[11px] font-medium text-muted-foreground">{t("dash.hammaliExtra")}</span>
             </div>
             <div className="flex items-center gap-2" data-testid="text-hammali-extra-due">
-              <div className="text-sm font-bold text-teal-700 dark:text-teal-400">₹{summary.hammaliDue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
+              <div className="text-sm font-bold text-teal-700 dark:text-teal-400">₹{summary.totalHammali.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
               <span className="text-muted-foreground text-xs">|</span>
               <div className="text-sm font-bold text-purple-700 dark:text-purple-400">₹{summary.extraChargesDue.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
             </div>
