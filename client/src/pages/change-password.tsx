@@ -11,7 +11,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { Link, useLocation } from "wouter";
 
 export default function ChangePasswordPage({ standalone = false }: { standalone?: boolean }) {
-  const { user, changePassword } = useAuth();
+  const { user, changePassword, logout } = useAuth();
   const { toast } = useToast();
   const { t, language, setLanguage } = useLanguage();
   const [, setLocation] = useLocation();
@@ -210,10 +210,22 @@ export default function ChangePasswordPage({ standalone = false }: { standalone?
             )}
           </form>
           <div className="mt-3 text-center">
-            <Link href="/" data-testid="link-back-login" className="text-green-500 text-sm font-medium inline-flex items-center gap-1">
-              <ArrowLeft className="w-3 h-3" />
-              {isMustChange ? "Back" : t("changePassword.backToLogin")}
-            </Link>
+            {isMustChange ? (
+              <button
+                type="button"
+                data-testid="link-back-login"
+                className="text-green-500 text-sm font-medium inline-flex items-center gap-1"
+                onClick={() => logout()}
+              >
+                <ArrowLeft className="w-3 h-3" />
+                Back
+              </button>
+            ) : (
+              <Link href="/" data-testid="link-back-login" className="text-green-500 text-sm font-medium inline-flex items-center gap-1">
+                <ArrowLeft className="w-3 h-3" />
+                {t("changePassword.backToLogin")}
+              </Link>
+            )}
           </div>
         </CardContent>
       </Card>
