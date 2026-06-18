@@ -212,7 +212,7 @@ export default function ChangePasswordPage({ standalone = false }: { standalone?
           <div className="mt-3 text-center">
             <Link href="/" data-testid="link-back-login" className="text-green-500 text-sm font-medium inline-flex items-center gap-1">
               <ArrowLeft className="w-3 h-3" />
-              {isMustChange ? t("changePassword.back") || "Back" : t("changePassword.backToLogin")}
+              {isMustChange ? "Back" : t("changePassword.backToLogin")}
             </Link>
           </div>
         </CardContent>
