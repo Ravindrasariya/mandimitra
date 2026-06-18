@@ -1,0 +1,81 @@
+root@srv1277141:/var/www/mandi-mitra# pm2 logs mandi-mitra --lines 50
+[TAILING] Tailing last 50 lines for [mandi-mitra] process (change the value with --lines option)
+/root/.pm2/logs/mandi-mitra-error.log last 50 lines:
+3|mandi-mi | if(i<2)return n;var r=e&&e.decode||h7,a=0,s=0,o=0;do{if(s=t.indexOf("=",a),s===-1)break;if(o=t.indexOf(";",a),o===-1)o=i;else if(s>o){a=t.lastIndexOf(";",s-1)+1;continue}var c=FT(t,a,s),u=BT(t,s,c),l=t.slice(c,u);if(!c7.call(n,l)){var p=FT(t,s+1,o),d=BT(t,o,p);t.charCodeAt(p)===34&&t.charCodeAt(d-1)===34&&(p++,d--);var f=t.slice(p,d);n[l]=v7(f,r)}a=o+1}while(a<i);return n}function FT(t,e,n){do{var i=t.charCodeAt(e);if(i!==32&&i!==9)return e}while(++e<n);return n}function BT(t,e,n){for(;e>n;){var i=t.charCodeAt(--e);if(i!==32&&i!==9)return e+1}return n}function m7(t,e,n){var i=n&&n.encode||encodeURIComponent;if(typeof i!="function")throw new TypeError("option encode is invalid");if(!u7.test(t))throw new TypeError("argument name is invalid");var r=i(e);if(!l7.test(r))throw new TypeError("argument val is invalid");var a=t+"="+r;if(!n)return a;if(n.maxAge!=null){var s=Math.floor(n.maxAge);if(!isFinite(s))throw new TypeError("option maxAge is invalid");a+="; Max-Age="+s}if(n.domain){if(!p7.test(n.domain))throw new TypeError("option domain is invalid");a+="; Domain="+n.domain}if(n.path){if(!d7.test(n.path))throw new TypeError("option path is invalid");a+="; Path="+n.path}if(n.expires){var o=n.expires;if(!g7(o)||isNaN(o.valueOf()))throw new TypeError("option expires is invalid");a+="; Expires="+o.toUTCString()}if(n.httpOnly&&(a+="; HttpOnly"),n.secure&&(a+="; Secure"),n.partitioned&&(a+="; Partitioned"),n.priority){var c=typeof n.priority=="string"?n.priority.toLowerCase():n.priority;switch(c){case"low":a+="; Priority=Low";break;case"medium":a+="; Priority=Medium";break;case"high":a+="; Priority=High";break;default:throw new TypeError("option priority is invalid")}}if(n.sameSite){var u=typeof n.sameSite=="string"?n.sameSite.toLowerCase():n.sameSite;switch(u){case!0:a+="; SameSite=Strict";break;case"lax":a+="; SameSite=Lax";break;case"strict":a+="; SameSite=Strict";break;case"none":a+="; SameSite=None";break;default:throw new TypeError("option sameSite is invalid")}}return a}function h7(t){return t.indexOf("%")!==-1?decodeURIComponent(t):t}function g7(t){return o7.call(t)==="[object Date]"}function v7(t,e){try{return e(t)}catch{return t}}});var qT=y((Zse,RT)=>{var _o=1e3,So=_o*60,Co=So*60,Eo=Co*24,y7=Eo*365.25;RT.exports=function(t,e){e=e||{};var n=typeof t;if(n==="string"&&t.length>0)return x7(t);if(n==="number"&&isNaN(t)===!1)return e.long?w7(t):b7(t);throw new Error("val is not a non-empty string or a valid number. val="+JSON.stringify(t))};function x7(t){if(t=String(t),!(t.length>100)){var e=/^((?:\d+)?\.?\d+) *(milliseconds?|msecs?|ms|seconds?|secs?|s|minutes?|mins?|m|hours?|hrs?|h|days?|d|years?|yrs?|y)?$/i.exec(t);if(e){var n=parseFloat(e[1]),i=(e[2]||"ms").toLowerCase();switch(i){case"years":case"year":case"yrs":case"yr":case"y":return n*y7;case"days":case"day":case"d":return n*Eo;case"hours":case"hour":case"hrs":case"hr":case"h":return n*Co;case"minutes":case"minute":case"mins":case"min":case"m":return n*So;case"seconds":case"second":case"secs":case"sec":case"s":return n*_o;case"milliseconds":case"millisecond":case"msecs":case"msec":case"ms":return n;default:return}}}}function b7(t){return t>=Eo?Math.round(t/Eo)+"d":t>=Co?Math.round(t/Co)+"h":t>=So?Math.round(t/So)+"m":t>=_o?Math.round(t/_o)+"s":t+"ms"}function w7(t){return Tl(t,Eo,"day")||Tl(t,Co,"hour")||Tl(t,So,"minute")||Tl(t,_o,"second")||t+" ms"}function Tl(t,e,n){if(!(t<e))return t<e*1.5?Math.floor(t/e)+" "+n:Math.ceil(t/e)+" "+n+"s"}});var uy=y((Ce,DT)=>{Ce=DT.exports=cy.debug=cy.default=cy;Ce.coerce=T7;Ce.disable=C7;Ce.enable=S7;Ce.enabled=E7;Ce.humanize=qT();Ce.names=[];Ce.skips=[];Ce.formatters={};var oy;function _7(t){var e=0,n;for(n in t)e=(e<<5)-e+t.charCodeAt(n),e|=0;return Ce.colors[Math.abs(e)%Ce.colors.length]}function cy(t){function e(){if(e.enabled){var n=e,i=+new Date,r=i-(oy||i);n.diff=r,n.prev=oy,n.curr=i,oy=i;for(var a=new Array(arguments.length),s=0;s<a.length;s++)a[s]=arguments[s];a[0]=Ce.coerce(a[0]),typeof a[0]!="string"&&a.unshift("%O");var o=0;a[0]=a[0].replace(/%([a-zA-Z%])/g,function(u,l){if(u==="%%")return u;o++;var p=Ce.formatters[l];if(typeof p=="function"){var d=a[o];u=p.call(n,d),a.splice(o,1),o--}return u}),Ce.formatArgs.call(n,a);var c=e.log||Ce.log||console.log.bind(console);c.apply(n,a)}}return e.namespace=t,e.enabled=Ce.enabled(t),e.useColors=Ce.useColors(),e.color=_7(t),typeof Ce.init=="function"&&Ce.init(e),e}function S7(t){Ce.save(t),Ce.names=[],Ce.skips=[];for(var e=(typeof t=="string"?t:"").split(/[\s,]+/),n=e.length,i=0;i<n;i++)e[i]&&(t=e[i].replace(/\*/g,".*?"),t[0]==="-"?Ce.skips.push(new RegExp("^"+t.substr(1)+"$")):Ce.names.push(new RegExp("^"+t+"$")))}function C7(){Ce.enable("")}function E7(t){var e,n;for(e=0,n=Ce.skips.length;e<n;e++)if(Ce.skips[e].test(t))return!1;for(e=0,n=Ce.names.length;e<n;e++)if(Ce.names[e].test(t))return!0;return!1}function T7(t){return t instanceof Error?t.stack||t.message:t}});var $T=y((Pt,LT)=>{Pt=LT.exports=uy();Pt.log=A7;Pt.formatArgs=I7;Pt.save=P7;Pt.load=MT;Pt.useColors=k7;Pt.storage=typeof chrome<"u"&&typeof chrome.storage<"u"?chrome.storage.local:O7();Pt.colors=["lightseagreen","forestgreen","goldenrod","dodgerblue","darkorchid","crimson"];function k7(){return typeof window<"u"&&window.process&&window.process.type==="renderer"?!0:typeof document<"u"&&document.documentElement&&document.documentElement.style&&document.documentElement.style.WebkitAppearance||typeof window<"u"&&window.console&&(window.console.firebug||window.console.exception&&window.console.table)||typeof navigator<"u"&&navigator.userAgent&&navigator.userAgent.toLowerCase().match(/firefox\/(\d+)/)&&parseInt(RegExp.$1,10)>=31||typeof navigator<"u"&&navigator.userAgent&&navigator.userAgent.toLowerCase().match(/applewebkit\/(\d+)/)}Pt.formatters.j=function(t){try{return JSON.stringify(t)}catch(e){return"[UnexpectedJSONParseError]: "+e.message}};function I7(t){var e=this.useColors;if(t[0]=(e?"%c":"")+this.namespace+(e?" %c":" ")+t[0]+(e?"%c ":" ")+"+"+Pt.humanize(this.diff),!!e){var n="color: "+this.color;t.splice(1,0,n,"color: inherit");var i=0,r=0;t[0].replace(/%[a-zA-Z%]/g,function(a){a!=="%%"&&(i++,a==="%c"&&(r=i))}),t.splice(r,0,n)}}function A7(){return typeof console=="object"&&console.log&&Function.prototype.apply.call(console.log,console,arguments)}function P7(t){try{t==null?Pt.storage.removeItem("debug"):Pt.storage.debug=t}catch{}}function MT(){var t;try{t=Pt.storage.debug}catch{}return!t&&typeof process<"u"&&"env"in process&&(t=process.env.DEBUG),t}Pt.enable(MT());function O7(){try{return window.localStorage}catch{}}});var VT=y((ht,HT)=>{var zT=require("tty"),To=require("util");ht=HT.exports=uy();ht.init=D7;ht.log=B7;ht.formatArgs=F7;ht.save=R7;ht.load=UT;ht.useColors=N7;ht.colors=[6,2,3,4,5,1];ht.inspectOpts=Object.keys(process.env).filter(function(t){return/^debug_/i.test(t)}).reduce(function(t,e){var n=e.substring(6).toLowerCase().replace(/_([a-z])/g,function(r,a){return a.toUpperCase()}),i=process.env[e];return/^(yes|on|true|enabled)$/i.test(i)?i=!0:/^(no|off|false|disabled)$/i.test(i)?i=!1:i==="null"?i=null:i=Number(i),t[n]=i,t},{});var za=parseInt(process.env.DEBUG_FD,10)||2;za!==1&&za!==2&&To.deprecate(function(){},"except for stderr(2) and stdout(1), any other usage of DEBUG_FD is deprecated. Override debug.log if you want to use a different log function (https://git.io/debug_fd)")();var j7=za===1?process.stdout:za===2?process.stderr:q7(za);function N7(){return"colors"in ht.inspectOpts?!!ht.inspectOpts.colors:zT.isatty(za)}ht.formatters.o=function(t){return this.inspectOpts.colors=this.useColors,To.inspect(t,this.inspectOpts).split(`
+3|mandi-mi |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             
+3|mandi-mi | 
+3|mandi-mi | Error: DATABASE_URL must be set. Did you forget to provision a database?
+3|mandi-mi |     at /var/www/mandi-mitra/dist/index.cjs:74:31605
+3|mandi-mi |     at /var/www/mandi-mitra/dist/index.cjs:1:225
+3|mandi-mi |     at Object.<anonymous> (/var/www/mandi-mitra/dist/index.cjs:82:73499)
+3|mandi-mi |     at Module._compile (node:internal/modules/cjs/loader:1521:14)
+3|mandi-mi |     at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+3|mandi-mi |     at Module.load (node:internal/modules/cjs/loader:1266:32)
+3|mandi-mi |     at Module._load (node:internal/modules/cjs/loader:1091:12)
+3|mandi-mi |     at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:164:12)
+3|mandi-mi |     at node:internal/main/run_main_module:28:49
+3|mandi-mi | 
+3|mandi-mi | Node.js v20.20.0
+3|mandi-mi | Error: DATABASE_URL must be set. Did you forget to provision a database?
+3|mandi-mi |     at /var/www/mandi-mitra/dist/index.cjs:74:31605
+3|mandi-mi |     at /var/www/mandi-mitra/dist/index.cjs:1:225
+3|mandi-mi |     at Object.<anonymous> (/var/www/mandi-mitra/dist/index.cjs:82:73499)
+3|mandi-mi |     at Module._compile (node:internal/modules/cjs/loader:1521:14)
+3|mandi-mi |     at Module._extensions..js (node:internal/modules/cjs/loader:1623:10)
+3|mandi-mi |     at Module.load (node:internal/modules/cjs/loader:1266:32)
+3|mandi-mi |     at Module._load (node:internal/modules/cjs/loader:1091:12)
+3|mandi-mi |     at cjsLoader (node:internal/modules/esm/translators:298:15)
+3|mandi-mi |     at ModuleWrap.<anonymous> (node:internal/modules/esm/translators:240:7)
+3|mandi-mi |     at ModuleJob.run (node:internal/modules/esm/module_job:325:25)
+
+/root/.pm2/logs/mandi-mitra-out.log last 50 lines:
+3|mandi-mi |   db:push
+3|mandi-mi |     drizzle-kit push
+3|mandi-mi | Lifecycle scripts included in rest-express@1.0.0:
+3|mandi-mi |   start
+3|mandi-mi |     NODE_ENV=production node dist/index.cjs
+3|mandi-mi | available via `npm run-script`:
+3|mandi-mi |   dev
+3|mandi-mi |     NODE_ENV=development tsx server/index.ts
+3|mandi-mi |   build
+3|mandi-mi |     tsx script/build.ts
+3|mandi-mi |   check
+3|mandi-mi |     tsc
+3|mandi-mi |   db:push
+3|mandi-mi |     drizzle-kit push
+3|mandi-mi | Lifecycle scripts included in rest-express@1.0.0:
+3|mandi-mi |   start
+3|mandi-mi |     NODE_ENV=production node dist/index.cjs
+3|mandi-mi | available via `npm run-script`:
+3|mandi-mi |   dev
+3|mandi-mi |     NODE_ENV=development tsx server/index.ts
+3|mandi-mi |   build
+3|mandi-mi |     tsx script/build.ts
+3|mandi-mi |   check
+3|mandi-mi |     tsc
+3|mandi-mi |   db:push
+3|mandi-mi |     drizzle-kit push
+3|mandi-mi | Lifecycle scripts included in rest-express@1.0.0:
+3|mandi-mi |   start
+3|mandi-mi |     NODE_ENV=production node dist/index.cjs
+3|mandi-mi | available via `npm run-script`:
+3|mandi-mi |   dev
+3|mandi-mi |     NODE_ENV=development tsx server/index.ts
+3|mandi-mi |   build
+3|mandi-mi |     tsx script/build.ts
+3|mandi-mi |   check
+3|mandi-mi |     tsc
+3|mandi-mi |   db:push
+3|mandi-mi |     drizzle-kit push
+3|mandi-mi | Lifecycle scripts included in rest-express@1.0.0:
+3|mandi-mi |   start
+3|mandi-mi |     NODE_ENV=production node dist/index.cjs
+3|mandi-mi | available via `npm run-script`:
+3|mandi-mi |   dev
+3|mandi-mi |     NODE_ENV=development tsx server/index.ts
+3|mandi-mi |   build
+3|mandi-mi |     tsx script/build.ts
+3|mandi-mi |   check
+3|mandi-mi |     tsc
+3|mandi-mi |   db:push
+3|mandi-mi |     drizzle-kit push
