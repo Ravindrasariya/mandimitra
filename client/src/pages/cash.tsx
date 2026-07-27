@@ -1904,11 +1904,6 @@ export default function CashPage() {
                       </div>
                     </>
                   )}
-                  {outwardOutflowType === "Hammali" && dueHammali > 0 && (
-                    <div className="p-2 bg-amber-50 dark:bg-amber-950 rounded text-xs text-amber-700 dark:text-amber-300">
-                      Total Hammali from Transactions: ₹{(txAggregates?.totalHammali || 0).toLocaleString("en-IN")} | Paid: ₹{(txAggregates?.paidHammali || 0).toLocaleString("en-IN")} | <span className="font-bold">Due: ₹{dueHammali.toLocaleString("en-IN")}</span>
-                    </div>
-                  )}
                   {outwardOutflowType === "Extra Charges" && dueExtraCharges > 0 && (
                     <div className="p-2 bg-purple-50 dark:bg-purple-950 rounded text-xs text-purple-700 dark:text-purple-300">
                       Total Extra Charges from Transactions: ₹{(txAggregates?.totalExtraCharges || 0).toLocaleString("en-IN")} | Paid: ₹{(txAggregates?.paidExtraCharges || 0).toLocaleString("en-IN")} | <span className="font-bold">Due: ₹{dueExtraCharges.toLocaleString("en-IN")}</span>
@@ -1948,19 +1943,17 @@ export default function CashPage() {
                         </div>
                         {hammaliAllocationDropdownOpen && (() => {
                           const selectedDates = new Set(hammaliAllocations.map(a => a.date));
-                          const available = hammaliBreakdown.filter(r => !selectedDates.has(r.date));
+                          const available = hammaliBreakdown.filter(r => r.dueHammali > 0 && !selectedDates.has(r.date));
                           const filtered = available.filter(r => !hammaliAllocationSearch || r.date.includes(hammaliAllocationSearch));
                           if (filtered.length === 0) return null;
                           return (
                             <div className="absolute z-50 w-full mt-1 max-h-48 overflow-y-auto bg-popover border rounded-md shadow-lg">
                               {filtered.map(r => {
-                                const disabled = r.dueHammali <= 0;
                                 return (
                                   <div
                                     key={r.date}
-                                    className={`px-3 py-2 text-xs border-b last:border-b-0 ${disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-accent cursor-pointer"}`}
+                                    className="px-3 py-2 text-xs border-b last:border-b-0 hover:bg-accent cursor-pointer"
                                     onClick={() => {
-                                      if (disabled) return;
                                       setHammaliAllocations(prev => {
                                         const total = parseFloat(outwardAmount || "0");
                                         const alreadyAllocated = prev.reduce((s, a) => s + parseFloat(a.amount || "0"), 0);
@@ -1982,7 +1975,7 @@ export default function CashPage() {
                                   >
                                     <div className="flex justify-between">
                                       <span className="font-medium">{r.date}</span>
-                                      <span className={`font-semibold ${disabled ? "text-muted-foreground" : "text-orange-600"}`}>Due ₹{r.dueHammali.toLocaleString("en-IN")}</span>
+                                      <span className="font-semibold text-orange-600">Due ₹{r.dueHammali.toLocaleString("en-IN")}</span>
                                     </div>
                                     <div className="text-muted-foreground mt-0.5">
                                       Total ₹{r.totalHammali.toLocaleString("en-IN")} | Paid ₹{r.paidHammali.toLocaleString("en-IN")}
