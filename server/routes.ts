@@ -1818,6 +1818,31 @@ export async function registerRoutes(
         broadcastBusinessEvent(req.user!.businessId);
         res.status(201).json(entries);
       } else {
+        if (data.outflowType === "Hammali" && data.category === "outward" && data.splitLog) {
+          // Server-side validation: per-date settled amount must not exceed current due
+          const breakdown = await storage.getHammaliBreakdown(req.user!.businessId);
+          const dueByDate = new Map(breakdown.map(r => [r.date, r.dueHammali]));
+          const amtSection = String(data.splitLog).split("| Petty:")[0];
+          const matches = Array.from(amtSection.matchAll(/(\d{4}-\d{2}-\d{2})-([\d.]+)/g));
+          if (matches.length === 0) {
+            return res.status(400).json({ message: "Invalid hammali allocation: no valid date-amount pairs found" });
+          }
+          // Aggregate per date first so multiple tokens for the same date can't bypass the due check
+          const settledByDate = new Map<string, number>();
+          for (const m of matches) {
+            const amt = parseFloat(m[2]) || 0;
+            settledByDate.set(m[1], (settledByDate.get(m[1]) || 0) + amt);
+          }
+          for (const [d, settled] of Array.from(settledByDate.entries())) {
+            const due = dueByDate.get(d);
+            if (due === undefined) {
+              return res.status(400).json({ message: `No hammali due found for date ${d}` });
+            }
+            if (settled > due + 0.01) {
+              return res.status(400).json({ message: `Allocation for ${d} (₹${settled.toFixed(2)}) exceeds current due (₹${due.toFixed(2)}). Please refresh and try again.` });
+            }
+          }
+        }
         const entry = await storage.createCashEntry(data);
         broadcastBusinessEvent(req.user!.businessId);
         res.status(201).json(entry);
@@ -1842,6 +1867,15 @@ export async function registerRoutes(
   app.get("/api/transaction-aggregates", requireAuth, async (req, res) => {
     try {
       const result = await storage.getTransactionAggregates(req.user!.businessId);
+      res.json(result);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  app.get("/api/hammali-breakdown", requireAuth, async (req, res) => {
+    try {
+      const result = await storage.getHammaliBreakdown(req.user!.businessId);
       res.json(result);
     } catch (e: any) {
       res.status(400).json({ message: e.message });

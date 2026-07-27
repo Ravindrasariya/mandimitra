@@ -111,6 +111,20 @@ export default function CashPage() {
     return () => document.removeEventListener("mousedown", handler);
   }, []);
 
+  const [hammaliAllocations, setHammaliAllocations, clearHammaliAllocations] = usePersistedState<{ date: string; total: number; paid: number; due: number; amount: string; pettyAdj: string }[]>("cash-hammaliAllocations", []);
+  const [hammaliAllocationSearch, setHammaliAllocationSearch] = useState("");
+  const [hammaliAllocationDropdownOpen, setHammaliAllocationDropdownOpen] = useState(false);
+  const hammaliAllocationDropdownRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (hammaliAllocationDropdownRef.current && !hammaliAllocationDropdownRef.current.contains(e.target as Node)) {
+        setHammaliAllocationDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
   const [transferFromType, setTransferFromType, clearTransferFromType] = usePersistedState("cash-transferFromType", "cash");
   const [transferFromAccountId, setTransferFromAccountId, clearTransferFromAccountId] = usePersistedState("cash-transferFromAccountId", "");
   const [transferToType, setTransferToType, clearTransferToType] = usePersistedState("cash-transferToType", "account");
@@ -173,6 +187,36 @@ export default function CashPage() {
     queryFn: () => outwardFarmerId ? fetch(`/api/farmers/${outwardFarmerId}/pending-transactions`, { credentials: "include" }).then(r => r.json()) : Promise.resolve([]),
     enabled: (outwardOutflowType === "Farmer-Harvest Sale" || outwardOutflowType === "Farmer-Advance") && !!outwardFarmerId,
   });
+
+  type HammaliBreakdownRow = { date: string; totalHammali: number; paidHammali: number; dueHammali: number };
+  const { data: hammaliBreakdown = [] } = useQuery<HammaliBreakdownRow[]>({
+    queryKey: ["/api/hammali-breakdown"],
+    enabled: outwardOutflowType === "Hammali",
+  });
+
+  // Reconcile persisted hammali allocations against fresh breakdown data:
+  // drop dates that no longer exist or are fully paid, and refresh due/total/paid values.
+  useEffect(() => {
+    if (outwardOutflowType !== "Hammali" || hammaliBreakdown.length === 0 || hammaliAllocations.length === 0) return;
+    const byDate = new Map(hammaliBreakdown.map(r => [r.date, r]));
+    let changed = false;
+    const next = hammaliAllocations
+      .filter(a => {
+        const row = byDate.get(a.date);
+        if (!row || row.dueHammali <= 0) { changed = true; return false; }
+        return true;
+      })
+      .map(a => {
+        const row = byDate.get(a.date)!;
+        if (a.due !== row.dueHammali || a.total !== row.totalHammali || a.paid !== row.paidHammali) {
+          changed = true;
+          const amt = Math.min(parseFloat(a.amount || "0"), row.dueHammali);
+          return { ...a, total: row.totalHammali, paid: row.paidHammali, due: row.dueHammali, amount: amt > 0 ? amt.toFixed(2) : "" };
+        }
+        return a;
+      });
+    if (changed) setHammaliAllocations(next);
+  }, [hammaliBreakdown, outwardOutflowType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const hasBankAccounts = bankAccountsList.length > 0;
 
@@ -314,6 +358,7 @@ export default function CashPage() {
     }});
     queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/transactions"] });
     queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/transaction-aggregates"] });
+    queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/hammali-breakdown"] });
     queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/bank-accounts"] });
     queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/dashboard"] });
     queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/stock-cards"] });
@@ -500,6 +545,8 @@ export default function CashPage() {
     clearOutwardPaymentMode();
     setOutwardDate(format(new Date(), "yyyy-MM-dd"));
     setFarmerAllocationSearch("");
+    clearHammaliAllocations();
+    setHammaliAllocationSearch("");
   };
 
   const clearTransferForm = () => {
@@ -658,6 +705,44 @@ export default function CashPage() {
     } else if ((outwardOutflowType === "Farmer-Harvest Sale" || outwardOutflowType === "Farmer-Advance") && outwardFarmerId) {
       toast({ title: t("common.error"), description: "Select at least one transaction to allocate payment", variant: "destructive" });
       return;
+    } else if (outwardOutflowType === "Hammali" && hammaliAllocations.length > 0) {
+      if (!outwardAmount || parseFloat(outwardAmount) <= 0) {
+        toast({ title: t("common.error"), description: "Enter the total amount paid", variant: "destructive" });
+        return;
+      }
+      const hasInvalidAmount = hammaliAllocations.some(a => a.amount === "" || parseFloat(a.amount || "0") < 0);
+      if (hasInvalidAmount) {
+        toast({ title: t("common.error"), description: "Enter valid amounts for all selected dates", variant: "destructive" });
+        return;
+      }
+      const overAllocated = hammaliAllocations.some(a => parseFloat(a.amount || "0") + parseFloat(a.pettyAdj || "0") > a.due + 0.01);
+      if (overAllocated) {
+        toast({ title: t("common.error"), description: "Amount + petty adj cannot exceed due for any date", variant: "destructive" });
+        return;
+      }
+      const totalAllocated = hammaliAllocations.reduce((sum, a) => sum + parseFloat(a.amount || "0"), 0);
+      const totalPaid = parseFloat(outwardAmount);
+      if (Math.abs(totalAllocated - totalPaid) > 0.01) {
+        toast({ title: t("common.error"), description: `Allocated amount (₹${totalAllocated.toLocaleString("en-IN")}) must equal paid amount (₹${totalPaid.toLocaleString("en-IN")})`, variant: "destructive" });
+        return;
+      }
+      const totalPetty = hammaliAllocations.reduce((sum, a) => sum + parseFloat(a.pettyAdj || "0"), 0);
+      const amtParts = hammaliAllocations.map(a => `${a.date}-${(parseFloat(a.amount || "0") + parseFloat(a.pettyAdj || "0")).toFixed(2)}`);
+      const pettyParts = hammaliAllocations.filter(a => parseFloat(a.pettyAdj || "0") > 0).map(a => `${a.date}-${parseFloat(a.pettyAdj || "0").toFixed(2)}`);
+      let splitLog = `Hammali Amt: ${amtParts.join(", ")}`;
+      if (pettyParts.length > 0) splitLog += ` | Petty: ${pettyParts.join(", ")}`;
+      createMutation.mutate({
+        category: "outward",
+        type: "cash_out",
+        outflowType: "Hammali",
+        amount: outwardAmount,
+        pettyAdj: totalPetty > 0 ? totalPetty.toFixed(2) : "0",
+        date: outwardDate,
+        paymentMode: outwardPaymentMode,
+        bankAccountId: outwardPaymentMode !== "Cash" ? parseInt(outwardBankAccountId) : null,
+        notes: outwardNotes || null,
+        splitLog,
+      }, { onSuccess: clearOutwardForm });
     } else {
       if (!outwardAmount || parseFloat(outwardAmount) <= 0) {
         toast({ title: t("common.error"), description: "Enter valid amount", variant: "destructive" });
@@ -1608,7 +1693,7 @@ export default function CashPage() {
                 <>
                   <div className="space-y-1">
                     <Label className="text-xs">{t("cash.outflowType")}</Label>
-                    <Select value={outwardOutflowType} onValueChange={(v) => { setOutwardOutflowType(v); setFarmerAllocations([]); setFarmerAllocationSearch(""); }}>
+                    <Select value={outwardOutflowType} onValueChange={(v) => { setOutwardOutflowType(v); setFarmerAllocations([]); setFarmerAllocationSearch(""); setHammaliAllocations([]); setHammaliAllocationSearch(""); }}>
                       <SelectTrigger className="h-9 text-sm" data-testid="outward-outflow-type"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {OUTFLOW_TYPES.map(type => {
@@ -1837,7 +1922,138 @@ export default function CashPage() {
                   {outwardOutflowType !== "Farmer-Harvest Sale" && outwardOutflowType !== "Farmer-Advance" && (
                     <div className="space-y-1">
                       <Label className="text-xs">{t("cash.amount")}</Label>
-                      <Input type="number" inputMode="decimal" value={outwardAmount} onChange={e => setOutwardAmount(e.target.value)} onFocus={e => e.target.select()} placeholder="0" className="h-9 text-sm" data-testid="outward-amount" />
+                      <Input type="number" inputMode="decimal" value={outwardAmount} onChange={e => {
+                        const newVal = e.target.value;
+                        setOutwardAmount(newVal);
+                        if (outwardOutflowType === "Hammali" && hammaliAllocations.length === 1) {
+                          setHammaliAllocations(prev => prev.map(a => ({ ...a, amount: newVal })));
+                        }
+                      }} onFocus={e => e.target.select()} placeholder="0" className="h-9 text-sm" data-testid="outward-amount" />
+                    </div>
+                  )}
+                  {outwardOutflowType === "Hammali" && hammaliBreakdown.length > 0 && (
+                    <div className="space-y-2">
+                      <Label className="text-xs">Allocate to Dates</Label>
+                      <div className="relative" ref={hammaliAllocationDropdownRef}>
+                        <div className="flex items-center border rounded-md bg-background">
+                          <Search className="w-3.5 h-3.5 ml-2 text-muted-foreground" />
+                          <Input
+                            value={hammaliAllocationSearch}
+                            onChange={e => { setHammaliAllocationSearch(e.target.value); setHammaliAllocationDropdownOpen(true); }}
+                            onFocus={() => setHammaliAllocationDropdownOpen(true)}
+                            placeholder="Search date..."
+                            className="h-9 text-sm border-0 focus-visible:ring-0"
+                            data-testid="hammali-allocation-search"
+                          />
+                        </div>
+                        {hammaliAllocationDropdownOpen && (() => {
+                          const selectedDates = new Set(hammaliAllocations.map(a => a.date));
+                          const available = hammaliBreakdown.filter(r => !selectedDates.has(r.date));
+                          const filtered = available.filter(r => !hammaliAllocationSearch || r.date.includes(hammaliAllocationSearch));
+                          if (filtered.length === 0) return null;
+                          return (
+                            <div className="absolute z-50 w-full mt-1 max-h-48 overflow-y-auto bg-popover border rounded-md shadow-lg">
+                              {filtered.map(r => {
+                                const disabled = r.dueHammali <= 0;
+                                return (
+                                  <div
+                                    key={r.date}
+                                    className={`px-3 py-2 text-xs border-b last:border-b-0 ${disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-accent cursor-pointer"}`}
+                                    onClick={() => {
+                                      if (disabled) return;
+                                      setHammaliAllocations(prev => {
+                                        const total = parseFloat(outwardAmount || "0");
+                                        const alreadyAllocated = prev.reduce((s, a) => s + parseFloat(a.amount || "0"), 0);
+                                        const remaining = Math.max(0, total - alreadyAllocated);
+                                        const autoAmt = total > 0 ? Math.min(remaining, r.dueHammali) : r.dueHammali;
+                                        return [...prev, {
+                                          date: r.date,
+                                          total: r.totalHammali,
+                                          paid: r.paidHammali,
+                                          due: r.dueHammali,
+                                          amount: autoAmt.toFixed(2),
+                                          pettyAdj: "0",
+                                        }];
+                                      });
+                                      setHammaliAllocationSearch("");
+                                      setHammaliAllocationDropdownOpen(false);
+                                    }}
+                                    data-testid={`hammali-allocation-option-${r.date}`}
+                                  >
+                                    <div className="flex justify-between">
+                                      <span className="font-medium">{r.date}</span>
+                                      <span className={`font-semibold ${disabled ? "text-muted-foreground" : "text-orange-600"}`}>Due ₹{r.dueHammali.toLocaleString("en-IN")}</span>
+                                    </div>
+                                    <div className="text-muted-foreground mt-0.5">
+                                      Total ₹{r.totalHammali.toLocaleString("en-IN")} | Paid ₹{r.paidHammali.toLocaleString("en-IN")}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })()}
+                      </div>
+                      {hammaliAllocations.length > 0 && (
+                        <div className="space-y-1.5">
+                          {hammaliAllocations.map((alloc, idx) => (
+                            <div key={alloc.date} className="border rounded-md p-2 space-y-1.5 bg-muted/30" data-testid={`hammali-allocation-row-${idx}`}>
+                              <div className="flex items-center justify-between">
+                                <div className="text-xs font-medium">{alloc.date}</div>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-[10px] text-orange-600 font-semibold">Due ₹{alloc.due.toLocaleString("en-IN")}</span>
+                                  <button
+                                    onClick={() => setHammaliAllocations(prev => prev.filter((_, i) => i !== idx))}
+                                    className="text-muted-foreground hover:text-destructive"
+                                    data-testid={`hammali-allocation-remove-${idx}`}
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="grid grid-cols-2 gap-1.5">
+                                <div className="space-y-0.5">
+                                  <Label className="text-[10px] text-muted-foreground">Amount</Label>
+                                  <Input
+                                    type="number" inputMode="decimal"
+                                    value={alloc.amount}
+                                    onChange={e => setHammaliAllocations(prev => prev.map((a, i) => i === idx ? { ...a, amount: e.target.value } : a))}
+                                    onFocus={e => e.target.select()}
+                                    className="h-7 text-xs px-1.5"
+                                    data-testid={`hammali-allocation-amount-${idx}`}
+                                  />
+                                </div>
+                                <div className="space-y-0.5">
+                                  <Label className="text-[10px] text-muted-foreground">Petty Adj</Label>
+                                  <Input
+                                    type="number" inputMode="decimal"
+                                    value={alloc.pettyAdj}
+                                    onChange={e => setHammaliAllocations(prev => prev.map((a, i) => i === idx ? { ...a, pettyAdj: e.target.value } : a))}
+                                    onFocus={e => e.target.select()}
+                                    className={`h-7 text-xs px-1.5 font-medium ${parseFloat(alloc.pettyAdj || "0") > 50 ? "text-red-600" : parseFloat(alloc.pettyAdj || "0") > 1 ? "text-orange-500" : ""}`}
+                                    data-testid={`hammali-allocation-petty-${idx}`}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          {(() => {
+                            const totalAllocated = hammaliAllocations.reduce((s, a) => s + parseFloat(a.amount || "0"), 0);
+                            const totalPaid = parseFloat(outwardAmount || "0");
+                            const matched = totalPaid > 0 && Math.abs(totalAllocated - totalPaid) < 0.02;
+                            return (
+                              <div className="text-xs px-1 pt-1 border-t">
+                                <div className="flex justify-between items-center">
+                                  <span className="font-medium text-muted-foreground">Allocated</span>
+                                  <span className={`font-bold ${matched ? "text-green-600" : totalPaid > 0 ? "text-red-600" : ""}`} data-testid="hammali-allocated-total">
+                                    ₹{totalAllocated.toLocaleString("en-IN")} / ₹{totalPaid.toLocaleString("en-IN")}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
                     </div>
                   )}
                   <div className="space-y-1">

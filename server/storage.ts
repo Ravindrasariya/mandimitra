@@ -1570,6 +1570,74 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
+  async getHammaliBreakdown(businessId: number): Promise<{ date: string; totalHammali: number; paidHammali: number; dueHammali: number }[]> {
+    const txRows = await db.select({
+      date: transactions.date,
+      total: sql<number>`coalesce(sum(cast(${transactions.hammaliCharges} as numeric) + cast(coalesce(${transactions.hammaliBuyerPerBag}, '0') as numeric) * ${transactions.numberOfBags}), 0)`,
+    }).from(transactions).where(and(
+      eq(transactions.businessId, businessId),
+      eq(transactions.isReversed, false),
+      eq(transactions.isArchived, false)
+    )).groupBy(transactions.date);
+
+    const paidEntries = await db.select({
+      amount: cashEntries.amount,
+      pettyAdj: cashEntries.pettyAdj,
+      splitLog: cashEntries.splitLog,
+    }).from(cashEntries).where(and(
+      eq(cashEntries.businessId, businessId),
+      eq(cashEntries.outflowType, "Hammali"),
+      eq(cashEntries.category, "outward"),
+      eq(cashEntries.isReversed, false),
+      eq(cashEntries.isArchived, false)
+    ));
+
+    const totalsByDate = new Map<string, number>();
+    for (const r of txRows) {
+      if (!r.date) continue;
+      const t = Number(r.total) || 0;
+      if (t > 0) totalsByDate.set(r.date, t);
+    }
+
+    const paidByDate = new Map<string, number>();
+    let unattributed = 0;
+    for (const p of paidEntries) {
+      // Parse only the "Hammali Amt:" section (amounts already include petty adj);
+      // the "| Petty:" section is informational and must not be double-counted.
+      const sl = (p.splitLog || "").split("| Petty:")[0];
+      const matches = Array.from(sl.matchAll(/(\d{4}-\d{2}-\d{2})-([\d.]+)/g));
+      if (matches.length > 0) {
+        for (const m of matches) {
+          const d = m[1];
+          const amt = parseFloat(m[2]) || 0;
+          paidByDate.set(d, (paidByDate.get(d) || 0) + amt);
+        }
+      } else {
+        unattributed += (parseFloat(p.amount || "0") || 0) + (parseFloat(p.pettyAdj || "0") || 0);
+      }
+    }
+
+    // Allocate legacy (unattributed) payments FIFO oldest-first
+    const sortedAsc = Array.from(totalsByDate.keys()).sort();
+    for (const d of sortedAsc) {
+      if (unattributed <= 0) break;
+      const total = totalsByDate.get(d) || 0;
+      const alreadyPaid = paidByDate.get(d) || 0;
+      const due = Math.max(0, total - alreadyPaid);
+      if (due > 0) {
+        const alloc = Math.min(unattributed, due);
+        paidByDate.set(d, alreadyPaid + alloc);
+        unattributed -= alloc;
+      }
+    }
+
+    return sortedAsc.reverse().map(d => {
+      const total = totalsByDate.get(d) || 0;
+      const paid = Math.min(total, paidByDate.get(d) || 0);
+      return { date: d, totalHammali: total, paidHammali: paid, dueHammali: Math.max(0, total - paid) };
+    });
+  }
+
   async getFarmerLedger(businessId: number, farmerId: number, dateFrom?: string, dateTo?: string) {
     const farmer = await this.getFarmer(farmerId, businessId);
     if (!farmer) throw new Error("Farmer not found");
