@@ -1088,9 +1088,9 @@ export default function CashPage() {
     const colDate = margin;
     const colParty = margin + contentW * 0.12;
     const colMode = margin + contentW * 0.47;
-    const colDr = margin + contentW * 0.60;
-    const colCr = margin + contentW * 0.73;
-    const colRemarks = margin + contentW * 0.85;
+    const colDr = margin + contentW * 0.55;
+    const colCr = margin + contentW * 0.67;
+    const colRemarks = margin + contentW * 0.80;
     const rowH = 6;
     const headerH = 7;
 
@@ -1104,8 +1104,8 @@ export default function CashPage() {
       doc.text("Date", colDate, tY);
       doc.text("Party", colParty, tY);
       doc.text("Mode", colMode, tY);
-      doc.text("Dr (Outflow)", colDr + contentW * 0.13 - 1, tY, { align: "right" });
-      doc.text("Cr (Inflow)", colCr + contentW * 0.12 - 1, tY, { align: "right" });
+      doc.text("Dr (Outflow)", colDr + contentW * 0.11 - 1, tY, { align: "right" });
+      doc.text("Cr (Inflow)", colCr + contentW * 0.10 - 1, tY, { align: "right" });
       doc.text("Remarks", colRemarks, tY);
       doc.setTextColor(0, 0, 0);
       return startY + headerH;
@@ -1173,8 +1173,8 @@ export default function CashPage() {
       const modeTrunc = mode.length > 14 ? mode.substring(0, 13) + "…" : mode;
       doc.text(modeTrunc, colMode, y + rowH - 2);
 
-      doc.text(dr > 0 ? fmtAmt(dr) : "-", colDr + contentW * 0.13 - 1, y + rowH - 2, { align: "right" });
-      doc.text(cr > 0 ? fmtAmt(cr) : "-", colCr + contentW * 0.12 - 1, y + rowH - 2, { align: "right" });
+      doc.text(dr > 0 ? fmtAmt(dr) : "-", colDr + contentW * 0.11 - 1, y + rowH - 2, { align: "right" });
+      doc.text(cr > 0 ? fmtAmt(cr) : "-", colCr + contentW * 0.10 - 1, y + rowH - 2, { align: "right" });
 
       const remarksTrunc = (e.notes || "").length > 18 ? (e.notes || "").substring(0, 17) + "…" : (e.notes || "");
       doc.text(remarksTrunc, colRemarks, y + rowH - 2);
@@ -1192,8 +1192,8 @@ export default function CashPage() {
     doc.setFontSize(8);
     doc.setTextColor(0, 0, 0);
     doc.text("Total", colParty, y + rowH - 1);
-    doc.text(fmtAmt(totalDr), colDr + contentW * 0.13 - 1, y + rowH - 1, { align: "right" });
-    doc.text(fmtAmt(totalCr), colCr + contentW * 0.12 - 1, y + rowH - 1, { align: "right" });
+    doc.text(fmtAmt(totalDr), colDr + contentW * 0.11 - 1, y + rowH - 1, { align: "right" });
+    doc.text(fmtAmt(totalCr), colCr + contentW * 0.10 - 1, y + rowH - 1, { align: "right" });
 
     y += rowH + 5;
     doc.setFont("helvetica", "normal");
