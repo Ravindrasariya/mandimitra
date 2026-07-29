@@ -961,7 +961,8 @@ export default function CashPage() {
     const netAccount = accountIn - accountOut;
 
     const fmtAmt = (n: number) => n.toLocaleString("en-IN", { maximumFractionDigits: 0 });
-    const fmtAmtDec = (n: number) => "₹" + n.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+    // jsPDF built-in Helvetica doesn't support ₹ (U+20B9); use Rs. prefix instead
+    const fmtAmtDec = (n: number) => "Rs." + n.toLocaleString("en-IN", { maximumFractionDigits: 0 });
 
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
     const pageW = 210;
@@ -1142,7 +1143,11 @@ export default function CashPage() {
         else if (e.type === "account_to_account_in") party = `Transfer: ${e.partyName || ""} → ${e.bankAccountId ? getAccountName(e.bankAccountId) : ""}`;
         else party = "Transfer";
       } else {
-        party = e.partyName || (e.buyerId ? getBuyerName(e.buyerId) : e.farmerId ? getFarmerName(e.farmerId) : "");
+        party = e.partyName
+          || (e.buyerId ? getBuyerName(e.buyerId) : "")
+          || (e.farmerId ? getFarmerName(e.farmerId) : "")
+          || (e.category === "outward" ? (e.outflowType || "General Expense") : "")
+          || "General";
       }
 
       // Mode label
@@ -2480,12 +2485,14 @@ export default function CashPage() {
         <div className="bg-muted/40 rounded-xl p-3 space-y-3">
           <div className="flex items-center justify-between border-b pb-2">
             <h2 className="text-sm font-semibold">{t("cash.cashFlowHistory")}</h2>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={downloadPDF} data-testid="button-download-pdf" title="Download PDF">
-              <Printer className="w-4 h-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={downloadCSV} data-testid="button-download-csv">
-              <Download className="w-4 h-4" />
-            </Button>
+            <div className="flex items-center gap-1">
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={downloadPDF} data-testid="button-download-pdf" title="Download PDF">
+                <Printer className="w-4 h-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={downloadCSV} data-testid="button-download-csv">
+                <Download className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
 
           {isLoading ? (
