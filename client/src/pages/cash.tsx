@@ -14,10 +14,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import type { Farmer, Buyer, CashEntry, BankAccount } from "@shared/schema";
 import { ASSET_CATEGORIES, ASSET_DEPRECIATION_RATES } from "@shared/schema";
-import { Wallet, Settings, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Download, RotateCcw, Trash2, Plus, Filter, X, Search, ChevronsUpDown, Pencil, Check, Save, Calendar, ChevronDown } from "lucide-react";
+import { Wallet, Settings, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Download, RotateCcw, Trash2, Plus, Filter, X, Search, ChevronsUpDown, Pencil, Check, Save, Calendar, ChevronDown, Printer } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
+import jsPDF from "jspdf";
+import { useAuth } from "@/lib/auth";
 
 type CashEntryWithTxn = CashEntry & { srNumber: number | null; bbNumber: number | null; txnCode: string | null };
 type BuyerWithDues = Buyer & { receivableDue: string; overallDue: string; advanceBalance: string };
@@ -43,6 +45,7 @@ const OUTFLOW_TYPES = [
 export default function CashPage() {
   const { toast } = useToast();
   const { t } = useLanguage();
+  const { user } = useAuth();
   const now = new Date();
   useEffect(() => {
     localStorage.removeItem("cash-inwardDate");
@@ -931,6 +934,269 @@ export default function CashPage() {
     a.download = `cash-flow-${format(now, "yyyy-MM-dd")}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const downloadPDF = () => {
+    const SKIP_MODES = new Set(["Advance Adj", "Sales Loss"]);
+    const activeEntries = filteredEntries.filter(e => !e.isReversed && !SKIP_MODES.has(e.paymentMode || ""));
+
+    // Summary calculations
+    let cashIn = 0, cashOut = 0, accountIn = 0, accountOut = 0;
+    for (const e of activeEntries) {
+      const amt = parseFloat(e.amount || "0");
+      if (e.category === "inward") {
+        if (e.paymentMode === "Cash") cashIn += amt;
+        else accountIn += amt;
+      } else if (e.category === "outward") {
+        if (e.paymentMode === "Cash") cashOut += amt;
+        else accountOut += amt;
+      } else if (e.category === "transfer") {
+        if (e.type === "cash_to_account") { cashOut += amt; accountIn += amt; }
+        else if (e.type === "account_to_cash") { accountOut += amt; cashIn += amt; }
+        else if (e.type === "account_to_account_out") accountOut += amt;
+        else if (e.type === "account_to_account_in") accountIn += amt;
+      }
+    }
+    const netCash = cashIn - cashOut;
+    const netAccount = accountIn - accountOut;
+
+    const fmtAmt = (n: number) => n.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+    const fmtAmtDec = (n: number) => "₹" + n.toLocaleString("en-IN", { maximumFractionDigits: 0 });
+
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    const pageW = 210;
+    const margin = 12;
+    const contentW = pageW - margin * 2;
+    let y = 16;
+
+    // Business header
+    doc.setFontSize(14);
+    doc.setFont("helvetica", "bold");
+    doc.text(user?.businessName || "Mandi Mitra", pageW / 2, y, { align: "center" });
+    y += 5.5;
+    if (user?.businessAddress) {
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.text(user.businessAddress, pageW / 2, y, { align: "center" });
+      y += 4.5;
+    }
+    if (user?.businessPhone) {
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "normal");
+      doc.text(user.businessPhone, pageW / 2, y, { align: "center" });
+      y += 4.5;
+    }
+    // Divider
+    doc.setDrawColor(180, 180, 180);
+    doc.line(margin, y, pageW - margin, y);
+    y += 5;
+
+    // Sub-header row
+    doc.setFontSize(11);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(0, 0, 0);
+    doc.text("Cash Flow History", margin, y);
+    doc.setFontSize(7.5);
+    doc.setFont("helvetica", "normal");
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Generated: ${format(now, "dd/MM/yyyy")}`, pageW - margin, y, { align: "right" });
+    y += 4.5;
+    doc.setFontSize(8);
+    doc.text("Filtered transactions", margin, y);
+    doc.setTextColor(0, 0, 0);
+    y += 7;
+
+    // Summary boxes
+    const boxW = (contentW - 5) / 2;
+    const boxH = 28;
+    const boxY = y;
+
+    // CASH box
+    doc.setDrawColor(22, 163, 74);
+    doc.setLineWidth(0.5);
+    doc.rect(margin, boxY, boxW, boxH);
+    doc.setFillColor(240, 253, 244);
+    doc.rect(margin, boxY, boxW, 7, "F");
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(22, 163, 74);
+    doc.text("CASH", margin + 3, boxY + 4.8);
+
+    let bY = boxY + 11;
+    const labelX = margin + 3;
+    const valX = margin + boxW - 3;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(0, 0, 0);
+    doc.text("Total Cash In", labelX, bY);
+    doc.setTextColor(22, 163, 74);
+    doc.text(fmtAmtDec(cashIn), valX, bY, { align: "right" });
+    bY += 6;
+    doc.setTextColor(0, 0, 0);
+    doc.text("Total Cash Out", labelX, bY);
+    doc.setTextColor(220, 38, 38);
+    doc.text(fmtAmtDec(cashOut), valX, bY, { align: "right" });
+    bY += 6;
+    doc.setDrawColor(200, 200, 200);
+    doc.line(labelX, bY - 1.5, valX, bY - 1.5);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(0, 0, 0);
+    doc.text("Net Cash", labelX, bY + 1);
+    doc.setTextColor(netCash >= 0 ? 22 : 220, netCash >= 0 ? 163 : 38, netCash >= 0 ? 74 : 38);
+    doc.text((netCash < 0 ? "−" : "") + fmtAmtDec(Math.abs(netCash)), valX, bY + 1, { align: "right" });
+
+    // ACCOUNT box
+    const boxX2 = margin + boxW + 5;
+    doc.setDrawColor(22, 163, 74);
+    doc.setLineWidth(0.5);
+    doc.rect(boxX2, boxY, boxW, boxH);
+    doc.setFillColor(240, 249, 255);
+    doc.rect(boxX2, boxY, boxW, 7, "F");
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(22, 163, 74);
+    doc.text("ACCOUNT", boxX2 + 3, boxY + 4.8);
+
+    bY = boxY + 11;
+    const labelX2 = boxX2 + 3;
+    const valX2 = boxX2 + boxW - 3;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(0, 0, 0);
+    doc.text("Total Account In", labelX2, bY);
+    doc.setTextColor(22, 163, 74);
+    doc.text(fmtAmtDec(accountIn), valX2, bY, { align: "right" });
+    bY += 6;
+    doc.setTextColor(0, 0, 0);
+    doc.text("Total Account Out", labelX2, bY);
+    doc.setTextColor(220, 38, 38);
+    doc.text(fmtAmtDec(accountOut), valX2, bY, { align: "right" });
+    bY += 6;
+    doc.setDrawColor(200, 200, 200);
+    doc.line(labelX2, bY - 1.5, valX2, bY - 1.5);
+    doc.setFont("helvetica", "bold");
+    doc.setTextColor(0, 0, 0);
+    doc.text("Net Account", labelX2, bY + 1);
+    doc.setTextColor(netAccount >= 0 ? 22 : 220, netAccount >= 0 ? 163 : 38, netAccount >= 0 ? 74 : 38);
+    doc.text((netAccount < 0 ? "−" : "") + fmtAmtDec(Math.abs(netAccount)), valX2, bY + 1, { align: "right" });
+
+    y = boxY + boxH + 8;
+
+    // Table column positions (proportions per spec)
+    // Date 12%, Party 35%, Mode 13%, Dr 13%, Cr 12%, Remarks 15%
+    const colDate = margin;
+    const colParty = margin + contentW * 0.12;
+    const colMode = margin + contentW * 0.47;
+    const colDr = margin + contentW * 0.60;
+    const colCr = margin + contentW * 0.73;
+    const colRemarks = margin + contentW * 0.85;
+    const rowH = 6;
+    const headerH = 7;
+
+    const drawTableHeader = (startY: number) => {
+      doc.setFillColor(22, 163, 74);
+      doc.rect(margin, startY, contentW, headerH, "F");
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(8);
+      doc.setFont("helvetica", "bold");
+      const tY = startY + headerH - 2;
+      doc.text("Date", colDate, tY);
+      doc.text("Party", colParty, tY);
+      doc.text("Mode", colMode, tY);
+      doc.text("Dr (Outflow)", colDr + contentW * 0.13 - 1, tY, { align: "right" });
+      doc.text("Cr (Inflow)", colCr + contentW * 0.12 - 1, tY, { align: "right" });
+      doc.text("Remarks", colRemarks, tY);
+      doc.setTextColor(0, 0, 0);
+      return startY + headerH;
+    };
+
+    y = drawTableHeader(y);
+
+    let totalDr = 0, totalCr = 0;
+    let rowIdx = 0;
+
+    for (const e of activeEntries) {
+      if (y > 272) {
+        doc.addPage();
+        y = drawTableHeader(14);
+        rowIdx = 0;
+      }
+      const amt = parseFloat(e.amount || "0");
+
+      // Determine Dr/Cr per row
+      let dr = 0, cr = 0;
+      if (e.category === "inward") { cr = amt; }
+      else if (e.category === "outward") { dr = amt; }
+      else if (e.category === "transfer") {
+        dr = amt; cr = amt; // show both sides for transfers
+      }
+      totalDr += e.category === "transfer" ? amt : dr;
+      totalCr += e.category === "transfer" ? amt : cr;
+
+      // Party label
+      let party = "";
+      if (e.category === "transfer") {
+        if (e.type === "cash_to_account") party = `Transfer: Cash → ${e.bankAccountId ? getAccountName(e.bankAccountId) : "Account"}`;
+        else if (e.type === "account_to_cash") party = `Transfer: ${e.bankAccountId ? getAccountName(e.bankAccountId) : "Account"} → Cash`;
+        else if (e.type === "account_to_account_out") party = `Transfer: ${e.bankAccountId ? getAccountName(e.bankAccountId) : ""} → ${e.partyName || "Account"}`;
+        else if (e.type === "account_to_account_in") party = `Transfer: ${e.partyName || ""} → ${e.bankAccountId ? getAccountName(e.bankAccountId) : ""}`;
+        else party = "Transfer";
+      } else {
+        party = e.partyName || (e.buyerId ? getBuyerName(e.buyerId) : e.farmerId ? getFarmerName(e.farmerId) : "");
+      }
+
+      // Mode label
+      const mode = e.category === "transfer" ? "Transfer" : (e.paymentMode || "");
+
+      // Row shading
+      if (rowIdx % 2 === 1) {
+        doc.setFillColor(248, 248, 248);
+        doc.rect(margin, y, contentW, rowH, "F");
+      }
+      rowIdx++;
+
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.5);
+      doc.setTextColor(0, 0, 0);
+
+      const dateStr = e.date ? format(new Date(e.date + "T00:00:00"), "dd/MM/yy") : "";
+      doc.text(dateStr, colDate, y + rowH - 2);
+
+      const partyTrunc = party.length > 38 ? party.substring(0, 37) + "…" : party;
+      doc.text(partyTrunc, colParty, y + rowH - 2);
+
+      const modeTrunc = mode.length > 14 ? mode.substring(0, 13) + "…" : mode;
+      doc.text(modeTrunc, colMode, y + rowH - 2);
+
+      doc.text(dr > 0 ? fmtAmt(dr) : "-", colDr + contentW * 0.13 - 1, y + rowH - 2, { align: "right" });
+      doc.text(cr > 0 ? fmtAmt(cr) : "-", colCr + contentW * 0.12 - 1, y + rowH - 2, { align: "right" });
+
+      const remarksTrunc = (e.notes || "").length > 18 ? (e.notes || "").substring(0, 17) + "…" : (e.notes || "");
+      doc.text(remarksTrunc, colRemarks, y + rowH - 2);
+
+      doc.setDrawColor(220, 220, 220);
+      doc.line(margin, y + rowH, pageW - margin, y + rowH);
+      y += rowH;
+    }
+
+    // Total row
+    y += 1;
+    doc.setFillColor(220, 252, 231);
+    doc.rect(margin, y, contentW, rowH + 1, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.setTextColor(0, 0, 0);
+    doc.text("Total", colParty, y + rowH - 1);
+    doc.text(fmtAmt(totalDr), colDr + contentW * 0.13 - 1, y + rowH - 1, { align: "right" });
+    doc.text(fmtAmt(totalCr), colCr + contentW * 0.12 - 1, y + rowH - 1, { align: "right" });
+
+    y += rowH + 5;
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
+    doc.setTextColor(150, 150, 150);
+    doc.text("Generated by Mandi Mitra", pageW / 2, y, { align: "center" });
+
+    doc.save(`cash-flow-${format(now, "yyyy-MM-dd")}.pdf`);
   };
 
   const MONTH_LABELS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
@@ -2214,6 +2480,9 @@ export default function CashPage() {
         <div className="bg-muted/40 rounded-xl p-3 space-y-3">
           <div className="flex items-center justify-between border-b pb-2">
             <h2 className="text-sm font-semibold">{t("cash.cashFlowHistory")}</h2>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={downloadPDF} data-testid="button-download-pdf" title="Download PDF">
+              <Printer className="w-4 h-4" />
+            </Button>
             <Button variant="ghost" size="icon" className="h-7 w-7" onClick={downloadCSV} data-testid="button-download-csv">
               <Download className="w-4 h-4" />
             </Button>
