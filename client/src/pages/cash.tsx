@@ -14,7 +14,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import type { Farmer, Buyer, CashEntry, BankAccount } from "@shared/schema";
 import { ASSET_CATEGORIES, ASSET_DEPRECIATION_RATES } from "@shared/schema";
-import { Wallet, Settings, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Download, RotateCcw, Trash2, Plus, Filter, X, Search, ChevronsUpDown, Pencil, Check, Save, Calendar, ChevronDown, Printer } from "lucide-react";
+import { Wallet, Settings, ArrowDownLeft, ArrowUpRight, ArrowLeftRight, Download, RotateCcw, Trash2, Plus, Filter, X, Search, ChevronsUpDown, Pencil, Check, Save, Calendar, ChevronDown, Printer, Calculator as CalculatorIcon } from "lucide-react";
+import { Calculator } from "@/components/calculator";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Checkbox } from "@/components/ui/checkbox";
 import { format } from "date-fns";
@@ -127,6 +128,8 @@ export default function CashPage() {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  const [showCalculator, setShowCalculator] = useState(false);
 
   const [transferFromType, setTransferFromType, clearTransferFromType] = usePersistedState("cash-transferFromType", "cash");
   const [transferFromAccountId, setTransferFromAccountId, clearTransferFromAccountId] = usePersistedState("cash-transferFromAccountId", "");
@@ -1862,7 +1865,12 @@ export default function CashPage() {
                         return (
                           <div className="text-xs px-1 pt-1 border-t space-y-0.5">
                             <div className="flex justify-between items-center">
-                              <span className="font-medium text-muted-foreground">Allocated</span>
+                              <span className="flex items-center gap-1 font-medium text-muted-foreground">
+                                Allocated
+                                <button type="button" className="p-0.5 rounded hover:bg-orange-50" onClick={() => setShowCalculator(v => !v)} title="Open calculator">
+                                  <CalculatorIcon className="w-3.5 h-3.5 text-orange-500" />
+                                </button>
+                              </span>
                               <span className={`font-bold ${matched ? "text-green-600" : totalReceived > 0 ? "text-red-600" : ""}`}>
                                 ₹{totalAllocated.toLocaleString("en-IN")} / ₹{totalReceived.toLocaleString("en-IN")}
                               </span>
@@ -2162,7 +2170,12 @@ export default function CashPage() {
                               return (
                                 <div className="text-xs px-1 pt-1 border-t">
                                   <div className="flex justify-between items-center">
-                                    <span className="font-medium text-muted-foreground">Allocated</span>
+                                    <span className="flex items-center gap-1 font-medium text-muted-foreground">
+                                      Allocated
+                                      <button type="button" className="p-0.5 rounded hover:bg-orange-50" onClick={() => setShowCalculator(v => !v)} title="Open calculator">
+                                        <CalculatorIcon className="w-3.5 h-3.5 text-orange-500" />
+                                      </button>
+                                    </span>
                                     <span className={`font-bold ${matched ? "text-green-600" : totalPaid > 0 ? "text-red-600" : ""}`}>
                                       ₹{totalAllocated.toLocaleString("en-IN")} / ₹{totalPaid.toLocaleString("en-IN")}
                                     </span>
@@ -2308,7 +2321,12 @@ export default function CashPage() {
                             return (
                               <div className="text-xs px-1 pt-1 border-t">
                                 <div className="flex justify-between items-center">
-                                  <span className="font-medium text-muted-foreground">Allocated</span>
+                                  <span className="flex items-center gap-1 font-medium text-muted-foreground">
+                                    Allocated
+                                    <button type="button" className="p-0.5 rounded hover:bg-orange-50" onClick={() => setShowCalculator(v => !v)} title="Open calculator">
+                                      <CalculatorIcon className="w-3.5 h-3.5 text-orange-500" />
+                                    </button>
+                                  </span>
                                   <span className={`font-bold ${matched ? "text-green-600" : totalPaid > 0 ? "text-red-600" : ""}`} data-testid="hammali-allocated-total">
                                     ₹{totalAllocated.toLocaleString("en-IN")} / ₹{totalPaid.toLocaleString("en-IN")}
                                   </span>
@@ -2768,6 +2786,8 @@ export default function CashPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {showCalculator && <Calculator onClose={() => setShowCalculator(false)} />}
     </div>
   );
 }
