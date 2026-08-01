@@ -96,6 +96,44 @@ function isFieldChanged(row: Record<string, any>, body: Record<string, any>, fie
 const REVERSE_FARMER = "Reverse the farmer payment in the Liability Register first.";
 const REVERSE_BUYER = "Reverse the buyer payment in Transactions first.";
 
+/**
+ * Reject an edit that a payment has frozen. `message` is the English text (logs, API clients);
+ * `code` + `params` let the browser rebuild the same sentence in the user's language.
+ */
+function guardReject(
+  res: express.Response,
+  status: number,
+  code: string,
+  message: string,
+  params?: Record<string, string>,
+) {
+  return res.status(status).json({ message, code, params });
+}
+
+/**
+ * Which crop groups on a farmer card (same farmer + same date) already carry a farmer payment.
+ * A card is farmer-scoped, so anything that applies card-wide — the vehicle fields, and the
+ * identity of the farmer itself — is frozen once any one of these groups has been paid.
+ */
+async function getFarmerCardPaidGroups(businessId: number, farmerId: number, date: string) {
+  const blocking = await db.selectDistinct({ serialNumber: lots.serialNumber, crop: lots.crop })
+    .from(cashEntries)
+    .innerJoin(transactions, eq(cashEntries.transactionId, transactions.id))
+    .innerJoin(lots, eq(transactions.lotId, lots.id))
+    .where(and(
+      eq(lots.farmerId, farmerId),
+      eq(lots.date, date),
+      eq(lots.businessId, businessId),
+      eq(lots.isArchived, false),
+      eq(cashEntries.businessId, businessId),
+      eq(cashEntries.isReversed, false),
+      eq(cashEntries.isArchived, false),
+      eq(cashEntries.category, "outward"),
+      isNotNull(cashEntries.farmerId)
+    ));
+  return blocking.map(b => `SR #${b.serialNumber} (${b.crop})`);
+}
+
 export async function registerRoutes(
   httpServer: Server,
   app: Express
@@ -1293,27 +1331,24 @@ export async function registerRoutes(
       numChanged(lot.vehicleBhadaRate, data.vehicleBhadaRate) ||
       numChanged(lot.totalBagsInVehicle, data.totalBagsInVehicle);
 
-    if (vehicleFieldChanged) {
-      const blocking = await db.selectDistinct({ serialNumber: lots.serialNumber, crop: lots.crop })
-        .from(cashEntries)
-        .innerJoin(transactions, eq(cashEntries.transactionId, transactions.id))
-        .innerJoin(lots, eq(transactions.lotId, lots.id))
-        .where(and(
-          eq(lots.farmerId, lot.farmerId),
-          eq(lots.date, lot.date),
-          eq(lots.businessId, businessId),
-          eq(lots.isArchived, false),
-          eq(cashEntries.businessId, businessId),
-          eq(cashEntries.isReversed, false),
-          eq(cashEntries.isArchived, false),
-          eq(cashEntries.category, "outward"),
-          isNotNull(cashEntries.farmerId)
-        ));
-      if (blocking.length > 0) {
-        const where = blocking.map(b => `SR #${b.serialNumber} (${b.crop})`).join(", ");
-        return res.status(400).json({
-          message: `Cannot change Vehicle Bhada or Total Bags — these apply to every crop group on this farmer card and a farmer payment already exists on ${where}. Reverse the farmer payment in the Liability Register first.`,
-        });
+    // The farmer this card belongs to is frozen the moment any crop group on it has been paid:
+    // moving the card would leave the payment on the old farmer's ledger while the lots and
+    // transactions point at the new one. Renaming the farmer record itself is unaffected — that
+    // keeps the same ledger id and goes through the farmers route.
+    const farmerChanged = data.farmerId !== undefined && Number(data.farmerId) !== Number(lot.farmerId);
+
+    if (vehicleFieldChanged || farmerChanged) {
+      const paidGroups = await getFarmerCardPaidGroups(businessId, lot.farmerId, lot.date);
+      if (paidGroups.length > 0) {
+        const srList = paidGroups.join(", ");
+        if (farmerChanged) {
+          return guardReject(res, 400, "GUARD_LOT_FARMER_CHANGE",
+            `Cannot change the farmer on this card — a farmer payment already exists on ${srList}. ${REVERSE_FARMER} To only correct the current farmer's name, phone or village, edit them in the Farmer Ledger instead.`,
+            { srList });
+        }
+        return guardReject(res, 400, "GUARD_LOT_VEHICLE",
+          `Cannot change Vehicle Bhada or Total Bags — these apply to every crop group on this farmer card and a farmer payment already exists on ${srList}. ${REVERSE_FARMER}`,
+          { srList });
       }
     }
 
@@ -1456,25 +1491,38 @@ export async function registerRoutes(
     const bidId = paramId(req.params.id);
     const businessId = req.user!.businessId;
 
-    // A bid's buyer, rate and bag count feed the transaction's economics, so they carry the
-    // same payment guard as the transaction route. Without this the guard there is bypassable:
-    // the card save PATCHes the bid first and the transaction second.
-    const BID_GUARD_FIELDS = ["buyerId", "pricePerKg", "numberOfBags"];
+    // A bid's rate and bag count feed the transaction's economics, so they carry the same
+    // payment guard as the transaction route. Without this the guard there is bypassable: the
+    // card save PATCHes the bid first and the transaction second.
+    // The buyer is scoped differently — it is only frozen by a *buyer* payment, because that is
+    // the entry that would end up filed against a buyer this bid no longer points at. A farmer
+    // payment says nothing about who bought the lot, so it must not block a buyer correction.
+    const BID_CORE_FIELDS = ["pricePerKg", "numberOfBags"];
     const [oldBid] = await db.select().from(bids).where(and(eq(bids.id, bidId), eq(bids.businessId, businessId)));
     if (!oldBid) return res.status(404).json({ message: "Bid not found" });
 
-    if (BID_GUARD_FIELDS.some(f => isFieldChanged(oldBid as any, req.body, f))) {
+    const bidCoreChanged = BID_CORE_FIELDS.some(f => isFieldChanged(oldBid as any, req.body, f));
+    const bidBuyerChanged = isFieldChanged(oldBid as any, req.body, "buyerId");
+
+    if (bidCoreChanged || bidBuyerChanged) {
       const [tx] = await db.select({ id: transactions.id }).from(transactions)
         .where(and(eq(transactions.bidId, bidId), eq(transactions.businessId, businessId)))
         .limit(1);
       if (tx) {
         const { hasFarmerPayment, hasBuyerPayment } = await getActivePaymentParties(businessId, tx.id);
-        if (hasFarmerPayment || hasBuyerPayment) {
-          const who = hasFarmerPayment && hasBuyerPayment
+        if (bidBuyerChanged && hasBuyerPayment) {
+          return guardReject(res, 400, "GUARD_BID_BUYER_CHANGE",
+            `Cannot change the buyer on this bid — a buyer payment already exists against it. ${REVERSE_BUYER}`);
+        }
+        if (bidCoreChanged && (hasFarmerPayment || hasBuyerPayment)) {
+          const parties = hasFarmerPayment && hasBuyerPayment ? "both" : hasFarmerPayment ? "farmer" : "buyer";
+          const who = parties === "both"
             ? "farmer and buyer payments exist"
-            : hasFarmerPayment ? "a farmer payment exists" : "a buyer payment exists";
+            : parties === "farmer" ? "a farmer payment exists" : "a buyer payment exists";
           const how = hasFarmerPayment ? REVERSE_FARMER : REVERSE_BUYER;
-          return res.status(400).json({ message: `Cannot change buyer, bags or price on this bid — ${who} against it. ${how}` });
+          return guardReject(res, 400, "GUARD_CORE",
+            `Cannot change bags, weight or price on this bid — ${who} against it. ${how}`,
+            { parties });
         }
       }
     }
@@ -1712,22 +1760,35 @@ export async function registerRoutes(
     const changedShared = SHARED_GUARD_FIELDS.filter(isChanged);
     const changedFarmer = FARMER_GUARD_FIELDS.filter(isChanged);
     const changedBuyer = BUYER_GUARD_FIELDS.filter(isChanged);
+    // The buyer can also be rewritten here (the card save sends it right after the bid PATCH),
+    // so it needs the same buyer-payment-only rule the bid route applies — otherwise the two
+    // paths disagree and the transaction can end up on a buyer the bid was refused.
+    const changedBuyerId = isChanged("buyerId");
 
-    if (changedShared.length || changedFarmer.length || changedBuyer.length) {
+    if (changedShared.length || changedFarmer.length || changedBuyer.length || changedBuyerId) {
       const { hasFarmerPayment, hasBuyerPayment } = await getActivePaymentParties(businessId, txId);
 
+      if (changedBuyerId && hasBuyerPayment) {
+        return guardReject(res, 400, "GUARD_BID_BUYER_CHANGE",
+          `Cannot change the buyer on this bid — a buyer payment already exists against it. ${REVERSE_BUYER}`);
+      }
       if (changedShared.length && (hasFarmerPayment || hasBuyerPayment)) {
-        const who = hasFarmerPayment && hasBuyerPayment
+        const parties = hasFarmerPayment && hasBuyerPayment ? "both" : hasFarmerPayment ? "farmer" : "buyer";
+        const who = parties === "both"
           ? "farmer and buyer payments exist"
-          : hasFarmerPayment ? "a farmer payment exists" : "a buyer payment exists";
+          : parties === "farmer" ? "a farmer payment exists" : "a buyer payment exists";
         const how = hasFarmerPayment ? REVERSE_FARMER : REVERSE_BUYER;
-        return res.status(400).json({ message: `Cannot change bags, weight or price on this bid — ${who} against it. ${how}` });
+        return guardReject(res, 400, "GUARD_CORE",
+          `Cannot change bags, weight or price on this bid — ${who} against it. ${how}`,
+          { parties });
       }
       if (changedFarmer.length && hasFarmerPayment) {
-        return res.status(400).json({ message: `Cannot change farmer extra charges on this bid — a farmer payment exists against it. ${REVERSE_FARMER}` });
+        return guardReject(res, 400, "GUARD_FARMER_EXTRAS",
+          `Cannot change farmer extra charges on this bid — a farmer payment exists against it. ${REVERSE_FARMER}`);
       }
       if (changedBuyer.length && hasBuyerPayment) {
-        return res.status(400).json({ message: `Cannot change buyer extra charges on this bid — a buyer payment exists against it. ${REVERSE_BUYER}` });
+        return guardReject(res, 400, "GUARD_BUYER_EXTRAS",
+          `Cannot change buyer extra charges on this bid — a buyer payment exists against it. ${REVERSE_BUYER}`);
       }
     }
 

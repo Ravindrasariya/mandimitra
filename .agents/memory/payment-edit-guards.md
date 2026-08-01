@@ -32,6 +32,34 @@ transaction second, so buyer / price / bag count can be mutated through the bid 
 transaction keeps the old numbers. Any route that can reach a guarded value needs the same check,
 and the client's pre-check must run **before** the first write of the sequence, not between writes.
 
+## A party's identity is frozen by that party's own payment
+
+Re-pointing a row to a different farmer or buyer after money has moved is worse than editing an
+amount: the cash entry stays filed under the old party while the row moves to the new one, and
+both ledgers look internally consistent while disagreeing with each other. Scope this the same way
+as amounts — a buyer payment freezes the buyer, a farmer payment freezes the farmer — and never
+lump the party field in with the amount fields, or a farmer payout ends up blocking an unrelated
+buyer correction.
+
+The freeze is on the *ledger id*, not on the party's details. Renaming a farmer keeps the id and
+must stay possible; there is a separate details-edit path for that.
+
+## Server guard rejections must carry a code, not just English prose
+
+Guard messages are the one place a user most needs their own language, and the sentence is built
+server-side from live data (which SR#s are paid, which party paid). Reject with a stable reason
+code plus the values that go inside the sentence, keep the English text for logs and non-UI
+callers, and let the client rebuild the sentence from its dictionary. The fetch wrapper must
+preserve those fields — the default "throw away everything but `message`" loses them silently and
+there is then no way to translate.
+
+## One block, one message
+
+A guard raised deep inside a multi-step save is normally caught again by the save's outer handler,
+which re-toasts `err.message`. With a toast limit of one, the raw English message *replaces* the
+translated one and the translation work is invisible. Throw a distinct error type carrying the
+already-translated text and let only the outer handler render it.
+
 ## Never report a partial multi-row failure with a transient toast
 
 One card save fans out to many transactions. If some succeed and some are rejected, a toast that

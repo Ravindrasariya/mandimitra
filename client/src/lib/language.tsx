@@ -643,11 +643,22 @@ const translations: Record<string, Record<Language, string>> = {
   "stock.saveBlocked": { en: "Save blocked", hi: "सहेजना अवरुद्ध" },
   "stock.deleteBlocked": { en: "Delete blocked", hi: "हटाना अवरुद्ध" },
   "stock.editBlocked": { en: "Edit blocked", hi: "संपादन अवरुद्ध" },
-  "stock.vehicleLockedTitle": { en: "Vehicle Bhada and Total Bags apply to every crop group on this farmer card, and a farmer payment already exists on:", hi: "वाहन भाड़ा और कुल बोरियां इस किसान कार्ड के सभी फसल समूहों पर लागू होती हैं, और किसान भुगतान पहले से मौजूद है:" },
-  "stock.vehicleLockedHow": { en: "Reverse the farmer payment in the Liability Register first.", hi: "पहले देयता रजिस्टर में किसान भुगतान वापस करें।" },
   "stock.partialSaveTitle": { en: "Some rows were not saved", hi: "कुछ पंक्तियाँ सहेजी नहीं गईं" },
   "stock.partialSaveIntro": { en: "The card was saved, but these bids kept their previous values. The numbers shown on screen for them are not what is stored.", hi: "कार्ड सहेजा गया, लेकिन इन बोलियों ने अपने पिछले मान बनाए रखे। स्क्रीन पर दिख रहे उनके आंकड़े संग्रहीत मानों से अलग हैं।" },
   "stock.partialSaveDismiss": { en: "Got it", hi: "ठीक है" },
+  // Payment-aware edit guards. Shared by the client-side pre-check and by server rejections,
+  // which travel as a `code` + `params` pair so the sentence can be rebuilt in either language.
+  "guard.partiesFarmer": { en: "a farmer payment exists", hi: "किसान भुगतान मौजूद है" },
+  "guard.partiesBuyer": { en: "a buyer payment exists", hi: "व्यापारी भुगतान मौजूद है" },
+  "guard.partiesBoth": { en: "farmer and buyer payments exist", hi: "किसान और व्यापारी दोनों के भुगतान मौजूद हैं" },
+  "guard.reverseFarmer": { en: "Reverse the farmer payment in the Liability Register first.", hi: "पहले देयता रजिस्टर में किसान भुगतान वापस करें।" },
+  "guard.reverseBuyer": { en: "Reverse the buyer payment in Transactions first.", hi: "पहले लेनदेन में व्यापारी भुगतान वापस करें।" },
+  "guard.core": { en: "Cannot change bags, weight or price on this bid — {parties} against it. {how}", hi: "इस बोली पर बोरियां, वज़न या भाव नहीं बदल सकते — इसके विरुद्ध {parties}। {how}" },
+  "guard.buyerChange": { en: "Cannot change the buyer on this bid — a buyer payment already exists against it. Reverse the buyer payment in Transactions first.", hi: "इस बोली का व्यापारी नहीं बदल सकते — इसके विरुद्ध व्यापारी भुगतान पहले से मौजूद है। पहले लेनदेन में व्यापारी भुगतान वापस करें।" },
+  "guard.farmerExtras": { en: "Cannot change farmer extra charges on this bid — a farmer payment exists against it. Reverse the farmer payment in the Liability Register first.", hi: "इस बोली पर किसान के अतिरिक्त खर्च नहीं बदल सकते — इसके विरुद्ध किसान भुगतान मौजूद है। पहले देयता रजिस्टर में किसान भुगतान वापस करें।" },
+  "guard.buyerExtras": { en: "Cannot change buyer extra charges on this bid — a buyer payment exists against it. Reverse the buyer payment in Transactions first.", hi: "इस बोली पर व्यापारी के अतिरिक्त खर्च नहीं बदल सकते — इसके विरुद्ध व्यापारी भुगतान मौजूद है। पहले लेनदेन में व्यापारी भुगतान वापस करें।" },
+  "guard.vehicle": { en: "Cannot change Vehicle Bhada or Total Bags — these apply to every crop group on this farmer card and a farmer payment already exists on {srList}. Reverse the farmer payment in the Liability Register first.", hi: "वाहन भाड़ा या कुल बोरियां नहीं बदल सकते — ये इस किसान कार्ड के हर फसल समूह पर लागू होती हैं और {srList} पर किसान भुगतान पहले से मौजूद है। पहले देयता रजिस्टर में किसान भुगतान वापस करें।" },
+  "guard.farmerChange": { en: "Cannot change the farmer on this card — a farmer payment already exists on {srList}. Reverse the farmer payment in the Liability Register first, then change the farmer. To only correct the current farmer's name, phone or village, edit them in the Farmer Ledger instead.", hi: "इस कार्ड का किसान नहीं बदल सकते — {srList} पर किसान भुगतान पहले से मौजूद है। पहले देयता रजिस्टर में किसान भुगतान वापस करें, फिर किसान बदलें। सिर्फ़ मौजूदा किसान का नाम, फ़ोन या गाँव सुधारना हो तो किसान बही में बदलें।" },
   "stock.priceCannotBeZero": { en: "Price per kg cannot be 0 for a bid with an existing transaction", hi: "मौजूदा लेनदेन वाली बोली के लिए प्रति किलो मूल्य 0 नहीं हो सकता" },
   "stock.bagsCannotBeZero": { en: "Number of bags cannot be 0 for a bid with an existing transaction", hi: "मौजूदा लेनदेन वाली बोली के लिए बोरियों की संख्या 0 नहीं हो सकती" },
   "stock.weightCannotBeZero": { en: "Net weight cannot be 0 for a bid with an existing transaction", hi: "मौजूदा लेनदेन वाली बोली के लिए शुद्ध वज़न 0 नहीं हो सकता" },
@@ -674,7 +685,7 @@ const translations: Record<string, Record<Language, string>> = {
 type LanguageContextType = {
   language: Language;
   setLanguage: (lang: Language) => void;
-  t: (key: string) => string;
+  t: (key: string, params?: Record<string, string | number>) => string;
 };
 
 const LanguageContext = createContext<LanguageContextType>({
@@ -700,10 +711,14 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
     } catch {}
   }, []);
 
-  const t = useCallback((key: string): string => {
+  const t = useCallback((key: string, params?: Record<string, string | number>): string => {
     const entry = translations[key];
-    if (!entry) return key;
-    return entry[language] || entry["en"] || key;
+    const raw = entry ? (entry[language] || entry["en"] || key) : key;
+    if (!params) return raw;
+    return raw.replace(/\{(\w+)\}/g, (match, name) => {
+      const value = params[name];
+      return value === undefined ? match : String(value);
+    });
   }, [language]);
 
   return (

@@ -1,14 +1,37 @@
 import { QueryClient, QueryFunction } from "@tanstack/react-query";
 
+/**
+ * Error thrown for any non-2xx response. Carries the server's machine-readable `code` and
+ * `params` alongside the English `message` so the caller can render a translated sentence
+ * instead of the hardcoded English one. Falls back to `message` when no code is sent.
+ */
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+  params?: Record<string, string | number>;
+
+  constructor(message: string, status: number, code?: string, params?: Record<string, string | number>) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+    this.params = params;
+  }
+}
+
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
     let message = text;
+    let code: string | undefined;
+    let params: Record<string, string | number> | undefined;
     try {
       const json = JSON.parse(text);
       if (json.message) message = json.message;
+      if (typeof json.code === "string") code = json.code;
+      if (json.params && typeof json.params === "object") params = json.params;
     } catch {}
-    throw new Error(message);
+    throw new ApiError(message, res.status, code, params);
   }
 }
 

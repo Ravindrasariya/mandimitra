@@ -38,6 +38,7 @@ import {
 } from "@/lib/receiptGenerators";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useLanguage } from "@/lib/language";
+import { translateApiError } from "@/lib/guardErrors";
 import type { Lot, Farmer, Transaction, Bid, Buyer, ReceiptTemplate } from "@shared/schema";
 
 const capFirst = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
@@ -507,6 +508,22 @@ const hasLotUserData = (lot: LotRow): boolean =>
   [lot.numberOfBags, lot.variety, lot.bagMarka,
     ...lot.bids.flatMap(b => [b.buyerName, b.pricePerKg, b.numberOfBags, b.txn.netWeightInput]),
   ].some(v => (v ?? "").trim() !== "" && (v ?? "").trim() !== "0");
+
+/**
+ * A save refused by a payment guard. The message is already translated at the point of the
+ * block, so the outer handler shows it verbatim instead of stacking a second English toast
+ * from `err.message` on top of the one the guard raised.
+ */
+class SaveBlockedError extends Error {
+  title: string;
+  description: string;
+  constructor(title: string, description: string) {
+    super(description);
+    this.name = "SaveBlockedError";
+    this.title = title;
+    this.description = description;
+  }
+}
 
 const emptyCard = (): FarmerCard => ({
   id: uid(),
@@ -2187,7 +2204,7 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
     .map(g => `BB# ${g.bbNumber} SR# ${g.srNumber} ${g.crop}`);
   const vehicleFieldsLocked = farmerPaidGroups.length > 0;
   const vehicleLockMessage = vehicleFieldsLocked
-    ? `${t("stock.vehicleLockedTitle")} ${farmerPaidGroups.join(", ")}. ${t("stock.vehicleLockedHow")}`
+    ? t("guard.vehicle", { srList: farmerPaidGroups.join(", ") })
     : "";
   const warnVehicleLocked = () => {
     if (!vehicleFieldsLocked) return;
@@ -3876,6 +3893,28 @@ export default function StockPage() {
       const originalFarmerId = savedCardMap.get(card.id)?.farmerId;
       let currentFarmerId = card.farmerId;
 
+      // The card belongs to one farmer, so a farmer payment on any crop group freezes which
+      // farmer that is: re-pointing the card would leave the payment on the old ledger while
+      // the lots move to the new one. Editing the farmer's own name/phone/village is untouched —
+      // that keeps the same ledger id. Checked before any write so a blocked save creates no
+      // stray farmer record.
+      const farmerPaidGroupLabels = card.cropGroups
+        .filter(g => !g.archived && g.lots.some(l => l.bids.some(b => b.txnDbId && (
+          b.farmerPaymentStatus === "paid" || b.farmerPaymentStatus === "partial"
+        ))))
+        .map(g => `BB# ${g.bbNumber} SR# ${g.srNumber} ${g.crop}`);
+      const farmerIdentityLocked = !!originalFarmerId && farmerPaidGroupLabels.length > 0;
+      const blockFarmerChange = () => {
+        throw new SaveBlockedError(
+          t("stock.saveBlocked"),
+          t("guard.farmerChange", { srList: farmerPaidGroupLabels.join(", ") }),
+        );
+      };
+
+      if (farmerIdentityLocked && currentFarmerId && currentFarmerId !== originalFarmerId) {
+        blockFarmerChange();
+      }
+
       if (!currentFarmerId) {
         const dupRes = await apiRequest("POST", "/api/farmers/check-duplicate", {
           name: card.farmerName.trim(),
@@ -3885,7 +3924,12 @@ export default function StockPage() {
         const dupData = await dupRes.json();
         if (dupData.duplicate) {
           currentFarmerId = dupData.duplicate.id;
+          // Retyping the same farmer resolves back to the original id — that is a detail edit,
+          // not a re-point, so it is allowed even on a locked card.
+          if (farmerIdentityLocked && currentFarmerId !== originalFarmerId) blockFarmerChange();
         } else {
+          // No match means this save would mint a new farmer and move the card onto it.
+          if (farmerIdentityLocked) blockFarmerChange();
           const createRes = await apiRequest("POST", "/api/farmers", {
             name: capFirst(card.farmerName.trim()),
             phone: card.farmerPhone.trim(),
@@ -4160,16 +4204,13 @@ export default function StockPage() {
               const ppkCheck = parseFloat(bid.pricePerKg) || 0;
               const bagsCheck = parseInt(bid.numberOfBags) || 0;
               if (ppkCheck <= 0) {
-                toast({ title: t("stock.saveBlocked"), description: `${t("stock.priceCannotBeZero")} (${bid.buyerName})`, variant: "destructive" });
-                throw new Error("Price per kg cannot be 0 for a bid with an existing transaction.");
+                throw new SaveBlockedError(t("stock.saveBlocked"), `${t("stock.priceCannotBeZero")} (${bid.buyerName})`);
               }
               if (bagsCheck <= 0) {
-                toast({ title: t("stock.saveBlocked"), description: `${t("stock.bagsCannotBeZero")} (${bid.buyerName})`, variant: "destructive" });
-                throw new Error("Number of bags cannot be 0 for a bid with an existing transaction.");
+                throw new SaveBlockedError(t("stock.saveBlocked"), `${t("stock.bagsCannotBeZero")} (${bid.buyerName})`);
               }
               if (nw <= 0) {
-                toast({ title: t("stock.saveBlocked"), description: `${t("stock.weightCannotBeZero")} (${bid.buyerName})`, variant: "destructive" });
-                throw new Error("Net weight cannot be 0 for a bid with an existing transaction.");
+                throw new SaveBlockedError(t("stock.saveBlocked"), `${t("stock.weightCannotBeZero")} (${bid.buyerName})`);
               }
               const hasBuyerPayment = bid.paymentStatus === "paid" || bid.paymentStatus === "partial";
               const hasFarmerPayment = bid.farmerPaymentStatus === "paid" || bid.farmerPaymentStatus === "partial";
@@ -4189,25 +4230,33 @@ export default function StockPage() {
                 const txnDiffers = (f: keyof TxnState) => differs(bid.txn[f], savedBid.txn?.[f]);
                 const farmerExtraFields: (keyof TxnState)[] = ["extraChargesFarmer", "extraPerKgFarmer", "extraTulai", "extraBharai", "extraKhadiKarai", "extraThelaBhada", "extraOthers"];
                 const buyerExtraFields: (keyof TxnState)[] = ["extraChargesBuyer", "extraPerKgBuyer"];
-                const sharedChanged =
+                // The buyer is its own rule: only a *buyer* payment freezes it, because that is
+                // the entry that would end up filed against a buyer this bid no longer names.
+                // A farmer payment says nothing about who bought the lot.
+                const buyerChanged = differs(bid.buyerId, savedBid.buyerId);
+                const coreChanged =
                   differs(bid.numberOfBags, savedBid.numberOfBags) ||
                   differs(bid.pricePerKg, savedBid.pricePerKg) ||
-                  differs(bid.buyerId, savedBid.buyerId) ||
                   txnDiffers("netWeightInput");
                 const farmerExtrasChanged = farmerExtraFields.some(txnDiffers);
                 const buyerExtrasChanged = buyerExtraFields.some(txnDiffers);
 
                 let blockReason = "";
-                if (sharedChanged) {
-                  blockReason = `Cannot change buyer, bags, weight or price for "${bid.buyerName}" — a payment exists on this bid. Reverse it first.`;
+                if (buyerChanged && hasBuyerPayment) {
+                  blockReason = t("guard.buyerChange");
+                } else if (coreChanged) {
+                  const parties = hasFarmerPayment && hasBuyerPayment ? "both" : hasFarmerPayment ? "farmer" : "buyer";
+                  blockReason = t("guard.core", {
+                    parties: t(parties === "both" ? "guard.partiesBoth" : parties === "farmer" ? "guard.partiesFarmer" : "guard.partiesBuyer"),
+                    how: t(parties === "buyer" ? "guard.reverseBuyer" : "guard.reverseFarmer"),
+                  });
                 } else if (farmerExtrasChanged && hasFarmerPayment) {
-                  blockReason = `Cannot change farmer extra charges for "${bid.buyerName}" — a farmer payment exists on this bid. Reverse it in the Liability Register first.`;
+                  blockReason = t("guard.farmerExtras");
                 } else if (buyerExtrasChanged && hasBuyerPayment) {
-                  blockReason = `Cannot change buyer extra charges for "${bid.buyerName}" — a buyer payment exists on this bid. Reverse it in Transactions first.`;
+                  blockReason = t("guard.buyerExtras");
                 }
                 if (blockReason) {
-                  toast({ title: t("stock.saveBlocked"), description: blockReason, variant: "destructive" });
-                  throw new Error(blockReason);
+                  throw new SaveBlockedError(t("stock.saveBlocked"), `${bid.buyerName} — ${blockReason}`);
                 }
               }
             }
@@ -4250,7 +4299,7 @@ export default function StockPage() {
                     advanceAmount: bid.advanceAmount || "0",
                   });
                 } catch (err: any) {
-                  toast({ title: t("stock.warning"), description: `${t("stock.failedUpdateBid")}: ${err.message}`, variant: "destructive" });
+                  toast({ title: t("stock.warning"), description: `${t("stock.failedUpdateBid")}: ${translateApiError(err, t)}`, variant: "destructive" });
                 }
               }
             }
@@ -4349,7 +4398,7 @@ export default function StockPage() {
                   savedMuddatAnyaChargesAfterSave = muddatAnyaBuyer;
                   savedFreightChargesAfterSave = freight;
                 } catch (err: any) {
-                  txnFailures.push({ label: `${group.crop} BB# ${group.bbNumber} SR# ${group.srNumber} — ${bid.buyerName || t("stock.buyerName")}`, reason: err.message });
+                  txnFailures.push({ label: `${group.crop} BB# ${group.bbNumber} SR# ${group.srNumber} — ${bid.buyerName || t("stock.buyerName")}`, reason: translateApiError(err, t) });
                 }
               } else {
                 try {
@@ -4360,7 +4409,7 @@ export default function StockPage() {
                   savedMuddatAnyaChargesAfterSave = muddatAnyaBuyer;
                   savedFreightChargesAfterSave = freight;
                 } catch (err: any) {
-                  txnFailures.push({ label: `${group.crop} BB# ${group.bbNumber} SR# ${group.srNumber} — ${bid.buyerName || t("stock.buyerName")}`, reason: err.message });
+                  txnFailures.push({ label: `${group.crop} BB# ${group.bbNumber} SR# ${group.srNumber} — ${bid.buyerName || t("stock.buyerName")}`, reason: translateApiError(err, t) });
                 }
               }
             }
@@ -4450,7 +4499,13 @@ export default function StockPage() {
         toast({ title: t("stock.saved"), description: `${card.farmerName.trim()} ${t("stock.entrySavedSuccess")}`, variant: "success" });
       }
     } catch (err: any) {
-      toast({ title: t("stock.saveFailed"), description: err.message, variant: "destructive" });
+      // Guard blocks already carry a translated sentence; everything else falls back to the
+      // server message unless it came with a guard code we can render in the user's language.
+      if (err instanceof SaveBlockedError) {
+        toast({ title: err.title, description: err.description, variant: "destructive" });
+      } else {
+        toast({ title: t("stock.saveFailed"), description: translateApiError(err, t), variant: "destructive" });
+      }
     } finally {
       savingRef.current = null;
       setSavingCardId(null);
