@@ -10,7 +10,7 @@ import path from "path";
 import fs from "fs";
 import { db } from "./db";
 import { transactions, bids, buyers, lots, farmers, cashEntries, transactionEditHistory, lotEditHistory, insertAssetSchema, insertLiabilitySchema, businesses, type Farmer, type Transaction, type CashEntry } from "@shared/schema";
-import { eq, and, inArray, notInArray, sql, isNull } from "drizzle-orm";
+import { eq, and, inArray, notInArray, sql, isNull, isNotNull } from "drizzle-orm";
 import { addSseClient, removeSseClient, broadcastBusinessEvent } from "./sse";
 
 const uploadsDir = path.join(process.cwd(), "uploads");
@@ -50,6 +50,51 @@ const videoUpload = multer({
 function paramId(val: string | string[]): number {
   return parseInt(Array.isArray(val) ? val[0] : val);
 }
+
+/**
+ * Which parties hold an active (non-reversed, non-archived) payment against a transaction.
+ * `cash_entries` has no direction column, so the party is inferred from the FK plus the
+ * category: a farmer payout is `farmerId + outward`, a buyer receipt is `buyerId + inward`.
+ */
+async function getActivePaymentParties(businessId: number, transactionId: number) {
+  const activeEntries = await db.select({
+    farmerId: cashEntries.farmerId,
+    buyerId: cashEntries.buyerId,
+    category: cashEntries.category,
+  })
+    .from(cashEntries)
+    .where(and(
+      eq(cashEntries.transactionId, transactionId),
+      eq(cashEntries.businessId, businessId),
+      eq(cashEntries.isReversed, false),
+      eq(cashEntries.isArchived, false)
+    ));
+
+  return {
+    hasFarmerPayment: activeEntries.some(e => e.farmerId != null && e.category === "outward"),
+    hasBuyerPayment: activeEntries.some(e => e.buyerId != null && e.category === "inward"),
+  };
+}
+
+/**
+ * True when `body` carries a value for `field` that actually differs from the stored one.
+ * Decimal columns come back as strings ("0.00"), so equal numbers written in different
+ * formats must not read as an edit — every card save re-sends the full field set.
+ */
+function isFieldChanged(row: Record<string, any>, body: Record<string, any>, field: string): boolean {
+  if (body[field] === undefined) return false;
+  const oldRaw = row[field];
+  const newRaw = body[field];
+  const oldNum = Number(oldRaw);
+  const newNum = Number(newRaw);
+  if (oldRaw != null && newRaw != null && oldRaw !== "" && newRaw !== "" && !Number.isNaN(oldNum) && !Number.isNaN(newNum)) {
+    return oldNum !== newNum;
+  }
+  return String(oldRaw ?? "") !== String(newRaw ?? "");
+}
+
+const REVERSE_FARMER = "Reverse the farmer payment in the Liability Register first.";
+const REVERSE_BUYER = "Reverse the buyer payment in Transactions first.";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -1232,6 +1277,46 @@ export async function registerRoutes(
       }
     }
 
+    // Vehicle Bhada Rate and Total Bags in Vehicle drive freight on every bid under the whole
+    // farmer card (all crop groups for this farmer + date), so a farmer payment anywhere on the
+    // card blocks them. Buyer payments never block these — freight is a farmer-side deduction.
+    const numChanged = (oldVal: unknown, newVal: unknown) => {
+      if (newVal === undefined) return false;
+      const o = oldVal == null || oldVal === "" ? null : Number(oldVal);
+      const n = newVal == null || newVal === "" ? null : Number(newVal);
+      if (o == null || n == null || Number.isNaN(o) || Number.isNaN(n)) {
+        return String(oldVal ?? "") !== String(newVal ?? "");
+      }
+      return o !== n;
+    };
+    const vehicleFieldChanged =
+      numChanged(lot.vehicleBhadaRate, data.vehicleBhadaRate) ||
+      numChanged(lot.totalBagsInVehicle, data.totalBagsInVehicle);
+
+    if (vehicleFieldChanged) {
+      const blocking = await db.selectDistinct({ serialNumber: lots.serialNumber, crop: lots.crop })
+        .from(cashEntries)
+        .innerJoin(transactions, eq(cashEntries.transactionId, transactions.id))
+        .innerJoin(lots, eq(transactions.lotId, lots.id))
+        .where(and(
+          eq(lots.farmerId, lot.farmerId),
+          eq(lots.date, lot.date),
+          eq(lots.businessId, businessId),
+          eq(lots.isArchived, false),
+          eq(cashEntries.businessId, businessId),
+          eq(cashEntries.isReversed, false),
+          eq(cashEntries.isArchived, false),
+          eq(cashEntries.category, "outward"),
+          isNotNull(cashEntries.farmerId)
+        ));
+      if (blocking.length > 0) {
+        const where = blocking.map(b => `SR #${b.serialNumber} (${b.crop})`).join(", ");
+        return res.status(400).json({
+          message: `Cannot change Vehicle Bhada or Total Bags — these apply to every crop group on this farmer card and a farmer payment already exists on ${where}. Reverse the farmer payment in the Liability Register first.`,
+        });
+      }
+    }
+
     const oldActual = lot.actualNumberOfBags ?? lot.numberOfBags;
 
     // Compute soldBags from actual active transactions (source of truth).
@@ -1370,6 +1455,30 @@ export async function registerRoutes(
   app.patch("/api/bids/:id", requireAuth, async (req, res) => {
     const bidId = paramId(req.params.id);
     const businessId = req.user!.businessId;
+
+    // A bid's buyer, rate and bag count feed the transaction's economics, so they carry the
+    // same payment guard as the transaction route. Without this the guard there is bypassable:
+    // the card save PATCHes the bid first and the transaction second.
+    const BID_GUARD_FIELDS = ["buyerId", "pricePerKg", "numberOfBags"];
+    const [oldBid] = await db.select().from(bids).where(and(eq(bids.id, bidId), eq(bids.businessId, businessId)));
+    if (!oldBid) return res.status(404).json({ message: "Bid not found" });
+
+    if (BID_GUARD_FIELDS.some(f => isFieldChanged(oldBid as any, req.body, f))) {
+      const [tx] = await db.select({ id: transactions.id }).from(transactions)
+        .where(and(eq(transactions.bidId, bidId), eq(transactions.businessId, businessId)))
+        .limit(1);
+      if (tx) {
+        const { hasFarmerPayment, hasBuyerPayment } = await getActivePaymentParties(businessId, tx.id);
+        if (hasFarmerPayment || hasBuyerPayment) {
+          const who = hasFarmerPayment && hasBuyerPayment
+            ? "farmer and buyer payments exist"
+            : hasFarmerPayment ? "a farmer payment exists" : "a buyer payment exists";
+          const how = hasFarmerPayment ? REVERSE_FARMER : REVERSE_BUYER;
+          return res.status(400).json({ message: `Cannot change buyer, bags or price on this bid — ${who} against it. ${how}` });
+        }
+      }
+    }
+
     const updated = await storage.updateBid(bidId, businessId, req.body);
     if (!updated) return res.status(404).json({ message: "Bid not found" });
     broadcastBusinessEvent(businessId);
@@ -1587,21 +1696,38 @@ export async function registerRoutes(
     if (!oldTx) return res.status(404).json({ message: "Transaction not found" });
 
     const txTrackFields: (keyof typeof oldTx)[] = ["numberOfBags", "extraChargesFarmer", "extraTulaiFarmer", "extraBharaiFarmer", "extraKhadiKaraiFarmer", "extraThelaBhadaFarmer", "extraOthersFarmer", "extraChargesBuyer", "extraPerKgFarmer", "extraPerKgBuyer", "netWeight", "pricePerKg", "totalPayableToFarmer", "totalReceivableFromBuyer", "hammaliCharges", "freightCharges", "aadhatCharges", "mandiCharges", "muddatAnyaCharges"];
-    const hasFieldChange = txTrackFields.some(f => {
-      if (req.body[f] === undefined) return false;
-      return String(req.body[f] ?? "") !== String(oldTx[f] ?? "");
-    });
-    if (hasFieldChange) {
-      const [activeCashEntry] = await db.select({ id: cashEntries.id })
-        .from(cashEntries)
-        .where(and(
-          eq(cashEntries.transactionId, txId),
-          eq(cashEntries.businessId, businessId),
-          eq(cashEntries.isReversed, false)
-        ))
-        .limit(1);
-      if (activeCashEntry) {
-        return res.status(400).json({ message: "Cannot edit transaction: payments exist. Please reverse all payments first." });
+
+    // Payment-aware edit guards, scoped by the party a field affects.
+    // Derived amounts (freight, hammali, aadhat, mandi, muddat-anya and both totals) are
+    // deliberately NOT guarded: they are recomputed on every card save from inputs that are
+    // themselves guarded (bid inputs here, vehicle bhada/total bags on the lot route), and
+    // from rate snapshots stored on the transaction. Blocking them made a legitimate freight
+    // recalculation fail on lots whose buyer had already paid, leaving stale values behind.
+    const SHARED_GUARD_FIELDS: (keyof typeof oldTx)[] = ["numberOfBags", "netWeight", "pricePerKg"];
+    const FARMER_GUARD_FIELDS: (keyof typeof oldTx)[] = ["extraChargesFarmer", "extraTulaiFarmer", "extraBharaiFarmer", "extraKhadiKaraiFarmer", "extraThelaBhadaFarmer", "extraOthersFarmer", "extraPerKgFarmer"];
+    const BUYER_GUARD_FIELDS: (keyof typeof oldTx)[] = ["extraChargesBuyer", "extraPerKgBuyer"];
+
+    const isChanged = (f: keyof typeof oldTx) => isFieldChanged(oldTx as any, req.body, f as string);
+
+    const changedShared = SHARED_GUARD_FIELDS.filter(isChanged);
+    const changedFarmer = FARMER_GUARD_FIELDS.filter(isChanged);
+    const changedBuyer = BUYER_GUARD_FIELDS.filter(isChanged);
+
+    if (changedShared.length || changedFarmer.length || changedBuyer.length) {
+      const { hasFarmerPayment, hasBuyerPayment } = await getActivePaymentParties(businessId, txId);
+
+      if (changedShared.length && (hasFarmerPayment || hasBuyerPayment)) {
+        const who = hasFarmerPayment && hasBuyerPayment
+          ? "farmer and buyer payments exist"
+          : hasFarmerPayment ? "a farmer payment exists" : "a buyer payment exists";
+        const how = hasFarmerPayment ? REVERSE_FARMER : REVERSE_BUYER;
+        return res.status(400).json({ message: `Cannot change bags, weight or price on this bid — ${who} against it. ${how}` });
+      }
+      if (changedFarmer.length && hasFarmerPayment) {
+        return res.status(400).json({ message: `Cannot change farmer extra charges on this bid — a farmer payment exists against it. ${REVERSE_FARMER}` });
+      }
+      if (changedBuyer.length && hasBuyerPayment) {
+        return res.status(400).json({ message: `Cannot change buyer extra charges on this bid — a buyer payment exists against it. ${REVERSE_BUYER}` });
       }
     }
 

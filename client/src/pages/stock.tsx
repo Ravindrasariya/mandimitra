@@ -2178,6 +2178,22 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
   const vehicleBhadaRate = parseFloat(card.vehicleBhadaRate) || 0;
   const totalBagsInVehicle = parseInt(card.totalBagsInVehicle) || 0;
 
+  // Vehicle Bhada and Total Bags in Vehicle drive freight on every bid under this farmer card,
+  // so any farmer payment (partial or full) anywhere on the card locks them. Buyer payments do not.
+  const farmerPaidGroups = card.cropGroups
+    .filter(g => g.lots.some(l => l.bids.some(b => b.txnDbId && (
+      b.farmerPaymentStatus === "paid" || b.farmerPaymentStatus === "partial"
+    ))))
+    .map(g => `BB# ${g.bbNumber} SR# ${g.srNumber} ${g.crop}`);
+  const vehicleFieldsLocked = farmerPaidGroups.length > 0;
+  const vehicleLockMessage = vehicleFieldsLocked
+    ? `${t("stock.vehicleLockedTitle")} ${farmerPaidGroups.join(", ")}. ${t("stock.vehicleLockedHow")}`
+    : "";
+  const warnVehicleLocked = () => {
+    if (!vehicleFieldsLocked) return;
+    toast({ title: t("stock.editBlocked"), description: vehicleLockMessage, variant: "destructive" });
+  };
+
   const hasAnyInput = !!(
     card.farmerName.trim() || card.farmerPhone || card.village ||
     card.vehicleNumber || card.advanceAmount ||
@@ -2671,7 +2687,13 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
               </div>
               <div>
                 <Label className="text-[10px] sm:text-xs text-muted-foreground">{t("stock.freightBhada")} <span className="text-destructive">*</span></Label>
-                <Input data-testid="input-bhada-rate" type="text" inputMode="decimal" placeholder="0.00" value={card.vehicleBhadaRate} onChange={e => set("vehicleBhadaRate", toNum(e.target.value))} onFocus={e => e.target.select()} {...noScrollProps} className="h-8 text-sm" />
+                <Input data-testid="input-bhada-rate" type="text" inputMode="decimal" placeholder="0.00" value={card.vehicleBhadaRate}
+                  readOnly={vehicleFieldsLocked}
+                  title={vehicleLockMessage || undefined}
+                  onChange={e => { if (vehicleFieldsLocked) return; set("vehicleBhadaRate", toNum(e.target.value)); }}
+                  onFocus={e => { e.target.select(); warnVehicleLocked(); }}
+                  {...noScrollProps}
+                  className={`h-8 text-sm ${vehicleFieldsLocked ? "cursor-not-allowed bg-muted/60" : ""}`} />
               </div>
               <div>
                 <Label className="text-[10px] sm:text-xs text-muted-foreground">{t("stock.advanceCredit")} <span className="text-destructive">*</span></Label>
@@ -2687,7 +2709,12 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
               </div>
               <div>
                 <Label className="text-[10px] sm:text-xs text-muted-foreground">{t("stock.totalBagsInVehicle")} <span className="text-destructive">*</span></Label>
-                <Input data-testid="input-total-bags-vehicle" type="text" inputMode="numeric" placeholder="0" value={card.totalBagsInVehicle} onChange={e => set("totalBagsInVehicle", e.target.value.replace(/\D/g, ""))} onFocus={e => e.target.select()} className="h-8 text-sm" />
+                <Input data-testid="input-total-bags-vehicle" type="text" inputMode="numeric" placeholder="0" value={card.totalBagsInVehicle}
+                  readOnly={vehicleFieldsLocked}
+                  title={vehicleLockMessage || undefined}
+                  onChange={e => { if (vehicleFieldsLocked) return; set("totalBagsInVehicle", e.target.value.replace(/\D/g, "")); }}
+                  onFocus={e => { e.target.select(); warnVehicleLocked(); }}
+                  className={`h-8 text-sm ${vehicleFieldsLocked ? "cursor-not-allowed bg-muted/60" : ""}`} />
                 {(() => {
                   const allocated = card.cropGroups.reduce((sum, g) => sum + g.lots.reduce((s, l) => s + (parseInt(l.numberOfBags) || 0), 0), 0);
                   const total = parseInt(card.totalBagsInVehicle) || 0;
@@ -3562,6 +3589,9 @@ export default function StockPage() {
   const [cards, setCards] = useState<FarmerCard[]>([]);
   const [savedCardMap, setSavedCardMap] = useState<Map<string, FarmerCard>>(new Map());
   const [savingCardId, setSavingCardId] = useState<string | null>(null);
+  // Per-transaction failures during a card save. Shown in a dialog the user must dismiss, because
+  // the card keeps rendering freshly recalculated numbers that were never persisted for these bids.
+  const [partialSaveFailures, setPartialSaveFailures] = useState<{ label: string; reason: string }[]>([]);
   const savingRef = useRef<string | null>(null);
   const dbLoaded = useRef(false);
   const { user } = useAuth();
@@ -3804,6 +3834,7 @@ export default function StockPage() {
     setCards(prev => prev.map((c, i) => (i === idx ? card : c)));
 
   const saveCard = async (idx: number, collapseAfter = false) => {
+    const txnFailures: { label: string; reason: string }[] = [];
     let card = cards[idx];
     if (!card.farmerName.trim()) {
       toast({ title: t("stock.error"), description: t("stock.farmerNameRequired"), variant: "destructive" });
@@ -4120,6 +4151,66 @@ export default function StockPage() {
             }
 
             let bidDbId = bid.bidDbId;
+            const nw = parseFloat(bid.txn.netWeightInput) || 0;
+
+            // Validate and payment-guard BEFORE any write for this bid. The bid row is PATCHed
+            // ahead of its transaction, so checking later would let a blocked save persist a new
+            // buyer/price/bag count against a transaction that still holds the old economics.
+            if (bidDbId && bid.txnDbId) {
+              const ppkCheck = parseFloat(bid.pricePerKg) || 0;
+              const bagsCheck = parseInt(bid.numberOfBags) || 0;
+              if (ppkCheck <= 0) {
+                toast({ title: t("stock.saveBlocked"), description: `${t("stock.priceCannotBeZero")} (${bid.buyerName})`, variant: "destructive" });
+                throw new Error("Price per kg cannot be 0 for a bid with an existing transaction.");
+              }
+              if (bagsCheck <= 0) {
+                toast({ title: t("stock.saveBlocked"), description: `${t("stock.bagsCannotBeZero")} (${bid.buyerName})`, variant: "destructive" });
+                throw new Error("Number of bags cannot be 0 for a bid with an existing transaction.");
+              }
+              if (nw <= 0) {
+                toast({ title: t("stock.saveBlocked"), description: `${t("stock.weightCannotBeZero")} (${bid.buyerName})`, variant: "destructive" });
+                throw new Error("Net weight cannot be 0 for a bid with an existing transaction.");
+              }
+              const hasBuyerPayment = bid.paymentStatus === "paid" || bid.paymentStatus === "partial";
+              const hasFarmerPayment = bid.farmerPaymentStatus === "paid" || bid.farmerPaymentStatus === "partial";
+              const savedBid = savedBidMap.get(bidDbId);
+              if ((hasBuyerPayment || hasFarmerPayment) && savedBid) {
+                // Mirror the server guards: only the fields the user types are protected, and each
+                // is scoped to the party it affects. Derived amounts (freight, hammali, commissions,
+                // payable/receivable) are always allowed through so a vehicle-bhada correction can
+                // refresh freight on a bid whose buyer has already paid.
+                // Numeric-aware compare, matching the server — decimals round-trip as "0.00".
+                const differs = (a: unknown, b: unknown) => {
+                  const an = Number(a), bn = Number(b);
+                  const aStr = String(a ?? ""), bStr = String(b ?? "");
+                  if (aStr !== "" && bStr !== "" && !Number.isNaN(an) && !Number.isNaN(bn)) return an !== bn;
+                  return aStr !== bStr;
+                };
+                const txnDiffers = (f: keyof TxnState) => differs(bid.txn[f], savedBid.txn?.[f]);
+                const farmerExtraFields: (keyof TxnState)[] = ["extraChargesFarmer", "extraPerKgFarmer", "extraTulai", "extraBharai", "extraKhadiKarai", "extraThelaBhada", "extraOthers"];
+                const buyerExtraFields: (keyof TxnState)[] = ["extraChargesBuyer", "extraPerKgBuyer"];
+                const sharedChanged =
+                  differs(bid.numberOfBags, savedBid.numberOfBags) ||
+                  differs(bid.pricePerKg, savedBid.pricePerKg) ||
+                  differs(bid.buyerId, savedBid.buyerId) ||
+                  txnDiffers("netWeightInput");
+                const farmerExtrasChanged = farmerExtraFields.some(txnDiffers);
+                const buyerExtrasChanged = buyerExtraFields.some(txnDiffers);
+
+                let blockReason = "";
+                if (sharedChanged) {
+                  blockReason = `Cannot change buyer, bags, weight or price for "${bid.buyerName}" — a payment exists on this bid. Reverse it first.`;
+                } else if (farmerExtrasChanged && hasFarmerPayment) {
+                  blockReason = `Cannot change farmer extra charges for "${bid.buyerName}" — a farmer payment exists on this bid. Reverse it in the Liability Register first.`;
+                } else if (buyerExtrasChanged && hasBuyerPayment) {
+                  blockReason = `Cannot change buyer extra charges for "${bid.buyerName}" — a buyer payment exists on this bid. Reverse it in Transactions first.`;
+                }
+                if (blockReason) {
+                  toast({ title: t("stock.saveBlocked"), description: blockReason, variant: "destructive" });
+                  throw new Error(blockReason);
+                }
+              }
+            }
 
             if (!bidDbId) {
               try {
@@ -4165,40 +4256,6 @@ export default function StockPage() {
             }
 
             let txnDbId = bid.txnDbId;
-            const nw = parseFloat(bid.txn.netWeightInput) || 0;
-
-            if (txnDbId) {
-              const ppkCheck = parseFloat(bid.pricePerKg) || 0;
-              const bagsCheck = parseInt(bid.numberOfBags) || 0;
-              if (ppkCheck <= 0) {
-                toast({ title: t("stock.saveBlocked"), description: `${t("stock.priceCannotBeZero")} (${bid.buyerName})`, variant: "destructive" });
-                throw new Error("Price per kg cannot be 0 for a bid with an existing transaction.");
-              }
-              if (bagsCheck <= 0) {
-                toast({ title: t("stock.saveBlocked"), description: `${t("stock.bagsCannotBeZero")} (${bid.buyerName})`, variant: "destructive" });
-                throw new Error("Number of bags cannot be 0 for a bid with an existing transaction.");
-              }
-              if (nw <= 0) {
-                toast({ title: t("stock.saveBlocked"), description: `${t("stock.weightCannotBeZero")} (${bid.buyerName})`, variant: "destructive" });
-                throw new Error("Net weight cannot be 0 for a bid with an existing transaction.");
-              }
-              const hasBuyerPayment = bid.paymentStatus === "paid" || bid.paymentStatus === "partial";
-              const hasFarmerPayment = bid.farmerPaymentStatus === "paid" || bid.farmerPaymentStatus === "partial";
-              if (hasBuyerPayment || hasFarmerPayment) {
-                const savedBid = savedBidMap.get(bidDbId);
-                const txnFields: (keyof TxnState)[] = ["netWeightInput", "extraChargesFarmer", "extraChargesBuyer", "extraPerKgFarmer", "extraPerKgBuyer", "extraTulai", "extraBharai", "extraKhadiKarai", "extraThelaBhada", "extraOthers"];
-                const txnChanged = savedBid && (
-                  savedBid.numberOfBags !== bid.numberOfBags ||
-                  savedBid.pricePerKg !== bid.pricePerKg ||
-                  savedBid.buyerId !== bid.buyerId ||
-                  txnFields.some(f => String(bid.txn[f] || "") !== String(savedBid.txn?.[f] || ""))
-                );
-                if (txnChanged) {
-                  toast({ title: t("stock.saveBlocked"), description: `Cannot edit transaction for "${bid.buyerName}" — payments exist. Please reverse all payments first.`, variant: "destructive" });
-                  throw new Error("Cannot edit a transaction with active payments.");
-                }
-              }
-            }
 
             let savedBuyerReceivableAfterSave = bid.savedBuyerReceivable;
             let savedFarmerPayableAfterSave = bid.savedFarmerPayable;
@@ -4292,7 +4349,7 @@ export default function StockPage() {
                   savedMuddatAnyaChargesAfterSave = muddatAnyaBuyer;
                   savedFreightChargesAfterSave = freight;
                 } catch (err: any) {
-                  toast({ title: t("stock.warning"), description: `${t("stock.failedCreateTxn")}: ${err.message}`, variant: "destructive" });
+                  txnFailures.push({ label: `${group.crop} BB# ${group.bbNumber} SR# ${group.srNumber} — ${bid.buyerName || t("stock.buyerName")}`, reason: err.message });
                 }
               } else {
                 try {
@@ -4303,7 +4360,7 @@ export default function StockPage() {
                   savedMuddatAnyaChargesAfterSave = muddatAnyaBuyer;
                   savedFreightChargesAfterSave = freight;
                 } catch (err: any) {
-                  toast({ title: t("stock.warning"), description: `${t("stock.failedUpdateTxn")}: ${err.message}`, variant: "destructive" });
+                  txnFailures.push({ label: `${group.crop} BB# ${group.bbNumber} SR# ${group.srNumber} — ${bid.buyerName || t("stock.buyerName")}`, reason: err.message });
                 }
               }
             }
@@ -4387,7 +4444,11 @@ export default function StockPage() {
       }});
 
       setCards(prev => sortCardsByMaxSr([...prev]));
-      toast({ title: t("stock.saved"), description: `${card.farmerName.trim()} ${t("stock.entrySavedSuccess")}`, variant: "success" });
+      if (txnFailures.length > 0) {
+        setPartialSaveFailures(txnFailures);
+      } else {
+        toast({ title: t("stock.saved"), description: `${card.farmerName.trim()} ${t("stock.entrySavedSuccess")}`, variant: "success" });
+      }
     } catch (err: any) {
       toast({ title: t("stock.saveFailed"), description: err.message, variant: "destructive" });
     } finally {
@@ -4970,6 +5031,29 @@ export default function StockPage() {
           );
         })}
       </div>
+      {partialSaveFailures.length > 0 && (
+        <AlertDialog open onOpenChange={v => { if (!v) setPartialSaveFailures([]); }}>
+          <AlertDialogContent data-testid="dialog-partial-save-failures">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-red-600 dark:text-red-400">{t("stock.partialSaveTitle")}</AlertDialogTitle>
+              <AlertDialogDescription>{t("stock.partialSaveIntro")}</AlertDialogDescription>
+            </AlertDialogHeader>
+            <ul className="max-h-64 overflow-y-auto space-y-2 text-sm">
+              {partialSaveFailures.map((f, i) => (
+                <li key={i} className="border rounded-md p-2" data-testid={`row-partial-save-failure-${i}`}>
+                  <div className="font-medium">{f.label}</div>
+                  <div className="text-xs text-muted-foreground mt-0.5">{f.reason}</div>
+                </li>
+              ))}
+            </ul>
+            <AlertDialogFooter>
+              <AlertDialogAction data-testid="button-dismiss-partial-save" onClick={() => setPartialSaveFailures([])}>
+                {t("stock.partialSaveDismiss")}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
       {bbSROverride && (
         <AlertDialog open={bbSROverride.open} onOpenChange={v => { if (!v) setBBSROverride(null); }}>
           <AlertDialogContent>
