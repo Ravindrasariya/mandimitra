@@ -663,7 +663,7 @@ ${!hideAadhat ? `<div class="summary-row total"><span>Total Receivable from Buye
 </body></html>`;
 }
 
-export function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[], serialNumber: number, date: string, businessName?: string, businessAddress?: string, businessInitials?: string, businessPhone?: string, businessLicenceNo?: string, businessShopNo?: string, receiptSerialNumber?: number, farmer?: { name: string; village?: string }, hideAadhat?: boolean): string {
+export function applyCombinedBuyerTemplate(tmpl: string, entries: BuyerLotEntry[], serialNumber: number, date: string, businessName?: string, businessAddress?: string, businessInitials?: string, businessPhone?: string, businessLicenceNo?: string, businessShopNo?: string, receiptSerialNumber?: number, farmer?: { name: string; village?: string | null }, hideAadhat?: boolean): string {
   const firstTx = entries[0].tx;
   const firstLot = entries[0].lot;
   const aadhatPct = parseFloat(firstTx.aadhatBuyerPercent || "0");

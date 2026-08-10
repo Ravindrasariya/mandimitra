@@ -741,7 +741,7 @@ export async function registerRoutes(
   });
 
   app.get("/api/vehicles/:vehicleNumber/drivers", requireAuth, async (req, res) => {
-    const vehicleNumber = req.params.vehicleNumber;
+    const vehicleNumber = String(req.params.vehicleNumber ?? "");
     if (!vehicleNumber || vehicleNumber.trim().length < 3) {
       return res.json([]);
     }
@@ -807,6 +807,8 @@ export async function registerRoutes(
           isReversed: boolean;
           paymentStatus: string;
           farmerPaymentStatus: string;
+          farmerPaidAmount: string;
+          paidAmount: string;
         } | null;
       }
 
@@ -1962,7 +1964,7 @@ export async function registerRoutes(
       const isFarmerOutward = allocations && Array.isArray(allocations) && allocations.length > 0 && data.category === "outward" && data.farmerId;
 
       if (isBuyerInward || isFarmerOutward) {
-        const expandedAllocations: { transactionId: number | null; amount: string; discount: string; pettyAdj: string }[] = [];
+        const expandedAllocations: { transactionId: number | null; amount: string; discount: string; pettyAdj: string; isAdvanceDeposit?: boolean }[] = [];
         for (const a of allocations) {
           if (a.transactionIds && Array.isArray(a.transactionIds) && a.transactionIds.length > 0) {
             const groupAmount = parseFloat(a.amount || "0");

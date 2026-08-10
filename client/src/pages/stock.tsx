@@ -91,6 +91,7 @@ type TxnState = {
   extraKhadiKarai: string;
   extraThelaBhada: string;
   extraOthers: string;
+  isReversed?: boolean;
 };
 
 const emptyTxn = (): TxnState => ({
