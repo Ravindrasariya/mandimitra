@@ -18,7 +18,8 @@ import { Separator } from "@/components/ui/separator";
 import type { Buyer, BuyerEditHistory } from "@shared/schema";
 import { ShoppingBag, Search, Plus, Pencil, ArrowUpDown, ArrowUp, ArrowDown, Printer, RefreshCw, ChevronDown, ChevronRight, Calendar, Share2, AlertTriangle, FileText, Archive } from "lucide-react";
 import { format } from "date-fns";
-import { printReceipt, shareReceiptAsImage } from "@/lib/receiptUtils";
+import { printReceipt, shareReceiptAsImage, letterheadHtml } from "@/lib/receiptUtils";
+import { useAuth } from "@/lib/auth";
 import jsPDF from "jspdf";
 
 type BuyerWithDues = Buyer & { receivableDue: string; overallDue: string; advanceBalance: string; bidDates?: string[] };
@@ -49,7 +50,8 @@ function generateBuyerPaanaHtml(
   businessAddress: string,
   buyer: { name: string; address?: string | null; phone?: string | null; openingBalance?: string | null },
   txns: PaanaTxn[],
-  overallDue: string
+  overallDue: string,
+  receiptHeaderImage?: string | null
 ) {
   const today = format(new Date(), "dd/MM/yyyy");
   const dueTxns = txns.filter(t => t.paymentStatus === "due" || t.paymentStatus === "partial");
@@ -102,9 +104,10 @@ function generateBuyerPaanaHtml(
   table { width: 100%; border-collapse: collapse; margin-top: 12px; }
   th { background: #2e7d32; color: white; padding: 8px; border: 1px solid #ddd; text-align: center; font-size: 0.85em; }
 </style></head><body>
+  ${letterheadHtml(receiptHeaderImage)}
   <div style="text-align:center;margin-bottom:16px">
-    <h2 style="margin:0;color:#2e7d32">${businessName}</h2>
-    ${businessAddress ? `<p style="margin:2px 0;color:#555;font-size:0.85em">${businessAddress}</p>` : ""}
+    ${receiptHeaderImage ? "" : `<h2 style="margin:0;color:#2e7d32">${businessName}</h2>
+    ${businessAddress ? `<p style="margin:2px 0;color:#555;font-size:0.85em">${businessAddress}</p>` : ""}`}
     <p style="margin:4px 0;color:#666;font-size:0.85em">Date: ${today}</p>
   </div>
   <div style="background:#f8f8f8;padding:12px;border-radius:6px;margin-bottom:16px">
@@ -129,7 +132,7 @@ function generateBuyerPaanaHtml(
 </body></html>`;
 }
 
-function generateBuyerListPrintHtml(buyers: BuyerWithDues[], summary: { total: number; withDues: number; totalOverallDue: number; totalReceivableDue: number; duesOver15: number; duesOver30: number; totalAdvance: number }) {
+function generateBuyerListPrintHtml(buyers: BuyerWithDues[], summary: { total: number; withDues: number; totalOverallDue: number; totalReceivableDue: number; duesOver15: number; duesOver30: number; totalAdvance: number }, receiptHeaderImage?: string | null) {
   const rows = buyers.map(b => `<tr>
 <td style="padding:6px 10px;border:1px solid #ddd">${b.buyerId}</td>
 <td style="padding:6px 10px;border:1px solid #ddd">${b.name}</td>
@@ -143,6 +146,7 @@ function generateBuyerListPrintHtml(buyers: BuyerWithDues[], summary: { total: n
 .summary{display:flex;gap:20px;justify-content:center;margin:15px 0}
 .summary-card{padding:10px 20px;border:1px solid #ddd;border-radius:8px;text-align:center}
 @media print{body{margin:5mm}}</style></head><body>
+${letterheadHtml(receiptHeaderImage)}
 <h2 style="text-align:center;margin-bottom:5px">Buyer Ledger</h2>
 <div class="summary">
 <div class="summary-card"><div style="font-size:0.8em;color:#666">Total Buyers</div><div style="font-size:1.3em;font-weight:bold">${summary.total}</div></div>
@@ -442,6 +446,7 @@ function BuyerLedgerSection({ buyer }: { buyer: BuyerWithDues }) {
 export default function BuyerLedgerPage() {
   const { toast } = useToast();
   const { t } = useLanguage();
+  const { user } = useAuth();
   const _now = new Date();
   const _defaultYear = String(_now.getMonth() < 3 ? _now.getFullYear() - 1 : _now.getFullYear());
   const _defaultMonth = String(_now.getMonth() + 1);
@@ -799,7 +804,8 @@ export default function BuyerLedgerPage() {
       data.businessAddress || "",
       data.buyer,
       filteredTxns,
-      buyer.overallDue
+      buyer.overallDue,
+      user?.receiptHeaderImage
     );
   };
 
@@ -900,7 +906,7 @@ export default function BuyerLedgerPage() {
   };
 
   const handlePrintList = () => {
-    const html = generateBuyerListPrintHtml(sortedBuyers, summary);
+    const html = generateBuyerListPrintHtml(sortedBuyers, summary, user?.receiptHeaderImage);
     printReceipt(html);
   };
 

@@ -296,3 +296,14 @@ export async function shareReceiptAsImage(html: string, fileName: string): Promi
     try { document.body.removeChild(container); } catch {}
   }
 }
+
+/**
+ * Markup for the business letterhead uploaded through the admin utility. Sized to the full printable
+ * width of whatever document it is dropped into, with the height left to follow the image's own
+ * proportions so it is never stretched. Returns an empty string when no letterhead is set, so callers
+ * can fall back to their existing text header.
+ */
+export function letterheadHtml(src?: string | null): string {
+  if (!src) return "";
+  return `<div style="text-align:center;margin-bottom:8px"><img src="${escHtml(src)}" style="display:block;width:100%;max-width:100%;height:auto" /></div>`;
+}

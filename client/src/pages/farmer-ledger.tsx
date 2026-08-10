@@ -21,7 +21,8 @@ import { Users, Search, Pencil, RefreshCw, Printer, Archive, AlertTriangle, Arro
 import jsPDF from "jspdf";
 import { useKeyboardNav } from "@/hooks/use-keyboard-nav";
 import { format } from "date-fns";
-import { printReceipt } from "@/lib/receiptUtils";
+import { printReceipt, letterheadHtml } from "@/lib/receiptUtils";
+import { useAuth } from "@/lib/auth";
 
 type FarmerWithDues = Farmer & { totalPayable: string; totalDue: string; totalAdvance: string; advanceEntries?: { date: string; amount: string }[]; salesCount: number; bidDates?: string[] };
 type SortField = "farmerId" | "name" | "totalPayable" | "totalDue";
@@ -35,7 +36,7 @@ function formatIndianCurrency(value: string | number): string {
   return `₹${formatted}`;
 }
 
-function generateFarmerListPrintHtml(farmers: FarmerWithDues[], summary: { total: number; withDues: number; totalPayable: number; totalDue: number }, duesMap: Map<number, { payable: number; due: number }>) {
+function generateFarmerListPrintHtml(farmers: FarmerWithDues[], summary: { total: number; withDues: number; totalPayable: number; totalDue: number }, duesMap: Map<number, { payable: number; due: number }>, receiptHeaderImage?: string | null) {
   const rows = farmers.map(f => {
     const d = duesMap.get(f.id);
     const payable = d?.payable ?? parseFloat(f.totalPayable);
@@ -59,6 +60,7 @@ h2{text-align:center}th{background:#f5f5f5;padding:8px;border:1px solid #ddd;tex
 .summary{display:flex;gap:20px;justify-content:center;margin:15px 0}
 .summary-card{padding:10px 20px;border:1px solid #ddd;border-radius:8px;text-align:center}
 @media print{body{margin:5mm}}</style></head><body>
+${letterheadHtml(receiptHeaderImage)}
 <h2>Farmer Ledger Report</h2>
 <p style="text-align:center;color:#666">${format(new Date(), "dd MMM yyyy")}</p>
 <div class="summary">
@@ -352,6 +354,7 @@ function FarmerLedgerSection({ farmer }: { farmer: FarmerWithDues }) {
 export default function FarmerLedgerPage() {
   const { toast } = useToast();
   const { t } = useLanguage();
+  const { user } = useAuth();
   const [searchName, setSearchName] = usePersistedState("fl-searchName", "");
   const [searchNameId, setSearchNameId] = useState<number | null>(null);
   const [searchNameOpen, setSearchNameOpen] = useState(false);
@@ -709,7 +712,7 @@ export default function FarmerLedgerPage() {
   };
 
   const handlePrint = () => {
-    const html = generateFarmerListPrintHtml(sortedFarmers, summary, filteredDuesByFarmer);
+    const html = generateFarmerListPrintHtml(sortedFarmers, summary, filteredDuesByFarmer, user?.receiptHeaderImage);
     printReceipt(html);
   };
 
