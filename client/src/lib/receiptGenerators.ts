@@ -30,17 +30,27 @@ export function generateFarmerReceiptHtml(sg: UnifiedSerialGroup, businessName?:
   const rawDate = sg.date || format(new Date(), "yyyy-MM-dd");
   const firstLot = sg.lotGroups[0]?.lot;
   const cropHindi: Record<string, string> = { Potato: "आलू", Onion: "प्याज", Garlic: "लहसुन" };
+  const escMap: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
+  const esc = (v: unknown) => String(v ?? "").replace(/[&<>"']/g, c => escMap[c]);
 
   // Format date as DD/MM/YYYY
   const [yr, mo, dy] = rawDate.split("-");
   const dateDisplay = `${dy}/${mo}/${yr}`;
 
-  // Aggregates
+  // Aggregates -- single source of truth for both the charges table and the payment slip below it.
   const totalFreight = allTxns.reduce((s, t) => s + parseFloat(t.freightCharges || "0"), 0);
   const totalHammali = allTxns.reduce((s, t) => s + parseFloat(t.hammaliCharges || "0"), 0);
   const totalExtra = allTxns.reduce((s, t) => s + parseFloat(t.extraChargesFarmer || "0"), 0);
   const hammaliAndExtras = totalHammali + totalExtra;
   const totalShownDeductions = totalFreight + hammaliAndExtras;
+  // Itemised breakdown shown on the slip. extraChargesFarmer is already the sum of these, so the
+  // breakdown is presentational only and does not alter the totals above. Every component is
+  // listed -- including "others" -- so the printed items always add up to कुल खर्च exactly.
+  const totalTulai = allTxns.reduce((s, t) => s + parseFloat((t as any).extraTulaiFarmer || "0"), 0);
+  const totalBharai = allTxns.reduce((s, t) => s + parseFloat((t as any).extraBharaiFarmer || "0"), 0);
+  const totalKhadiKarai = allTxns.reduce((s, t) => s + parseFloat((t as any).extraKhadiKaraiFarmer || "0"), 0);
+  const totalThelaBhada = allTxns.reduce((s, t) => s + parseFloat((t as any).extraThelaBhadaFarmer || "0"), 0);
+  const totalOthers = allTxns.reduce((s, t) => s + parseFloat((t as any).extraOthersFarmer || "0"), 0);
   const farmerAdvance = parseFloat(firstLot?.farmerAdvanceAmount || "0");
   const totalGross = allTxns.reduce((s, t) => {
     const nw = parseFloat(t.netWeight || "0");
@@ -74,6 +84,12 @@ export function generateFarmerReceiptHtml(sg: UnifiedSerialGroup, businessName?:
     </tr>`;
   }).join("");
 
+  // Keep the ruled table a sensible size on light receipts so the space freed up for the
+  // slip does not leave the produce area looking stranded.
+  const MIN_PRODUCE_ROWS = 10;
+  const blankProduceRow = `<tr>${tdEmpty()}${tdEmpty()}${tdEmpty()}${tdEmpty()}${tdEmpty()}${tdEmpty()}</tr>`;
+  const blankProduceRows = Array(Math.max(0, MIN_PRODUCE_ROWS - allTxns.length)).fill(blankProduceRow).join("");
+
   // Deduction rows: cols 1-5 empty, col 6 has label + value
   const dedRow = (label: string, amount: number, bold = false) =>
     `<tr>
@@ -99,18 +115,109 @@ export function generateFarmerReceiptHtml(sg: UnifiedSerialGroup, businessName?:
   const th = (label: string) =>
     `<th style="padding:6px 7px;border:1px solid #444;background:#f0f0f0;font-weight:bold;text-align:center">${label}</th>`;
 
+  // ---- Farmer payment slip (tear-off copy handed to the farmer) ----
+  const slipVillage = esc(farmer.village);
+  const slipFarmerLine = `<span class="bold">${esc(farmer.name)}</span>${slipVillage ? `&nbsp;&ndash;&nbsp;${slipVillage}` : ""}`;
+
+  const slipCrop = firstLot?.crop || "";
+  const slipCropBags = slipCrop ? `(${esc(cropHindi[slipCrop] || slipCrop)} - ${sg.totalBags})` : "";
+
+  // Only print charges that actually apply, so a receipt with no deductions
+  // does not hand the farmer a row of zeroes.
+  const chargeList = (entries: [string, number][], sep: string) =>
+    entries.filter(([, v]) => v > 0).map(([l, v]) => `${l} <span class="bold">${v.toFixed(2)}</span>`).join(sep);
+  const slipCharges = chargeList([
+    ["हम्माली", totalHammali], ["तुलाई", totalTulai], ["भराई", totalBharai], ["खड़ी कराई", totalKhadiKarai],
+  ], " &nbsp; ");
+  const slipBhada = chargeList([
+    ["ठेला भाड़ा", totalThelaBhada], ["अन्य", totalOthers], ["ट्रक भाड़ा", totalFreight],
+  ], "&nbsp;&nbsp;&nbsp; ");
+
+  const bankParts: string[] = [];
+  if (farmer.bankAccountNumber) bankParts.push(`<span class="bold">खाता नं :</span> ${esc(farmer.bankAccountNumber)}`);
+  if (farmer.ifscCode) bankParts.push(`<span class="bold">IFSC :</span> ${esc(farmer.ifscCode)}`);
+  if (farmer.bankName) bankParts.push(`<span class="bold">बैंक :</span> ${esc(farmer.bankName)}`);
+  const slipBankRow = bankParts.join(" &nbsp;&nbsp; ");
+
+  const cutLine = `<div class="cut-line">&#9986; ${"&mdash;".repeat(57)}</div>`;
+
+  const slipHtml = `<div class="receipt-copy slip-copy">
+  <div class="header">
+    ${businessName ? `<div class="firm-title">${esc(businessName)}</div>` : ""}
+    ${businessAddress ? `<div class="firm-address" style="font-size:12px;color:#333">${esc(businessAddress)}</div>` : ""}
+  </div>
+
+  <table class="slip-table">
+    <tr>
+      <td style="width:40%"><span class="bold">बिल दिनांक</span> : ${dateDisplay}</td>
+      <td style="width:18%;text-align:center"><span class="bold">बुक क्र.</span> : ${sg.billBookNumber || 1}</td>
+      <td style="width:22%;text-align:center"><span class="bold">बिल नंबर</span> : <span style="font-size:19.5px">${sg.serialNumber}</span></td>
+      <td style="width:20%;text-align:right"><span class="bold">दिनांक</span> : ${dateDisplay}</td>
+    </tr>
+    <tr>
+      <td colspan="3">${slipFarmerLine}</td>
+      <td style="text-align:right"><span class="bold">कुल योग :</span> ${totalGross.toFixed(2)}</td>
+    </tr>
+    <tr>
+      <td colspan="3" style="padding-top:6px">
+        <span class="bold">प्रवेश क्रमांक :</span>${slipCharges ? ` &nbsp;&nbsp; ${slipCharges}` : ""}
+      </td>
+      <td style="text-align:right; vertical-align:middle"><span class="bold">कुल खर्च :</span> ${totalShownDeductions.toFixed(2)}</td>
+    </tr>
+    <tr>
+      <td colspan="3">${slipBhada}</td>
+      <td style="text-align:right"><span class="bold">नेट रकम :</span> ${netPayable.toFixed(2)}</td>
+    </tr>
+  </table>
+
+  ${slipCropBags ? `<div style="font-size:14px;font-weight:bold;margin-top:10px">${slipCropBags}</div>` : ""}
+  <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:8px;font-size:13px">
+    <div>${slipBankRow}</div>
+    <div>विक्रेता /कृषक के भुगतान प्राप्ति के हस्ताक्षर</div>
+  </div>
+</div>`;
+
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>किसान बुक</title>
 <style>
-body{font-family:'Noto Sans Devanagari',Arial,sans-serif;margin:18px 22px;color:#111}
-table{width:100%;border-collapse:collapse}
-@media print{body{margin:8mm}.no-print{display:none!important}}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Noto Sans Devanagari', Arial, sans-serif; color: #111; }
+table { width: 100%; border-collapse: collapse; }
+.page-wrapper { display: flex; flex-direction: column; min-height: 1100px; }
+.receipt-copy { width: 100%; padding: 12px 18px; }
+.receipt-copy.main-copy { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.slip-copy { font-size: 13px; break-inside: avoid; page-break-inside: avoid; }
+/* An uploaded letterhead is arbitrarily tall; cap it so the single-page fit stays predictable. */
+.hdr-img { width: 100%; max-width: 100%; height: auto; max-height: 20mm; object-fit: contain; }
+.produce-wrap { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+table.produce { flex: 1; }
+.cut-line { text-align: center; padding: 2px 0; font-size: 10px; color: #555; border-top: 1.5px dashed #888; border-bottom: 1.5px dashed #888; margin: 4px 0; }
+.header { text-align: center; margin-bottom: 8px; }
+.firm-title { font-size: 18px; font-weight: bold; }
+.firm-address { font-size: 13px; margin-bottom: 3px; }
+.bold { font-weight: bold; }
+.slip-table { width: 100%; border-collapse: collapse; font-size: 13px; margin: 6px 0; border: 1.5px solid #000; }
+.slip-table td { padding: 6px 10px; vertical-align: top; }
+.slip-table tr td { border-bottom: 1px solid #000; }
+.slip-table tr:last-child td { border-bottom: none; }
+@page { size: A4 portrait; margin: 0; }
+@media print {
+  body { margin: 5mm; }
+  /* min-height, not height: a normal receipt fills exactly one sheet and pins the slip to the
+     bottom, but an unusually long produce table grows the page instead of spilling over the
+     fixed box and colliding with the slip. */
+  .page-wrapper { min-height: calc(100vh - 10mm); }
+  .no-print { display: none !important; }
+}
 </style></head><body>
 
-${receiptHeaderImage ? `<div style="text-align:center;margin-bottom:6px"><img src="${receiptHeaderImage}" style="width:100%;max-width:100%;height:auto" /></div>` : `<div style="text-align:right;font-size:12px;margin-bottom:2px">${businessPhone ? `&#9742; ${businessPhone}` : "&nbsp;"}</div>
+<div class="page-wrapper">
+
+<div class="receipt-copy main-copy">
+${receiptHeaderImage ? `<div style="text-align:center;margin-bottom:6px"><img class="hdr-img" src="${esc(receiptHeaderImage)}" /></div>` : `<div style="text-align:right;font-size:12px;margin-bottom:2px">${businessPhone ? `&#9742; ${esc(businessPhone)}` : "&nbsp;"}</div>
 
 <div style="text-align:center;margin-bottom:10px">
-  ${businessName ? `<div style="font-size:1.2em;font-weight:bold;text-decoration:underline">${businessName}</div>` : ""}
-  ${businessAddress ? `<div style="font-size:0.9em;margin-top:2px;text-decoration:underline">${businessAddress}</div>` : ""}
+  ${businessName ? `<div style="font-size:1.2em;font-weight:bold;text-decoration:underline">${esc(businessName)}</div>` : ""}
+  ${businessAddress ? `<div style="font-size:0.9em;margin-top:2px;text-decoration:underline">${esc(businessAddress)}</div>` : ""}
   <div style="margin-top:5px;font-size:0.88em">आलू, प्याज, लहसुन आदि के कमीशन एजेंट एवं थोक विक्रेता</div>
 </div>`}
 <div style="text-align:center;font-weight:bold;font-size:1.05em;text-decoration:underline;margin-bottom:8px">किसान बुक</div>
@@ -122,12 +229,13 @@ ${receiptHeaderImage ? `<div style="text-align:center;margin-bottom:6px"><img sr
     <td style="border:none;padding:2px 0;text-align:right">दिनांक : <strong>${dateDisplay}</strong></td>
   </tr>
   <tr>
-    <td style="border:none;padding:2px 0">श्रीमान <strong>${farmer.name}</strong></td>
-    <td style="border:none;padding:2px 0;text-align:right">पता : <strong>${farmer.village || "-"}</strong></td>
+    <td style="border:none;padding:2px 0">श्रीमान <strong>${esc(farmer.name)}</strong></td>
+    <td style="border:none;padding:2px 0;text-align:right">पता : <strong>${esc(farmer.village) || "-"}</strong></td>
   </tr>
 </table>
 
-<table style="margin-top:8px">
+<div class="produce-wrap">
+<table class="produce" style="margin-top:8px">
   <thead>
     <tr>
       ${th("माल की किस्म")}
@@ -140,13 +248,22 @@ ${receiptHeaderImage ? `<div style="text-align:center;margin-bottom:6px"><img sr
   </thead>
   <tbody>
     ${bidRows}
+    ${blankProduceRows}
     ${deductRows}
     ${netPayableRow}
   </tbody>
 </table>
+</div>
 
 <div style="text-align:right;margin-top:36px;font-size:13px">हस्ताक्षर</div>
 <div style="text-align:center;margin-top:8px;font-size:13px">हमें सेवा का अवसर देने के लिए धन्यवाद।</div>
+</div>
+
+${cutLine}
+
+${slipHtml}
+
+</div>
 
 </body></html>`;
 }

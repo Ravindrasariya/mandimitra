@@ -22,6 +22,16 @@ Custom templates are filled by plain string replacement over a fixed set of `{{T
 
 The print helper always injects `@page { margin: 0 !important }`, and *additionally* injects a `body` margin (`!important`) only when the template has **no** `@page` rule of its own. A template that stretches a wrapper to `100vh` while relying on its own body margin therefore overflows to a near-blank second page. **How to apply:** every template must declare its own `@page` rule (so the helper stays hands-off from the body), set the body print margin itself, and size any full-page wrapper as `calc(100vh - top-and-bottom-margins)`. Verify with headless Chromium `--print-to-pdf` + `pdfinfo` page count.
 
+## Screenshots cannot validate a print layout
+
+A screenshot proves nothing about the printed result: the viewport is shorter than the page, so bottom-anchored content is cropped out of frame, and `@media print` rules never apply on screen. A receipt can look perfect in the browser and still print two pages.
+
+**Why:** page fit is decided by rules that exist only in the print context, against a page box the screen never uses.
+
+**How to apply:** print the real generator output to PDF headlessly and assert the page count, sweeping produce-row counts and toggling the letterhead image on and off.
+
+**Related trap:** an uploaded letterhead has no intrinsic height limit. In a fixed-height page layout it must be capped (`max-height` plus `object-fit: contain`), or one tall image pushes even a nearly empty receipt onto a second sheet.
+
 ## Page-fit structure
 
 In the two-copy A4 farmer layout, the main copy absorbs all leftover page height while the lower payment slip is content-sized. Adding a **row** to the slip therefore shrinks the produce table above it rather than lengthening the page; adding a **cell to an existing row** changes nothing vertically. Use this to reason about single-page fit without needing to print.
