@@ -18,6 +18,10 @@ There are two independent sources for a printed receipt, and they are **differen
 
 Custom templates are filled by plain string replacement over a fixed set of `{{TOKEN}}` keys — no templating engine, no expressions, no conditionals. An unknown token is left in the output verbatim, so a typo prints as a literal `{{SOME_TOKEN}}` on the customer's receipt instead of failing loudly. Always render the template with sample data and grep the output for leftover `{{...}}` before calling a token change done.
 
+## Print margin contract
+
+The print helper always injects `@page { margin: 0 !important }`, and *additionally* injects a `body` margin (`!important`) only when the template has **no** `@page` rule of its own. A template that stretches a wrapper to `100vh` while relying on its own body margin therefore overflows to a near-blank second page. **How to apply:** every template must declare its own `@page` rule (so the helper stays hands-off from the body), set the body print margin itself, and size any full-page wrapper as `calc(100vh - top-and-bottom-margins)`. Verify with headless Chromium `--print-to-pdf` + `pdfinfo` page count.
+
 ## Page-fit structure
 
 In the two-copy A4 farmer layout, the main copy absorbs all leftover page height while the lower payment slip is content-sized. Adding a **row** to the slip therefore shrinks the produce table above it rather than lengthening the page; adding a **cell to an existing row** changes nothing vertically. Use this to reason about single-page fit without needing to print.

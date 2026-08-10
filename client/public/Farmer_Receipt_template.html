@@ -36,9 +36,10 @@ table.summary th { background: #f0f0f0; }
 .slip-table td { padding: 6px 10px; vertical-align: top; }
 .slip-table tr td { border-bottom: 1px solid #000; }
 .slip-table tr:last-child td { border-bottom: none; }
+@page { size: A4 portrait; margin: 0; }
 @media print {
-  body { margin: 8mm; }
-  .page-wrapper { min-height: auto; height: 100vh; }
+  body { margin: 5mm; }
+  .page-wrapper { min-height: auto; height: calc(100vh - 10mm); }
 }
 </style>
 </head>
