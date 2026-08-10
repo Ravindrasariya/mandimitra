@@ -1,4 +1,5 @@
 import { format } from "date-fns";
+import { letterheadHtml } from "./receiptUtils";
 import type { Bid, Buyer, Lot, Farmer, Transaction } from "@shared/schema";
 
 export type TransactionWithDetails = Transaction & { farmer: Farmer; buyer: Buyer; lot: Lot; bid: Bid };
@@ -189,8 +190,6 @@ table { width: 100%; border-collapse: collapse; }
 .receipt-copy { width: 100%; padding: 12px 18px; }
 .receipt-copy.main-copy { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .slip-copy { font-size: 13px; break-inside: avoid; page-break-inside: avoid; }
-/* An uploaded letterhead is arbitrarily tall; cap it so the single-page fit stays predictable. */
-.hdr-img { width: 100%; max-width: 100%; height: auto; max-height: 20mm; object-fit: contain; }
 .produce-wrap { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 table.produce { flex: 1; }
 .cut-line { text-align: center; padding: 2px 0; font-size: 10px; color: #555; border-top: 1.5px dashed #888; border-bottom: 1.5px dashed #888; margin: 4px 0; }
@@ -217,7 +216,7 @@ table.produce { flex: 1; }
 <div class="page-wrapper">
 
 <div class="receipt-copy main-copy">
-${receiptHeaderImage ? `<div style="text-align:center;margin-bottom:6px"><img class="hdr-img" src="${esc(receiptHeaderImage)}" /></div>` : `<div style="text-align:right;font-size:12px;margin-bottom:2px">${businessPhone ? `&#9742; ${esc(businessPhone)}` : "&nbsp;"}</div>
+${receiptHeaderImage ? letterheadHtml(receiptHeaderImage) : `<div style="text-align:right;font-size:12px;margin-bottom:2px">${businessPhone ? `&#9742; ${esc(businessPhone)}` : "&nbsp;"}</div>
 
 <div style="text-align:center;margin-bottom:10px">
   ${businessName ? `<div style="font-size:1.2em;font-weight:bold;text-decoration:underline">${esc(businessName)}</div>` : ""}
@@ -303,7 +302,7 @@ h2{text-align:center;margin-bottom:5px}
 .total{font-weight:bold;font-size:1.1em;color:#dc2626;border-top:2px solid #333;padding-top:8px;margin-top:8px}
 @media print{body{margin:10mm}.no-print{display:none!important}}
 </style></head><body>
-${receiptHeaderImage ? `<div style="text-align:center;margin-bottom:6px"><img src="${receiptHeaderImage}" style="width:100%;max-width:100%;height:auto" /></div>` : `<div class="header">
+${receiptHeaderImage ? letterheadHtml(receiptHeaderImage) : `<div class="header">
 ${businessName ? `<h2 style="margin-bottom:2px">${businessName}</h2>` : ""}
 ${businessAddress ? `<p style="font-size:0.85em;color:#555;margin:2px 0">${businessAddress}</p>` : ""}
 <h3 style="margin:8px 0 5px 0;font-size:1.1em">Buyer Receipt</h3>
@@ -524,7 +523,7 @@ th:first-child{text-align:left}
 .totals-row td{font-weight:bold;background:#f0f0f0;padding:5px;border:1px solid #ccc}
 @media print{body{margin:6mm}.no-print{display:none!important}}
 </style></head><body>
-${receiptHeaderImage ? `<div style="text-align:center;margin-bottom:4px"><img src="${receiptHeaderImage}" style="width:100%;max-width:100%;height:auto" /></div>` : `<div style="display:flex;justify-content:flex-end;font-size:12px;margin-bottom:1px">${businessPhone ? `&#9742; ${businessPhone}` : ""}</div>
+${receiptHeaderImage ? letterheadHtml(receiptHeaderImage) : `<div style="display:flex;justify-content:flex-end;font-size:12px;margin-bottom:1px">${businessPhone ? `&#9742; ${businessPhone}` : ""}</div>
 <div class="header">
 ${businessName ? `<div style="font-weight:bold;font-size:1.05em;margin-bottom:1px">${businessName}</div>` : ""}
 ${businessAddress ? `<p style="font-size:0.82em;color:#555;margin:1px 0">${businessAddress}</p>` : ""}
@@ -617,7 +616,7 @@ th:first-child{text-align:left}
 .totals-row td{font-weight:bold;background:#f0f0f0;padding:5px;border:1px solid #ccc}
 @media print{body{margin:6mm}.no-print{display:none!important}}
 </style></head><body>
-${receiptHeaderImage ? `<div style="text-align:center;margin-bottom:4px"><img src="${receiptHeaderImage}" style="width:100%;max-width:100%;height:auto" /></div>` : `<div style="display:flex;justify-content:flex-end;font-size:12px;margin-bottom:1px">${businessPhone ? `&#9742; ${businessPhone}` : ""}</div>
+${receiptHeaderImage ? letterheadHtml(receiptHeaderImage) : `<div style="display:flex;justify-content:flex-end;font-size:12px;margin-bottom:1px">${businessPhone ? `&#9742; ${businessPhone}` : ""}</div>
 <div class="header">
 ${businessName ? `<div style="font-weight:bold;font-size:1.05em;margin-bottom:1px">${businessName}</div>` : ""}
 ${businessAddress ? `<p style="font-size:0.82em;color:#555;margin:1px 0">${businessAddress}</p>` : ""}

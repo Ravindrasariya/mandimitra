@@ -30,7 +30,13 @@ A screenshot proves nothing about the printed result: the viewport is shorter th
 
 **How to apply:** print the real generator output to PDF headlessly and assert the page count, sweeping produce-row counts and toggling the letterhead image on and off.
 
-**Related trap:** an uploaded letterhead has no intrinsic height limit. In a fixed-height page layout it must be capped (`max-height` plus `object-fit: contain`), or one tall image pushes even a nearly empty receipt onto a second sheet.
+## Letterhead sizing: width wins over page fit
+
+An uploaded letterhead must print at the **full content width of whatever page it lands on**, at its natural aspect ratio — never height-capped. Emit it through the one shared helper, not per-generator inline markup.
+
+**Why:** capping the height with `max-height` + `object-fit: contain` letterboxes a wide banner (a ~3.7:1 image shrank to about a third of the A4 width), which the user reads as a broken header. They accepted that a tall letterhead may push a receipt onto a second sheet and asked to verify page fit themselves; do not reintroduce a height ceiling, re-tune the page-height target, or trim content to compensate.
+
+**How to apply:** when a document gains a letterhead, route it through the shared helper so escaping and sizing stay uniform. Verify by measuring the rendered image box headlessly: its width must equal the content width and its drawn aspect must equal the image's natural aspect.
 
 ## Page-fit structure
 
