@@ -86,7 +86,7 @@ export function generateFarmerReceiptHtml(sg: UnifiedSerialGroup, businessName?:
 
   // Keep the ruled table a sensible size on light receipts so the space freed up for the
   // slip does not leave the produce area looking stranded.
-  const MIN_PRODUCE_ROWS = 10;
+  const MIN_PRODUCE_ROWS = 8;
   const blankProduceRow = `<tr>${tdEmpty()}${tdEmpty()}${tdEmpty()}${tdEmpty()}${tdEmpty()}${tdEmpty()}</tr>`;
   const blankProduceRows = Array(Math.max(0, MIN_PRODUCE_ROWS - allTxns.length)).fill(blankProduceRow).join("");
 
@@ -182,7 +182,10 @@ export function generateFarmerReceiptHtml(sg: UnifiedSerialGroup, businessName?:
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { font-family: 'Noto Sans Devanagari', Arial, sans-serif; color: #111; }
 table { width: 100%; border-collapse: collapse; }
-.page-wrapper { display: flex; flex-direction: column; min-height: 1100px; }
+/* Height target for the on-screen / share-as-PDF render. The produce table below is flex-sized and
+   swallows any leftover space, so this figure -- not the row count -- is what decides where the cut
+   line and slip land. Sized to leave real slack under the one-page raster limit. */
+.page-wrapper { display: flex; flex-direction: column; min-height: 997px; }
 .receipt-copy { width: 100%; padding: 12px 18px; }
 .receipt-copy.main-copy { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .slip-copy { font-size: 13px; break-inside: avoid; page-break-inside: avoid; }
@@ -202,10 +205,11 @@ table.produce { flex: 1; }
 @page { size: A4 portrait; margin: 0; }
 @media print {
   body { margin: 5mm; }
-  /* min-height, not height: a normal receipt fills exactly one sheet and pins the slip to the
-     bottom, but an unusually long produce table grows the page instead of spilling over the
-     fixed box and colliding with the slip. */
-  .page-wrapper { min-height: calc(100vh - 10mm); }
+  /* min-height, not height: a normal receipt pins the slip near the bottom, but an unusually long
+     produce table grows the page instead of spilling over a fixed box and colliding with the slip.
+     Deliberately short of a full sheet -- sizing this to exactly 100% left no room for rounding and
+     tipped ordinary receipts onto a second page. */
+  .page-wrapper { min-height: calc(100vh - 37mm); }
   .no-print { display: none !important; }
 }
 </style></head><body>
@@ -255,8 +259,11 @@ ${receiptHeaderImage ? `<div style="text-align:center;margin-bottom:6px"><img cl
 </table>
 </div>
 
-<div style="text-align:right;margin-top:36px;font-size:13px">हस्ताक्षर</div>
-<div style="text-align:center;margin-top:8px;font-size:13px">हमें सेवा का अवसर देने के लिए धन्यवाद।</div>
+<div style="display:flex;align-items:flex-end;margin-top:36px;font-size:13px">
+  <div style="flex:1"></div>
+  <div style="flex:2;text-align:center">हमें सेवा का अवसर देने के लिए धन्यवाद।</div>
+  <div style="flex:1;text-align:right">हस्ताक्षर</div>
+</div>
 </div>
 
 ${cutLine}

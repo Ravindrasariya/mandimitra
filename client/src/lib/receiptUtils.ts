@@ -119,14 +119,21 @@ function canvasToPdfBlob(canvas: HTMLCanvasElement): Blob {
   const imgH = (canvas.height * imgW) / canvas.width;
   const pageImgH = (usableH / imgW) * canvas.width;
 
-  if (imgH <= usableH) {
-    pdf.addImage(canvas.toDataURL("image/jpeg", 0.95), "JPEG", margin, margin, imgW, imgH);
+  // A hair of overflow used to cost a whole extra sheet -- a receipt a pixel too tall produced a
+  // second, visually blank page. Anything within this tolerance is scaled down onto one page instead.
+  const FIT_TOLERANCE = 1.05;
+
+  if (imgH <= usableH * FIT_TOLERANCE) {
+    const drawH = Math.min(imgH, usableH);
+    const drawW = imgH > usableH ? (imgW * usableH) / imgH : imgW;
+    pdf.addImage(canvas.toDataURL("image/jpeg", 0.95), "JPEG", margin + (usableW - drawW) / 2, margin, drawW, drawH);
   } else {
     const pages = Math.ceil(imgH / usableH);
     for (let p = 0; p < pages; p++) {
-      if (p > 0) pdf.addPage();
       const srcY = p * pageImgH;
       const srcH = Math.min(pageImgH, canvas.height - srcY);
+      if (srcH <= 0) break;
+      if (p > 0) pdf.addPage();
       const sc = document.createElement("canvas");
       sc.width = canvas.width;
       sc.height = srcH;
@@ -253,7 +260,7 @@ export async function shareReceiptAsImage(html: string, fileName: string): Promi
   }
 
   const bodyWrapper = document.createElement("div");
-  bodyWrapper.style.cssText = "overflow:visible;padding-bottom:40px;";
+  bodyWrapper.style.cssText = "overflow:visible;";
   bodyWrapper.innerHTML = bodyHtml;
   container.appendChild(bodyWrapper);
 
