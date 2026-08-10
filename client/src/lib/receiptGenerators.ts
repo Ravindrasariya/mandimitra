@@ -151,8 +151,8 @@ export function generateFarmerReceiptHtml(sg: UnifiedSerialGroup, businessName?:
   <table class="slip-table">
     <tr>
       <td style="width:40%"><span class="bold">बिल दिनांक</span> : ${dateDisplay}</td>
-      <td style="width:18%;text-align:center"><span class="bold">बुक क्र.</span> : ${sg.billBookNumber || 1}</td>
       <td style="width:22%;text-align:center"><span class="bold">बिल नंबर</span> : <span style="font-size:19.5px">${sg.serialNumber}</span></td>
+      <td style="width:18%;text-align:center"><span class="bold">बुक क्र.</span> : ${sg.billBookNumber || 1}</td>
       <td style="width:20%;text-align:right"><span class="bold">दिनांक</span> : ${dateDisplay}</td>
     </tr>
     <tr>
