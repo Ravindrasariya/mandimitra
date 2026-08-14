@@ -1,4 +1,5 @@
 import { useState, useMemo, useRef, useEffect } from "react";
+import { allocationFromGroup, farmerAllocationLabel, reconcileFarmerAllocations, PY_OPENING_KEY, type FarmerAllocation, type FarmerPendingGroupRow } from "@/lib/farmer-allocations";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -102,7 +103,7 @@ export default function CashPage() {
   const [outwardPaymentMode, setOutwardPaymentMode, clearOutwardPaymentMode] = usePersistedState("cash-outwardPaymentMode", "Cash");
   const [outwardBankAccountId, setOutwardBankAccountId, clearOutwardBankAccountId] = usePersistedState("cash-outwardBankAccountId", "");
   const [outwardNotes, setOutwardNotes, clearOutwardNotes] = usePersistedState("cash-outwardNotes", "");
-  const [farmerAllocations, setFarmerAllocations, clearFarmerAllocations] = usePersistedState<{ groupKey: string; txnLabel: string; serialNumber: number; billBookNumber: number; date: string; numberOfBags: number; crops: string; due: number; amount: string; transactionIds: { id: number; due: number }[] }[]>("cash-farmerAllocations", []);
+  const [farmerAllocations, setFarmerAllocations, clearFarmerAllocations] = usePersistedState<FarmerAllocation[]>("cash-farmerAllocations", []);
   const [farmerAllocationSearch, setFarmerAllocationSearch] = useState("");
   const [farmerAllocationDropdownOpen, setFarmerAllocationDropdownOpen] = useState(false);
   const farmerAllocationDropdownRef = useRef<HTMLDivElement>(null);
@@ -188,8 +189,7 @@ export default function CashPage() {
     enabled: inwardPartyType === "Buyer" && !!inwardBuyerId,
   });
 
-  type FarmerPendingTxn = { groupKey: string; serialNumber: number; billBookNumber: number; date: string; numberOfBags: number; crops: string; totalPayableToFarmer: string; farmerPaidAmount: string; due: string; transactionIds: { id: number; due: number }[] };
-  const { data: farmerPendingTransactions = [] } = useQuery<FarmerPendingTxn[]>({
+  const { data: farmerPendingTransactions = [] } = useQuery<FarmerPendingGroupRow[]>({
     queryKey: ["/api/farmers", outwardFarmerId, "pending-transactions"],
     queryFn: () => outwardFarmerId ? fetch(`/api/farmers/${outwardFarmerId}/pending-transactions`, { credentials: "include" }).then(r => r.json()) : Promise.resolve([]),
     enabled: (outwardOutflowType === "Farmer-Harvest Sale" || outwardOutflowType === "Farmer-Advance") && !!outwardFarmerId,
@@ -224,6 +224,17 @@ export default function CashPage() {
       });
     if (changed) setHammaliAllocations(next);
   }, [hammaliBreakdown, outwardOutflowType]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Re-anchor persisted farmer allocations onto the bills that are currently outstanding: drop
+  // ones that have since been settled, refresh dues, and fold rows that now resolve to the same
+  // bill into one. Without this a persisted allocation carrying a group key from before bills were
+  // grouped by stock register date would leave its own bill still selectable in the list below.
+  useEffect(() => {
+    if (outwardOutflowType !== "Farmer-Harvest Sale" && outwardOutflowType !== "Farmer-Advance") return;
+    if (farmerPendingTransactions.length === 0 || farmerAllocations.length === 0) return;
+    const { changed, next } = reconcileFarmerAllocations(farmerAllocations, farmerPendingTransactions);
+    if (changed) setFarmerAllocations(next);
+  }, [farmerPendingTransactions, outwardOutflowType]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const hasBankAccounts = bankAccountsList.length > 0;
 
@@ -2042,7 +2053,7 @@ export default function CashPage() {
                               value={farmerAllocationSearch}
                               onChange={e => { setFarmerAllocationSearch(e.target.value); setFarmerAllocationDropdownOpen(true); }}
                               onFocus={() => setFarmerAllocationDropdownOpen(true)}
-                              placeholder="Search SR#, date, crop..."
+                              placeholder="Search BB#, SR#, date, crop..."
                               className="h-9 text-sm border-0 focus-visible:ring-0"
                               data-testid="farmer-allocation-search"
                             />
@@ -2053,7 +2064,7 @@ export default function CashPage() {
                             const filtered = available.filter(pt => {
                               if (!farmerAllocationSearch) return true;
                               const s = farmerAllocationSearch.toLowerCase();
-                              return String(pt.serialNumber).includes(s) || pt.date.toLowerCase().includes(s) || (pt.crops || "").toLowerCase().includes(s);
+                              return String(pt.billBookNumber).includes(s) || String(pt.serialNumber).includes(s) || pt.registerDate.toLowerCase().includes(s) || (pt.crops || "").toLowerCase().includes(s);
                             });
                             if (filtered.length === 0) return null;
                             return (
@@ -2063,18 +2074,7 @@ export default function CashPage() {
                                     key={pt.groupKey}
                                     className="px-3 py-2 hover:bg-accent cursor-pointer text-xs border-b last:border-b-0"
                                     onClick={() => {
-                                      setFarmerAllocations(prev => [...prev, {
-                                        groupKey: pt.groupKey,
-                                        txnLabel: pt.groupKey === "PY_OPENING" ? "PY Opening Balance" : `BB#${pt.billBookNumber} SR#${pt.serialNumber}`,
-                                        serialNumber: pt.serialNumber,
-                                        billBookNumber: pt.billBookNumber,
-                                        date: pt.date,
-                                        numberOfBags: pt.numberOfBags,
-                                        crops: pt.crops,
-                                        due: parseFloat(pt.due),
-                                        amount: pt.due,
-                                        transactionIds: pt.transactionIds,
-                                      }]);
+                                      setFarmerAllocations(prev => [...prev, allocationFromGroup(pt)]);
                                       setFarmerAllocationSearch("");
                                       setFarmerAllocationDropdownOpen(false);
                                     }}
@@ -2082,12 +2082,12 @@ export default function CashPage() {
                                   >
                                     <div className="flex justify-between">
                                       <span className="font-medium">
-                                        {pt.groupKey === "PY_OPENING" ? "PY Opening Balance" : `BB#${pt.billBookNumber} SR#${pt.serialNumber}${pt.crops ? ` | ${pt.crops}` : ""}`}
+                                        {farmerAllocationLabel(pt)}{pt.groupKey !== PY_OPENING_KEY && pt.crops ? ` | ${pt.crops}` : ""}
                                       </span>
                                       <span className="text-orange-600 font-semibold">₹{parseFloat(pt.due).toLocaleString("en-IN")}</span>
                                     </div>
                                     <div className="text-muted-foreground mt-0.5">
-                                      {pt.date} {pt.numberOfBags > 0 && `| ${pt.numberOfBags} bags`}
+                                      {pt.registerDate} {pt.numberOfBags > 0 && `| ${pt.numberOfBags} bags`}
                                     </div>
                                   </div>
                                 ))}

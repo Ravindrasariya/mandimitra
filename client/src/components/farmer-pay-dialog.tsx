@@ -13,12 +13,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { format } from "date-fns";
 import type { BankAccount } from "@shared/schema";
 
-/** Shape returned by `GET /api/farmers/:id/pending-transactions` — one entry per BB#/SR#/date group. */
+/**
+ * Shape returned by `GET /api/farmers/:id/pending-transactions` — one entry per bill, keyed by
+ * bill book + serial + the bill's stock register date.
+ */
 export type FarmerPendingGroup = {
   groupKey: string;
   serialNumber: number;
   billBookNumber: number;
-  date: string;
+  /** The bill's stock register date — what the user looks up in the book, not a transaction date. */
+  registerDate: string;
   numberOfBags: number;
   crops: string;
   totalPayableToFarmer: string;
@@ -89,21 +93,27 @@ export function FarmerPayDialog({
    * BB#/SR# is not a safe key on its own: the duplicate guard only makes it unique within a
    * financial year, so an unpaid bill from an earlier year can carry the same numbers and would
    * be swept into the same payment. Intersecting on transaction id pins the dialog to this card
-   * exactly, while still tolerating a bill that the server split across several date groups
-   * because one of its bids carried its own transaction date.
+   * exactly, and keeps doing so however the server chooses to group the rows.
    */
   const matched = useMemo(
     () => pendingGroups
       .filter(g => g.groupKey !== "PY_OPENING")
       .map(g => ({ ...g, transactionIds: g.transactionIds.filter(t => cardTxnIds.has(t.id)) }))
       .filter(g => g.transactionIds.length > 0)
-      .sort((a, b) => a.date.localeCompare(b.date)),
+      .sort((a, b) => a.registerDate.localeCompare(b.registerDate)),
     [pendingGroups, cardTxnIds],
   );
   // Sum the surviving transactions rather than the group's own due, which may cover rows this
   // card does not own.
   const totalDue = useMemo(
     () => matched.reduce((s, g) => s + g.transactionIds.reduce((gs, t) => gs + t.due, 0), 0),
+    [matched],
+  );
+
+  // Taken from the grouped response rather than the card's own date, so this can never disagree
+  // with the date the Cash tab shows for the same bill. Normally exactly one.
+  const registerDates = useMemo(
+    () => Array.from(new Set(matched.map(g => g.registerDate).filter(Boolean))).join(", "),
     [matched],
   );
 
@@ -212,6 +222,9 @@ export function FarmerPayDialog({
               <Badge variant="outline" className="text-[10px]" data-testid="text-farmer-pay-bbsr">
                 BB#{billBookNumber} SR#{serialNumber}
               </Badge>
+              {registerDates && (
+                <span className="text-muted-foreground" data-testid="text-farmer-pay-register-date">{registerDates}</span>
+              )}
               {crop && <span className="text-muted-foreground">{crop}</span>}
             </div>
           </div>

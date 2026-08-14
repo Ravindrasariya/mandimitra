@@ -980,6 +980,9 @@ export class DatabaseStorage implements IStorage {
         eq(transactions.isReversed, false),
         eq(transactions.isArchived, false),
       ))
+      // Ordered oldest transaction first, and that order is load-bearing: the group's
+      // transactionIds are filled in array order when a partial payment is split across them,
+      // so a part payment settles the earliest transaction of the bill first.
       .orderBy(transactions.date, transactions.id);
 
     const txnItems = results
@@ -991,7 +994,10 @@ export class DatabaseStorage implements IStorage {
           id: r.transaction.id,
           serialNumber: r.lot.serialNumber,
           billBookNumber: r.lot.billBookNumber,
-          date: r.transaction.date,
+          // The stock register date the bill is filed under, not the transaction date. Each bid
+          // can carry its own transaction date, so keying on that splits one bill into several
+          // rows; the register date is what the user looks up in the physical book.
+          registerDate: r.lot.date,
           numberOfBags: r.transaction.numberOfBags,
           crop: r.lot.crop,
           totalPayableToFarmer: payable,
@@ -1004,7 +1010,7 @@ export class DatabaseStorage implements IStorage {
     const grouped: Record<string, {
       serialNumber: number;
       billBookNumber: number;
-      date: string;
+      registerDate: string;
       crops: string[];
       totalBags: number;
       totalPayable: number;
@@ -1014,12 +1020,14 @@ export class DatabaseStorage implements IStorage {
     }> = {};
 
     for (const t of txnItems) {
-      const key = `${t.billBookNumber}_${t.serialNumber}_${t.date || ""}`;
+      // Bill book + serial + register date. Serial numbers restart each financial year, so the
+      // register date is also what keeps a repeated BB#/SR# from an earlier year separate.
+      const key = `${t.billBookNumber}_${t.serialNumber}_${t.registerDate || ""}`;
       if (!grouped[key]) {
         grouped[key] = {
           serialNumber: t.serialNumber,
           billBookNumber: t.billBookNumber,
-          date: t.date || "",
+          registerDate: t.registerDate || "",
           crops: [],
           totalBags: 0,
           totalPayable: 0,
@@ -1040,10 +1048,10 @@ export class DatabaseStorage implements IStorage {
     const pendingGroups = Object.values(grouped)
       .filter(g => g.totalDue > 0.005)
       .map(g => ({
-        groupKey: `${g.billBookNumber}_${g.serialNumber}_${g.date}`,
+        groupKey: `${g.billBookNumber}_${g.serialNumber}_${g.registerDate}`,
         serialNumber: g.serialNumber,
         billBookNumber: g.billBookNumber,
-        date: g.date,
+        registerDate: g.registerDate,
         crops: g.crops.join(", "),
         numberOfBags: g.totalBags,
         totalPayableToFarmer: g.totalPayable.toFixed(2),
@@ -1052,7 +1060,7 @@ export class DatabaseStorage implements IStorage {
         transactionIds: g.transactionIds,
       }));
 
-    pendingGroups.sort((a, b) => a.date.localeCompare(b.date) || a.serialNumber - b.serialNumber);
+    pendingGroups.sort((a, b) => a.registerDate.localeCompare(b.registerDate) || a.serialNumber - b.serialNumber);
 
     const farmer = await this.getFarmer(farmerId, businessId);
     const openingBal = parseFloat(farmer?.openingBalance || "0");
@@ -1073,7 +1081,9 @@ export class DatabaseStorage implements IStorage {
           groupKey: "PY_OPENING",
           serialNumber: 0,
           billBookNumber: 0,
-          date: "Previous Year",
+          // Not a real register date — this is the carried-forward opening balance, and it is
+          // unshifted after the sort so it always sits at the top of the list.
+          registerDate: "Previous Year",
           crops: "",
           numberOfBags: 0,
           totalPayableToFarmer: openingBal.toFixed(2),
