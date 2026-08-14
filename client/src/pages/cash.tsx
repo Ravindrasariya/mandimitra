@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect } from "react";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { invalidateCashQueries } from "@/lib/cashQueries";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/lib/language";
 import { Button } from "@/components/ui/button";
@@ -348,31 +349,6 @@ export default function CashPage() {
       accountBreakdowns,
     };
   }, [allEntries, cashSettingsData, bankAccountsList]);
-
-  const invalidateCashQueries = () => {
-    queryClient.invalidateQueries({ refetchType: 'all', predicate: (query) => {
-      const key = query.queryKey[0];
-      return typeof key === "string" && key.startsWith("/api/cash-entries");
-    }});
-    queryClient.invalidateQueries({ refetchType: 'all', predicate: (query) => {
-      const key = query.queryKey[0];
-      return typeof key === "string" && key.startsWith("/api/buyers");
-    }});
-    queryClient.invalidateQueries({ refetchType: 'all', predicate: (query) => {
-      const key = query.queryKey[0];
-      return typeof key === "string" && key.startsWith("/api/farmers");
-    }});
-    queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/transactions"] });
-    queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/transaction-aggregates"] });
-    queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/hammali-breakdown"] });
-    queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/bank-accounts"] });
-    queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/dashboard"] });
-    queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/stock-cards"] });
-    queryClient.invalidateQueries({ refetchType: 'all', predicate: (query) => {
-      const key = query.queryKey[0];
-      return typeof key === "string" && (key.startsWith("/api/books/balance-sheet") || key.startsWith("/api/books/profit-and-loss"));
-    }});
-  };
 
   const createMutation = useMutation({
     mutationFn: async (data: any) => {

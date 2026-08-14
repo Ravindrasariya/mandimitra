@@ -18,7 +18,7 @@ import {
 import {
   Plus, Trash2, ChevronDown, ChevronRight, Truck, User,
   AlertTriangle, AlertCircle, Scale, Wheat, ChevronsUpDown, X, Calculator,
-  Archive, History, Save, Check, Printer, Share2, Loader2,
+  Archive, History, Save, Check, Printer, Share2, Loader2, Banknote,
   Layers, Landmark, ShoppingBag, Calendar, Search, Filter, RotateCcw, Download, ClipboardList, FileText, Hammer, Lock,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -37,6 +37,7 @@ import {
   type UnifiedSerialGroup, type UnifiedLotGroup, type BuyerLotEntry, type TransactionWithDetails,
 } from "@/lib/receiptGenerators";
 import { usePersistedState } from "@/hooks/use-persisted-state";
+import { FarmerPayDialog, sumBillDue, FARMER_PAY_MIN_DUE } from "@/components/farmer-pay-dialog";
 import { useLanguage } from "@/lib/language";
 import { translateApiError } from "@/lib/guardErrors";
 import type { Lot, Farmer, Transaction, Bid, Buyer, ReceiptTemplate } from "@shared/schema";
@@ -1607,6 +1608,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, onBBChange, is
   const [showReinstateConfirm, setShowReinstateConfirm] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [receiptLoading, setReceiptLoading] = useState(false);
+  const [showFarmerPay, setShowFarmerPay] = useState(false);
 
   const { data: receiptTemplates = [] } = useQuery<ReceiptTemplate[]>({
     queryKey: ["/api/receipt-templates"],
@@ -1618,6 +1620,16 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, onBBChange, is
     b.farmerPaymentStatus === "paid" || b.farmerPaymentStatus === "partial"
   )));
   const bbSrLocked = hasPayments;
+
+  // What the farmer is still owed on this bill, from the saved figures the card already holds.
+  const farmerPaySavedBids = group.lots.flatMap(l => l.bids.filter(b => b.txnDbId));
+  const farmerBillDue = sumBillDue(farmerPaySavedBids.map(b => ({ payable: b.savedFarmerPayable, paid: b.farmerPaidAmount })));
+  const farmerPayTxnIds = farmerPaySavedBids.map(b => b.txnDbId as number);
+  const farmerPayFarmerId = farmerCard?.farmerId;
+  const canFarmerPay = hasTransactions && !!farmerPayFarmerId && farmerBillDue >= FARMER_PAY_MIN_DUE;
+  const farmerPayDisabledReason = !hasTransactions || !farmerPayFarmerId
+    ? t("stock.farmerPaySaveFirst")
+    : t("stock.farmerPayNoDue");
 
   const headerCls = CROP_HEADER[group.crop] || "bg-muted border-border";
   const badgeCls = CROP_COLORS[group.crop] || "bg-muted border-border text-foreground";
@@ -1972,6 +1984,17 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, onBBChange, is
           </div>
           {/* Action buttons */}
           <div className="flex items-center gap-1 shrink-0">
+            <Button
+              type="button" variant="ghost" size="sm"
+              onClick={e => { e.stopPropagation(); setShowFarmerPay(true); }}
+              disabled={!canFarmerPay}
+              className="h-7 px-1.5 gap-1 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 shrink-0 disabled:opacity-40"
+              title={canFarmerPay ? t("stock.farmerPay") : farmerPayDisabledReason}
+              data-testid={`button-farmer-pay-${group.crop.toLowerCase()}`}
+            >
+              <Banknote className="w-3.5 h-3.5" />
+              <span className="text-[11px] font-medium hidden sm:inline">{t("stock.farmerPay")}</span>
+            </Button>
             {hasTransactions && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -2108,6 +2131,19 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, onBBChange, is
         history={group.editHistory}
         onClose={() => setShowHistory(false)}
       />
+
+      {farmerPayFarmerId && (
+        <FarmerPayDialog
+          open={showFarmerPay}
+          onOpenChange={setShowFarmerPay}
+          farmerId={farmerPayFarmerId}
+          farmerName={farmerLabel}
+          billBookNumber={parseInt(group.bbNumber) || 0}
+          serialNumber={parseInt(group.srNumber) || 0}
+          crop={group.crop}
+          transactionIds={farmerPayTxnIds}
+        />
+      )}
 
       <ConfirmDeleteDialog
         open={showDeleteConfirm}
