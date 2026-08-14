@@ -2407,7 +2407,7 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
         onSyncSaved(updatedCard);
         toast({ title: t("stock.cropGroupArchived"), variant: "success" });
       } catch (err: any) {
-        toast({ title: t("stock.archiveFailedCrop"), description: err?.message, variant: "destructive" });
+        toast({ title: t("stock.archiveFailedCrop"), description: translateApiError(err, t), variant: "destructive" });
       }
     }
     setPendingArchiveGroupIdx(null);
@@ -4076,7 +4076,7 @@ export default function StockPage() {
               try {
                 await apiRequest("DELETE", `/api/lots/${savedLot.dbId}`);
               } catch (err: any) {
-                toast({ title: t("stock.warning"), description: `Failed to delete lot: ${err.message}`, variant: "destructive" });
+                toast({ title: t("stock.warning"), description: `${t("stock.failedDeleteLot")}: ${translateApiError(err, t)}`, variant: "destructive" });
                 // Restore the lot into the current card state to keep UI in sync with DB.
                 // If the entire crop group was also removed, recreate it.
                 const groupExists = card.cropGroups.some(g => g.id === savedGroup.id);
@@ -4115,7 +4115,7 @@ export default function StockPage() {
               try {
                 await apiRequest("DELETE", `/api/bids/${deletedBidDbId}`);
               } catch (err: any) {
-                toast({ title: t("stock.warning"), description: `${t("stock.failedDeleteBid")}: ${err.message}`, variant: "destructive" });
+                toast({ title: t("stock.warning"), description: `${t("stock.failedDeleteBid")}: ${translateApiError(err, t)}`, variant: "destructive" });
                 restoredBids.push(deletedBid);
               }
             }
@@ -4583,7 +4583,7 @@ export default function StockPage() {
           return typeof key === "string" && key.startsWith("/api/buyers");
         }});
       } catch (err: any) {
-        toast({ title: t("stock.archiveFailed"), description: err.message, variant: "destructive" });
+        toast({ title: t("stock.archiveFailed"), description: translateApiError(err, t), variant: "destructive" });
         return;
       }
     }

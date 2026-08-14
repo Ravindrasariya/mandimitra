@@ -23,6 +23,7 @@ import { useKeyboardNav } from "@/hooks/use-keyboard-nav";
 import { format } from "date-fns";
 import { printReceipt, letterheadHtml } from "@/lib/receiptUtils";
 import { useAuth } from "@/lib/auth";
+import { translateApiError } from "@/lib/guardErrors";
 
 type FarmerWithDues = Farmer & { totalPayable: string; totalDue: string; totalAdvance: string; advanceEntries?: { date: string; amount: string }[]; salesCount: number; bidDates?: string[] };
 type SortField = "farmerId" | "name" | "totalPayable" | "totalDue";
@@ -448,7 +449,7 @@ export default function FarmerLedgerPage() {
       toast({ title: "Farmer Updated", variant: "success" });
     },
     onError: (err: any) => {
-      toast({ title: "Error", description: err.message, variant: "destructive" });
+      toast({ title: t("common.error"), description: translateApiError(err, t), variant: "destructive" });
     },
   });
 

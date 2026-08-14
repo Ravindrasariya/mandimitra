@@ -11,6 +11,14 @@ const GUARD_CODE_KEYS: Record<string, string> = {
   GUARD_CORE: "guard.core",
   GUARD_FARMER_EXTRAS: "guard.farmerExtras",
   GUARD_BUYER_EXTRAS: "guard.buyerExtras",
+  // Delete and archive blocks. Unlike the edit guards above they are not party-scoped — any
+  // un-reversed payment blocks them — but they still name whoever actually paid.
+  GUARD_ARCHIVE_LOT: "guard.archiveLot",
+  GUARD_ARCHIVE_LOTS: "guard.archiveLots",
+  GUARD_ARCHIVE_FARMER: "guard.archiveFarmer",
+  GUARD_DELETE_BID: "guard.deleteBid",
+  GUARD_DELETE_LOT: "guard.deleteLot",
+  GUARD_PAYMENT_BLOCKED: "guard.paymentBlocked",
 };
 
 const PARTY_PHRASE_KEYS: Record<string, string> = {

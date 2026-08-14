@@ -44,6 +44,20 @@ buyer correction.
 The freeze is on the *ledger id*, not on the party's details. Renaming a farmer keeps the id and
 must stay possible; there is a separate details-edit path for that.
 
+## Deletes and archives block bluntly but must still name the right party
+
+Edits are party-scoped; deletes and archives are not, and that asymmetry is deliberate. A delete
+removes the whole row, so *any* un-reversed payment has to stop it no matter who paid. Do not
+"improve" these into party-scoped checks — that would let a delete destroy the row a payment on the
+other side still depends on.
+
+What the party *is* still matters, for the message only. Reaching the party through the payment's
+transaction rather than through the payment itself looks equivalent and is not: every transaction
+has a buyer, so a farmer-only payout still resolves to a buyer name and the block correctly fires
+while naming someone who paid nothing. The failure is silent — the guard looks like it works.
+Resolve the party from the payment's own record, and keep "is it blocked" and "who paid" as
+separate values so a change to the message can never change what is refused.
+
 ## Server guard rejections must carry a code, not just English prose
 
 Guard messages are the one place a user most needs their own language, and the sentence is built

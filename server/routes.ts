@@ -56,12 +56,34 @@ function paramId(val: string | string[]): number {
  * `cash_entries` has no direction column, so the party is inferred from the FK plus the
  * category: a farmer payout is `farmerId + outward`, a buyer receipt is `buyerId + inward`.
  */
-async function getActivePaymentParties(businessId: number, transactionId: number) {
-  const activeEntries = await db.select({
-    farmerId: cashEntries.farmerId,
-    buyerId: cashEntries.buyerId,
-    category: cashEntries.category,
-  })
+type PaymentParties = { hasFarmerPayment: boolean; hasBuyerPayment: boolean };
+
+/** The only columns any payment-party lookup needs. */
+const PAYMENT_PARTY_COLUMNS = {
+  farmerId: cashEntries.farmerId,
+  buyerId: cashEntries.buyerId,
+  category: cashEntries.category,
+};
+
+/**
+ * Who actually paid, read from each cash entry's own party and direction: a farmer payout is an
+ * outward entry filed under a farmer, a buyer receipt an inward entry filed under a buyer.
+ *
+ * Never infer the party from the transaction's buyer instead. Every transaction has a buyer, so
+ * that reports a farmer payout as a buyer's and sends the user hunting for a buyer receipt that
+ * does not exist. This is the single definition — every guard must derive parties through it.
+ */
+function derivePaymentParties(
+  rows: { farmerId: number | null; buyerId: number | null; category: string }[],
+): PaymentParties {
+  return {
+    hasFarmerPayment: rows.some(e => e.farmerId != null && e.category === "outward"),
+    hasBuyerPayment: rows.some(e => e.buyerId != null && e.category === "inward"),
+  };
+}
+
+async function getActivePaymentParties(businessId: number, transactionId: number): Promise<PaymentParties> {
+  const activeEntries = await db.select(PAYMENT_PARTY_COLUMNS)
     .from(cashEntries)
     .where(and(
       eq(cashEntries.transactionId, transactionId),
@@ -70,10 +92,7 @@ async function getActivePaymentParties(businessId: number, transactionId: number
       eq(cashEntries.isArchived, false)
     ));
 
-  return {
-    hasFarmerPayment: activeEntries.some(e => e.farmerId != null && e.category === "outward"),
-    hasBuyerPayment: activeEntries.some(e => e.buyerId != null && e.category === "inward"),
-  };
+  return derivePaymentParties(activeEntries);
 }
 
 /**
@@ -108,6 +127,82 @@ function guardReject(
   params?: Record<string, string>,
 ) {
   return res.status(status).json({ message, code, params });
+}
+
+type PartyTag = "farmer" | "buyer" | "both";
+
+/**
+ * Deletes and archives are deliberately blunter than edits: they remove the whole row, so *any*
+ * un-reversed payment blocks them no matter which party made it. `blocked` alone decides that.
+ * `tag` records who paid purely so the message can name them — it never widens or narrows what
+ * is blocked.
+ */
+type PaymentBlock = { blocked: boolean; tag: PartyTag | null };
+
+function partyTag(p: PaymentParties): PartyTag | null {
+  if (p.hasFarmerPayment && p.hasBuyerPayment) return "both";
+  if (p.hasFarmerPayment) return "farmer";
+  if (p.hasBuyerPayment) return "buyer";
+  return null;
+}
+
+async function getPaymentBlockForTransactions(businessId: number, transactionIds: number[]): Promise<PaymentBlock> {
+  if (transactionIds.length === 0) return { blocked: false, tag: null };
+  const rows = await db.select(PAYMENT_PARTY_COLUMNS)
+    .from(cashEntries)
+    .where(and(
+      inArray(cashEntries.transactionId, transactionIds),
+      eq(cashEntries.businessId, businessId),
+      eq(cashEntries.isReversed, false)
+    ));
+  return { blocked: rows.length > 0, tag: partyTag(derivePaymentParties(rows)) };
+}
+
+async function getPaymentBlockForLots(businessId: number, lotIds: number[]): Promise<PaymentBlock> {
+  if (lotIds.length === 0) return { blocked: false, tag: null };
+  const rows = await db.select(PAYMENT_PARTY_COLUMNS)
+    .from(cashEntries)
+    .innerJoin(transactions, eq(cashEntries.transactionId, transactions.id))
+    .where(and(
+      inArray(transactions.lotId, lotIds),
+      eq(cashEntries.businessId, businessId),
+      eq(cashEntries.isReversed, false)
+    ));
+  return { blocked: rows.length > 0, tag: partyTag(derivePaymentParties(rows)) };
+}
+
+const PARTY_PHRASE: Record<PartyTag, string> = {
+  farmer: "a farmer payment exists",
+  buyer: "a buyer payment exists",
+  both: "farmer and buyer payments exist",
+};
+
+/**
+ * Reject a delete or archive that an un-reversed payment blocks. The English sentence is for logs
+ * and non-UI callers; `code` + `parties` let the browser rebuild it in the user's language.
+ *
+ * A farmer payout is the harder one to reverse, so it wins the hint when both parties have paid.
+ * That tie-break must stay in step with `translateApiError` on the client.
+ *
+ * A payment with no derivable party should not occur — every transaction-linked entry is written
+ * as either a farmer payout or a buyer receipt — but if one ever appears the block still stands
+ * and falls back to a sentence that names nobody rather than naming the wrong party.
+ */
+function rejectPaymentBlocked(
+  res: express.Response,
+  code: string,
+  block: PaymentBlock,
+  action: string,
+  scope: string,
+) {
+  if (!block.tag) {
+    return guardReject(res, 400, "GUARD_PAYMENT_BLOCKED",
+      `${action} — an active payment exists ${scope}. Please reverse all payments first.`);
+  }
+  const how = block.tag === "buyer" ? REVERSE_BUYER : REVERSE_FARMER;
+  return guardReject(res, 400, code,
+    `${action} — ${PARTY_PHRASE[block.tag]} ${scope}. ${how}`,
+    { parties: block.tag });
 }
 
 /**
@@ -478,19 +573,10 @@ export async function registerRoutes(
       const farmerLots = await db.select({ id: lots.id }).from(lots)
         .where(and(eq(lots.farmerId, farmerId), eq(lots.businessId, businessId)));
       if (farmerLots.length > 0) {
-        const lotIds = farmerLots.map(l => l.id);
-        const paidBuyers = await db.selectDistinct({ buyerName: buyers.name })
-          .from(cashEntries)
-          .innerJoin(transactions, eq(cashEntries.transactionId, transactions.id))
-          .innerJoin(buyers, eq(transactions.buyerId, buyers.id))
-          .where(and(
-            inArray(transactions.lotId, lotIds),
-            eq(cashEntries.businessId, businessId),
-            eq(cashEntries.isReversed, false)
-          ));
-        if (paidBuyers.length > 0) {
-          const names = paidBuyers.map(b => b.buyerName).join(", ");
-          return res.status(400).json({ message: `Cannot archive farmer: active payments exist for buyer(s): ${names}. Please reverse all payments first.` });
+        const block = await getPaymentBlockForLots(businessId, farmerLots.map(l => l.id));
+        if (block.blocked) {
+          return rejectPaymentBlocked(res, "GUARD_ARCHIVE_FARMER", block,
+            "Cannot archive this farmer", "against their lots");
         }
       }
     }
@@ -519,18 +605,10 @@ export async function registerRoutes(
       }
 
       if (isArchived) {
-        const paidBuyers = await db.selectDistinct({ buyerName: buyers.name })
-          .from(cashEntries)
-          .innerJoin(transactions, eq(cashEntries.transactionId, transactions.id))
-          .innerJoin(buyers, eq(transactions.buyerId, buyers.id))
-          .where(and(
-            inArray(transactions.lotId, lotIds),
-            eq(cashEntries.businessId, businessId),
-            eq(cashEntries.isReversed, false)
-          ));
-        if (paidBuyers.length > 0) {
-          const names = paidBuyers.map(b => b.buyerName).join(", ");
-          return res.status(400).json({ message: `Cannot archive: active payments exist for buyer(s): ${names}. Please reverse all payments first.` });
+        const block = await getPaymentBlockForLots(businessId, lotIds);
+        if (block.blocked) {
+          return rejectPaymentBlocked(res, "GUARD_ARCHIVE_LOTS", block,
+            "Cannot archive these lots", "against them");
         }
       }
 
@@ -1434,18 +1512,10 @@ export async function registerRoutes(
     }
 
     if (data.isArchived === true && !lot.isArchived) {
-      const paidBuyers = await db.selectDistinct({ buyerName: buyers.name })
-        .from(cashEntries)
-        .innerJoin(transactions, eq(cashEntries.transactionId, transactions.id))
-        .innerJoin(buyers, eq(transactions.buyerId, buyers.id))
-        .where(and(
-          eq(transactions.lotId, lotId),
-          eq(cashEntries.businessId, businessId),
-          eq(cashEntries.isReversed, false)
-        ));
-      if (paidBuyers.length > 0) {
-        const names = paidBuyers.map(b => b.buyerName).join(", ");
-        return res.status(400).json({ message: `Cannot archive lot: active payments exist for buyer(s): ${names}. Please reverse all payments first.` });
+      const block = await getPaymentBlockForLots(businessId, [lotId]);
+      if (block.blocked) {
+        return rejectPaymentBlocked(res, "GUARD_ARCHIVE_LOT", block,
+          "Cannot archive this lot", "against it");
       }
     }
 
@@ -1558,16 +1628,10 @@ export async function registerRoutes(
       };
 
       if (tx) {
-        const [activeCashEntry] = await db.select({ id: cashEntries.id })
-          .from(cashEntries)
-          .where(and(
-            eq(cashEntries.transactionId, tx.id),
-            eq(cashEntries.businessId, businessId),
-            eq(cashEntries.isReversed, false)
-          ))
-          .limit(1);
-        if (activeCashEntry) {
-          return res.status(400).json({ message: "Cannot delete bid: payments exist against this transaction. Please reverse all payments first." });
+        const block = await getPaymentBlockForTransactions(businessId, [tx.id]);
+        if (block.blocked) {
+          return rejectPaymentBlocked(res, "GUARD_DELETE_BID", block,
+            "Cannot delete this bid", "against it");
         }
 
         const [farmer] = await db.select({ name: farmers.name }).from(farmers).where(eq(farmers.id, tx.farmerId));
@@ -1635,16 +1699,10 @@ export async function registerRoutes(
 
       if (lotTxns.length > 0) {
         const txnIds = lotTxns.map(t => t.id);
-        const [activeCashEntry] = await db.select({ id: cashEntries.id })
-          .from(cashEntries)
-          .where(and(
-            inArray(cashEntries.transactionId, txnIds),
-            eq(cashEntries.businessId, businessId),
-            eq(cashEntries.isReversed, false)
-          ))
-          .limit(1);
-        if (activeCashEntry) {
-          return res.status(400).json({ message: "Cannot delete lot: payments exist against transactions in this lot. Please reverse all payments first." });
+        const block = await getPaymentBlockForTransactions(businessId, txnIds);
+        if (block.blocked) {
+          return rejectPaymentBlocked(res, "GUARD_DELETE_LOT", block,
+            "Cannot delete this lot", "against its transactions");
         }
       }
 
