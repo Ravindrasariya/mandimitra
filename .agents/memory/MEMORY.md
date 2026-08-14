@@ -4,5 +4,6 @@
 - [Payment-aware edit guards](payment-edit-guards.md) — scope guards by party, fire on a changed value not payload presence, and cover every write route that reaches the same numbers.
 - [BB#/SR# is not a unique bill key](bill-number-scoping.md) — bill numbers repeat across financial years; scope bill-level actions by transaction id, and never by number+date.
 - [Farmer rows per bill, buyer rows per txn](payment-row-granularity.md) — the two allocation lists differ by design; don't align the buyer side to the farmer side.
+- [Stock cards load once](stock-card-local-state.md) — invalidating a query never updates an open stock card; server-owned fields need an explicit re-sync effect.
 - [Persisted selections need re-anchoring](persisted-selection-state.md) — browser-persisted picks keyed by a server grouping key break when grouping changes; reconcile by entity id.
 - [Receipt template plumbing](receipt-template-plumbing.md) — public-folder template files are reference copies; what prints is a stored DB template or a hardcoded generator, so file edits are silent no-ops until re-uploaded.

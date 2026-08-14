@@ -38,6 +38,7 @@ import {
 } from "@/lib/receiptGenerators";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { FarmerPayDialog, sumBillDue, FARMER_PAY_MIN_DUE } from "@/components/farmer-pay-dialog";
+import { collectBidPayments, syncBidPayments } from "@/lib/stock-payment-sync";
 import { useLanguage } from "@/lib/language";
 import { translateApiError } from "@/lib/guardErrors";
 import type { Lot, Farmer, Transaction, Bid, Buyer, ReceiptTemplate } from "@shared/schema";
@@ -111,7 +112,7 @@ const emptyTxn = (): TxnState => ({
   extraOthers: "0",
 });
 
-type BidRow = {
+export type BidRow = {
   id: string;
   bidDbId?: number;
   buyerId?: number;
@@ -137,7 +138,7 @@ type BidRow = {
   paidAmount?: string;
 };
 
-type LotRow = {
+export type LotRow = {
   id: string;
   dbId?: number;
   lotId?: string;
@@ -194,14 +195,14 @@ function dbRecordToEditEntry(rec: { fieldChanged: string; oldValue: string | nul
   return { timestamp, username, changes: [], label: path };
 }
 
-type CropGroup = {
+export type CropGroup = {
   id: string; crop: string; srNumber: string; bbNumber: string; groupOpen: boolean; lots: LotRow[];
   archived: boolean;
   persisted: boolean;
   editHistory: EditEntry[];
 };
 
-type FarmerCard = {
+export type FarmerCard = {
   id: string;
   farmerId?: number;
   date: string;
@@ -3863,6 +3864,32 @@ export default function StockPage() {
         .catch(() => {});
     }
   }, [stockCardsData, businessId]);
+
+  // The load above deliberately runs only once, so a card being edited is never clobbered
+  // mid-typing. Payment status is the exception: it is server-owned, the user cannot edit it here,
+  // and it changes underneath an open card whenever a payment is recorded — the Farmer Pay
+  // shortcut sits on this very page. Copy just those fields across on every refetch so the Due
+  // badges settle without a hard refresh, and mirror them into the saved snapshot so the card is
+  // not mistaken for having unsaved edits.
+  useEffect(() => {
+    if (!stockCardsData || !dbLoaded.current) return;
+    const fresh = collectBidPayments(stockCardsToFarmerCards(stockCardsData));
+    if (fresh.size === 0) return;
+
+    setCards(prev => {
+      const next = prev.map(c => syncBidPayments(c, fresh));
+      return next.some((c, i) => c !== prev[i]) ? next : prev;
+    });
+    setSavedCardMap(prev => {
+      let changed = false;
+      const next = new Map(prev);
+      for (const [id, card] of Array.from(prev.entries())) {
+        const synced = syncBidPayments(card, fresh);
+        if (synced !== card) { next.set(id, synced); changed = true; }
+      }
+      return changed ? next : prev;
+    });
+  }, [stockCardsData]);
 
   useEffect(() => {
     if (!dbLoaded.current || !businessId) return;
