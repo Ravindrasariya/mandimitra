@@ -6,4 +6,5 @@
 - [Farmer rows per bill, buyer rows per txn](payment-row-granularity.md) — the two allocation lists differ by design; don't align the buyer side to the farmer side.
 - [Stock cards load once](stock-card-local-state.md) — invalidating a query never updates an open stock card; server-owned fields need an explicit re-sync effect.
 - [Persisted selections need re-anchoring](persisted-selection-state.md) — browser-persisted picks keyed by a server grouping key break when grouping changes; reconcile by entity id.
+- [Previewing generated receipts](receipt-html-preview.md) — the screenshot browser can't log in; render the generator's HTML into the public dir and shoot that instead.
 - [Receipt template plumbing](receipt-template-plumbing.md) — public-folder template files are reference copies; what prints is a stored DB template or a hardcoded generator, so file edits are silent no-ops until re-uploaded.

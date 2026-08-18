@@ -61,13 +61,18 @@ export function generateFarmerReceiptHtml(sg: UnifiedSerialGroup, businessName?:
   }, 0);
   const netPayable = totalGross - totalShownDeductions;
 
-  const B = "padding:5px 7px;border:1px solid #444;vertical-align:middle;";
+  // Column rules only. The pre-printed bill book draws no horizontal lines through the body, and
+  // without them the flex-stretched rows can differ slightly in height without it being visible --
+  // which is what lets the खर्च column run alongside the produce rows instead of below them.
+  const CELL = "padding:5px 7px;border-left:1px solid #444;border-right:1px solid #444;vertical-align:middle;";
+  const ROW_H = "34px";
   const td = (content: string, style = "") =>
-    `<td style="${B}${style}">${content}</td>`;
-  const tdEmpty = () => `<td style="${B}">&nbsp;</td>`;
+    `<td style="${CELL}${style}">${content}</td>`;
+  const tdEmpty = () => `<td style="${CELL}">&nbsp;</td>`;
 
-  // One row per bid/transaction
-  const bidRows = allTxns.map(t => {
+  // The five produce columns of each row. खर्च is filled in separately below: it runs down the side
+  // of these rows rather than belonging to any one of them.
+  const produceCells = allTxns.map(t => {
     const nw = parseFloat(t.netWeight || "0");
     const ppk = parseFloat(t.pricePerKg || "0");
     const epk = parseFloat((t as any).extraPerKgFarmer || "0");
@@ -75,42 +80,47 @@ export function generateFarmerReceiptHtml(sg: UnifiedSerialGroup, businessName?:
     const ratePerQ = (rate * 100).toFixed(0);
     const gross = nw * rate;
     const crop = t.lot?.crop || firstLot?.crop || "";
-    return `<tr>
-      ${td(cropHindi[crop] || crop, "text-align:center")}
+    return `${td(cropHindi[crop] || crop, "text-align:center")}
       ${td(String(t.numberOfBags || 0), "text-align:center")}
       ${td(ratePerQ, "text-align:center")}
       ${td(nw.toFixed(2), "text-align:center")}
-      ${td(gross.toFixed(2), "text-align:center")}
-      ${tdEmpty()}
-    </tr>`;
-  }).join("");
+      ${td(gross.toFixed(2), "text-align:center")}`;
+  });
 
   // Keep the ruled table a sensible size on light receipts so the space freed up for the
   // slip does not leave the produce area looking stranded.
   const MIN_PRODUCE_ROWS = 8;
-  const blankProduceRow = `<tr>${tdEmpty()}${tdEmpty()}${tdEmpty()}${tdEmpty()}${tdEmpty()}${tdEmpty()}</tr>`;
-  const blankProduceRows = Array(Math.max(0, MIN_PRODUCE_ROWS - allTxns.length)).fill(blankProduceRow).join("");
+  const blankCells = `${tdEmpty()}${tdEmpty()}${tdEmpty()}${tdEmpty()}${tdEmpty()}`;
+  while (produceCells.length < MIN_PRODUCE_ROWS) produceCells.push(blankCells);
 
-  // Deduction rows: cols 1-5 empty, col 6 has label + value
-  const dedRow = (label: string, amount: number, bold = false) =>
-    `<tr>
-      ${tdEmpty()}${tdEmpty()}${tdEmpty()}${tdEmpty()}${tdEmpty()}
-      <td style="${B}vertical-align:top;text-align:center">
-        <div style="font-size:11px;color:#555;text-align:center">${label}</div>
-        <div style="text-align:center;${bold ? "font-weight:bold;text-decoration:underline" : ""}">&#8377;${amount.toFixed(2)}</div>
-      </td>
+  // खर्च is written down the last column the way it is in the bill book: each label sits above its
+  // amount, with the three groups spaced out over the produce rows. Always printed in full, zeros
+  // included, so every receipt has the charges in the same place. Anchored to the last eight rows,
+  // so टोटल खर्च lands directly above किसान को देय no matter how many produce rows there are.
+  const kLabel = (text: string) => `<div style="font-size:11px;color:#555">${text}</div>`;
+  const kValue = (amount: number, bold = false) =>
+    `<div style="${bold ? "font-weight:bold;text-decoration:underline;" : ""}">&#8377;${amount.toFixed(2)}</div>`;
+  const kharchSlots = [
+    "", kLabel("भाड़ा"), kValue(totalFreight),
+    "", kLabel("हम्माली तुलाई"), kValue(hammaliAndExtras),
+    kLabel("टोटल खर्च"), kValue(totalShownDeductions, true),
+  ];
+  const firstSlotRow = produceCells.length - kharchSlots.length;
+
+  const produceRows = produceCells.map((cells, i) => {
+    const slot = kharchSlots[i - firstSlotRow] || "";
+    return `<tr style="height:${ROW_H}">
+      ${cells}
+      <td style="${CELL}text-align:center">${slot || "&nbsp;"}</td>
     </tr>`;
+  }).join("");
 
-  const deductRows = [
-    ...(totalFreight > 0 ? [dedRow("भाड़ा", totalFreight)] : []),
-    ...(hammaliAndExtras > 0 ? [dedRow("हम्माली तुलवाई", hammaliAndExtras)] : []),
-    ...(totalShownDeductions > 0 ? [dedRow("टोटल खर्च", totalShownDeductions, true)] : []),
-  ].join("");
-
-  const netPayableRow = `<tr>
-    ${tdEmpty()}${tdEmpty()}${tdEmpty()}${tdEmpty()}
-    <td style="${B}text-align:right;font-weight:bold">किसान को देय</td>
-    <td style="${B}font-weight:bold;font-size:1.05em;text-align:center">&#8377;${netPayable.toFixed(2)}</td>
+  // The one horizontal rule in the body: it closes off the produce rows above the total.
+  const NET = `${CELL}border-top:1px solid #444;`;
+  const netPayableRow = `<tr style="height:${ROW_H}">
+    <td style="${NET}">&nbsp;</td><td style="${NET}">&nbsp;</td><td style="${NET}">&nbsp;</td><td style="${NET}">&nbsp;</td>
+    <td style="${NET}text-align:right;font-weight:bold">किसान को देय</td>
+    <td style="${NET}font-weight:bold;font-size:1.05em;text-align:center">&#8377;${netPayable.toFixed(2)}</td>
   </tr>`;
 
   const th = (label: string) =>
@@ -191,7 +201,7 @@ table { width: 100%; border-collapse: collapse; }
 .receipt-copy.main-copy { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .slip-copy { font-size: 13px; break-inside: avoid; page-break-inside: avoid; }
 .produce-wrap { flex: 1; display: flex; flex-direction: column; min-height: 0; }
-table.produce { flex: 1; }
+table.produce { flex: 1; border: 1px solid #444; }
 .cut-line { text-align: center; padding: 2px 0; font-size: 10px; color: #555; border-top: 1.5px dashed #888; border-bottom: 1.5px dashed #888; margin: 4px 0; }
 .header { text-align: center; margin-bottom: 8px; }
 .firm-title { font-size: 18px; font-weight: bold; }
@@ -250,9 +260,7 @@ ${receiptHeaderImage ? letterheadHtml(receiptHeaderImage) : `<div style="text-al
     </tr>
   </thead>
   <tbody>
-    ${bidRows}
-    ${blankProduceRows}
-    ${deductRows}
+    ${produceRows}
     ${netPayableRow}
   </tbody>
 </table>
