@@ -17,6 +17,20 @@ The screenshot viewport is much shorter than a full A4 page, so a one-page-fit c
 wrapper page in the same directory that embeds the receipt in a scaled-down iframe. That is the only
 way to see where the cut line and tear-off slip actually land.
 
+For anything involving `@media print` or page breaks, the screenshot route is useless -- it renders
+screen styles on one endless page. There is a Chromium binary in the nix store (under the playwright
+browsers package) that will print to PDF headlessly, and `pdftoppm` / `pdfinfo` / `pdftotext` are on
+PATH. That gives a far better loop than screenshots: real page counts, per-page PNGs to look at, and
+`pdftotext -f N -l N` to assert *which sheet* a given label landed on without spending a screenshot.
+
+It also gives a regression test with no test framework: render the same fixtures from the pre-change
+generator (copy the file aside, `git checkout --` it, render, restore) and compare page-image md5s. An
+identical hash is hard proof that a layout change left the ordinary cases untouched.
+
+Two gotchas: avoid unbounded `find /nix/store` (it will blow the command timeout -- glob the specific
+store path instead), and Devanagari has no system font, so glyphs render as boxes. Layout and
+pagination are still accurate, and `pdftotext` extracts the real characters regardless.
+
 **Why:** the alternative is shipping print-layout changes unseen, and printed receipts are the one
 output in this project the user physically hands to someone.
 

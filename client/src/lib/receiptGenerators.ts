@@ -90,6 +90,12 @@ export function generateFarmerReceiptHtml(sg: UnifiedSerialGroup, businessName?:
   // Keep the ruled table a sensible size on light receipts so the space freed up for the
   // slip does not leave the produce area looking stranded.
   const MIN_PRODUCE_ROWS = 8;
+  // Measured against this layout: the main copy still fits a single A4 sheet at 25 produce rows and
+  // spills at 26. Past that the receipt is certain to span sheets whatever the header looks like, so
+  // it is safe to switch to the print layout that fragments cleanly. A receipt at or under the limit
+  // keeps the one-sheet layout untouched -- with a tall uploaded letterhead one may still spill, and
+  // it then breaks exactly as it always has.
+  const MAX_ROWS_ONE_SHEET = 25;
   const blankCells = `${tdEmpty()}${tdEmpty()}${tdEmpty()}${tdEmpty()}${tdEmpty()}`;
   while (produceCells.length < MIN_PRODUCE_ROWS) produceCells.push(blankCells);
 
@@ -108,13 +114,18 @@ export function generateFarmerReceiptHtml(sg: UnifiedSerialGroup, businessName?:
   ];
   const firstSlotRow = produceCells.length - kharchSlots.length;
 
-  const produceRows = produceCells.map((cells, i) => {
+  const produceRowList = produceCells.map((cells, i) => {
     const slot = kharchSlots[i - firstSlotRow] || "";
     return `<tr style="height:${ROW_H}">
       ${cells}
       <td style="${CELL}text-align:center">${slot || "&nbsp;"}</td>
     </tr>`;
-  }).join("");
+  });
+  // Split into two row groups so a receipt long enough to need a second sheet breaks tidily. The
+  // rows above the charges may flow across the boundary, but the charges and किसान को देय below them
+  // travel as one block -- otherwise a label could print on one sheet and its amount on the next.
+  const openingRows = produceRowList.slice(0, firstSlotRow).join("");
+  const closingRows = produceRowList.slice(firstSlotRow).join("");
 
   // The one horizontal rule in the body: it closes off the produce rows above the total.
   const NET = `${CELL}border-top:1px solid #444;`;
@@ -220,11 +231,25 @@ table.produce { flex: 1; border: 1px solid #444; }
      Deliberately short of a full sheet -- sizing this to exactly 100% left no room for rounding and
      tipped ordinary receipts onto a second page. */
   .page-wrapper { min-height: calc(100vh - 37mm); }
+  /* Receipts long enough to need a second sheet only. The one-sheet layout above stretches the
+     produce table to fill the page, which means the whole receipt is a flex container -- and Chrome
+     does not reposition later flex items when a page break is pushed down, so an avoided break makes
+     the table print straight over the payment slip. A receipt this long has no leftover space to
+     stretch into anyway, so it lays out as ordinary blocks, where fragmentation behaves. */
+  .page-wrapper.long,
+  .page-wrapper.long .receipt-copy.main-copy,
+  .page-wrapper.long .produce-wrap { display: block; }
+  .page-wrapper.long table.produce { flex: none; }
+  /* Never slice a row through the middle; reprint the headings on the continuation sheet; and keep
+     the charges and किसान को देय together, so a label never lands away from its amount. */
+  .page-wrapper.long table.produce tr { break-inside: avoid; page-break-inside: avoid; }
+  .page-wrapper.long table.produce thead { display: table-header-group; }
+  .page-wrapper.long table.produce tbody.closing { break-inside: avoid; page-break-inside: avoid; }
   .no-print { display: none !important; }
 }
 </style></head><body>
 
-<div class="page-wrapper">
+<div class="page-wrapper${produceCells.length > MAX_ROWS_ONE_SHEET ? " long" : ""}">
 
 <div class="receipt-copy main-copy">
 ${receiptHeaderImage ? letterheadHtml(receiptHeaderImage) : `<div style="text-align:right;font-size:12px;margin-bottom:2px">${businessPhone ? `&#9742; ${esc(businessPhone)}` : "&nbsp;"}</div>
@@ -260,8 +285,9 @@ ${receiptHeaderImage ? letterheadHtml(receiptHeaderImage) : `<div style="text-al
       ${th("खर्च")}
     </tr>
   </thead>
-  <tbody>
-    ${produceRows}
+  ${openingRows ? `<tbody>${openingRows}</tbody>` : ""}
+  <tbody class="closing">
+    ${closingRows}
     ${netPayableRow}
   </tbody>
 </table>
