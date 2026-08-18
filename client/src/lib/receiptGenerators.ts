@@ -97,7 +97,8 @@ export function generateFarmerReceiptHtml(sg: UnifiedSerialGroup, businessName?:
   // amount, with the three groups spaced out over the produce rows. Always printed in full, zeros
   // included, so every receipt has the charges in the same place. Anchored to the last eight rows,
   // so टोटल खर्च lands directly above किसान को देय no matter how many produce rows there are.
-  const kLabel = (text: string) => `<div style="font-size:11px;color:#555">${text}</div>`;
+  // Same size as the column headings above -- these read as headings for the amounts under them.
+  const kLabel = (text: string) => `<div>${text}</div>`;
   const kValue = (amount: number, bold = false) =>
     `<div style="${bold ? "font-weight:bold;text-decoration:underline;" : ""}">&#8377;${amount.toFixed(2)}</div>`;
   const kharchSlots = [
