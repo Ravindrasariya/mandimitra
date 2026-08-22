@@ -246,7 +246,19 @@ body { margin:0; font-family:Arial,sans-serif; font-size:11px; color:#111; }
 </head><body>${body}</body></html>`;
 }
 
-export async function shareReceiptAsImage(html: string, fileName: string): Promise<void> {
+function downloadPdfBlob(pdfBlob: Blob, pdfName: string): void {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(pdfBlob);
+  a.download = pdfName;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
+/**
+ * Renders receipt HTML off-screen and returns it as a PDF blob. The caller decides what to do with
+ * it -- save it to the device, or hand it to the share sheet.
+ */
+async function renderReceiptPdf(html: string, fileName: string): Promise<{ pdfBlob: Blob; pdfName: string }> {
   const bodyHtml = extractBodyHtml(html);
   const headStyles = extractHeadStyles(html);
 
@@ -280,21 +292,31 @@ export async function shareReceiptAsImage(html: string, fileName: string): Promi
     });
 
     const pdfName = fileName.replace(/\.[^.]+$/, ".pdf");
-    const pdfBlob = canvasToPdfBlob(canvas);
-    const pdfFile = new File([pdfBlob], pdfName, { type: "application/pdf" });
-
-    if (navigator.share && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
-      await navigator.share({ files: [pdfFile], title: pdfName }).catch(() => {});
-    } else {
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(pdfBlob);
-      a.download = pdfName;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-    }
+    return { pdfBlob: canvasToPdfBlob(canvas), pdfName };
   } finally {
     try { document.body.removeChild(container); } catch {}
   }
+}
+
+/**
+ * Hands the receipt to the device's share sheet. On a device that cannot share files -- typically a
+ * desktop browser -- it saves the PDF instead, which is the long-standing behaviour.
+ */
+export async function shareReceiptAsImage(html: string, fileName: string): Promise<void> {
+  const { pdfBlob, pdfName } = await renderReceiptPdf(html, fileName);
+  const pdfFile = new File([pdfBlob], pdfName, { type: "application/pdf" });
+
+  if (navigator.share && navigator.canShare && navigator.canShare({ files: [pdfFile] })) {
+    await navigator.share({ files: [pdfFile], title: pdfName }).catch(() => {});
+  } else {
+    downloadPdfBlob(pdfBlob, pdfName);
+  }
+}
+
+/** Always saves the receipt to the device, whether or not the device could share it. */
+export async function downloadReceiptAsPdf(html: string, fileName: string): Promise<void> {
+  const { pdfBlob, pdfName } = await renderReceiptPdf(html, fileName);
+  downloadPdfBlob(pdfBlob, pdfName);
 }
 
 /**

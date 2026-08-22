@@ -16,9 +16,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
 import type { Buyer, BuyerEditHistory } from "@shared/schema";
-import { ShoppingBag, Search, Plus, Pencil, ArrowUpDown, ArrowUp, ArrowDown, Printer, RefreshCw, ChevronDown, ChevronRight, Calendar, Share2, AlertTriangle, FileText, Archive } from "lucide-react";
+import { ShoppingBag, Search, Plus, Pencil, ArrowUpDown, ArrowUp, ArrowDown, Printer, RefreshCw, ChevronDown, ChevronRight, Calendar, Share2, AlertTriangle, FileText, Archive, Download } from "lucide-react";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { format } from "date-fns";
-import { printReceipt, shareReceiptAsImage, letterheadHtml } from "@/lib/receiptUtils";
+import { printReceipt, shareReceiptAsImage, downloadReceiptAsPdf, letterheadHtml } from "@/lib/receiptUtils";
 import { useAuth } from "@/lib/auth";
 import jsPDF from "jspdf";
 
@@ -818,13 +819,21 @@ export default function BuyerLedgerPage() {
     }
   };
 
-  const shareBuyerPaana = async (buyer: BuyerWithDues) => {
+  const shareBuyerPaana = async (buyer: BuyerWithDues, action: "download" | "share") => {
     try {
       const html = await getPaanaHtml(buyer);
       const fileName = `Buyer_Paana_${buyer.name.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
-      await shareReceiptAsImage(html, fileName);
+      if (action === "download") {
+        await downloadReceiptAsPdf(html, fileName);
+      } else {
+        await shareReceiptAsImage(html, fileName);
+      }
     } catch {
-      toast({ title: t("common.error"), description: "Failed to share Buyer Paana", variant: "destructive" });
+      toast({
+        title: t("common.error"),
+        description: action === "download" ? "Failed to download Buyer Paana" : "Failed to share Buyer Paana",
+        variant: "destructive",
+      });
     }
   };
 
@@ -1164,14 +1173,26 @@ export default function BuyerLedgerPage() {
                           </td>
                           <td className="p-3" onClick={(e) => e.stopPropagation()}>
                             <div className="flex items-center gap-1">
-                              <button
-                                data-testid={`button-share-buyer-${buyer.id}`}
-                                className="p-1.5 rounded hover:bg-muted"
-                                onClick={() => shareBuyerPaana(buyer)}
-                                title="Share via WhatsApp"
-                              >
-                                <Share2 className="w-4 h-4 text-muted-foreground" />
-                              </button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button
+                                    data-testid={`button-share-buyer-${buyer.id}`}
+                                    className="p-1.5 rounded hover:bg-muted"
+                                    onClick={(e) => e.stopPropagation()}
+                                    title={t("buyerLedger.downloadOrShare")}
+                                  >
+                                    <Share2 className="w-4 h-4 text-muted-foreground" />
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                  <DropdownMenuItem onClick={() => shareBuyerPaana(buyer, "download")} data-testid={`paana-download-buyer-${buyer.id}`}>
+                                    <Download className="w-3.5 h-3.5 mr-2" /> {t("buyerLedger.downloadPaana")}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => shareBuyerPaana(buyer, "share")} data-testid={`paana-share-buyer-${buyer.id}`}>
+                                    <Share2 className="w-3.5 h-3.5 mr-2" /> {t("buyerLedger.shareWhatsapp")}
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                               <button
                                 data-testid={`button-expand-buyer-${buyer.id}`}
                                 className="p-1.5 rounded hover:bg-muted"
@@ -1240,13 +1261,26 @@ export default function BuyerLedgerPage() {
                               >
                                 <Pencil className="w-4 h-4 text-muted-foreground" />
                               </button>
-                              <button
-                                data-testid={`button-share-buyer-mobile-${buyer.id}`}
-                                className="p-1.5 rounded hover:bg-muted"
-                                onClick={() => shareBuyerPaana(buyer)}
-                              >
-                                <Share2 className="w-4 h-4 text-muted-foreground" />
-                              </button>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button
+                                    data-testid={`button-share-buyer-mobile-${buyer.id}`}
+                                    className="p-1.5 rounded hover:bg-muted"
+                                    onClick={(e) => e.stopPropagation()}
+                                    title={t("buyerLedger.downloadOrShare")}
+                                  >
+                                    <Share2 className="w-4 h-4 text-muted-foreground" />
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                  <DropdownMenuItem onClick={() => shareBuyerPaana(buyer, "download")} data-testid={`paana-download-buyer-mobile-${buyer.id}`}>
+                                    <Download className="w-3.5 h-3.5 mr-2" /> {t("buyerLedger.downloadPaana")}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => shareBuyerPaana(buyer, "share")} data-testid={`paana-share-buyer-mobile-${buyer.id}`}>
+                                    <Share2 className="w-3.5 h-3.5 mr-2" /> {t("buyerLedger.shareWhatsapp")}
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                               <button
                                 data-testid={`button-expand-buyer-mobile-${buyer.id}`}
                                 className="p-1.5 rounded hover:bg-muted"
