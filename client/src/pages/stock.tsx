@@ -3515,6 +3515,7 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
   let buyerReceivableTotal = 0, buyerDue = 0;
   let aadhatTotal = 0;
   let hammaliTotal = 0, extrasTotal = 0;
+  let vehicleBhadaTotal = 0;
 
   for (const card of cards) {
     if (card.archived || !savedCardMap.has(card.id)) continue;
@@ -3544,6 +3545,11 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
             + Math.round((parseFloat(ecs.hammaliBuyerPerBag) || 0) * bidBags);
           extrasTotal += (parseFloat(bid.txn?.extraChargesFarmer || "0"))
             + (parseFloat(bid.txn?.extraChargesBuyer || "0"));
+          // Bhada is entered once per vehicle and split across its transactions by bag share. Sum the
+          // UNROUNDED share and round once at the end, so a fully sold vehicle totals exactly the rate
+          // entered -- the rounded per-transaction figures shown on each row can fall a rupee or two short
+          // of it. Summing shares (never the rate itself) is also what keeps filtered views correct.
+          if (tbi > 0) vehicleBhadaTotal += (vbr * bidBags) / tbi;
           if (bid.farmerPaymentStatus !== "paid") {
             const farmerPaid = parseFloat(bid.farmerPaidAmount || "0");
             cardFarmerDue += Math.max(0, bt.farmerPayable - farmerPaid);
@@ -3559,7 +3565,7 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-2" data-testid="stock-summary-bar">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-2" data-testid="stock-summary-bar">
       <div className="rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 px-4 py-3">
         <div className="flex items-center gap-1.5 text-xs font-medium text-blue-600 dark:text-blue-400 mb-1">
           <Layers className="w-3.5 h-3.5" /> {t("stock.farmerLotsTxns")}
@@ -3611,6 +3617,15 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
           <span className="text-sm font-bold text-purple-700 dark:text-purple-300" data-testid="text-extras-total">
             ₹{Math.round(extrasTotal).toLocaleString("en-IN")}
           </span>
+        </div>
+      </div>
+
+      <div className="rounded-xl border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/30 px-4 py-3">
+        <div className="flex items-center gap-1.5 text-xs font-medium text-purple-600 dark:text-purple-400 mb-1">
+          <Truck className="w-3.5 h-3.5" /> {t("stock.totalVehicleBhada")}
+        </div>
+        <div className="text-sm font-bold text-purple-700 dark:text-purple-300" data-testid="text-vehicle-bhada">
+          ₹{Math.round(vehicleBhadaTotal).toLocaleString("en-IN")}
         </div>
       </div>
     </div>

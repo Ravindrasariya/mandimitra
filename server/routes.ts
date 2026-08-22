@@ -2599,6 +2599,7 @@ export async function registerRoutes(
           mandiCharges: t.mandiCharges, aadhatCharges: t.aadhatCharges,
           hammaliCharges: t.hammaliCharges, hammaliBuyerPerBag: t.hammaliBuyerPerBag,
           extraChargesFarmer: t.extraChargesFarmer, extraChargesBuyer: t.extraChargesBuyer,
+          vehicleBhadaRate: t.lot.vehicleBhadaRate, totalBagsInVehicle: t.lot.totalBagsInVehicle,
           netWeight: t.netWeight, numberOfBags: t.numberOfBags,
           isReversed: t.isReversed,
         })),

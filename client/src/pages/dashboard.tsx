@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { LayoutDashboard, ChevronDown, Calendar, Users, Package, Landmark, HandCoins, ShoppingBag, TrendingUp, Settings, Hammer, History } from "lucide-react";
+import { LayoutDashboard, ChevronDown, Calendar, Users, Package, HandCoins, ShoppingBag, TrendingUp, Settings, Hammer, History, Truck } from "lucide-react";
 import type { BusinessChargeSettings } from "@shared/schema";
 import {
   PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
@@ -22,7 +22,7 @@ import {
 type DashboardData = {
   businessName: string;
   lots: { id: number; lotId: string; crop: string; date: string; numberOfBags: number; remainingBags: number; farmerId: number; farmerName: string }[];
-  transactions: { id: number; transactionId: string; date: string; crop: string; lotId: string; farmerId: number; farmerName: string; buyerId: number; buyerName: string; totalPayableToFarmer: string; totalReceivableFromBuyer: string; paidAmount: string; farmerPaidAmount: string; mandiCharges: string; aadhatCharges: string; hammaliCharges: string; hammaliBuyerPerBag: string | null; extraChargesFarmer: string; extraChargesBuyer: string; netWeight: string; numberOfBags: number; isReversed: boolean }[];
+  transactions: { id: number; transactionId: string; date: string; crop: string; lotId: string; farmerId: number; farmerName: string; buyerId: number; buyerName: string; totalPayableToFarmer: string; totalReceivableFromBuyer: string; paidAmount: string; farmerPaidAmount: string; mandiCharges: string; aadhatCharges: string; hammaliCharges: string; hammaliBuyerPerBag: string | null; extraChargesFarmer: string; extraChargesBuyer: string; vehicleBhadaRate: string | null; totalBagsInVehicle: number | null; netWeight: string; numberOfBags: number; isReversed: boolean }[];
   farmersWithDues: { id: number; name: string; totalPayable: string; totalDue: string; totalAdvance: string; advanceEntries: { date: string; amount: string }[] }[];
   buyersWithDues: { id: number; name: string; receivableDue: string; overallDue: string; openingBalance: string; isArchived: boolean }[];
   txAggregates: { totalHammali: number; totalExtraCharges: number; totalMandiCommission: number; paidHammali: number; paidExtraCharges: number; paidMandiCommission: number };
@@ -222,18 +222,26 @@ export default function DashboardPage() {
     const txnReceivable = filteredTxns.reduce((s, t) => s + parseFloat(t.totalReceivableFromBuyer || "0"), 0);
     const openingBalanceTotal = filteredBuyersWithDues.reduce((s, b) => s + parseFloat(b.openingBalance || "0"), 0);
     const totalReceivable = txnReceivable + openingBalanceTotal;
-    const totalMandi = filteredTxns.reduce((s, t) => s + parseFloat(t.mandiCharges || "0"), 0);
     const totalAadhat = filteredTxns.reduce((s, t) => s + parseFloat(t.aadhatCharges || "0"), 0);
     const totalHammali = filteredTxns.reduce((s, t) =>
       s + parseFloat(t.hammaliCharges || "0") + Math.round(parseFloat(t.hammaliBuyerPerBag || "0") * (t.numberOfBags || 0)), 0);
     const totalExtraCharges = filteredTxns.reduce((s, t) => s + parseFloat(t.extraChargesFarmer || "0") + parseFloat(t.extraChargesBuyer || "0"), 0);
+    // Bhada is entered once per vehicle and split across that vehicle's transactions by bag share. Sum the
+    // UNROUNDED share and round once at the end, so a fully sold vehicle totals exactly the rate entered --
+    // the per-transaction figures stored against each bill are individually rounded and can fall a rupee or
+    // two short of it. Summing shares (never the rate itself) is also what keeps filtered views correct.
+    const totalVehicleBhada = filteredTxns.reduce((s, t) => {
+      const bagsInVehicle = t.totalBagsInVehicle || 0;
+      if (bagsInVehicle <= 0) return s;
+      return s + (parseFloat(t.vehicleBhadaRate || "0") * (t.numberOfBags || 0)) / bagsInVehicle;
+    }, 0);
 
     const farmerDue = filteredFarmersWithDues.reduce((s, f) => s + parseFloat(f.totalDue || "0"), 0);
     const buyerDue = filteredBuyersWithDues.reduce((s, b) => s + parseFloat(b.overallDue || "0"), 0);
 
     const extraChargesDue = (data?.txAggregates?.totalExtraCharges || 0) - (data?.txAggregates?.paidExtraCharges || 0);
 
-    return { farmersCount, lotsCount, txnCount, totalPayable, totalReceivable, totalMandi, totalAadhat, totalHammali, totalExtraCharges, farmerDue, buyerDue, extraChargesDue };
+    return { farmersCount, lotsCount, txnCount, totalPayable, totalReceivable, totalAadhat, totalHammali, totalExtraCharges, totalVehicleBhada, farmerDue, buyerDue, extraChargesDue };
   }, [filteredTxns, filteredLots, uniqueFarmerIds, filteredFarmersWithDues, filteredBuyersWithDues, data]);
 
   const cropDistribution = useMemo(() => {
@@ -532,11 +540,11 @@ export default function DashboardPage() {
         <Card className="border-purple-200 dark:border-purple-800">
           <CardContent className="p-3">
             <div className="flex items-center gap-1.5 mb-1">
-              <Landmark className="w-3.5 h-3.5 text-purple-600" />
-              <span className="text-[11px] font-medium text-muted-foreground">{t("dash.mandiCommission")}</span>
+              <Truck className="w-3.5 h-3.5 text-purple-600" />
+              <span className="text-[11px] font-medium text-muted-foreground">{t("dash.totalVehicleBhada")}</span>
             </div>
-            <div className="text-sm font-bold text-purple-700 dark:text-purple-400" data-testid="text-mandi-commission">
-              ₹{summary.totalMandi.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+            <div className="text-sm font-bold text-purple-700 dark:text-purple-400" data-testid="text-vehicle-bhada">
+              ₹{summary.totalVehicleBhada.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
             </div>
           </CardContent>
         </Card>
