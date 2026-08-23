@@ -2296,7 +2296,9 @@ export async function registerRoutes(
 
   app.get("/api/bhada-breakdown", requireAuth, async (req, res) => {
     try {
-      const result = await storage.getBhadaBreakdown(req.user!.businessId);
+      // The Stock register asks for settled cards too, so it can show a "Paid" badge rather than nothing.
+      const includePaid = req.query.includePaid === "1" || req.query.includePaid === "true";
+      const result = await storage.getBhadaBreakdown(req.user!.businessId, includePaid);
       res.json(result);
     } catch (e: any) {
       res.status(400).json({ message: e.message });

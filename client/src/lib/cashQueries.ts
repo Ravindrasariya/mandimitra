@@ -25,7 +25,12 @@ export function invalidateCashQueries() {
   queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/transactions"] });
   queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/transaction-aggregates"] });
   queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/hammali-breakdown"] });
-  queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/bhada-breakdown"] });
+  // Two screens read this: the Cash picker (unpaid cards only) and the Stock register's freight badge
+  // (settled cards included). They use different keys, so match on the prefix or one of them goes stale.
+  queryClient.invalidateQueries({ refetchType: 'all', predicate: (query) => {
+    const key = query.queryKey[0];
+    return typeof key === "string" && key.startsWith("/api/bhada-breakdown");
+  }});
   queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/bank-accounts"] });
   queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/dashboard"] });
   queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/stock-cards"] });

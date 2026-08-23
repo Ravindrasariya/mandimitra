@@ -1694,7 +1694,16 @@ export class DatabaseStorage implements IStorage {
    * its bhada. Payments recorded before bhada tracking existed carry no stock date and are ignored —
    * they cannot be attributed to a card without guessing.
    */
-  async getBhadaBreakdown(businessId: number): Promise<{
+  /**
+   * The bhada position of every farmer card, keyed by farmer + stock date.
+   *
+   * A card is one farmer on one stock date; farmerId + date is therefore the key, and this returns that
+   * key exactly once. The two callers want different slices of it: the Cash page's Freight/Bhada picker
+   * only offers cards that still owe something, while the Stock register also needs the settled ones so it
+   * can show a "Paid" badge. `includePaid` switches between the two rather than letting each screen do its
+   * own arithmetic, which is how the two would eventually disagree about what a card owes.
+   */
+  async getBhadaBreakdown(businessId: number, includePaid = false): Promise<{
     farmerId: number; farmerName: string; date: string;
     totalBhada: number; paidBhada: number; dueBhada: number;
   }[]> {
@@ -1753,11 +1762,27 @@ export class DatabaseStorage implements IStorage {
     for (const [cardKey, total] of Array.from(totalByCard.entries())) {
       const meta = cardMeta.get(cardKey)!;
       const paid = paidByCard.get(cardKey) || 0;
-      const due = Math.round((total - paid) * 100) / 100;
-      if (due <= 0) continue;
+      // A card can be overpaid only if something has gone wrong upstream; clamp so a negative due can never
+      // be presented as money still owing in the opposite direction.
+      const due = Math.max(0, Math.round((total - paid) * 100) / 100);
+      if (due <= 0 && !includePaid) continue;
       rows.push({ ...meta, totalBhada: total, paidBhada: paid, dueBhada: due });
     }
     rows.sort((a, b) => (a.date === b.date ? a.farmerName.localeCompare(b.farmerName) : b.date.localeCompare(a.date)));
+
+    // Farmer + stock date must identify one card and one only. A duplicate here would split a single
+    // card's freight across two rows, and the smaller half could read as fully paid while money is still
+    // owed. The grouping above makes that impossible, so if it ever happens something upstream has changed
+    // and the caller must not be handed a plausible-looking wrong answer.
+    const seenKeys = new Set<string>();
+    for (const row of rows) {
+      const key = `${row.farmerId}|${row.date}`;
+      if (seenKeys.has(key)) {
+        throw new Error(`Bhada card appears twice for farmer ${row.farmerId} on ${row.date}`);
+      }
+      seenKeys.add(key);
+    }
+
     return rows;
   }
 

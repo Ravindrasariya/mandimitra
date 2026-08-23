@@ -10,3 +10,4 @@
 - [Print layouts that fill a page can't paginate](print-flex-fragmentation.md) — a flex stretch-to-fill sheet overlaps its own content once it breaks; switch to block layout for the long case.
 - [Previewing generated receipts](receipt-html-preview.md) — the screenshot browser can't log in; render the generator's HTML into the public dir and shoot that instead.
 - [Receipt template plumbing](receipt-template-plumbing.md) — public-folder template files are reference copies; what prints is a stored DB template or a hardcoded generator, so file edits are silent no-ops until re-uploaded.
+- [Query-param variants break invalidation](query-param-variant-invalidation.md) — giving an endpoint a second cache key makes every exact-key invalidation silently miss it.

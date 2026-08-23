@@ -727,8 +727,88 @@ function calcLotTotals(lot: LotRow, cs: ChargeSettings, vehicleBhadaRate: number
 
 // ─── Section toggle ───────────────────────────────────────────────────────────
 
-function SectionToggle({ open, onToggle, icon, label, count, summary }: {
+// ─── Bhada (freight) status ──────────────────────────────────────────────────
+
+export type BhadaCardRow = {
+  farmerId: number;
+  farmerName: string;
+  date: string;
+  totalBhada: number;
+  paidBhada: number;
+  dueBhada: number;
+};
+
+/**
+ * Every farmer card's freight position, settled ones included.
+ *
+ * Keyed by farmer + stock date, exactly as the Cash page's Freight/Bhada picker is, so the badge here and
+ * the amount owing there are the same number from the same place and cannot drift apart. React Query
+ * shares one fetch across every card on screen, and because this reads the query rather than the stock
+ * card's own loaded copy, it stays right when a payment is recorded on another screen.
+ */
+const BHADA_STATUS_KEY = "/api/bhada-breakdown?includePaid=1";
+
+function useBhadaCard(farmerId: number | undefined, date: string | undefined) {
+  const { data } = useQuery<BhadaCardRow[]>({ queryKey: [BHADA_STATUS_KEY] });
+  return useMemo(() => {
+    if (!farmerId || !date || !data) return undefined;
+    return data.find(r => r.farmerId === farmerId && r.date === date);
+  }, [data, farmerId, date]);
+}
+
+/**
+ * Paid / part-paid / unpaid for one farmer card's freight.
+ *
+ * Shows nothing at all when the card carries no freight or its position is not yet known: a card with no
+ * bhada must not be labelled as owing, and a missing answer must never be dressed up as "Paid".
+ */
+function BhadaStatusBadge({ farmerId, date }: { farmerId?: number; date?: string }) {
+  const { t } = useLanguage();
+  const card = useBhadaCard(farmerId, date);
+
+  if (!card || card.totalBhada <= 0) return null;
+
+  const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
+  const state = card.dueBhada <= 0
+    ? {
+        label: t("stock.bhadaPaid"),
+        testId: "badge-bhada-paid",
+        // The tick and the wording carry the meaning; colour only reinforces it, so the badge still reads
+        // correctly in the print view and for anyone who cannot easily distinguish the colours.
+        icon: <Check className="w-3 h-3 shrink-0" strokeWidth={3} />,
+        className: "border-green-600 text-green-700 dark:border-green-500 dark:text-green-400",
+      }
+    : card.paidBhada > 0
+      ? {
+          label: `${t("stock.bhadaPartial")} · ${money(card.dueBhada)}`,
+          testId: "badge-bhada-partial",
+          icon: <AlertCircle className="w-3 h-3 shrink-0" />,
+          className: "border-amber-600 text-amber-700 dark:border-amber-500 dark:text-amber-400",
+        }
+      : {
+          label: `${t("stock.bhadaDue")} · ${money(card.dueBhada)}`,
+          testId: "badge-bhada-due",
+          icon: <AlertTriangle className="w-3 h-3 shrink-0" />,
+          className: `border-red-600 text-red-700 dark:border-red-500 dark:text-red-400`,
+        };
+
+  return (
+    <Badge
+      variant="outline"
+      data-testid={state.testId}
+      title={`${t("stock.bhadaTotal")} ${money(card.totalBhada)} · ${t("stock.bhadaPaidAmount")} ${money(card.paidBhada)}`}
+      className={`ml-1 shrink-0 text-xs font-medium px-1.5 py-0.5 gap-1 ${state.className}`}
+    >
+      {state.icon}
+      {t("stock.bhadaLabel")} — {state.label}
+    </Badge>
+  );
+}
+
+function SectionToggle({ open, onToggle, icon, label, count, summary, badge }: {
   open: boolean; onToggle: () => void; icon: React.ReactNode; label: string; count?: string; summary?: string[];
+  /** Sits immediately after the label, before the collapsed summary. */
+  badge?: React.ReactNode;
 }) {
   return (
     <button
@@ -739,6 +819,7 @@ function SectionToggle({ open, onToggle, icon, label, count, summary }: {
       {open ? <ChevronDown className="w-5 h-5 shrink-0 mt-0.5 text-muted-foreground" strokeWidth={3} /> : <ChevronRight className="w-5 h-5 shrink-0 mt-0.5 text-muted-foreground" strokeWidth={3} />}
       <span className="shrink-0 mt-0.5">{icon}</span>
       <span>{label}</span>
+      {badge}
       {!open && summary && summary.length > 0 && (
         <span className="flex items-center gap-1.5 flex-wrap ml-1">
           {summary.map((s, i) => (
@@ -1902,7 +1983,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, onBBChange, is
               }
               if (dbLots.length > 0) {
                 queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
-              queryClient.invalidateQueries({ queryKey: ["/api/bhada-breakdown"] });
+              queryClient.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/bhada-breakdown") });
                 queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
                 queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
                 queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
@@ -2395,7 +2476,7 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
         }
         if (dbLots.length > 0) {
           queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
-              queryClient.invalidateQueries({ queryKey: ["/api/bhada-breakdown"] });
+              queryClient.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/bhada-breakdown") });
           queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
           queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
           queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
@@ -2721,6 +2802,7 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
           {/* Vehicle info */}
           <SectionToggle open={card.vehicleOpen} onToggle={() => set("vehicleOpen", !card.vehicleOpen)}
             icon={<Truck className="w-3.5 h-3.5" />} label={t("stock.vehicleInfo")}
+            badge={<BhadaStatusBadge farmerId={card.farmerId} date={card.date} />}
             summary={[
               card.vehicleNumber && `# ${card.vehicleNumber}`,
               card.driverName && card.driverName,
@@ -2912,7 +2994,7 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
             try {
               await apiRequest("POST", "/api/lots/bulk-archive", { lotIds, isArchived: false });
               queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
-              queryClient.invalidateQueries({ queryKey: ["/api/bhada-breakdown"] });
+              queryClient.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/bhada-breakdown") });
               queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
               queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
               queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
@@ -4553,7 +4635,7 @@ export default function StockPage() {
       setSavedCardMap(prev => new Map(prev).set(card.id, JSON.parse(JSON.stringify(updatedCard))));
 
       queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
-              queryClient.invalidateQueries({ queryKey: ["/api/bhada-breakdown"] });
+              queryClient.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/bhada-breakdown") });
       queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
       queryClient.invalidateQueries({ queryKey: ["/api/bids"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
@@ -4620,7 +4702,7 @@ export default function StockPage() {
       try {
         await apiRequest("POST", "/api/lots/bulk-archive", { lotIds, isArchived: true });
         queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
-              queryClient.invalidateQueries({ queryKey: ["/api/bhada-breakdown"] });
+              queryClient.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/bhada-breakdown") });
         queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
         queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
         queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
