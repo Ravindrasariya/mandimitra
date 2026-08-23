@@ -226,6 +226,12 @@ export type FarmerCard = {
   vehicleOpen: boolean;
   archived: boolean;
   savedAt: string | null;
+  /**
+   * Set the moment this user actually edits the card, and cleared once it is saved or cancelled.
+   * A card counts as having unsaved changes only when this is set: values alone are not enough,
+   * because the server can move fields underneath an untouched card.
+   */
+  touched?: boolean;
 };
 
 // ─── Confirm delete dialog ────────────────────────────────────────────────────
@@ -559,8 +565,34 @@ const emptyCropGroup = (crop: string, date?: string): CropGroup => ({
 
 // ─── Data fingerprint (for dirty detection, strips UI-only flags) ─────────────
 
+/**
+ * Two answers from the server can carry the same figure in different shapes — a rate as a number one
+ * time and as text the next, a field absent one time and blank the next — so every value is flattened
+ * to a comparable form before anything is compared. Otherwise an untouched card looks edited.
+ */
+function normaliseValue(v: any): any {
+  if (v === null || v === undefined) return "";
+  if (typeof v === "number") return Number.isFinite(v) ? String(v) : "";
+  if (typeof v === "boolean") return v;
+  if (Array.isArray(v)) return v.map(normaliseValue);
+  if (typeof v === "object") {
+    const out: Record<string, any> = {};
+    for (const k of Object.keys(v).sort()) out[k] = normaliseValue(v[k]);
+    return out;
+  }
+  return String(v);
+}
+
 function getDataFingerprint(card: FarmerCard): string {
-  const stripBid = ({ id, bidDbId, buyerId, txnDbId, bidOpen, txn, ...b }: BidRow) => ({
+  // Payment status, paid amounts and the charge/total figures frozen at save time all belong to the
+  // server and cannot be edited here, so they must never make a card look edited.
+  const stripBid = ({
+    id, bidDbId, buyerId, txnDbId, bidOpen, txn,
+    paymentStatus, farmerPaymentStatus, paidAmount, farmerPaidAmount,
+    savedCharges, savedBuyerReceivable, savedFarmerPayable,
+    savedAadhatCharges, savedMuddatAnyaCharges, savedFreightCharges,
+    ...b
+  }: BidRow) => ({
     ...b,
     bidDbId, buyerId, txnDbId,
     txn: (({ showWeightCalc, showExtraBreakdown, ...t }) => t)(txn),
@@ -569,8 +601,43 @@ function getDataFingerprint(card: FarmerCard): string {
   const stripGroup = ({ groupOpen, editHistory, persisted, lots, ...g }: CropGroup) => ({
     ...g, lots: lots.map(stripLot),
   });
-  const { cardOpen, farmerOpen, vehicleOpen, savedAt, farmerId, cropGroups, ...rest } = card;
-  return JSON.stringify({ ...rest, cropGroups: cropGroups.map(stripGroup) });
+  const { cardOpen, farmerOpen, vehicleOpen, savedAt, farmerId, touched, cropGroups, ...rest } = card;
+  return JSON.stringify(normaliseValue({ ...rest, cropGroups: cropGroups.map(stripGroup) }));
+}
+
+/**
+ * Archiving or reinstating takes effect on the server immediately, so the saved entry must follow it.
+ * Only the archive flags are carried across: the live card can also hold edits this user has not saved
+ * yet, and writing the whole card into the saved entry would make those edits look already saved and
+ * let the next refresh throw them away.
+ */
+function applyArchiveState(prev: FarmerCard | undefined, updated: FarmerCard): FarmerCard {
+  if (!prev) return updated;
+  const updatedGroups = new Map(updated.cropGroups.map(g => [g.id, g]));
+  return {
+    ...prev,
+    archived: updated.archived,
+    cropGroups: prev.cropGroups.map(g => {
+      const u = updatedGroups.get(g.id);
+      if (!u) return g;
+      const updatedLots = new Map(u.lots.map(l => [l.id, l]));
+      return {
+        ...g,
+        archived: u.archived,
+        lots: g.lots.map(l => {
+          const ul = updatedLots.get(l.id);
+          return ul ? { ...l, isArchived: ul.isArchived } : l;
+        }),
+      };
+    }),
+  };
+}
+
+/** A card is unsaved only when this user touched it and its values really differ from the saved entry. */
+function hasUnsavedEdits(card: FarmerCard, saved: FarmerCard | undefined | null): boolean {
+  if (!saved) return false;
+  if (!card.touched) return false;
+  return getDataFingerprint(card) !== getDataFingerprint(saved);
 }
 
 function diffCropGroup(saved: CropGroup, current: CropGroup, tr: (key: string) => string): ChangeRecord[] {
@@ -2357,7 +2424,7 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
   );
 
   const isDirty = savedCard
-    ? (() => {
+    ? (card.touched ?? false) && (() => {
         const filteredGroupIds = new Set(card.cropGroups.map(g => g.id));
         const filteredLotIds = new Set(card.cropGroups.flatMap(g => g.lots.map(l => l.id)));
         const filteredBidIds = new Set(card.cropGroups.flatMap(g => g.lots.flatMap(l => l.bids.map(b => b.id))));
@@ -3147,7 +3214,8 @@ function saveDraftsToStorage(cards: FarmerCard[], savedCardMap: Map<string, Farm
     if (c.archived) return false;
     const saved = savedCardMap.get(c.id);
     if (saved) {
-      return getDataFingerprint(c) !== getDataFingerprint(saved);
+      // Only this user's own edits are kept locally. An untouched card always comes from the server.
+      return hasUnsavedEdits(c, saved);
     }
     return !!(c.farmerName.trim() || c.farmerPhone || c.village || c.vehicleNumber || c.advanceAmount || c.cropGroups.some(g => g.lots.some(hasLotUserData)));
   });
@@ -3964,11 +4032,17 @@ export default function StockPage() {
     loaded.forEach(c => map.set(c.id, JSON.parse(JSON.stringify(c))));
     const drafts = loadDraftsFromStorage(businessId);
     const loadedIds = new Set(loaded.map(c => c.id));
-    const newDrafts = drafts.filter(d => !loadedIds.has(d.id));
-    const dirtyDrafts = drafts.filter(d => loadedIds.has(d.id));
+    const newDrafts = drafts.filter(d => !loadedIds.has(d.id)).map(d => ({ ...d, touched: true }));
+    // A draft stored before the comparison was corrected can be identical to the saved entry. Those
+    // are dropped here so they stop coming back marked unsaved on every refresh.
+    const dirtyDrafts = drafts.filter(d => {
+      const server = loaded.find(c => c.id === d.id);
+      if (!server) return false;
+      return getDataFingerprint({ ...d, touched: true }) !== getDataFingerprint(server);
+    });
     const mergedLoaded = loaded.map(c => {
       const dirty = dirtyDrafts.find(d => d.id === c.id);
-      return dirty ? { ...dirty, cardOpen: true, farmerOpen: true, vehicleOpen: false } : c;
+      return dirty ? { ...dirty, touched: true, cardOpen: true, farmerOpen: true, vehicleOpen: false } : c;
     });
     const allCards = sortCardsByMaxSr([...newDrafts, ...mergedLoaded]);
     setCards(allCards.length > 0 ? allCards : [emptyCard()]);
@@ -4069,12 +4143,12 @@ export default function StockPage() {
         // Vanished from the server: somebody else deleted or archived it. Drop it unless this user
         // has unsaved edits in it, which would otherwise be silently thrown away.
         if (!server) {
-          if (getDataFingerprint(local) !== getDataFingerprint(saved)) { next.push(local); continue; }
+          if (hasUnsavedEdits(local, saved)) { next.push(local); continue; }
           changed = true;
           continue;
         }
 
-        const dirty = getDataFingerprint(local) !== getDataFingerprint(saved);
+        const dirty = hasUnsavedEdits(local, saved);
         const busy = savingRef.current === local.id;
         if (dirty || busy) {
           const synced = syncBidPayments(local, fresh);
@@ -4126,7 +4200,7 @@ export default function StockPage() {
   const anyDirty = cards.some(c => {
     if (c.archived) return false;
     const saved = savedCardMap.get(c.id) ?? null;
-    return saved ? getDataFingerprint(c) !== getDataFingerprint(saved) : !!(c.farmerName.trim() || c.farmerPhone || c.village || c.vehicleNumber || c.advanceAmount || c.cropGroups.some(g => g.lots.some(hasLotUserData)));
+    return saved ? hasUnsavedEdits(c, saved) : !!(c.farmerName.trim() || c.farmerPhone || c.village || c.vehicleNumber || c.advanceAmount || c.cropGroups.some(g => g.lots.some(hasLotUserData)));
   });
 
   useEffect(() => {
@@ -4138,8 +4212,9 @@ export default function StockPage() {
   }, [anyDirty]);
 
   const addCard = () => setCards(prev => [emptyCard(), ...prev]);
+  // Every edit the user makes on this page lands here, so this is where a card becomes "touched".
   const updateCard = (idx: number, card: FarmerCard) =>
-    setCards(prev => prev.map((c, i) => (i === idx ? card : c)));
+    setCards(prev => prev.map((c, i) => (i === idx ? { ...card, touched: true } : c)));
 
   const saveCard = async (idx: number, collapseAfter = false) => {
     const txnFailures: { label: string; reason: string }[] = [];
@@ -4756,8 +4831,9 @@ export default function StockPage() {
         }),
       };
 
-      setCards(prev => prev.map((c, i) => (i === idx ? updatedCard : c)));
-      setSavedCardMap(prev => new Map(prev).set(card.id, JSON.parse(JSON.stringify(updatedCard))));
+      const savedNow = { ...updatedCard, touched: false };
+      setCards(prev => prev.map((c, i) => (i === idx ? savedNow : c)));
+      setSavedCardMap(prev => new Map(prev).set(card.id, JSON.parse(JSON.stringify(savedNow))));
 
       queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
               queryClient.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/bhada-breakdown") });
@@ -4807,7 +4883,7 @@ export default function StockPage() {
     const saved = savedCardMap.get(card.id);
     if (saved) {
       setCards(prev => prev.map((c, i) =>
-        i === idx ? { ...saved, cardOpen: false, farmerOpen: c.farmerOpen, vehicleOpen: c.vehicleOpen } : c
+        i === idx ? { ...saved, touched: false, cardOpen: false, farmerOpen: c.farmerOpen, vehicleOpen: c.vehicleOpen } : c
       ));
     } else {
       setCards(prev => {
@@ -5368,7 +5444,10 @@ export default function StockPage() {
               onSaveAndClose={() => saveCard(idx, true)}
               onCancel={() => cancelCard(idx)}
               onArchive={() => archiveCard(idx)}
-              onSyncSaved={c => setSavedCardMap(prev => new Map(prev).set(c.id, JSON.parse(JSON.stringify(c))))}
+              onSyncSaved={c => setSavedCardMap(prev => {
+                const merged = applyArchiveState(prev.get(c.id), c);
+                return new Map(prev).set(c.id, JSON.parse(JSON.stringify(merged)));
+              })}
               cs={cs}
               currentUsername={currentUsername}
               saving={savingCardId === card.id}
