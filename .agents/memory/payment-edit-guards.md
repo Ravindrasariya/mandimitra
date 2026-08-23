@@ -81,6 +81,19 @@ auto-dismisses leaves the user looking at freshly recalculated on-screen values 
 persisted — the bug looks like a wrong total, not a failed save. Collect per-row failures and show
 them in something the user has to dismiss.
 
+## Check and change must sit in one transaction, under the payment path's own lock
+
+A guard that reads the paid figure and then writes as a separate step passes on stale data whenever a
+payment commits in the gap: the change and the payout each look valid alone and together leave the card
+paid past what it owes. The fix is not a retry or a re-read — it is to run the guard inside the same
+transaction as the write, taking the *same* row lock the payment path takes. A farmer card has no row of
+its own, so its lots are the lock; lock lots first, then read cash entries, on both sides. Lock cards in a
+deterministic order when a guard spans several, or two bulk operations can deadlock.
+
+Raising a guard from inside a transaction needs a throwable error type carrying the reason code and params
+(rolling back), caught by the route and rendered by the same responder the inline guard used — otherwise
+the rollback path quietly degrades to a 500 and the client loses its translation code.
+
 **How to apply:** whenever adding a "you can't edit this after payment" rule, answer three
 questions first — which party's money is affected, which routes can reach the value, and does the
 client re-send the field unchanged on every save.

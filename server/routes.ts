@@ -146,9 +146,9 @@ function partyTag(p: PaymentParties): PartyTag | null {
   return null;
 }
 
-async function getPaymentBlockForTransactions(businessId: number, transactionIds: number[]): Promise<PaymentBlock> {
+async function getPaymentBlockForTransactions(businessId: number, transactionIds: number[], conn: typeof db = db): Promise<PaymentBlock> {
   if (transactionIds.length === 0) return { blocked: false, tag: null };
-  const rows = await db.select(PAYMENT_PARTY_COLUMNS)
+  const rows = await conn.select(PAYMENT_PARTY_COLUMNS)
     .from(cashEntries)
     .where(and(
       inArray(cashEntries.transactionId, transactionIds),
@@ -158,9 +158,9 @@ async function getPaymentBlockForTransactions(businessId: number, transactionIds
   return { blocked: rows.length > 0, tag: partyTag(derivePaymentParties(rows)) };
 }
 
-async function getPaymentBlockForLots(businessId: number, lotIds: number[]): Promise<PaymentBlock> {
+async function getPaymentBlockForLots(businessId: number, lotIds: number[], conn: typeof db = db): Promise<PaymentBlock> {
   if (lotIds.length === 0) return { blocked: false, tag: null };
-  const rows = await db.select(PAYMENT_PARTY_COLUMNS)
+  const rows = await conn.select(PAYMENT_PARTY_COLUMNS)
     .from(cashEntries)
     .innerJoin(transactions, eq(cashEntries.transactionId, transactions.id))
     .where(and(
@@ -188,21 +188,13 @@ const PARTY_PHRASE: Record<PartyTag, string> = {
  * as either a farmer payout or a buyer receipt — but if one ever appears the block still stands
  * and falls back to a sentence that names nobody rather than naming the wrong party.
  */
-function rejectPaymentBlocked(
-  res: express.Response,
-  code: string,
-  block: PaymentBlock,
-  action: string,
-  scope: string,
-) {
+function paymentBlockedError(code: string, block: PaymentBlock, action: string, scope: string): GuardError {
   if (!block.tag) {
-    return guardReject(res, 400, "GUARD_PAYMENT_BLOCKED",
+    return new GuardError("GUARD_PAYMENT_BLOCKED",
       `${action} — an active payment exists ${scope}. Please reverse all payments first.`);
   }
   const how = block.tag === "buyer" ? REVERSE_BUYER : REVERSE_FARMER;
-  return guardReject(res, 400, code,
-    `${action} — ${PARTY_PHRASE[block.tag]} ${scope}. ${how}`,
-    { parties: block.tag });
+  return new GuardError(code, `${action} — ${PARTY_PHRASE[block.tag]} ${scope}. ${how}`, { parties: block.tag });
 }
 
 /**
@@ -236,22 +228,50 @@ async function getFarmerCardPaidGroups(businessId: number, farmerId: number, dat
  * the transaction-linked payment blocks above cannot see it. Archiving or deleting the last bhada-bearing
  * lot of a paid card would drop that card out of the pending list while the payout stayed behind, leaving
  * money paid against nothing, so those actions have to check here too.
+ *
+ * Always call this inside the transaction that makes the change, passing that transaction as `conn`: it
+ * locks each card's lots first, so a payout racing the same card waits instead of settling against a due
+ * this change is about to remove.
  */
-async function getBhadaPaidForLots(businessId: number, lotIds: number[]): Promise<number> {
+async function getBhadaPaidForLots(businessId: number, lotIds: number[], conn: typeof db = db): Promise<number> {
   if (lotIds.length === 0) return 0;
-  const cards = await db.selectDistinct({ farmerId: lots.farmerId, date: lots.date })
+  const cards = await conn.selectDistinct({ farmerId: lots.farmerId, date: lots.date })
     .from(lots)
     .where(and(eq(lots.businessId, businessId), inArray(lots.id, lotIds)));
+  // Deterministic card order, so two of these running at once can never deadlock against each other.
+  cards.sort((a, b) => (a.farmerId - b.farmerId) || a.date.localeCompare(b.date));
   let paid = 0;
   for (const c of cards) {
-    paid += await storage.getBhadaPaidForCard(businessId, c.farmerId, c.date);
+    await storage.lockCardBhadaLots(conn, businessId, c.farmerId, c.date);
+    paid += await storage.getBhadaPaidForCard(businessId, c.farmerId, c.date, conn);
   }
   return paid;
 }
 
-function rejectBhadaBlocked(res: express.Response, action: string, bhadaPaid: number) {
+/**
+ * A guard rejection raised from inside a db transaction, so the check and the write it protects can sit
+ * in the same transaction. Throwing rolls the transaction back; the route catches it and sends the same
+ * response the inline `guardReject` would have sent.
+ */
+class GuardError extends Error {
+  constructor(
+    readonly code: string,
+    message: string,
+    readonly params?: Record<string, string>,
+    readonly status = 400,
+  ) {
+    super(message);
+  }
+}
+
+function sendGuardError(res: express.Response, err: GuardError) {
+  return guardReject(res, err.status, err.code, err.message, err.params);
+}
+
+/** The bhada-paid block, as a throwable for use inside a transaction. */
+function bhadaBlockedError(action: string, bhadaPaid: number): GuardError {
   const paid = bhadaPaid.toLocaleString("en-IN");
-  return guardReject(res, 400, "GUARD_BHADA_LOT_BLOCKED",
+  return new GuardError("GUARD_BHADA_LOT_BLOCKED",
     `${action} — ₹${paid} of Freight/Bhada has already been paid against this farmer card. Reverse that payment on the Cash page first.`,
     { paid });
 }
@@ -596,29 +616,41 @@ export async function registerRoutes(
       }
     }
 
-    if (data.isArchived === true && !existing.isArchived) {
-      const farmerLots = await db.select({ id: lots.id }).from(lots)
-        .where(and(eq(lots.farmerId, farmerId), eq(lots.businessId, businessId)));
-      if (farmerLots.length > 0) {
-        const block = await getPaymentBlockForLots(businessId, farmerLots.map(l => l.id));
-        if (block.blocked) {
-          return rejectPaymentBlocked(res, "GUARD_ARCHIVE_FARMER", block,
-            "Cannot archive this farmer", "against their lots");
+    // Guard and write share one transaction: the archive check must not pass on a paid figure that a
+    // payout being saved right now is about to change.
+    let updated;
+    try {
+      updated = await db.transaction(async (tx) => {
+        const conn = tx as unknown as typeof db;
+        const archiveChanged = data.isArchived !== undefined && data.isArchived !== existing.isArchived;
+        const farmerLots = archiveChanged
+          ? await conn.select({ id: lots.id }).from(lots)
+            .where(and(eq(lots.farmerId, farmerId), eq(lots.businessId, businessId)))
+          : [];
+
+        if (data.isArchived === true && !existing.isArchived && farmerLots.length > 0) {
+          const lotIds = farmerLots.map(l => l.id);
+          const bhadaPaid = await getBhadaPaidForLots(businessId, lotIds, conn);
+          const block = await getPaymentBlockForLots(businessId, lotIds, conn);
+          if (block.blocked) {
+            throw paymentBlockedError("GUARD_ARCHIVE_FARMER", block, "Cannot archive this farmer", "against their lots");
+          }
+          if (bhadaPaid > 0) throw bhadaBlockedError("Cannot archive this farmer", bhadaPaid);
         }
-        const bhadaPaid = await getBhadaPaidForLots(businessId, farmerLots.map(l => l.id));
-        if (bhadaPaid > 0) return rejectBhadaBlocked(res, "Cannot archive this farmer", bhadaPaid);
-      }
-    }
 
-    const updated = await storage.updateFarmer(farmerId, businessId, data);
+        const row = await storage.updateFarmer(farmerId, businessId, data, conn);
 
-    if (data.isArchived !== undefined && data.isArchived !== existing.isArchived) {
-      const farmerLots = await db.select({ id: lots.id }).from(lots)
-        .where(and(eq(lots.farmerId, farmerId), eq(lots.businessId, businessId)));
-      for (const lot of farmerLots) {
-        await db.update(lots).set({ isArchived: data.isArchived }).where(and(eq(lots.id, lot.id), eq(lots.businessId, businessId)));
-        await storage.cascadeArchiveToLot(lot.id, businessId, data.isArchived);
-      }
+        if (archiveChanged) {
+          for (const lot of farmerLots) {
+            await conn.update(lots).set({ isArchived: data.isArchived }).where(and(eq(lots.id, lot.id), eq(lots.businessId, businessId)));
+            await storage.cascadeArchiveToLot(lot.id, businessId, data.isArchived!, conn);
+          }
+        }
+        return row;
+      });
+    } catch (err: any) {
+      if (err instanceof GuardError) return sendGuardError(res, err);
+      return res.status(500).json({ message: err.message });
     }
 
     broadcastBusinessEvent(businessId);
@@ -633,23 +665,27 @@ export async function registerRoutes(
         return res.status(400).json({ message: "lotIds (non-empty array) and isArchived (boolean) required" });
       }
 
-      if (isArchived) {
-        const block = await getPaymentBlockForLots(businessId, lotIds);
-        if (block.blocked) {
-          return rejectPaymentBlocked(res, "GUARD_ARCHIVE_LOTS", block,
-            "Cannot archive these lots", "against them");
+      // Guard and write share one transaction, holding the same card lock a bhada payout takes.
+      await db.transaction(async (tx) => {
+        const conn = tx as unknown as typeof db;
+        if (isArchived) {
+          const bhadaPaid = await getBhadaPaidForLots(businessId, lotIds, conn);
+          const block = await getPaymentBlockForLots(businessId, lotIds, conn);
+          if (block.blocked) {
+            throw paymentBlockedError("GUARD_ARCHIVE_LOTS", block, "Cannot archive these lots", "against them");
+          }
+          if (bhadaPaid > 0) throw bhadaBlockedError("Cannot archive these lots", bhadaPaid);
         }
-        const bhadaPaid = await getBhadaPaidForLots(businessId, lotIds);
-        if (bhadaPaid > 0) return rejectBhadaBlocked(res, "Cannot archive these lots", bhadaPaid);
-      }
 
-      for (const lotId of lotIds) {
-        await db.update(lots).set({ isArchived }).where(and(eq(lots.id, lotId), eq(lots.businessId, businessId)));
-        await storage.cascadeArchiveToLot(lotId, businessId, isArchived);
-      }
+        for (const lotId of lotIds) {
+          await conn.update(lots).set({ isArchived }).where(and(eq(lots.id, lotId), eq(lots.businessId, businessId)));
+          await storage.cascadeArchiveToLot(lotId, businessId, isArchived, conn);
+        }
+      });
       broadcastBusinessEvent(businessId);
       res.json({ success: true });
     } catch (err: any) {
+      if (err instanceof GuardError) return sendGuardError(res, err);
       res.status(500).json({ message: err.message });
     }
   });
@@ -1461,19 +1497,23 @@ export async function registerRoutes(
       String(data.vehicleNumber ?? "").toUpperCase() !== String(lot.vehicleNumber ?? "").toUpperCase();
     const bhadaCut = data.vehicleBhadaRate !== undefined &&
       (Number(data.vehicleBhadaRate || 0) || 0) < (Number(lot.vehicleBhadaRate || 0) || 0);
-    if (dateChanged || farmerChanged || bhadaCut || vehicleNumberChanged) {
-      const bhadaPaid = await storage.getBhadaPaidForCard(businessId, lot.farmerId, lot.date);
-      if (bhadaPaid > 0) {
+    const bhadaCardGuard = !(dateChanged || farmerChanged || bhadaCut || vehicleNumberChanged)
+      ? null
+      : async (conn: typeof db): Promise<GuardError | null> => {
+        // Under a transaction, lock the card first so the paid figure cannot move under the check.
+        if (conn !== db) await storage.lockCardBhadaLots(conn, businessId, lot.farmerId, lot.date);
+        const bhadaPaid = await storage.getBhadaPaidForCard(businessId, lot.farmerId, lot.date, conn);
+        if (bhadaPaid <= 0) return null;
         const paid = bhadaPaid.toLocaleString("en-IN");
         if (farmerChanged || dateChanged) {
-          return guardReject(res, 400, "GUARD_BHADA_CARD_IDENTITY",
+          return new GuardError("GUARD_BHADA_CARD_IDENTITY",
             `Cannot change the farmer or the stock date on this card — ₹${paid} of Freight/Bhada has already been paid against it. Reverse that payment on the Cash page first.`,
             { paid });
         }
         // What is owed is the card's total, not this one vehicle's rate, so the cut is judged against
         // what the card would add up to afterwards — cutting one vehicle is fine while the rest still
         // covers what has been paid out.
-        const cardLots = await storage.getCardBhadaLots(businessId, lot.farmerId, lot.date);
+        const cardLots = await storage.getCardBhadaLots(businessId, lot.farmerId, lot.date, conn);
         const newVehicle = data.vehicleNumber !== undefined
           ? (data.vehicleNumber ? String(data.vehicleNumber).toUpperCase() : null)
           : lot.vehicleNumber;
@@ -1484,11 +1524,18 @@ export async function registerRoutes(
           { vehicleNumber: newVehicle, vehicleBhadaRate: newRate },
         ]);
         if (prospective < bhadaPaid - 0.01) {
-          return guardReject(res, 400, "GUARD_BHADA_RATE_CUT",
+          return new GuardError("GUARD_BHADA_RATE_CUT",
             `Cannot reduce Vehicle Bhada below ₹${paid} — that much Freight/Bhada has already been paid against this card. Reverse that payment on the Cash page first.`,
             { paid });
         }
-      }
+        return null;
+      };
+
+    // Cheap unlocked pre-check, so a plainly blocked edit is refused before the rest of the validation
+    // work. The authoritative run is the locked one inside the write transaction below.
+    if (bhadaCardGuard) {
+      const early = await bhadaCardGuard(db);
+      if (early) return sendGuardError(res, early);
     }
 
     if (vehicleFieldChanged || farmerChanged) {
@@ -1585,32 +1632,49 @@ export async function registerRoutes(
       }
     }
 
-    if (data.isArchived === true && !lot.isArchived) {
-      const block = await getPaymentBlockForLots(businessId, [lotId]);
-      if (block.blocked) {
-        return rejectPaymentBlocked(res, "GUARD_ARCHIVE_LOT", block,
-          "Cannot archive this lot", "against it");
-      }
-      const bhadaPaid = await getBhadaPaidForLots(businessId, [lotId]);
-      if (bhadaPaid > 0) return rejectBhadaBlocked(res, "Cannot archive this lot", bhadaPaid);
-    }
+    // Guards and write share one transaction, holding the card lock a bhada payout takes, so neither an
+    // archive nor a bhada/farmer/date change can settle against a paid figure that is changing right now.
+    let updated;
+    try {
+      updated = await db.transaction(async (tx) => {
+        const conn = tx as unknown as typeof db;
 
-    const updated = await storage.updateLot(lotId, businessId, data);
-    if (!updated) return res.status(404).json({ message: "Lot not found" });
+        if (data.isArchived === true && !lot.isArchived) {
+          const bhadaPaid = await getBhadaPaidForLots(businessId, [lotId], conn);
+          const block = await getPaymentBlockForLots(businessId, [lotId], conn);
+          if (block.blocked) {
+            throw paymentBlockedError("GUARD_ARCHIVE_LOT", block, "Cannot archive this lot", "against it");
+          }
+          if (bhadaPaid > 0) throw bhadaBlockedError("Cannot archive this lot", bhadaPaid);
+        }
 
-    if (data.isArchived !== undefined && data.isArchived !== lot.isArchived) {
-      await storage.cascadeArchiveToLot(lotId, businessId, data.isArchived);
-    }
+        if (bhadaCardGuard) {
+          const guard = await bhadaCardGuard(conn);
+          if (guard) throw guard;
+        }
 
-    if (data.farmerId != null && data.farmerId !== lot.farmerId) {
-      await db.update(transactions)
-        .set({ farmerId: data.farmerId })
-        .where(and(
-          eq(transactions.lotId, lotId),
-          eq(transactions.businessId, businessId),
-          eq(transactions.isReversed, false),
-          eq(transactions.isArchived, false)
-        ));
+        const row = await storage.updateLot(lotId, businessId, data, conn);
+        if (!row) throw new GuardError("LOT_NOT_FOUND", "Lot not found", undefined, 404);
+
+        if (data.isArchived !== undefined && data.isArchived !== lot.isArchived) {
+          await storage.cascadeArchiveToLot(lotId, businessId, data.isArchived, conn);
+        }
+
+        if (data.farmerId != null && data.farmerId !== lot.farmerId) {
+          await conn.update(transactions)
+            .set({ farmerId: data.farmerId })
+            .where(and(
+              eq(transactions.lotId, lotId),
+              eq(transactions.businessId, businessId),
+              eq(transactions.isReversed, false),
+              eq(transactions.isArchived, false)
+            ));
+        }
+        return row;
+      });
+    } catch (err: any) {
+      if (err instanceof GuardError) return sendGuardError(res, err);
+      return res.status(500).json({ message: err.message });
     }
 
     broadcastBusinessEvent(businessId);
@@ -1703,38 +1767,44 @@ export async function registerRoutes(
         pricePerKg: bid.pricePerKg,
       };
 
-      if (tx) {
-        const block = await getPaymentBlockForTransactions(businessId, [tx.id]);
-        if (block.blocked) {
-          return rejectPaymentBlocked(res, "GUARD_DELETE_BID", block,
-            "Cannot delete this bid", "against it");
+      // Guard and deletes share one transaction, so a payment cannot land between the check and the
+      // rows going away.
+      await db.transaction(async (dbTx) => {
+        const conn = dbTx as unknown as typeof db;
+
+        if (tx) {
+          const block = await getPaymentBlockForTransactions(businessId, [tx.id], conn);
+          if (block.blocked) {
+            throw paymentBlockedError("GUARD_DELETE_BID", block, "Cannot delete this bid", "against it");
+          }
+
+          const [farmer] = await conn.select({ name: farmers.name }).from(farmers).where(eq(farmers.id, tx.farmerId));
+          auditValue.transactionId = tx.transactionId;
+          auditValue.totalPayableToFarmer = tx.totalPayableToFarmer;
+          auditValue.totalReceivableFromBuyer = tx.totalReceivableFromBuyer;
+          auditValue.txnDate = tx.date;
+          auditValue.farmerName = farmer?.name || "";
+
+          await conn.delete(transactionEditHistory).where(eq(transactionEditHistory.transactionId, tx.id));
+          await conn.delete(cashEntries).where(eq(cashEntries.transactionId, tx.id));
+          await conn.delete(transactions).where(eq(transactions.id, tx.id));
         }
 
-        const [farmer] = await db.select({ name: farmers.name }).from(farmers).where(eq(farmers.id, tx.farmerId));
-        auditValue.transactionId = tx.transactionId;
-        auditValue.totalPayableToFarmer = tx.totalPayableToFarmer;
-        auditValue.totalReceivableFromBuyer = tx.totalReceivableFromBuyer;
-        auditValue.txnDate = tx.date;
-        auditValue.farmerName = farmer?.name || "";
+        await storage.createLotEditHistory({
+          lotId: bid.lotId,
+          businessId,
+          fieldChanged: "bid_deleted",
+          oldValue: JSON.stringify(auditValue),
+          newValue: null,
+          changedBy: username,
+        }, conn);
 
-        await db.delete(transactionEditHistory).where(eq(transactionEditHistory.transactionId, tx.id));
-        await db.delete(cashEntries).where(eq(cashEntries.transactionId, tx.id));
-        await db.delete(transactions).where(eq(transactions.id, tx.id));
-      }
-
-      await storage.createLotEditHistory({
-        lotId: bid.lotId,
-        businessId,
-        fieldChanged: "bid_deleted",
-        oldValue: JSON.stringify(auditValue),
-        newValue: null,
-        changedBy: username,
+        await storage.deleteBid(bidId, businessId, conn);
       });
-
-      await storage.deleteBid(bidId, businessId);
       broadcastBusinessEvent(businessId);
       res.json({ message: "Deleted" });
     } catch (err: any) {
+      if (err instanceof GuardError) return sendGuardError(res, err);
       res.status(500).json({ message: err.message });
     }
   });
@@ -1773,19 +1843,20 @@ export async function registerRoutes(
         .innerJoin(farmers, eq(transactions.farmerId, farmers.id))
         .where(and(eq(transactions.lotId, lotId), eq(transactions.businessId, businessId)));
 
-      if (lotTxns.length > 0) {
-        const txnIds = lotTxns.map(t => t.id);
-        const block = await getPaymentBlockForTransactions(businessId, txnIds);
-        if (block.blocked) {
-          return rejectPaymentBlocked(res, "GUARD_DELETE_LOT", block,
-            "Cannot delete this lot", "against its transactions");
-        }
-      }
-
-      const bhadaPaidOnCard = await getBhadaPaidForLots(businessId, [lotId]);
-      if (bhadaPaidOnCard > 0) return rejectBhadaBlocked(res, "Cannot delete this lot", bhadaPaidOnCard);
-
       await db.transaction(async (tx) => {
+        const conn = tx as unknown as typeof db;
+        // Guards run inside the delete's own transaction, holding the card lock a bhada payout takes,
+        // so the lot cannot vanish from under a payout being written at the same instant.
+        const bhadaPaidOnCard = await getBhadaPaidForLots(businessId, [lotId], conn);
+        if (lotTxns.length > 0) {
+          const txnIds = lotTxns.map(t => t.id);
+          const block = await getPaymentBlockForTransactions(businessId, txnIds, conn);
+          if (block.blocked) {
+            throw paymentBlockedError("GUARD_DELETE_LOT", block, "Cannot delete this lot", "against its transactions");
+          }
+        }
+        if (bhadaPaidOnCard > 0) throw bhadaBlockedError("Cannot delete this lot", bhadaPaidOnCard);
+
         // Write audit snapshot only when there is meaningful data to record
         if (lotBids.length > 0 || lotTxns.length > 0) {
           const auditValue = {
@@ -1834,6 +1905,7 @@ export async function registerRoutes(
       broadcastBusinessEvent(businessId);
       res.json({ message: "Deleted" });
     } catch (err: any) {
+      if (err instanceof GuardError) return sendGuardError(res, err);
       res.status(500).json({ message: err.message });
     }
   });

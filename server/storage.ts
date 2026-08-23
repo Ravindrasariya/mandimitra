@@ -321,8 +321,8 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async updateFarmer(id: number, businessId: number, data: Partial<InsertFarmer>): Promise<Farmer | undefined> {
-    const [updated] = await db.update(farmers).set(data).where(and(eq(farmers.id, id), eq(farmers.businessId, businessId))).returning();
+  async updateFarmer(id: number, businessId: number, data: Partial<InsertFarmer>, conn: typeof db = db): Promise<Farmer | undefined> {
+    const [updated] = await conn.update(farmers).set(data).where(and(eq(farmers.id, id), eq(farmers.businessId, businessId))).returning();
     return updated;
   }
 
@@ -561,8 +561,8 @@ export class DatabaseStorage implements IStorage {
       .orderBy(asc(lotEditHistory.createdAt));
   }
 
-  async createLotEditHistory(entry: InsertLotEditHistory): Promise<LotEditHistory> {
-    const [created] = await db.insert(lotEditHistory).values(entry).returning();
+  async createLotEditHistory(entry: InsertLotEditHistory, conn: typeof db = db): Promise<LotEditHistory> {
+    const [created] = await conn.insert(lotEditHistory).values(entry).returning();
     return created;
   }
 
@@ -758,8 +758,8 @@ export class DatabaseStorage implements IStorage {
     return created;
   }
 
-  async updateLot(id: number, businessId: number, data: Partial<InsertLot>): Promise<Lot | undefined> {
-    const [updated] = await db.update(lots).set(data).where(and(eq(lots.id, id), eq(lots.businessId, businessId))).returning();
+  async updateLot(id: number, businessId: number, data: Partial<InsertLot>, conn: typeof db = db): Promise<Lot | undefined> {
+    const [updated] = await conn.update(lots).set(data).where(and(eq(lots.id, id), eq(lots.businessId, businessId))).returning();
     return updated;
   }
 
@@ -878,13 +878,13 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async deleteBid(id: number, businessId: number): Promise<void> {
-    const [existing] = await db.select().from(bids).where(and(eq(bids.id, id), eq(bids.businessId, businessId)));
+  async deleteBid(id: number, businessId: number, conn: typeof db = db): Promise<void> {
+    const [existing] = await conn.select().from(bids).where(and(eq(bids.id, id), eq(bids.businessId, businessId)));
     if (existing) {
-      await db.update(lots).set({
+      await conn.update(lots).set({
         remainingBags: sql`${lots.remainingBags} + ${existing.numberOfBags}`
       }).where(eq(lots.id, existing.lotId));
-      await db.delete(bids).where(and(eq(bids.id, id), eq(bids.businessId, businessId)));
+      await conn.delete(bids).where(and(eq(bids.id, id), eq(bids.businessId, businessId)));
     }
   }
 
@@ -1803,11 +1803,31 @@ export class DatabaseStorage implements IStorage {
   }
 
   /**
+   * Take the same row lock on a farmer card's lots that a Freight/Bhada payout takes.
+   *
+   * A card has no row of its own, so its lots are the lock. Any write that changes what the card owes —
+   * cutting a vehicle bhada, moving the card to another farmer or date, archiving or deleting its lots —
+   * must call this inside its own transaction *before* reading the paid figure. Otherwise the guard reads
+   * a paid total that a payout being written at the same instant is about to change, and both sides commit
+   * on stale numbers, leaving the card paid past what it owes.
+   *
+   * Lock order matches the payment path: lots first, then cash_entries.
+   */
+  async lockCardBhadaLots(tx: typeof db, businessId: number, farmerId: number, stockDate: string): Promise<void> {
+    await tx.select({ id: lots.id }).from(lots).where(and(
+      eq(lots.businessId, businessId),
+      eq(lots.farmerId, farmerId),
+      eq(lots.date, stockDate),
+      eq(lots.isArchived, false),
+    )).for("update");
+  }
+
+  /**
    * The bhada-bearing lots of one farmer card, for guards that need to work out what the card's total
    * bhada would become after an edit. Pair with `sumCardBhada`.
    */
-  async getCardBhadaLots(businessId: number, farmerId: number, stockDate: string): Promise<{ vehicleNumber: string | null; vehicleBhadaRate: string | null }[]> {
-    return await db.select({
+  async getCardBhadaLots(businessId: number, farmerId: number, stockDate: string, conn: typeof db = db): Promise<{ vehicleNumber: string | null; vehicleBhadaRate: string | null }[]> {
+    return await conn.select({
       vehicleNumber: lots.vehicleNumber,
       vehicleBhadaRate: lots.vehicleBhadaRate,
     }).from(lots).where(and(
@@ -1822,8 +1842,8 @@ export class DatabaseStorage implements IStorage {
    * Live Freight/Bhada already paid against one farmer card. Used by the edit guards, which must not
    * let the card's stock date move or its bhada drop below what has been paid out on it.
    */
-  async getBhadaPaidForCard(businessId: number, farmerId: number, stockDate: string): Promise<number> {
-    const [row] = await db.select({
+  async getBhadaPaidForCard(businessId: number, farmerId: number, stockDate: string, conn: typeof db = db): Promise<number> {
+    const [row] = await conn.select({
       total: sql<number>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`,
     }).from(cashEntries).where(and(
       eq(cashEntries.businessId, businessId),
@@ -2033,15 +2053,15 @@ export class DatabaseStorage implements IStorage {
     return updated;
   }
 
-  async cascadeArchiveToLot(lotId: number, businessId: number, isArchived: boolean): Promise<void> {
-    await db.update(bids).set({ isArchived }).where(and(eq(bids.lotId, lotId), eq(bids.businessId, businessId)));
-    const txnRows = await db.select({ id: transactions.id })
+  async cascadeArchiveToLot(lotId: number, businessId: number, isArchived: boolean, conn: typeof db = db): Promise<void> {
+    await conn.update(bids).set({ isArchived }).where(and(eq(bids.lotId, lotId), eq(bids.businessId, businessId)));
+    const txnRows = await conn.select({ id: transactions.id })
       .from(transactions)
       .where(and(eq(transactions.lotId, lotId), eq(transactions.businessId, businessId)));
-    await db.update(transactions).set({ isArchived }).where(and(eq(transactions.lotId, lotId), eq(transactions.businessId, businessId)));
+    await conn.update(transactions).set({ isArchived }).where(and(eq(transactions.lotId, lotId), eq(transactions.businessId, businessId)));
     if (txnRows.length > 0) {
       const txnIds = txnRows.map(t => t.id);
-      await db.update(cashEntries).set({ isArchived })
+      await conn.update(cashEntries).set({ isArchived })
         .where(and(
           eq(cashEntries.businessId, businessId),
           sql`${cashEntries.transactionId} IN (${sql.join(txnIds.map(id => sql`${id}`), sql`, `)})`,
