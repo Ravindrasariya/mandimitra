@@ -243,7 +243,9 @@ export class DatabaseStorage implements IStorage {
     const prefix = `BU${dateStr}`;
     const [result] = await db.select({ count: sql<string>`count(*)` })
       .from(businesses)
-      .where(ilike(businesses.merchantId, `${prefix}%`));
+      // Matched on the lower-cased value rather than with ILIKE: only that form can use an index, so this
+      // counts today's IDs instead of reading every business ever created.
+      .where(sql`lower(${businesses.merchantId}) like ${prefix.toLowerCase() + "%"}`);
     const seq = parseInt(result?.count || "0", 10) + 1;
     return `${prefix}${seq}`;
   }
@@ -295,7 +297,9 @@ export class DatabaseStorage implements IStorage {
     const prefix = `FM${dateStr}`;
     const [result] = await db.select({ count: sql<string>`count(*)` })
       .from(farmers)
-      .where(and(eq(farmers.businessId, businessId), ilike(farmers.farmerId, `${prefix}%`)));
+      // Lower-cased match rather than ILIKE, so the lookup can use an index instead of reading every
+      // farmer the business has ever added.
+      .where(and(eq(farmers.businessId, businessId), sql`lower(${farmers.farmerId}) like ${prefix.toLowerCase() + "%"}`));
     const seq = parseInt(result?.count || "0", 10) + 1;
     return `${prefix}${seq}`;
   }
@@ -500,7 +504,8 @@ export class DatabaseStorage implements IStorage {
     const prefix = `BY${dateStr}`;
     const [result] = await db.select({ count: sql<string>`count(*)` })
       .from(buyers)
-      .where(and(eq(buyers.businessId, businessId), ilike(buyers.buyerId, `${prefix}%`)));
+      // Lower-cased match rather than ILIKE, for the same reason as the farmer ID above.
+      .where(and(eq(buyers.businessId, businessId), sql`lower(${buyers.buyerId}) like ${prefix.toLowerCase() + "%"}`));
     const seq = parseInt(result?.count || "0", 10) + 1;
     return `${prefix}${seq}`;
   }

@@ -1,5 +1,18 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, decimal, boolean, date, timestamp, serial, uniqueIndex, json, bigint } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, decimal, boolean, date, timestamp, serial, uniqueIndex, index, json, bigint } from "drizzle-orm/pg-core";
+
+/*
+ * A note on the indexes declared below.
+ *
+ * Every query in this app is scoped to one business, so businessId leads almost every index — an index
+ * starting with businessId also serves a lookup that filters on businessId alone. The remaining columns are
+ * the ones the app actually filters, joins or sorts by; columns that are only read back (amounts, names on
+ * a detail screen) are deliberately not indexed, because each index costs a little on every insert and
+ * update.
+ *
+ * Flag columns such as isReversed and isArchived are left out on purpose: nearly every row shares the same
+ * value, so they narrow almost nothing while adding write cost.
+ */
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -21,7 +34,11 @@ export const businesses = pgTable("businesses", {
   receiptHeaderImage: text("receipt_header_image"),
   status: text("status").notNull().default("active"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  // Each new business counts today's merchant IDs; a "starts with" match on the lower-cased value.
+  merchantIdPatternIdx: index("businesses_merchant_id_pattern_idx")
+    .on(sql`lower(${table.merchantId}) text_pattern_ops`),
+}));
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -35,7 +52,11 @@ export const users = pgTable("users", {
   accessLevel: text("access_level").notNull().default("edit"),
   mustChangePassword: boolean("must_change_password").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  // Login looks a user up by name alone; the admin screens list them per business.
+  usernameIdx: index("users_username_idx").on(table.username),
+  businessIdx: index("users_business_idx").on(table.businessId),
+}));
 
 export const farmers = pgTable("farmers", {
   id: serial("id").primaryKey(),
@@ -56,6 +77,12 @@ export const farmers = pgTable("farmers", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   uniqueFarmerPerBusiness: uniqueIndex("farmers_business_farmer_id_unique").on(table.businessId, table.farmerId),
+  // Farmers are always listed for one business in name order.
+  businessNameIdx: index("farmers_business_name_idx").on(table.businessId, table.name),
+  // Each new farmer counts today's IDs to pick the next one. That is a "starts with" match on the
+  // lower-cased ID, so the index has to be built the same way to be usable.
+  businessFarmerIdPatternIdx: index("farmers_business_farmer_id_pattern_idx")
+    .on(table.businessId, sql`lower(${table.farmerId}) text_pattern_ops`),
 }));
 
 export const buyers = pgTable("buyers", {
@@ -74,6 +101,9 @@ export const buyers = pgTable("buyers", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   uniqueBuyerPerBusiness: uniqueIndex("buyers_business_buyer_id_unique").on(table.businessId, table.buyerId),
+  businessNameIdx: index("buyers_business_name_idx").on(table.businessId, table.name),
+  businessBuyerIdPatternIdx: index("buyers_business_buyer_id_pattern_idx")
+    .on(table.businessId, sql`lower(${table.buyerId}) text_pattern_ops`),
 }));
 
 export const farmerEditHistory = pgTable("farmer_edit_history", {
@@ -85,7 +115,10 @@ export const farmerEditHistory = pgTable("farmer_edit_history", {
   newValue: text("new_value"),
   changedBy: text("changed_by"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  // History is only ever read for one row at a time, newest first.
+  businessFarmerIdx: index("farmer_edit_history_business_farmer_idx").on(table.businessId, table.farmerId, table.createdAt),
+}));
 
 export const buyerEditHistory = pgTable("buyer_edit_history", {
   id: serial("id").primaryKey(),
@@ -96,7 +129,9 @@ export const buyerEditHistory = pgTable("buyer_edit_history", {
   newValue: text("new_value"),
   changedBy: text("changed_by"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  businessBuyerIdx: index("buyer_edit_history_business_buyer_idx").on(table.businessId, table.buyerId, table.createdAt),
+}));
 
 export const lotEditHistory = pgTable("lot_edit_history", {
   id: serial("id").primaryKey(),
@@ -107,7 +142,9 @@ export const lotEditHistory = pgTable("lot_edit_history", {
   newValue: text("new_value"),
   changedBy: text("changed_by"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  businessLotIdx: index("lot_edit_history_business_lot_idx").on(table.businessId, table.lotId, table.createdAt),
+}));
 
 export const transactionEditHistory = pgTable("transaction_edit_history", {
   id: serial("id").primaryKey(),
@@ -118,7 +155,9 @@ export const transactionEditHistory = pgTable("transaction_edit_history", {
   newValue: text("new_value"),
   changedBy: text("changed_by"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  businessTransactionIdx: index("transaction_edit_history_business_txn_idx").on(table.businessId, table.transactionId, table.createdAt),
+}));
 
 export const lots = pgTable("lots", {
   id: serial("id").primaryKey(),
@@ -147,6 +186,22 @@ export const lots = pgTable("lots", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   uniqueLotPerBusiness: uniqueIndex("lots_business_lot_id_unique").on(table.businessId, table.lotId),
+  // The stock register reads a business's lots by date; the farmer card (and its bhada) is farmer + date.
+  businessDateIdx: index("lots_business_date_idx").on(table.businessId, table.date),
+  businessFarmerDateIdx: index("lots_business_farmer_date_idx").on(table.businessId, table.farmerId, table.date),
+  businessCreatedIdx: index("lots_business_created_idx").on(table.businessId, table.createdAt),
+  // Every new lot scans for the day's highest lot number. Same "starts with" match as the cash flow
+  // number, so it needs the same text_pattern_ops treatment to use an index at all.
+  businessLotIdPatternIdx: index("lots_business_lot_id_pattern_idx")
+    .on(table.businessId, table.lotId.op("text_pattern_ops")),
+  // Duplicate-bill checks and the next serial number sweep a whole financial year of the business's lots
+  // for one bill book, and each new lot triggers them.
+  businessBillBookSerialIdx: index("lots_business_bill_book_serial_idx")
+    .on(table.businessId, table.billBookNumber, table.serialNumber, table.date),
+  // Typing a vehicle number recalls its driver. The match ignores upper/lower case, so the index has to be
+  // built on the upper-cased value — an index on the column as stored would simply be skipped.
+  businessVehicleUpperIdx: index("lots_business_vehicle_upper_idx")
+    .on(table.businessId, sql`upper(${table.vehicleNumber})`),
 }));
 
 export const bids = pgTable("bids", {
@@ -162,7 +217,12 @@ export const bids = pgTable("bids", {
   advanceAmount: decimal("advance_amount", { precision: 10, scale: 2 }).default("0"),
   isArchived: boolean("is_archived").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  // Bids are fetched for one lot at a time, and listed newest first for the business.
+  businessLotIdx: index("bids_business_lot_idx").on(table.businessId, table.lotId),
+  businessBuyerIdx: index("bids_business_buyer_idx").on(table.businessId, table.buyerId),
+  businessCreatedIdx: index("bids_business_created_idx").on(table.businessId, table.createdAt),
+}));
 
 export const transactions = pgTable("transactions", {
   id: serial("id").primaryKey(),
@@ -211,6 +271,16 @@ export const transactions = pgTable("transactions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   uniqueTransactionPerBusiness: uniqueIndex("transactions_business_transaction_id_unique").on(table.businessId, table.transactionId),
+  // The ledgers read one party's transactions by date; the guards and receipts read them by lot or bid.
+  businessFarmerDateIdx: index("transactions_business_farmer_date_idx").on(table.businessId, table.farmerId, table.date),
+  businessBuyerDateIdx: index("transactions_business_buyer_date_idx").on(table.businessId, table.buyerId, table.date),
+  businessLotIdx: index("transactions_business_lot_idx").on(table.businessId, table.lotId),
+  businessBidIdx: index("transactions_business_bid_idx").on(table.businessId, table.bidId),
+  businessDateIdx: index("transactions_business_date_idx").on(table.businessId, table.date),
+  businessCreatedIdx: index("transactions_business_created_idx").on(table.businessId, table.createdAt),
+  // Same "starts with today's date" scan when a new transaction number is allocated.
+  businessTransactionIdPatternIdx: index("transactions_business_txn_id_pattern_idx")
+    .on(table.businessId, table.transactionId.op("text_pattern_ops")),
 }));
 
 export const businessChargeSettings = pgTable("business_charge_settings", {
@@ -228,7 +298,10 @@ export const businessChargeSettings = pgTable("business_charge_settings", {
   khadiKaraiFarmerPerBag: decimal("khadi_karai_farmer_per_bag", { precision: 10, scale: 2 }).default("0"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  // Only the latest settings row per business is read, with the whole history shown on demand.
+  businessUpdatedIdx: index("business_charge_settings_business_updated_idx").on(table.businessId, table.updatedAt),
+}));
 
 export const bankAccounts = pgTable("bank_accounts", {
   id: serial("id").primaryKey(),
@@ -237,7 +310,9 @@ export const bankAccounts = pgTable("bank_accounts", {
   accountType: text("account_type").notNull().default("Current"),
   openingBalance: decimal("opening_balance", { precision: 12, scale: 2 }).default("0"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  businessIdx: index("bank_accounts_business_idx").on(table.businessId),
+}));
 
 export const cashSettings = pgTable("cash_settings", {
   id: serial("id").primaryKey(),
@@ -278,7 +353,22 @@ export const cashEntries = pgTable("cash_entries", {
   reversedAt: timestamp("reversed_at"),
   isArchived: boolean("is_archived").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  // The ledgers read one party's entries by date; the payment guards read them by transaction.
+  businessFarmerDateIdx: index("cash_entries_business_farmer_date_idx").on(table.businessId, table.farmerId, table.date),
+  businessBuyerDateIdx: index("cash_entries_business_buyer_date_idx").on(table.businessId, table.buyerId, table.date),
+  businessTransactionIdx: index("cash_entries_business_transaction_idx").on(table.businessId, table.transactionId),
+  // What a farmer card still owes in Freight/Bhada, recalculated every time the Cash page opens.
+  businessFarmerStockDateIdx: index("cash_entries_business_farmer_stock_date_idx").on(table.businessId, table.farmerId, table.stockDate),
+  businessBankAccountIdx: index("cash_entries_business_bank_account_idx").on(table.businessId, table.bankAccountId),
+  businessDateIdx: index("cash_entries_business_date_idx").on(table.businessId, table.date),
+  businessCategoryOutflowIdx: index("cash_entries_business_category_outflow_idx").on(table.businessId, table.category, table.outflowType),
+  // Every new entry scans for the day's highest cash flow number before it can pick the next one. That
+  // lookup is a "starts with today's date" match, and Postgres can only use an index for that when the
+  // index is built with text_pattern_ops — a plain one is ignored and the whole table is read instead.
+  businessCashFlowIdIdx: index("cash_entries_business_cash_flow_id_idx")
+    .on(table.businessId, table.cashFlowId.op("text_pattern_ops")),
+}));
 
 export const insertBusinessSchema = createInsertSchema(businesses).omit({ id: true, createdAt: true });
 export const insertUserSchema = createInsertSchema(users).omit({ id: true, createdAt: true });
@@ -369,7 +459,9 @@ export const assets = pgTable("assets", {
   disposalAmount: decimal("disposal_amount", { precision: 12, scale: 2 }),
   disposalReason: text("disposal_reason"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  businessIdx: index("assets_business_idx").on(table.businessId),
+}));
 
 export const insertAssetSchema = createInsertSchema(assets).omit({ id: true, createdAt: true });
 export type Asset = typeof assets.$inferSelect;
@@ -385,7 +477,11 @@ export const assetDepreciationLog = pgTable("asset_depreciation_log", {
   closingValue: decimal("closing_value", { precision: 12, scale: 2 }).notNull(),
   monthsUsed: integer("months_used").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  // Depreciation is read per asset, and per financial year when the books are built.
+  businessAssetIdx: index("asset_depreciation_log_business_asset_idx").on(table.businessId, table.assetId),
+  assetFinancialYearIdx: index("asset_depreciation_log_asset_fy_idx").on(table.assetId, table.financialYear),
+}));
 
 export const insertAssetDepreciationLogSchema = createInsertSchema(assetDepreciationLog).omit({ id: true, createdAt: true });
 export type AssetDepreciationLog = typeof assetDepreciationLog.$inferSelect;
@@ -404,7 +500,9 @@ export const liabilities = pgTable("liabilities", {
   isSettled: boolean("is_settled").notNull().default(false),
   settledDate: date("settled_date"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  businessIdx: index("liabilities_business_idx").on(table.businessId),
+}));
 
 export const insertLiabilitySchema = createInsertSchema(liabilities).omit({ id: true, createdAt: true });
 export type Liability = typeof liabilities.$inferSelect;
@@ -420,7 +518,10 @@ export const liabilityPayments = pgTable("liability_payments", {
   interestAmount: decimal("interest_amount", { precision: 12, scale: 2 }).notNull().default("0"),
   isReversed: boolean("is_reversed").notNull().default(false),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  businessLiabilityIdx: index("liability_payments_business_liability_idx").on(table.businessId, table.liabilityId),
+  businessPaymentDateIdx: index("liability_payments_business_payment_date_idx").on(table.businessId, table.paymentDate),
+}));
 
 export const insertLiabilityPaymentSchema = createInsertSchema(liabilityPayments).omit({ id: true, createdAt: true });
 export type LiabilityPayment = typeof liabilityPayments.$inferSelect;
@@ -462,6 +563,8 @@ export const buyerReceiptSerials = pgTable("buyer_receipt_serials", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   uniqueBuyerReceiptSerial: uniqueIndex("buyer_receipt_serials_business_buyer_date_crop_unique").on(table.businessId, table.buyerId, table.date, table.crop),
+  // Duplicate-serial checks sweep a whole financial year for the business.
+  businessDateIdx: index("buyer_receipt_serials_business_date_idx").on(table.businessId, table.date),
 }));
 
 export type BuyerReceiptSerial = typeof buyerReceiptSerials.$inferSelect;

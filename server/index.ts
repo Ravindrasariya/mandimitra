@@ -4,6 +4,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
 import { createServer } from "http";
+import { ensureIndexes } from "./ensureIndexes";
 
 const app = express();
 const httpServer = createServer(app);
@@ -62,6 +63,10 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Bring the lookup indexes into existence on whatever database this is pointed at, so a freshly
+  // deployed one is not left reading whole tables. This runs in the background and never holds up serving.
+  ensureIndexes();
+
   await registerRoutes(httpServer, app);
 
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
