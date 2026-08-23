@@ -780,15 +780,17 @@ function BhadaStatusBadge({ farmerId, date }: { farmerId?: number; date?: string
 /**
  * Settle a card's freight from the Stock register instead of walking over to the Cash page.
  *
- * Stays out of the way when there is nothing to pay — a card with no freight, or one already settled —
- * so the button never invites a payment that would be rejected anyway.
+ * A settled card keeps the button in place but greyed out, so the row's layout never shifts and the user
+ * can see the payment was made here. It disappears only when the card carries no freight at all, where a
+ * payment button would make no sense.
  */
 function BhadaPayButton({ farmerId, farmerName, date }: { farmerId?: number; farmerName?: string; date?: string }) {
   const { t } = useLanguage();
   const [open, setOpen] = useState(false);
   const card = useBhadaCard(farmerId, date);
 
-  if (!card || !farmerId || !date || card.dueBhada < BHADA_PAY_MIN_DUE) return null;
+  if (!card || !farmerId || !date || card.totalBhada <= 0) return null;
+  const settled = card.dueBhada < BHADA_PAY_MIN_DUE;
 
   return (
     <>
@@ -796,8 +798,14 @@ function BhadaPayButton({ farmerId, farmerName, date }: { farmerId?: number; far
         type="button"
         size="sm"
         variant="outline"
-        className="h-8 w-full gap-1 px-1.5 text-[10px] sm:text-xs whitespace-nowrap bg-primary/10 hover:bg-primary/20 border-primary/30 text-primary font-medium"
-        onClick={() => setOpen(true)}
+        disabled={settled}
+        title={settled ? t("stock.bhadaPaid") : undefined}
+        className={`h-8 w-full gap-1 px-1.5 text-[10px] sm:text-xs whitespace-nowrap font-medium ${
+          settled
+            ? "opacity-50 bg-muted text-muted-foreground border-muted-foreground/30 cursor-not-allowed"
+            : "bg-primary/10 hover:bg-primary/20 border-primary/30 text-primary"
+        }`}
+        onClick={() => { if (!settled) setOpen(true); }}
         data-testid="button-bhada-pay"
       >
         <IndianRupee className="w-3 h-3 shrink-0" />
