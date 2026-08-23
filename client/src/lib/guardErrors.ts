@@ -7,6 +7,9 @@
 const GUARD_CODE_KEYS: Record<string, string> = {
   GUARD_LOT_FARMER_CHANGE: "guard.farmerChange",
   GUARD_LOT_VEHICLE: "guard.vehicle",
+  GUARD_BHADA_CARD_IDENTITY: "guard.bhadaCardIdentity",
+  GUARD_BHADA_RATE_CUT: "guard.bhadaRateCut",
+  GUARD_BHADA_LOT_BLOCKED: "guard.bhadaLotBlocked",
   GUARD_BID_BUYER_CHANGE: "guard.buyerChange",
   GUARD_CORE: "guard.core",
   GUARD_FARMER_EXTRAS: "guard.farmerExtras",

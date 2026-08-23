@@ -1902,6 +1902,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, onBBChange, is
               }
               if (dbLots.length > 0) {
                 queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
+              queryClient.invalidateQueries({ queryKey: ["/api/bhada-breakdown"] });
                 queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
                 queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
                 queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
@@ -2394,6 +2395,7 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
         }
         if (dbLots.length > 0) {
           queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
+              queryClient.invalidateQueries({ queryKey: ["/api/bhada-breakdown"] });
           queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
           queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
           queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
@@ -2910,6 +2912,7 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
             try {
               await apiRequest("POST", "/api/lots/bulk-archive", { lotIds, isArchived: false });
               queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
+              queryClient.invalidateQueries({ queryKey: ["/api/bhada-breakdown"] });
               queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
               queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
               queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
@@ -4550,6 +4553,7 @@ export default function StockPage() {
       setSavedCardMap(prev => new Map(prev).set(card.id, JSON.parse(JSON.stringify(updatedCard))));
 
       queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
+              queryClient.invalidateQueries({ queryKey: ["/api/bhada-breakdown"] });
       queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
       queryClient.invalidateQueries({ queryKey: ["/api/bids"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
@@ -4616,6 +4620,7 @@ export default function StockPage() {
       try {
         await apiRequest("POST", "/api/lots/bulk-archive", { lotIds, isArchived: true });
         queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
+              queryClient.invalidateQueries({ queryKey: ["/api/bhada-breakdown"] });
         queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
         queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
         queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });

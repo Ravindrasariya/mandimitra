@@ -150,6 +150,24 @@ export interface IStorage {
   checkDuplicateBuyerReceiptSerial(businessId: number, buyerId: number, date: string, crop: string, billBookNumber: number, serialNumber: number): Promise<boolean>;
 }
 
+/**
+ * Total bhada owed on one farmer card, given that card's non-archived lots.
+ *
+ * The rate is duplicated onto every lot of a vehicle sub-group, so it is read once per vehicle number and
+ * those are summed. A card the user sees as a single row can hold more than one vehicle sub-group, because
+ * the stock-cards view groups one level finer than the card itself.
+ */
+export function sumCardBhada(cardLots: { vehicleNumber: string | null; vehicleBhadaRate: string | null }[]): number {
+  const rateByVehicle = new Map<string, number>();
+  for (const l of cardLots) {
+    const rate = parseFloat(l.vehicleBhadaRate || "0") || 0;
+    if (rate > 0) rateByVehicle.set(l.vehicleNumber || "", rate);
+  }
+  let total = 0;
+  for (const rate of Array.from(rateByVehicle.values())) total += rate;
+  return total;
+}
+
 export class DatabaseStorage implements IStorage {
   async getUser(id: string): Promise<User | undefined> {
     const [user] = await db.select().from(users).where(eq(users.id, id));
@@ -1301,6 +1319,9 @@ export class DatabaseStorage implements IStorage {
     for (let attempt = 0; attempt < 5; attempt++) {
       try {
         const created = await db.transaction(async (tx) => {
+          if (entry.outflowType === "Freight/Bhada" && entry.category === "outward" && entry.farmerId && entry.stockDate) {
+            await this.validateBhadaPayment(tx as unknown as typeof db, entry.businessId, entry.farmerId, entry.stockDate, entry.amount || "0");
+          }
           if (entry.transactionId) {
             const isBuyerInward = !!(entry.buyerId && entry.category === "inward");
             const isFarmerOutward = !!(entry.farmerId && entry.category === "outward");
@@ -1352,6 +1373,12 @@ export class DatabaseStorage implements IStorage {
     const txDate = baseEntry.date ? new Date(baseEntry.date + "T00:00:00") : new Date();
     const dateStr = `${txDate.getFullYear()}${String(txDate.getMonth() + 1).padStart(2, "0")}${String(txDate.getDate()).padStart(2, "0")}`;
     const prefix = `CF${dateStr}`;
+
+    if (baseEntry.outflowType === "Freight/Bhada") {
+      // Card settlement is validated (and locked) only in createCashEntry. Allowing this type through the
+      // allocation writer would let a payout past the per-card cap.
+      throw new Error("Freight/Bhada must be recorded as a single card payment, not as bill allocations");
+    }
 
     return await db.transaction(async (tx) => {
       const isBuyerInward = !!(baseEntry.buyerId && baseEntry.category === "inward");
@@ -1646,6 +1673,168 @@ export class DatabaseStorage implements IStorage {
       const paid = Math.min(total, paidByDate.get(d) || 0);
       return { date: d, totalHammali: total, paidHammali: paid, dueHammali: Math.max(0, total - paid) };
     });
+  }
+
+  /**
+   * Freight/Bhada owed per farmer card, newest stock date first.
+   *
+   * A farmer card is not a stored row — it is the lots sharing a farmer and a stock entry date, and
+   * the bhada rate is duplicated onto every one of those lots. Driver name and vehicle number are
+   * optional, so they take no part in identifying a card here; the card is farmer + stock date, which
+   * the app already keeps unique. The stock-cards view groups one level finer (it also splits on
+   * vehicle number), so a rate is read once per vehicle sub-group and those are summed back up to the
+   * farmer + date the user actually sees.
+   *
+   * Only rows still owing something are returned; a card is settled the moment its live payments cover
+   * its bhada. Payments recorded before bhada tracking existed carry no stock date and are ignored —
+   * they cannot be attributed to a card without guessing.
+   */
+  async getBhadaBreakdown(businessId: number): Promise<{
+    farmerId: number; farmerName: string; date: string;
+    totalBhada: number; paidBhada: number; dueBhada: number;
+  }[]> {
+    const lotRows = await db.select({
+      farmerId: lots.farmerId,
+      farmerName: farmers.name,
+      date: lots.date,
+      vehicleNumber: lots.vehicleNumber,
+      vehicleBhadaRate: lots.vehicleBhadaRate,
+    }).from(lots)
+      .innerJoin(farmers, eq(lots.farmerId, farmers.id))
+      .where(and(
+        eq(lots.businessId, businessId),
+        eq(lots.isArchived, false),
+        isNotNull(lots.vehicleBhadaRate),
+      ));
+
+    const lotsByCard = new Map<string, { vehicleNumber: string | null; vehicleBhadaRate: string | null }[]>();
+    const cardMeta = new Map<string, { farmerId: number; farmerName: string; date: string }>();
+    for (const r of lotRows) {
+      const cardKey = `${r.farmerId}|${r.date}`;
+      if (!lotsByCard.has(cardKey)) {
+        lotsByCard.set(cardKey, []);
+        cardMeta.set(cardKey, { farmerId: r.farmerId, farmerName: r.farmerName, date: r.date });
+      }
+      lotsByCard.get(cardKey)!.push(r);
+    }
+
+    const totalByCard = new Map<string, number>();
+    for (const [cardKey, cardLots] of Array.from(lotsByCard.entries())) {
+      const total = sumCardBhada(cardLots);
+      if (total > 0) totalByCard.set(cardKey, total);
+    }
+
+    const paidRows = await db.select({
+      farmerId: cashEntries.farmerId,
+      stockDate: cashEntries.stockDate,
+      amount: cashEntries.amount,
+    }).from(cashEntries).where(and(
+      eq(cashEntries.businessId, businessId),
+      eq(cashEntries.outflowType, "Freight/Bhada"),
+      eq(cashEntries.category, "outward"),
+      eq(cashEntries.isReversed, false),
+      eq(cashEntries.isArchived, false),
+      isNotNull(cashEntries.stockDate),
+      isNotNull(cashEntries.farmerId),
+    ));
+
+    const paidByCard = new Map<string, number>();
+    for (const p of paidRows) {
+      const cardKey = `${p.farmerId}|${p.stockDate}`;
+      paidByCard.set(cardKey, (paidByCard.get(cardKey) || 0) + (parseFloat(p.amount || "0") || 0));
+    }
+
+    const rows: { farmerId: number; farmerName: string; date: string; totalBhada: number; paidBhada: number; dueBhada: number }[] = [];
+    for (const [cardKey, total] of Array.from(totalByCard.entries())) {
+      const meta = cardMeta.get(cardKey)!;
+      const paid = paidByCard.get(cardKey) || 0;
+      const due = Math.round((total - paid) * 100) / 100;
+      if (due <= 0) continue;
+      rows.push({ ...meta, totalBhada: total, paidBhada: paid, dueBhada: due });
+    }
+    rows.sort((a, b) => (a.date === b.date ? a.farmerName.localeCompare(b.farmerName) : b.date.localeCompare(a.date)));
+    return rows;
+  }
+
+  /**
+   * Refuse a Freight/Bhada payout that would take a farmer card past what it owes.
+   *
+   * This runs inside the insert's own transaction and first takes a row lock on the card's lots, so two
+   * payouts racing on the same card queue up instead of both reading the same due and both being written.
+   * The lots rows are the natural lock: they carry the bhada rate, and a card has no row of its own.
+   */
+  private async validateBhadaPayment(tx: typeof db, businessId: number, farmerId: number, stockDate: string, amount: string) {
+    const amt = parseFloat(amount || "0");
+    if (!Number.isFinite(amt) || amt <= 0) {
+      throw new Error("Freight/Bhada amount must be greater than zero");
+    }
+
+    const cardLots = await tx.select({
+      vehicleNumber: lots.vehicleNumber,
+      vehicleBhadaRate: lots.vehicleBhadaRate,
+    }).from(lots).where(and(
+      eq(lots.businessId, businessId),
+      eq(lots.farmerId, farmerId),
+      eq(lots.date, stockDate),
+      eq(lots.isArchived, false),
+    )).for("update");
+
+    const total = sumCardBhada(cardLots);
+    if (total <= 0) {
+      throw new Error(`No Freight/Bhada is due for this farmer on ${stockDate}. Please refresh and try again.`);
+    }
+
+    const [paidRow] = await tx.select({
+      total: sql<number>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`,
+    }).from(cashEntries).where(and(
+      eq(cashEntries.businessId, businessId),
+      eq(cashEntries.farmerId, farmerId),
+      eq(cashEntries.stockDate, stockDate),
+      eq(cashEntries.outflowType, "Freight/Bhada"),
+      eq(cashEntries.category, "outward"),
+      eq(cashEntries.isReversed, false),
+      eq(cashEntries.isArchived, false),
+    ));
+    const paid = Number(paidRow?.total) || 0;
+    const due = Math.round((total - paid) * 100) / 100;
+    if (amt > due + 0.01) {
+      throw new Error(`Amount (₹${amt.toFixed(2)}) exceeds the Freight/Bhada due (₹${due.toFixed(2)}) for this card. Please refresh and try again.`);
+    }
+  }
+
+  /**
+   * The bhada-bearing lots of one farmer card, for guards that need to work out what the card's total
+   * bhada would become after an edit. Pair with `sumCardBhada`.
+   */
+  async getCardBhadaLots(businessId: number, farmerId: number, stockDate: string): Promise<{ vehicleNumber: string | null; vehicleBhadaRate: string | null }[]> {
+    return await db.select({
+      vehicleNumber: lots.vehicleNumber,
+      vehicleBhadaRate: lots.vehicleBhadaRate,
+    }).from(lots).where(and(
+      eq(lots.businessId, businessId),
+      eq(lots.farmerId, farmerId),
+      eq(lots.date, stockDate),
+      eq(lots.isArchived, false),
+    ));
+  }
+
+  /**
+   * Live Freight/Bhada already paid against one farmer card. Used by the edit guards, which must not
+   * let the card's stock date move or its bhada drop below what has been paid out on it.
+   */
+  async getBhadaPaidForCard(businessId: number, farmerId: number, stockDate: string): Promise<number> {
+    const [row] = await db.select({
+      total: sql<number>`coalesce(sum(cast(${cashEntries.amount} as numeric)), 0)`,
+    }).from(cashEntries).where(and(
+      eq(cashEntries.businessId, businessId),
+      eq(cashEntries.farmerId, farmerId),
+      eq(cashEntries.stockDate, stockDate),
+      eq(cashEntries.outflowType, "Freight/Bhada"),
+      eq(cashEntries.category, "outward"),
+      eq(cashEntries.isReversed, false),
+      eq(cashEntries.isArchived, false),
+    ));
+    return Number(row?.total) || 0;
   }
 
   async getFarmerLedger(businessId: number, farmerId: number, dateFrom?: string, dateTo?: string) {

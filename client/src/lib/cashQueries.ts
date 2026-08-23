@@ -25,6 +25,7 @@ export function invalidateCashQueries() {
   queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/transactions"] });
   queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/transaction-aggregates"] });
   queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/hammali-breakdown"] });
+  queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/bhada-breakdown"] });
   queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/bank-accounts"] });
   queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/dashboard"] });
   queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/stock-cards"] });

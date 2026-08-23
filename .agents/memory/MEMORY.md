@@ -3,6 +3,7 @@
 - [Charge rate snapshots vs. freight](charge-rate-snapshots.md) — no dated rate table; each transaction freezes its own rates, and freight is the one derived charge that can go stale.
 - [Payment-aware edit guards](payment-edit-guards.md) — scope guards by party, fire on a changed value not payload presence, and cover every write route that reaches the same numbers.
 - [BB#/SR# is not a unique bill key](bill-number-scoping.md) — bill numbers repeat across financial years; scope bill-level actions by transaction id, and never by number+date.
+- [Settling money against a farmer card](bhada-card-settlement.md) — a card is farmer + stock date, never the optional vehicle no.; card totals are distinct-by-vehicle sums.
 - [Farmer rows per bill, buyer rows per txn](payment-row-granularity.md) — the two allocation lists differ by design; don't align the buyer side to the farmer side.
 - [Stock cards load once](stock-card-local-state.md) — invalidating a query never updates an open stock card; server-owned fields need an explicit re-sync effect.
 - [Persisted selections need re-anchoring](persisted-selection-state.md) — browser-persisted picks keyed by a server grouping key break when grouping changes; reconcile by entity id.

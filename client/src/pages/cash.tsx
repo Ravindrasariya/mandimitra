@@ -98,6 +98,11 @@ export default function CashPage() {
 
   const [outwardOutflowType, setOutwardOutflowType, clearOutwardOutflowType] = usePersistedState<string>("cash-outwardOutflowType", "Farmer-Advance");
   const [outwardFarmerId, setOutwardFarmerId, clearOutwardFarmerId] = usePersistedState("cash-outwardFarmerId", "");
+  // Freight/Bhada settles one farmer card, which is identified by the farmer plus the card's stock
+  // entry date -- vehicle number and driver are optional and play no part in it.
+  const [outwardBhadaStockDate, setOutwardBhadaStockDate, clearOutwardBhadaStockDate] = usePersistedState("cash-outwardBhadaStockDate", "");
+  const [outwardBhadaSearch, setOutwardBhadaSearch] = useState("");
+  const [outwardBhadaOpen, setOutwardBhadaOpen] = useState(false);
   const [outwardAmount, setOutwardAmount, clearOutwardAmount] = usePersistedState("cash-outwardAmount", "");
   const [outwardDate, setOutwardDate] = useState(format(now, "yyyy-MM-dd"));
   const [outwardPaymentMode, setOutwardPaymentMode, clearOutwardPaymentMode] = usePersistedState("cash-outwardPaymentMode", "Cash");
@@ -194,6 +199,11 @@ export default function CashPage() {
     queryFn: () => outwardFarmerId ? fetch(`/api/farmers/${outwardFarmerId}/pending-transactions`, { credentials: "include" }).then(r => r.json()) : Promise.resolve([]),
     enabled: (outwardOutflowType === "Farmer-Harvest Sale" || outwardOutflowType === "Farmer-Advance") && !!outwardFarmerId,
   });
+
+  type BhadaBreakdownRow = { farmerId: number; farmerName: string; date: string; totalBhada: number; paidBhada: number; dueBhada: number };
+  // Loaded unconditionally: the outstanding total has to be on the outflow-type list before
+  // Freight/Bhada is even picked, the same way the Hammali due is.
+  const { data: bhadaBreakdown = [] } = useQuery<BhadaBreakdownRow[]>({ queryKey: ["/api/bhada-breakdown"] });
 
   type HammaliBreakdownRow = { date: string; totalHammali: number; paidHammali: number; dueHammali: number };
   const { data: hammaliBreakdown = [] } = useQuery<HammaliBreakdownRow[]>({
@@ -540,6 +550,8 @@ export default function CashPage() {
     setFarmerAllocationSearch("");
     clearHammaliAllocations();
     setHammaliAllocationSearch("");
+    clearOutwardBhadaStockDate();
+    setOutwardBhadaSearch("");
   };
 
   const clearTransferForm = () => {
@@ -647,6 +659,16 @@ export default function CashPage() {
       toast({ title: t("common.error"), description: "Select a farmer", variant: "destructive" });
       return;
     }
+    if (outwardOutflowType === "Freight/Bhada") {
+      if (!selectedBhadaRow) {
+        toast({ title: t("common.error"), description: t("cash.selectBhadaEntry"), variant: "destructive" });
+        return;
+      }
+      if (parseFloat(outwardAmount || "0") > selectedBhadaRow.dueBhada + 0.01) {
+        toast({ title: t("common.error"), description: t("cash.bhadaAmountExceedsDue", { due: selectedBhadaRow.dueBhada.toLocaleString("en-IN") }), variant: "destructive" });
+        return;
+      }
+    }
     if (outwardOutflowType === "Salary" && !outwardReceiverName.trim()) {
       toast({ title: t("common.error"), description: "Enter receiver name", variant: "destructive" });
       return;
@@ -746,6 +768,8 @@ export default function CashPage() {
         type: "cash_out",
         outflowType: outwardOutflowType,
         farmerId: needsFarmer ? parseInt(outwardFarmerId) : null,
+        // Stamps the farmer card this bhada payout settles. Only Freight/Bhada carries one.
+        stockDate: outwardOutflowType === "Freight/Bhada" ? outwardBhadaStockDate : null,
         partyName: outwardOutflowType === "Salary" ? outwardReceiverName.trim() : null,
         amount: outwardAmount,
         date: outwardDate,
@@ -892,6 +916,7 @@ export default function CashPage() {
       "BB#": e.bbNumber != null ? String(e.bbNumber) : "",
       "SR#": e.srNumber != null ? String(e.srNumber) : "",
       "Transaction ID": e.txnCode || "",
+      "Bhada Card Date": e.stockDate ? format(new Date(e.stockDate + "T00:00:00"), "dd/MM/yyyy") : "",
       "Amount": e.amount,
       "Discount": e.discount || "0",
       "Petty Adj": e.pettyAdj || "0",
@@ -1230,7 +1255,21 @@ export default function CashPage() {
   const dueExtraCharges = (txAggregates?.totalExtraCharges || 0) - (txAggregates?.paidExtraCharges || 0);
   const dueMandi = (txAggregates?.totalMandiCommission || 0) - (txAggregates?.paidMandiCommission || 0);
 
+  const dueBhadaTotal = bhadaBreakdown.reduce((sum, r) => sum + r.dueBhada, 0);
+  const selectedBhadaRow = outwardFarmerId && outwardBhadaStockDate
+    ? bhadaBreakdown.find(r => r.farmerId === parseInt(outwardFarmerId) && r.date === outwardBhadaStockDate)
+    : undefined;
+
+  const formatBhadaDate = (d: string) => format(new Date(`${d}T00:00:00`), "dd MMM yyyy");
+  const clearBhadaSelection = () => {
+    setOutwardFarmerId("");
+    setOutwardBhadaStockDate("");
+    setOutwardBhadaSearch("");
+    setOutwardAmount("");
+  };
+
   const getOutflowHint = (type: string) => {
+    if (type === "Freight/Bhada") return dueBhadaTotal > 0 ? `Due: ₹${dueBhadaTotal.toLocaleString("en-IN")}` : null;
     if (type === "Hammali") return dueHammali > 0 ? `Due: ₹${dueHammali.toLocaleString("en-IN")}` : null;
     if (type === "Extra Charges") return dueExtraCharges > 0 ? `Due: ₹${dueExtraCharges.toLocaleString("en-IN")}` : null;
     if (type === "Mandi Commission") return dueMandi > 0 ? `Due: ₹${dueMandi.toLocaleString("en-IN")}` : null;
@@ -1959,7 +1998,7 @@ export default function CashPage() {
                 <>
                   <div className="space-y-1">
                     <Label className="text-xs">{t("cash.outflowType")}</Label>
-                    <Select value={outwardOutflowType} onValueChange={(v) => { setOutwardOutflowType(v); setFarmerAllocations([]); setFarmerAllocationSearch(""); setHammaliAllocations([]); setHammaliAllocationSearch(""); }}>
+                    <Select value={outwardOutflowType} onValueChange={(v) => { setOutwardOutflowType(v); setFarmerAllocations([]); setFarmerAllocationSearch(""); setHammaliAllocations([]); setHammaliAllocationSearch(""); clearBhadaSelection(); }}>
                       <SelectTrigger className="h-9 text-sm" data-testid="outward-outflow-type"><SelectValue /></SelectTrigger>
                       <SelectContent>
                         {OUTFLOW_TYPES.map(type => {
@@ -1979,7 +2018,67 @@ export default function CashPage() {
                       <Input value={outwardReceiverName} onChange={e => setOutwardReceiverName(e.target.value)} placeholder="Enter receiver name" className="h-9 text-sm" data-testid="outward-receiver-name" />
                     </div>
                   )}
-                  {(outwardOutflowType === "Farmer-Advance" || outwardOutflowType === "Farmer-Harvest Sale" || outwardOutflowType === "Freight/Bhada") && (
+                  {outwardOutflowType === "Freight/Bhada" && (
+                    <div className="space-y-1">
+                      <Label className="text-xs">{t("cash.bhadaPending")}</Label>
+                      <div className="relative">
+                        {selectedBhadaRow ? (
+                          <div className="h-9 text-sm rounded-md border border-input bg-background px-3 flex items-center gap-2">
+                            <span className="truncate flex-1" data-testid="text-outward-bhada-selected">
+                              {selectedBhadaRow.farmerName} · {formatBhadaDate(selectedBhadaRow.date)} · {t("cash.due")}: ₹{selectedBhadaRow.dueBhada.toLocaleString("en-IN")}
+                            </span>
+                            <button onClick={() => { clearBhadaSelection(); }} className="shrink-0" data-testid="button-clear-outward-bhada"><X className="w-3.5 h-3.5" /></button>
+                          </div>
+                        ) : (
+                          <>
+                            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                            <Input
+                              value={outwardBhadaSearch}
+                              onChange={(e) => { setOutwardBhadaSearch(e.target.value); setOutwardBhadaOpen(true); }}
+                              onFocus={() => setOutwardBhadaOpen(true)}
+                              onBlur={() => setTimeout(() => setOutwardBhadaOpen(false), 200)}
+                              placeholder={t("cash.searchBhadaPending")}
+                              className="h-9 text-sm pl-8"
+                              data-testid="outward-bhada-search"
+                            />
+                            {outwardBhadaOpen && (
+                              <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-[200px] overflow-y-auto">
+                                {(() => {
+                                  const q = outwardBhadaSearch.trim().toLowerCase();
+                                  const list = (q
+                                    ? bhadaBreakdown.filter(r => r.farmerName.toLowerCase().includes(q) || r.date.includes(q))
+                                    : bhadaBreakdown).slice(0, 30);
+                                  return list.length > 0 ? list.map(r => (
+                                    <button key={`${r.farmerId}-${r.date}`} className="flex flex-col px-3 py-2 text-sm w-full text-left hover:bg-accent" data-testid={`outward-bhada-opt-${r.farmerId}-${r.date}`}
+                                      onMouseDown={(e) => {
+                                        e.preventDefault();
+                                        setOutwardFarmerId(r.farmerId.toString());
+                                        setOutwardBhadaStockDate(r.date);
+                                        setOutwardBhadaSearch("");
+                                        setOutwardBhadaOpen(false);
+                                        setOutwardAmount(r.dueBhada.toFixed(2));
+                                      }}>
+                                      <div className="flex items-center justify-between w-full gap-2">
+                                        <span className="font-medium">{r.farmerName}</span>
+                                        <span className="text-xs font-semibold text-orange-600 shrink-0">{t("cash.due")}: ₹{r.dueBhada.toLocaleString("en-IN")}</span>
+                                      </div>
+                                      <div className="flex items-center gap-1.5 text-muted-foreground text-xs">
+                                        <span>{formatBhadaDate(r.date)}</span>
+                                        {r.paidBhada > 0 && <span>({t("cash.of")} ₹{r.totalBhada.toLocaleString("en-IN")})</span>}
+                                      </div>
+                                    </button>
+                                  )) : (
+                                    <div className="px-3 py-2 text-xs text-muted-foreground" data-testid="status-outward-bhada-empty">{t("cash.noBhadaPending")}</div>
+                                  );
+                                })()}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  {(outwardOutflowType === "Farmer-Advance" || outwardOutflowType === "Farmer-Harvest Sale") && (
                     <div className="space-y-1">
                       <Label className="text-xs">{outwardOutflowType === "Farmer-Harvest Sale" ? t("cash.farmerWithDues") : t("cash.farmer")}</Label>
                       <div className="relative">
@@ -1988,7 +2087,7 @@ export default function CashPage() {
                             <span className="truncate flex-1" data-testid="text-outward-farmer-selected">
                               {(() => { const f = farmersWithDues.find(f => f.id === parseInt(outwardFarmerId)); return f ? (parseFloat(f.totalDue) > 0 ? `${f.name} - Due: ₹${parseFloat(f.totalDue).toLocaleString("en-IN")}` : f.name) : ""; })()}
                             </span>
-                            <button onClick={() => { setOutwardFarmerId(""); setOutwardFarmerSearch(""); setFarmerAllocations([]); setFarmerAllocationSearch(""); if (outwardOutflowType === "Farmer-Harvest Sale" || outwardOutflowType === "Farmer-Advance" || outwardOutflowType === "Freight/Bhada") setOutwardAmount(""); }} className="shrink-0" data-testid="button-clear-outward-farmer"><X className="w-3.5 h-3.5" /></button>
+                            <button onClick={() => { setOutwardFarmerId(""); setOutwardFarmerSearch(""); setFarmerAllocations([]); setFarmerAllocationSearch(""); if (outwardOutflowType === "Farmer-Harvest Sale" || outwardOutflowType === "Farmer-Advance") setOutwardAmount(""); }} className="shrink-0" data-testid="button-clear-outward-farmer"><X className="w-3.5 h-3.5" /></button>
                           </div>
                         ) : (
                           <>
@@ -2005,7 +2104,7 @@ export default function CashPage() {
                             {outwardFarmerOpen && (
                               <div className="absolute z-50 w-full mt-1 bg-popover border rounded-md shadow-lg max-h-[200px] overflow-y-auto">
                                 {(() => {
-                                  const isAdvance = outwardOutflowType === "Farmer-Advance" || outwardOutflowType === "Freight/Bhada";
+                                  const isAdvance = outwardOutflowType === "Farmer-Advance";
                                   const farmerList = isAdvance
                                     ? farmersWithDues.filter(f => !f.isArchived).sort((a, b) => a.name.localeCompare(b.name))
                                     : farmersWithDues.filter(f => !f.isArchived && parseFloat(f.totalDue) > 0).sort((a, b) => a.name.localeCompare(b.name));
@@ -2519,6 +2618,11 @@ export default function CashPage() {
                           {entry.outflowType && entry.category === "outward" && (
                             <span className="text-muted-foreground">{entry.outflowType}</span>
                           )}
+                          {entry.stockDate && (
+                            <span className="text-muted-foreground" data-testid="row-bhada-card-date">
+                              {t("cash.bhadaCard")}: {formatBhadaDate(entry.stockDate)}
+                            </span>
+                          )}
                           {entry.isReversed && entry.reversedAt && (
                             <span>Reversed on {format(new Date(entry.reversedAt), "dd/MM/yyyy")}</span>
                           )}
@@ -2576,6 +2680,12 @@ export default function CashPage() {
               {detailEntry.bankAccountId && <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.bankAccount")}</span><span>{getAccountName(detailEntry.bankAccountId)}</span></div>}
               {detailEntry.buyerId && <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.buyer")}</span><span>{getBuyerName(detailEntry.buyerId)}</span></div>}
               {detailEntry.farmerId && <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.farmer")}</span><span>{getFarmerName(detailEntry.farmerId)}</span></div>}
+              {detailEntry.stockDate && (
+                <div className="flex justify-between" data-testid="detail-bhada-card-date">
+                  <span className="text-muted-foreground">{t("cash.bhadaCard")}</span>
+                  <span>{formatBhadaDate(detailEntry.stockDate)}</span>
+                </div>
+              )}
               {detailEntry.notes && <div className="flex justify-between"><span className="text-muted-foreground">{t("cash.remarks")}</span><span>{detailEntry.notes}</span></div>}
               <div className="flex justify-between"><span className="text-muted-foreground">Status</span><span>{detailEntry.isReversed ? "Reversed" : "Active"}</span></div>
               {!detailEntry.isReversed && detailEntry.paymentMode === "Cheque" && (

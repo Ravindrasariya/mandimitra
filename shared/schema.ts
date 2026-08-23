@@ -265,6 +265,11 @@ export const cashEntries = pgTable("cash_entries", {
   chequeDate: date("cheque_date"),
   bankName: text("bank_name"),
   date: date("date").notNull(),
+  // Freight/Bhada payouts settle a farmer card, which has no row of its own — it is just the lots
+  // sharing a farmer and a stock entry date. Vehicle number and driver are optional, so the card is
+  // identified by farmerId + this stock date. Null on every other kind of entry (and on Freight
+  // payments recorded before bhada tracking existed, which therefore settle nothing).
+  stockDate: date("stock_date"),
   partyName: text("party_name"),
   notes: text("notes"),
   splitLog: text("split_log"),

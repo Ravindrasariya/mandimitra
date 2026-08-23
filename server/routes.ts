@@ -2,7 +2,7 @@ import type { Express } from "express";
 import express from "express";
 import { createServer, type Server } from "http";
 import { z } from "zod";
-import { storage } from "./storage";
+import { storage, sumCardBhada } from "./storage";
 import { setupAuth, requireAuth, requireAdmin, hashPassword, comparePasswords } from "./auth";
 import { format } from "date-fns";
 import multer from "multer";
@@ -227,6 +227,33 @@ async function getFarmerCardPaidGroups(businessId: number, farmerId: number, dat
       isNotNull(cashEntries.farmerId)
     ));
   return blocking.map(b => `SR #${b.serialNumber} (${b.crop})`);
+}
+
+/**
+ * Freight/Bhada paid on the cards these lots belong to, or 0.
+ *
+ * A bhada payout is not linked to a transaction — it is stamped with a farmer and a stock entry date — so
+ * the transaction-linked payment blocks above cannot see it. Archiving or deleting the last bhada-bearing
+ * lot of a paid card would drop that card out of the pending list while the payout stayed behind, leaving
+ * money paid against nothing, so those actions have to check here too.
+ */
+async function getBhadaPaidForLots(businessId: number, lotIds: number[]): Promise<number> {
+  if (lotIds.length === 0) return 0;
+  const cards = await db.selectDistinct({ farmerId: lots.farmerId, date: lots.date })
+    .from(lots)
+    .where(and(eq(lots.businessId, businessId), inArray(lots.id, lotIds)));
+  let paid = 0;
+  for (const c of cards) {
+    paid += await storage.getBhadaPaidForCard(businessId, c.farmerId, c.date);
+  }
+  return paid;
+}
+
+function rejectBhadaBlocked(res: express.Response, action: string, bhadaPaid: number) {
+  const paid = bhadaPaid.toLocaleString("en-IN");
+  return guardReject(res, 400, "GUARD_BHADA_LOT_BLOCKED",
+    `${action} — ₹${paid} of Freight/Bhada has already been paid against this farmer card. Reverse that payment on the Cash page first.`,
+    { paid });
 }
 
 export async function registerRoutes(
@@ -578,6 +605,8 @@ export async function registerRoutes(
           return rejectPaymentBlocked(res, "GUARD_ARCHIVE_FARMER", block,
             "Cannot archive this farmer", "against their lots");
         }
+        const bhadaPaid = await getBhadaPaidForLots(businessId, farmerLots.map(l => l.id));
+        if (bhadaPaid > 0) return rejectBhadaBlocked(res, "Cannot archive this farmer", bhadaPaid);
       }
     }
 
@@ -610,6 +639,8 @@ export async function registerRoutes(
           return rejectPaymentBlocked(res, "GUARD_ARCHIVE_LOTS", block,
             "Cannot archive these lots", "against them");
         }
+        const bhadaPaid = await getBhadaPaidForLots(businessId, lotIds);
+        if (bhadaPaid > 0) return rejectBhadaBlocked(res, "Cannot archive these lots", bhadaPaid);
       }
 
       for (const lotId of lotIds) {
@@ -1417,6 +1448,49 @@ export async function registerRoutes(
     // keeps the same ledger id and goes through the farmers route.
     const farmerChanged = data.farmerId !== undefined && Number(data.farmerId) !== Number(lot.farmerId);
 
+    // A Freight/Bhada payout is stamped with this card's farmer and stock date, and settles against the
+    // card's bhada rate. So once bhada has actually been paid out on the card, three things are frozen:
+    // moving the card to another farmer or another stock date would strand the payout on a card that no
+    // longer exists, and cutting the bhada below what is already paid would leave the card overpaid.
+    // Raising the bhada is always fine — the extra simply reappears as a fresh due.
+    const dateChanged = data.date !== undefined && String(data.date) !== String(lot.date);
+    // The card total is a distinct-by-vehicle sum, so moving a lot onto another vehicle number can merge
+    // two sub-groups and shrink the total just as surely as cutting the rate. Both go through the same
+    // prospective-total check below.
+    const vehicleNumberChanged = data.vehicleNumber !== undefined &&
+      String(data.vehicleNumber ?? "").toUpperCase() !== String(lot.vehicleNumber ?? "").toUpperCase();
+    const bhadaCut = data.vehicleBhadaRate !== undefined &&
+      (Number(data.vehicleBhadaRate || 0) || 0) < (Number(lot.vehicleBhadaRate || 0) || 0);
+    if (dateChanged || farmerChanged || bhadaCut || vehicleNumberChanged) {
+      const bhadaPaid = await storage.getBhadaPaidForCard(businessId, lot.farmerId, lot.date);
+      if (bhadaPaid > 0) {
+        const paid = bhadaPaid.toLocaleString("en-IN");
+        if (farmerChanged || dateChanged) {
+          return guardReject(res, 400, "GUARD_BHADA_CARD_IDENTITY",
+            `Cannot change the farmer or the stock date on this card — ₹${paid} of Freight/Bhada has already been paid against it. Reverse that payment on the Cash page first.`,
+            { paid });
+        }
+        // What is owed is the card's total, not this one vehicle's rate, so the cut is judged against
+        // what the card would add up to afterwards — cutting one vehicle is fine while the rest still
+        // covers what has been paid out.
+        const cardLots = await storage.getCardBhadaLots(businessId, lot.farmerId, lot.date);
+        const newVehicle = data.vehicleNumber !== undefined
+          ? (data.vehicleNumber ? String(data.vehicleNumber).toUpperCase() : null)
+          : lot.vehicleNumber;
+        const newRate = data.vehicleBhadaRate !== undefined ? String(data.vehicleBhadaRate ?? "0") : lot.vehicleBhadaRate;
+        // Only this lot moves; its former sub-group keeps its rate if other lots remain on it.
+        const prospective = sumCardBhada([
+          ...cardLots.filter(l => (l.vehicleNumber || "") !== (lot.vehicleNumber || "")),
+          { vehicleNumber: newVehicle, vehicleBhadaRate: newRate },
+        ]);
+        if (prospective < bhadaPaid - 0.01) {
+          return guardReject(res, 400, "GUARD_BHADA_RATE_CUT",
+            `Cannot reduce Vehicle Bhada below ₹${paid} — that much Freight/Bhada has already been paid against this card. Reverse that payment on the Cash page first.`,
+            { paid });
+        }
+      }
+    }
+
     if (vehicleFieldChanged || farmerChanged) {
       const paidGroups = await getFarmerCardPaidGroups(businessId, lot.farmerId, lot.date);
       if (paidGroups.length > 0) {
@@ -1517,6 +1591,8 @@ export async function registerRoutes(
         return rejectPaymentBlocked(res, "GUARD_ARCHIVE_LOT", block,
           "Cannot archive this lot", "against it");
       }
+      const bhadaPaid = await getBhadaPaidForLots(businessId, [lotId]);
+      if (bhadaPaid > 0) return rejectBhadaBlocked(res, "Cannot archive this lot", bhadaPaid);
     }
 
     const updated = await storage.updateLot(lotId, businessId, data);
@@ -1705,6 +1781,9 @@ export async function registerRoutes(
             "Cannot delete this lot", "against its transactions");
         }
       }
+
+      const bhadaPaidOnCard = await getBhadaPaidForLots(businessId, [lotId]);
+      if (bhadaPaidOnCard > 0) return rejectBhadaBlocked(res, "Cannot delete this lot", bhadaPaidOnCard);
 
       await db.transaction(async (tx) => {
         // Write audit snapshot only when there is meaningful data to record
@@ -2018,6 +2097,12 @@ export async function registerRoutes(
         data.advanceAmount = "0";
       }
 
+      // A Freight/Bhada payout settles a farmer card, never a bill, so it must never take the allocation
+      // path — that path skips the per-card due check and would let an unlinked payout past the cap.
+      if (data.outflowType === "Freight/Bhada" && allocations && Array.isArray(allocations) && allocations.length > 0) {
+        return res.status(400).json({ message: "Freight/Bhada is paid against a farmer card, not against bills" });
+      }
+
       const isBuyerInward = allocations && Array.isArray(allocations) && allocations.length > 0 && data.category === "inward" && data.buyerId;
       const isFarmerOutward = allocations && Array.isArray(allocations) && allocations.length > 0 && data.category === "outward" && data.farmerId;
 
@@ -2065,6 +2150,23 @@ export async function registerRoutes(
         broadcastBusinessEvent(req.user!.businessId);
         res.status(201).json(entries);
       } else {
+        if (data.outflowType === "Freight/Bhada" && data.category === "outward") {
+          // A bhada payout settles one farmer card, so it must name the card it settles and may not
+          // pay out more than that card still owes. The due is re-read here rather than trusted from
+          // the form, so a stale tab cannot overpay a card someone else just settled.
+          if (!data.farmerId || !data.stockDate) {
+            return res.status(400).json({ message: "Select a pending Freight/Bhada entry to pay against" });
+          }
+          const breakdown = await storage.getBhadaBreakdown(req.user!.businessId);
+          const row = breakdown.find(r => r.farmerId === Number(data.farmerId) && r.date === data.stockDate);
+          if (!row) {
+            return res.status(400).json({ message: `No Freight/Bhada due for this farmer on ${data.stockDate}. Please refresh and try again.` });
+          }
+          const amt = parseFloat(data.amount || "0") || 0;
+          if (amt > row.dueBhada + 0.01) {
+            return res.status(400).json({ message: `Amount (₹${amt.toFixed(2)}) exceeds the Freight/Bhada due (₹${row.dueBhada.toFixed(2)}) for ${row.farmerName} on ${row.date}. Please refresh and try again.` });
+          }
+        }
         if (data.outflowType === "Hammali" && data.category === "outward" && data.splitLog) {
           // Server-side validation: per-date settled amount must not exceed current due
           const breakdown = await storage.getHammaliBreakdown(req.user!.businessId);
@@ -2114,6 +2216,15 @@ export async function registerRoutes(
   app.get("/api/transaction-aggregates", requireAuth, async (req, res) => {
     try {
       const result = await storage.getTransactionAggregates(req.user!.businessId);
+      res.json(result);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
+  app.get("/api/bhada-breakdown", requireAuth, async (req, res) => {
+    try {
+      const result = await storage.getBhadaBreakdown(req.user!.businessId);
       res.json(result);
     } catch (e: any) {
       res.status(400).json({ message: e.message });
