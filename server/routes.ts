@@ -11,7 +11,7 @@ import fs from "fs";
 import { db } from "./db";
 import { transactions, bids, buyers, lots, farmers, cashEntries, transactionEditHistory, lotEditHistory, insertAssetSchema, insertLiabilitySchema, businesses, type Farmer, type Transaction, type CashEntry } from "@shared/schema";
 import { eq, and, inArray, notInArray, sql, isNull, isNotNull } from "drizzle-orm";
-import { addSseClient, removeSseClient, broadcastBusinessEvent } from "./sse";
+import { addSseClient, removeSseClient, broadcastBusinessEvent, startBusinessEventListener, getBusinessRevision, ensureRevisionTable } from "./sse";
 
 const uploadsDir = path.join(process.cwd(), "uploads");
 if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
@@ -287,18 +287,55 @@ export async function registerRoutes(
     res.json({ siteKey: process.env.RECAPTCHA_SITE_KEY || null });
   });
 
+  // Start listening for changes announced by the other server copies as soon as routes are wired.
+  void ensureRevisionTable();
+  startBusinessEventListener();
+
+  /**
+   * Every successful write announces itself, whatever route made it.
+   *
+   * Announcing change route by route means any write added later silently leaves other people's screens
+   * stale, and the omission is invisible until somebody notices figures not matching. Catching every
+   * successful non-GET request instead makes staying in step the default. Bursts are collapsed
+   * downstream, so a save made of a dozen writes still amounts to one announcement.
+   *
+   * Signing in and out are excluded: they change nothing anyone else is looking at.
+   */
+  app.use((req, res, next) => {
+    if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS") return next();
+    if (req.path.startsWith("/api/auth/")) return next();
+    res.on("finish", () => {
+      const businessId = (req as any).user?.businessId;
+      if (businessId && res.statusCode < 400) broadcastBusinessEvent(businessId);
+    });
+    next();
+  });
+
+  /**
+   * How many changes this business has seen. A browser polls this to notice changes it missed while its
+   * live connection was down, which is the case that used to require a hard refresh.
+   */
+  app.get("/api/revision", requireAuth, async (req, res) => {
+    try {
+      res.json({ revision: await getBusinessRevision(req.user!.businessId) });
+    } catch {
+      res.status(500).json({ message: "Failed to read revision" });
+    }
+  });
+
   app.get("/api/events", requireAuth, (req, res) => {
     const businessId = req.user!.businessId;
     res.setHeader("Content-Type", "text/event-stream");
     res.setHeader("Cache-Control", "no-cache");
     res.setHeader("Connection", "keep-alive");
+    res.setHeader("X-Accel-Buffering", "no");
     res.flushHeaders();
 
     addSseClient(businessId, res);
 
     const heartbeat = setInterval(() => {
       try { res.write(":heartbeat\n\n"); } catch { clearInterval(heartbeat); }
-    }, 30_000);
+    }, 15_000);
 
     req.on("close", () => {
       clearInterval(heartbeat);
@@ -377,6 +414,7 @@ export async function registerRoutes(
   app.patch("/api/admin/businesses/:id", requireAdmin, async (req, res) => {
     const updated = await storage.updateBusiness(paramId(req.params.id), req.body);
     if (!updated) return res.status(404).json({ message: "Business not found" });
+    broadcastBusinessEvent(updated.id);
     res.json(updated);
   });
 
@@ -393,6 +431,7 @@ export async function registerRoutes(
 
     const newStatus = biz.status === "active" ? "inactive" : "active";
     const updated = await storage.updateBusiness(biz.id, { status: newStatus });
+    broadcastBusinessEvent(biz.id);
     res.json(updated);
   });
 
@@ -409,6 +448,7 @@ export async function registerRoutes(
 
     const newStatus = biz.status === "archived" ? "active" : "archived";
     const updated = await storage.updateBusiness(biz.id, { status: newStatus });
+    broadcastBusinessEvent(biz.id);
     res.json(updated);
   });
 
@@ -429,6 +469,7 @@ export async function registerRoutes(
     if (!biz) return res.status(404).json({ message: "Business not found" });
 
     await storage.resetBusinessData(biz.id);
+    broadcastBusinessEvent(biz.id);
     res.json({ message: "Business data has been reset successfully" });
   });
 
@@ -452,6 +493,7 @@ export async function registerRoutes(
         accessLevel: req.body.accessLevel || "edit",
       };
       const user = await storage.createUser(data);
+      if (user.businessId) broadcastBusinessEvent(user.businessId);
       const { password, ...safe } = user;
       res.status(201).json(safe);
     } catch (e: any) {
@@ -462,8 +504,12 @@ export async function registerRoutes(
   app.patch("/api/admin/users/:id", requireAdmin, async (req, res) => {
     const { name, phone, businessId, username, accessLevel } = req.body;
     const userId = req.params.id as string;
+    const before = await storage.getUser(userId);
     const updated = await storage.updateUser(userId, { name, phone, businessId, username, accessLevel });
     if (!updated) return res.status(404).json({ message: "User not found" });
+    // A user moved between businesses is news to both of them.
+    if (before?.businessId) broadcastBusinessEvent(before.businessId);
+    if (updated.businessId && updated.businessId !== before?.businessId) broadcastBusinessEvent(updated.businessId);
     const { password, ...safe } = updated;
     res.json(safe);
   });
@@ -474,6 +520,7 @@ export async function registerRoutes(
     if (!user) return res.status(404).json({ message: "User not found" });
     if (user.role === "system_admin") return res.status(400).json({ message: "Cannot delete system admin" });
     await storage.deleteUser(userId);
+    if (user.businessId) broadcastBusinessEvent(user.businessId);
     res.json({ message: "User deleted" });
   });
 
@@ -498,6 +545,7 @@ export async function registerRoutes(
     const { templateType, crop, templateHtml } = req.body;
     if (!templateType || !templateHtml) return res.status(400).json({ message: "templateType and templateHtml required" });
     const tmpl = await storage.upsertReceiptTemplate(businessId, templateType, crop || "", templateHtml);
+    broadcastBusinessEvent(businessId);
     res.json(tmpl);
   });
 
@@ -505,6 +553,7 @@ export async function registerRoutes(
     const businessId = paramId(req.params.businessId);
     const id = paramId(req.params.id);
     await storage.deleteReceiptTemplate(id, businessId);
+    broadcastBusinessEvent(businessId);
     res.json({ message: "Deleted" });
   });
 
@@ -526,6 +575,7 @@ export async function registerRoutes(
         }
         const imagePath = `/uploads/${req.file.filename}`;
         await db.update(businesses).set({ receiptHeaderImage: imagePath }).where(eq(businesses.id, businessId));
+        broadcastBusinessEvent(businessId);
         res.json({ receiptHeaderImage: imagePath });
       } catch (e: any) {
         res.status(500).json({ message: e.message || "Failed to save image" });
@@ -542,6 +592,7 @@ export async function registerRoutes(
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
       }
       await db.update(businesses).set({ receiptHeaderImage: null }).where(eq(businesses.id, businessId));
+      broadcastBusinessEvent(businessId);
       res.json({ message: "Deleted" });
     } catch (e: any) {
       res.status(500).json({ message: e.message || "Failed to delete image" });
@@ -2030,6 +2081,7 @@ export async function registerRoutes(
     try {
       const data = { ...req.body, businessId: req.user!.businessId };
       const account = await storage.createBankAccount(data);
+      broadcastBusinessEvent(req.user!.businessId);
       res.status(201).json(account);
     } catch (e: any) {
       res.status(400).json({ message: e.message });
@@ -2039,6 +2091,7 @@ export async function registerRoutes(
   app.patch("/api/bank-accounts/:id", requireAuth, async (req, res) => {
     try {
       const result = await storage.updateBankAccount(paramId(req.params.id), req.user!.businessId, req.body);
+      broadcastBusinessEvent(req.user!.businessId);
       res.json(result);
     } catch (e: any) {
       res.status(400).json({ message: e.message });
@@ -2048,6 +2101,7 @@ export async function registerRoutes(
   app.delete("/api/bank-accounts/:id", requireAuth, async (req, res) => {
     try {
       await storage.deleteBankAccount(paramId(req.params.id), req.user!.businessId);
+      broadcastBusinessEvent(req.user!.businessId);
       res.json({ success: true });
     } catch (e: any) {
       res.status(400).json({ message: e.message });
@@ -2084,6 +2138,7 @@ export async function registerRoutes(
         tulaiFarmerPerBag: req.body.tulaiFarmerPerBag,
         khadiKaraiFarmerPerBag: req.body.khadiKaraiFarmerPerBag,
       });
+      broadcastBusinessEvent(req.user!.businessId);
       res.json(result);
     } catch (e: any) {
       res.status(400).json({ message: e.message });
@@ -2103,6 +2158,7 @@ export async function registerRoutes(
   app.post("/api/cash-settings", requireAuth, async (req, res) => {
     try {
       const result = await storage.upsertCashSettings(req.user!.businessId, req.body.cashInHandOpening || "0");
+      broadcastBusinessEvent(req.user!.businessId);
       res.json(result);
     } catch (e: any) {
       res.status(400).json({ message: e.message });
@@ -3106,6 +3162,7 @@ export async function registerRoutes(
       const buyer = await storage.getBuyer(buyerId, req.user!.businessId);
       if (!buyer) return res.status(403).json({ message: "Buyer not found" });
       const { serialNumber, billBookNumber } = await storage.getOrCreateBuyerReceiptSerial(req.user!.businessId, buyerId, date, crop);
+      broadcastBusinessEvent(req.user!.businessId);
       res.json({ serialNumber, billBookNumber });
     } catch (e: any) { res.status(400).json({ message: e.message }); }
   });
@@ -3124,6 +3181,7 @@ export async function registerRoutes(
       const isDuplicate = await storage.checkDuplicateBuyerReceiptSerial(req.user!.businessId, buyerId, date, crop, billBookNumber, serialNumber);
       if (isDuplicate) return res.status(409).json({ message: `BB#${billBookNumber} / SR#${serialNumber} is already assigned to another buyer receipt in this fiscal year` });
       await storage.updateBuyerReceiptSerial(req.user!.businessId, buyerId, date, crop, billBookNumber, serialNumber);
+      broadcastBusinessEvent(req.user!.businessId);
       res.json({ success: true });
     } catch (e: any) { res.status(400).json({ message: e.message }); }
   });

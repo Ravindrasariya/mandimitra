@@ -3757,15 +3757,31 @@ export default function StockPage() {
   // the card keeps rendering freshly recalculated numbers that were never persisted for these bids.
   const [partialSaveFailures, setPartialSaveFailures] = useState<{ label: string; reason: string }[]>([]);
   const savingRef = useRef<string | null>(null);
+  const savedCardMapRef = useRef<Map<string, FarmerCard>>(new Map());
   const dbLoaded = useRef(false);
   const { user } = useAuth();
   const { toast } = useToast();
   const currentUsername = user?.name || user?.username || "Unknown";
   const businessId = user?.businessId || 0;
 
-  const { data: stockCardsData, isLoading: loadingCards } = useQuery<any[]>({
+  // The answer is stamped with the business it was fetched for, and anything not stamped with the
+  // business now signed in is ignored. A reply that was already in flight when the user switched
+  // business would otherwise land afterwards and be taken for the new business's cards — which is
+  // both wrong on screen and, through the draft autosave, wrong on disk.
+  const { data: stockCardsPayload, isLoading: loadingCards } = useQuery<{ businessId: number; rows: any[] }>({
     queryKey: ["/api/stock-cards"],
+    queryFn: async ({ signal }) => {
+      const fetchedFor = businessId;
+      const res = await fetch("/api/stock-cards", { credentials: "include", signal });
+      if (!res.ok) throw new Error(await res.text() || res.statusText);
+      return { businessId: fetchedFor, rows: await res.json() };
+    },
   });
+  const stockCardsData = stockCardsPayload?.businessId === businessId ? stockCardsPayload.rows : undefined;
+
+  // Mirror of the saved snapshots for the reconciliation effect below, which must read them without
+  // nesting one state update inside another.
+  savedCardMapRef.current = savedCardMap;
 
   const { data: chargeSettings } = useQuery<ChargeSettings>({
     queryKey: ["/api/charge-settings"],
@@ -3921,6 +3937,25 @@ export default function StockPage() {
     return [...unsaved, ...saved];
   }, [cards, savedCardMap, dateMode, yearFilter, selectedMonths, selectedDays, farmerFilter, farmerFilterId, buyerFilter, cropFilter, pageBuyersList]);
 
+  // Switching business must wipe the slate. The page stays mounted across a switch, so without this the
+  // previous business's cards would linger on screen, get reconciled against the new business's data,
+  // and — worst of all — be written back into the new business's draft storage.
+  const loadedBusinessId = useRef<number | null>(null);
+  useEffect(() => {
+    if (loadedBusinessId.current === null || loadedBusinessId.current === businessId) {
+      loadedBusinessId.current = businessId || null;
+      return;
+    }
+    loadedBusinessId.current = businessId || null;
+    dbLoaded.current = false;
+    savingRef.current = null;
+    savedCardMapRef.current = new Map();
+    setSavedCardMap(new Map());
+    setCards([]);
+    // Drop the other business's answer outright so nothing can read it while the new one is in flight.
+    queryClient.removeQueries({ queryKey: ["/api/stock-cards"] });
+  }, [businessId]);
+
   useEffect(() => {
     if (!stockCardsData || !businessId || dbLoaded.current) return;
     dbLoaded.current = true;
@@ -3974,34 +4009,117 @@ export default function StockPage() {
     }
   }, [stockCardsData, businessId]);
 
-  // The load above deliberately runs only once, so a card being edited is never clobbered
-  // mid-typing. Payment status is the exception: it is server-owned, the user cannot edit it here,
-  // and it changes underneath an open card whenever a payment is recorded — the Farmer Pay
-  // shortcut sits on this very page. Copy just those fields across on every refetch so the Due
-  // badges settle without a hard refresh, and mirror them into the saved snapshot so the card is
-  // not mistaken for having unsaved edits.
+  // The load above deliberately runs only once, so a card being edited is never clobbered mid-typing.
+  //
+  // Everything else on this page, though, belongs to the server, and two people work in the same
+  // business at the same time: cards get created, edited, paid, reversed and archived by somebody
+  // else, and none of that used to appear here until a hard refresh. So every refetch is reconciled
+  // card by card, and the one rule that must never break is that a card the user has touched — or is
+  // in the middle of saving — is left exactly as they left it. Payment status is copied even onto
+  // those, because it is server-owned, cannot be edited here, and drives the Due badges.
   useEffect(() => {
     if (!stockCardsData || !dbLoaded.current) return;
-    const fresh = collectBidPayments(stockCardsToFarmerCards(stockCardsData));
-    if (fresh.size === 0) return;
 
-    setCards(prev => {
-      const next = prev.map(c => syncBidPayments(c, fresh));
-      return next.some((c, i) => c !== prev[i]) ? next : prev;
+    const loaded = stockCardsToFarmerCards(stockCardsData);
+    const loadedById = new Map(loaded.map(c => [c.id, c]));
+    const fresh = collectBidPayments(loaded);
+
+    // Edit history arrives from a separate fetch and is not part of the card payload, so carry it
+    // across rather than letting a refresh wipe the history already on screen.
+    const withHistoryOf = (fromCard: FarmerCard | undefined, target: FarmerCard): FarmerCard => {
+      if (!fromCard) return target;
+      const historyByGroup = new Map(fromCard.cropGroups.map(g => [g.id, g.editHistory]));
+      return {
+        ...target,
+        cropGroups: target.cropGroups.map(g => {
+          const prevHistory = historyByGroup.get(g.id);
+          return prevHistory && prevHistory.length > 0 && g.editHistory.length === 0
+            ? { ...g, editHistory: prevHistory }
+            : g;
+        }),
+      };
+    };
+
+    // Whether a card is open, and which sections are expanded, is this user's own view of it and must
+    // survive somebody else's edit landing.
+    const withViewStateOf = (local: FarmerCard, target: FarmerCard): FarmerCard => ({
+      ...target,
+      cardOpen: local.cardOpen,
+      farmerOpen: local.farmerOpen,
+      vehicleOpen: local.vehicleOpen,
+      cropGroups: target.cropGroups.map(g => {
+        const localGroup = local.cropGroups.find(lg => lg.id === g.id);
+        return localGroup ? { ...g, groupOpen: localGroup.groupOpen } : g;
+      }),
     });
-    setSavedCardMap(prev => {
+
+    const prevSaved = savedCardMapRef.current;
+
+    setCards(prevCards => {
+      const next: FarmerCard[] = [];
       let changed = false;
-      const next = new Map(prev);
-      for (const [id, card] of Array.from(prev.entries())) {
-        const synced = syncBidPayments(card, fresh);
-        if (synced !== card) { next.set(id, synced); changed = true; }
+
+      for (const local of prevCards) {
+        const saved = prevSaved.get(local.id);
+        const server = loadedById.get(local.id);
+
+        // An unsaved card of this user's own making — never on the server yet. Leave it be.
+        if (!saved) { next.push(local); continue; }
+
+        // Vanished from the server: somebody else deleted or archived it. Drop it unless this user
+        // has unsaved edits in it, which would otherwise be silently thrown away.
+        if (!server) {
+          if (getDataFingerprint(local) !== getDataFingerprint(saved)) { next.push(local); continue; }
+          changed = true;
+          continue;
+        }
+
+        const dirty = getDataFingerprint(local) !== getDataFingerprint(saved);
+        const busy = savingRef.current === local.id;
+        if (dirty || busy) {
+          const synced = syncBidPayments(local, fresh);
+          if (synced !== local) changed = true;
+          next.push(synced);
+          continue;
+        }
+
+        const replacement = withViewStateOf(local, withHistoryOf(local, server));
+        if (getDataFingerprint(replacement) !== getDataFingerprint(local)) changed = true;
+        next.push(replacement);
       }
-      return changed ? next : prev;
+
+      // Cards created by somebody else since this page loaded.
+      const known = new Set(prevCards.map(c => c.id));
+      const added = loaded.filter(c => !known.has(c.id));
+      if (added.length > 0) changed = true;
+
+      if (!changed) return prevCards;
+      const merged = [...next, ...added];
+      return merged.length > 0 ? sortCardsByMaxSr(merged) : [emptyCard()];
     });
+
+    // The saved snapshot always tracks the server, except for a card mid-save, whose snapshot is
+    // about to be rewritten by the save itself.
+    let savedChanged = false;
+    const nextSaved = new Map(prevSaved);
+    for (const server of loaded) {
+      if (savingRef.current === server.id) continue;
+      const prev = prevSaved.get(server.id);
+      const withHistory = withHistoryOf(prev, server);
+      if (!prev || getDataFingerprint(prev) !== getDataFingerprint(withHistory)) {
+        nextSaved.set(server.id, JSON.parse(JSON.stringify(withHistory)));
+        savedChanged = true;
+      }
+    }
+    for (const id of Array.from(prevSaved.keys())) {
+      if (!loadedById.has(id) && savingRef.current !== id) { nextSaved.delete(id); savedChanged = true; }
+    }
+    if (savedChanged) setSavedCardMap(nextSaved);
   }, [stockCardsData]);
 
   useEffect(() => {
     if (!dbLoaded.current || !businessId) return;
+    if (!dbLoaded.current) return;
     saveDraftsToStorage(cards, savedCardMap, businessId);
   }, [cards, savedCardMap, businessId]);
 

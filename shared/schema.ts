@@ -313,6 +313,20 @@ export const bankAccounts = pgTable("bank_accounts", {
   businessIdx: index("bank_accounts_business_idx").on(table.businessId),
 }));
 
+/**
+ * One counter per business, bumped every time anything in that business changes.
+ *
+ * Two screens open at once can only stay in step if a browser can ask "has anything changed since I
+ * last looked?" cheaply. The live push handles the normal case; this counter is what lets a browser
+ * catch up after its live connection was dropped or blocked, and it works no matter which server
+ * copy answers the request.
+ */
+export const businessRevisions = pgTable("business_revisions", {
+  businessId: integer("business_id").primaryKey().references(() => businesses.id),
+  revision: bigint("revision", { mode: "number" }).notNull().default(0),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const cashSettings = pgTable("cash_settings", {
   id: serial("id").primaryKey(),
   businessId: integer("business_id").notNull().references(() => businesses.id).unique(),

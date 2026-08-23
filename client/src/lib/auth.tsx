@@ -1,6 +1,7 @@
-import { createContext, useContext, useEffect, useRef, type ReactNode } from "react";
+import { createContext, useContext, useEffect, type ReactNode } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient, getQueryFn } from "./queryClient";
+import { startLiveUpdates } from "./live-updates";
 
 const AUTH_CHANNEL_NAME = "mandi-mitra-auth";
 type AuthChannelMessage = { type: "business-switched"; businessId: number };
@@ -63,31 +64,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => channel.close();
   }, []);
 
-  const sseRef = useRef<EventSource | null>(null);
-
+  // Live updates run only while someone is signed in, and are rebuilt when the signed-in business
+  // changes so a stream can never feed one business's changes into another's screen.
   useEffect(() => {
-    if (!user) {
-      if (sseRef.current) {
-        sseRef.current.close();
-        sseRef.current = null;
-      }
-      return;
-    }
-
-    const es = new EventSource("/api/events", { withCredentials: true });
-    sseRef.current = es;
-
-    es.onmessage = () => {
-      queryClient.invalidateQueries();
-    };
-
-    es.onerror = () => {
-    };
-
-    return () => {
-      es.close();
-      sseRef.current = null;
-    };
+    if (!user) return;
+    return startLiveUpdates();
   }, [user?.id, user?.businessId]);
 
   const loginMutation = useMutation({

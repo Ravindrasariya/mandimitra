@@ -11,3 +11,5 @@
 - [Previewing generated receipts](receipt-html-preview.md) — the screenshot browser can't log in; render the generator's HTML into the public dir and shoot that instead.
 - [Receipt template plumbing](receipt-template-plumbing.md) — public-folder template files are reference copies; what prints is a stored DB template or a hardcoded generator, so file edits are silent no-ops until re-uploaded.
 - [Query-param variants break invalidation](query-param-variant-invalidation.md) — giving an endpoint a second cache key makes every exact-key invalidation silently miss it.
+- [Live updates across server copies](live-update-fanout.md) — an in-memory push reaches one server copy; fan out through the database and back it with a pollable counter.
+- [Business switching and page-local state](business-switch-stale-data.md) — a mounted page must prove which business a response came from; refetching on switch is not enough.
