@@ -978,7 +978,6 @@ export async function registerRoutes(
         driverName: string | null;
         driverContact: string | null;
         vehicleBhadaRate: string | null;
-        freightType: string | null;
         totalBagsInVehicle: number | null;
         farmerAdvanceAmount: string | null;
         farmerAdvanceMode: string | null;
@@ -999,7 +998,6 @@ export async function registerRoutes(
             driverName: lot.driverName,
             driverContact: lot.driverContact,
             vehicleBhadaRate: lot.vehicleBhadaRate,
-            freightType: lot.freightType,
             totalBagsInVehicle: lot.totalBagsInVehicle,
             farmerAdvanceAmount: lot.farmerAdvanceAmount,
             farmerAdvanceMode: lot.farmerAdvanceMode,
@@ -1131,7 +1129,6 @@ export async function registerRoutes(
           driverName: card.driverName,
           driverContact: card.driverContact,
           vehicleBhadaRate: card.vehicleBhadaRate,
-          freightType: card.freightType,
           totalBagsInVehicle: card.totalBagsInVehicle,
           farmerAdvanceAmount: card.farmerAdvanceAmount,
           farmerAdvanceMode: card.farmerAdvanceMode,
@@ -1210,7 +1207,6 @@ export async function registerRoutes(
         vehicleBhadaRate: req.body.vehicleBhadaRate || null,
         driverName: req.body.driverName || null,
         driverContact: req.body.driverContact || null,
-        freightType: req.body.freightType || null,
         totalBagsInVehicle: req.body.totalBagsInVehicle ? parseInt(req.body.totalBagsInVehicle) : null,
       };
 
@@ -1249,7 +1245,7 @@ export async function registerRoutes(
   app.post("/api/lots/batch", requireAuth, async (req, res) => {
     try {
       const businessId = req.user!.businessId;
-      const { farmerId, date, vehicleNumber, driverName, driverContact, vehicleBhadaRate, freightType, totalBagsInVehicle, farmerAdvanceAmount, farmerAdvanceMode, isAddingToExistingCard, billBookNumber, lots: lotItems } = req.body;
+      const { farmerId, date, vehicleNumber, driverName, driverContact, vehicleBhadaRate, totalBagsInVehicle, farmerAdvanceAmount, farmerAdvanceMode, isAddingToExistingCard, billBookNumber, lots: lotItems } = req.body;
       const dateStr = date || format(new Date(), "yyyy-MM-dd");
 
       if (!lotItems || !Array.isArray(lotItems) || lotItems.length === 0) {
@@ -1354,7 +1350,6 @@ export async function registerRoutes(
           vehicleBhadaRate: vehicleBhadaRate || null,
           driverName: driverName || null,
           driverContact: driverContact || null,
-          freightType: freightType || null,
           totalBagsInVehicle: totalBagsInVehicle ? parseInt(totalBagsInVehicle) : null,
           farmerAdvanceAmount: farmerAdvanceAmount || null,
           farmerAdvanceMode: farmerAdvanceMode || null,

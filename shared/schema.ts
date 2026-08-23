@@ -178,7 +178,6 @@ export const lots = pgTable("lots", {
   vehicleBhadaRate: decimal("vehicle_bhada_rate", { precision: 10, scale: 2 }),
   driverName: text("driver_name"),
   driverContact: text("driver_contact"),
-  freightType: text("freight_type"),
   totalBagsInVehicle: integer("total_bags_in_vehicle"),
   farmerAdvanceAmount: decimal("farmer_advance_amount", { precision: 10, scale: 2 }).default("0"),
   farmerAdvanceMode: text("farmer_advance_mode"),

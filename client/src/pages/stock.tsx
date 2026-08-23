@@ -18,7 +18,7 @@ import {
 import {
   Plus, Trash2, ChevronDown, ChevronRight, Truck, User,
   AlertTriangle, AlertCircle, Scale, Wheat, ChevronsUpDown, X, Calculator,
-  Archive, History, Save, Check, Printer, Share2, Loader2, Banknote,
+  Archive, History, Save, Check, Printer, Share2, Loader2, Banknote, IndianRupee,
   Layers, Landmark, ShoppingBag, Calendar, Search, Filter, RotateCcw, Download, ClipboardList, FileText, Hammer, Lock,
 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -38,6 +38,7 @@ import {
 } from "@/lib/receiptGenerators";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { FarmerPayDialog, sumBillDue, FARMER_PAY_MIN_DUE } from "@/components/farmer-pay-dialog";
+import { BhadaPayDialog, useBhadaCard, BHADA_PAY_MIN_DUE } from "@/components/bhada-pay-dialog";
 import { collectBidPayments, syncBidPayments } from "@/lib/stock-payment-sync";
 import { useLanguage } from "@/lib/language";
 import { translateApiError } from "@/lib/guardErrors";
@@ -217,7 +218,6 @@ export type FarmerCard = {
   driverContact: string;
   vehicleBhadaRate: string;
   totalBagsInVehicle: string;
-  freightType: string;
   advanceAmount: string;
   advanceMode: string;
   cropGroups: CropGroup[];
@@ -542,7 +542,6 @@ const emptyCard = (): FarmerCard => ({
   driverContact: "",
   vehicleBhadaRate: "",
   totalBagsInVehicle: "",
-  freightType: "Advance",
   advanceAmount: "",
   advanceMode: "",
   cropGroups: [],
@@ -729,33 +728,6 @@ function calcLotTotals(lot: LotRow, cs: ChargeSettings, vehicleBhadaRate: number
 
 // ─── Bhada (freight) status ──────────────────────────────────────────────────
 
-export type BhadaCardRow = {
-  farmerId: number;
-  farmerName: string;
-  date: string;
-  totalBhada: number;
-  paidBhada: number;
-  dueBhada: number;
-};
-
-/**
- * Every farmer card's freight position, settled ones included.
- *
- * Keyed by farmer + stock date, exactly as the Cash page's Freight/Bhada picker is, so the badge here and
- * the amount owing there are the same number from the same place and cannot drift apart. React Query
- * shares one fetch across every card on screen, and because this reads the query rather than the stock
- * card's own loaded copy, it stays right when a payment is recorded on another screen.
- */
-const BHADA_STATUS_KEY = "/api/bhada-breakdown?includePaid=1";
-
-function useBhadaCard(farmerId: number | undefined, date: string | undefined) {
-  const { data } = useQuery<BhadaCardRow[]>({ queryKey: [BHADA_STATUS_KEY] });
-  return useMemo(() => {
-    if (!farmerId || !date || !data) return undefined;
-    return data.find(r => r.farmerId === farmerId && r.date === date);
-  }, [data, farmerId, date]);
-}
-
 /**
  * Paid / part-paid / unpaid for one farmer card's freight.
  *
@@ -802,6 +774,45 @@ function BhadaStatusBadge({ farmerId, date }: { farmerId?: number; date?: string
       {state.icon}
       {t("stock.bhadaLabel")} — {state.label}
     </Badge>
+  );
+}
+
+/**
+ * Settle a card's freight from the Stock register instead of walking over to the Cash page.
+ *
+ * Stays out of the way when there is nothing to pay — a card with no freight, or one already settled —
+ * so the button never invites a payment that would be rejected anyway.
+ */
+function BhadaPayButton({ farmerId, farmerName, date }: { farmerId?: number; farmerName?: string; date?: string }) {
+  const { t } = useLanguage();
+  const [open, setOpen] = useState(false);
+  const card = useBhadaCard(farmerId, date);
+
+  if (!card || !farmerId || !date || card.dueBhada < BHADA_PAY_MIN_DUE) return null;
+
+  return (
+    <>
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        className="h-8 text-xs w-full gap-1"
+        onClick={() => setOpen(true)}
+        data-testid="button-bhada-pay"
+      >
+        <IndianRupee className="w-3 h-3 shrink-0" />
+        {t("stock.bhadaPay")}
+      </Button>
+      {open && (
+        <BhadaPayDialog
+          open={open}
+          onOpenChange={setOpen}
+          farmerId={farmerId}
+          farmerName={farmerName || card.farmerName}
+          stockDate={date}
+        />
+      )}
+    </>
   );
 }
 
@@ -2807,7 +2818,6 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
               card.vehicleNumber && `# ${card.vehicleNumber}`,
               card.driverName && card.driverName,
               card.vehicleBhadaRate && `₹${card.vehicleBhadaRate}`,
-              card.freightType && card.freightType,
               card.totalBagsInVehicle && `${card.totalBagsInVehicle} ${t("common.bags")}`,
             ].filter(Boolean) as string[]} />
           {card.vehicleOpen && (
@@ -2835,18 +2845,6 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
                   className={`h-8 text-sm ${vehicleFieldsLocked ? "cursor-not-allowed bg-muted/60" : ""}`} />
               </div>
               <div>
-                <Label className="text-[10px] sm:text-xs text-muted-foreground">{t("stock.advanceCredit")} <span className="text-destructive">*</span></Label>
-                <Select value={card.freightType} onValueChange={v => set("freightType", v)}>
-                  <SelectTrigger data-testid="select-freight-type" className="h-8 text-sm">
-                    <SelectValue placeholder={t("stock.selectType")} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Advance">{t("stock.advance")}</SelectItem>
-                    <SelectItem value="Credit">{t("stock.credit")}</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
                 <Label className="text-[10px] sm:text-xs text-muted-foreground">{t("stock.totalBagsInVehicle")} <span className="text-destructive">*</span></Label>
                 <Input data-testid="input-total-bags-vehicle" type="text" inputMode="numeric" placeholder="0" value={card.totalBagsInVehicle}
                   readOnly={vehicleFieldsLocked}
@@ -2864,6 +2862,9 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
                     </span>
                   );
                 })()}
+              </div>
+              <div className="flex items-end">
+                <BhadaPayButton farmerId={card.farmerId} farmerName={card.farmerName} date={card.date} />
               </div>
             </div>
           )}
@@ -3040,7 +3041,6 @@ function stockCardsToFarmerCards(apiCards: any[]): FarmerCard[] {
       driverContact: c.driverContact || "",
       vehicleBhadaRate: c.vehicleBhadaRate || "",
       totalBagsInVehicle: c.totalBagsInVehicle?.toString() || "",
-      freightType: c.freightType || "",
       advanceAmount: c.farmerAdvanceAmount || "",
       advanceMode: c.farmerAdvanceMode || "",
       cropGroups: (c.cropGroups || []).map((cg: any) => ({
@@ -4160,7 +4160,7 @@ export default function StockPage() {
             crop: string; variety: string | null; numberOfBags: number;
             size: string | null; bagMarka: string | null; vehicleNumber: string | null;
             vehicleBhadaRate: string | null; driverName: string | null; driverContact: string | null;
-            freightType: string | null; totalBagsInVehicle: number | null;
+            totalBagsInVehicle: number | null;
             farmerAdvanceAmount: string | null; farmerAdvanceMode: string | null;
             isArchived: boolean; farmerId?: number;
           } = {
@@ -4173,7 +4173,6 @@ export default function StockPage() {
             vehicleBhadaRate: card.vehicleBhadaRate || null,
             driverName: card.driverName || null,
             driverContact: card.driverContact || null,
-            freightType: card.freightType || null,
             totalBagsInVehicle: card.totalBagsInVehicle ? parseInt(card.totalBagsInVehicle) : null,
             farmerAdvanceAmount: card.advanceAmount || null,
             farmerAdvanceMode: card.advanceMode || null,
@@ -4287,7 +4286,6 @@ export default function StockPage() {
           driverName: card.driverName || null,
           driverContact: card.driverContact || null,
           vehicleBhadaRate: card.vehicleBhadaRate || null,
-          freightType: card.freightType || null,
           totalBagsInVehicle: card.totalBagsInVehicle ? parseInt(card.totalBagsInVehicle) : null,
           farmerAdvanceAmount: card.advanceAmount || null,
           farmerAdvanceMode: card.advanceMode || null,
@@ -5016,7 +5014,7 @@ export default function StockPage() {
     const headers = [
       "BB#", "SR#", "Lot ID", "Date", "Crop", "Variety", "Size", "Bag Marka",
       "Farmer Name", "Phone", "Village", "Tehsil", "District",
-      "Vehicle #", "Driver Name", "Driver Contact", "Advance/Credit", "Total # of Bags",
+      "Vehicle #", "Driver Name", "Driver Contact", "Total # of Bags",
       "# Bags", "Proportionate Freight (₹)",
       "Farmer Advance (₹)", "Advance Mode",
     ];
@@ -5034,7 +5032,7 @@ export default function StockPage() {
           rows.push([
             g.bbNumber, g.srNumber, lot.lotId || lot.dbId?.toString() || "", card.date, g.crop, lot.variety || "", lot.size || "None", lot.bagMarka || "",
             card.farmerName, card.farmerPhone, card.village, card.tehsil, card.district,
-            card.vehicleNumber, card.driverName, card.driverContact, card.freightType || "", card.totalBagsInVehicle || "",
+            card.vehicleNumber, card.driverName, card.driverContact, card.totalBagsInVehicle || "",
             lot.numberOfBags, freight,
             card.advanceAmount || "", card.advanceMode || "",
           ].map(escCSV).join(","));
@@ -5057,7 +5055,7 @@ export default function StockPage() {
       "Transaction ID", "Date", "Lot ID", "BB#", "SR#", "Crop", "Variety",
       "Farmer Name", "Phone", "Village",
       "Buyer Name", "Haste",
-      "Vehicle #", "Driver Name", "Driver Contact", "Advance/Credit",
+      "Vehicle #", "Driver Name", "Driver Contact",
       "# Bags", "Price/kg (₹)", "Net Weight (kg)",
       "Hammali/bag Farmer (₹)", "Hammali/bag Buyer (₹)",
       "Extra Charges (Farmer)", "Extra Charges (Buyer)",
@@ -5090,7 +5088,7 @@ export default function StockPage() {
               bid.txnDbId, bid.txnDate, lot.lotId || lot.dbId?.toString() || "", g.bbNumber, g.srNumber, g.crop, lot.variety || "",
               card.farmerName, card.farmerPhone, card.village,
               bid.buyerName, bid.haste,
-              card.vehicleNumber, card.driverName, card.driverContact, card.freightType || "",
+              card.vehicleNumber, card.driverName, card.driverContact,
               bid.numberOfBags, bid.pricePerKg, bid.txn.netWeightInput || "0",
               ecs.hammaliFarmerPerBag || "0", ecs.hammaliBuyerPerBag || "0",
               bid.txn.extraChargesFarmer || "0", bid.txn.extraChargesBuyer || "0",
