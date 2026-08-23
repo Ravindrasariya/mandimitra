@@ -796,7 +796,7 @@ function BhadaPayButton({ farmerId, farmerName, date }: { farmerId?: number; far
         type="button"
         size="sm"
         variant="outline"
-        className="h-8 text-xs w-full gap-1"
+        className="h-8 w-full gap-1 px-1.5 text-[10px] sm:text-xs whitespace-nowrap bg-primary/10 hover:bg-primary/20 border-primary/30 text-primary font-medium"
         onClick={() => setOpen(true)}
         data-testid="button-bhada-pay"
       >
@@ -2863,7 +2863,8 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
                   );
                 })()}
               </div>
-              <div className="flex items-end">
+              <div>
+                <Label className="text-[10px] sm:text-xs text-muted-foreground invisible" aria-hidden="true">&nbsp;</Label>
                 <BhadaPayButton farmerId={card.farmerId} farmerName={card.farmerName} date={card.date} />
               </div>
             </div>
