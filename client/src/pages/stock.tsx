@@ -38,9 +38,12 @@ import {
 } from "@/lib/receiptGenerators";
 import { usePersistedState } from "@/hooks/use-persisted-state";
 import { FarmerPayDialog, sumBillDue, FARMER_PAY_MIN_DUE } from "@/components/farmer-pay-dialog";
-import { BhadaPayDialog, useBhadaCard, BHADA_PAY_MIN_DUE } from "@/components/bhada-pay-dialog";
+import { BhadaPayDialog, useBhadaCard, BHADA_PAY_MIN_DUE, BHADA_STATUS_KEY, type BhadaCardRow } from "@/components/bhada-pay-dialog";
 import { collectBidPayments, syncBidPayments } from "@/lib/stock-payment-sync";
 import { getDataFingerprint, hasUnsavedEdits, applyArchiveState } from "@/lib/stock-dirty";
+import { scopeDue, addTo } from "@/lib/charge-dues";
+import { invalidateChargeBreakdowns } from "@/lib/cashQueries";
+
 import { useLanguage } from "@/lib/language";
 import { translateApiError } from "@/lib/guardErrors";
 import type { Lot, Farmer, Transaction, Bid, Buyer, ReceiptTemplate } from "@shared/schema";
@@ -1995,7 +1998,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, onBBChange, is
               }
               if (dbLots.length > 0) {
                 queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
-              queryClient.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/bhada-breakdown") });
+              invalidateChargeBreakdowns();
                 queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
                 queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
                 queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
@@ -2488,7 +2491,7 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
         }
         if (dbLots.length > 0) {
           queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
-              queryClient.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/bhada-breakdown") });
+              invalidateChargeBreakdowns();
           queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
           queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
           queryClient.invalidateQueries({ queryKey: ["/api/dashboard"] });
@@ -2997,7 +3000,7 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
             try {
               await apiRequest("POST", "/api/lots/bulk-archive", { lotIds, isArchived: false });
               queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
-              queryClient.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/bhada-breakdown") });
+              invalidateChargeBreakdowns();
               queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
               queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
               queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
@@ -3591,6 +3594,20 @@ function StockFilterBar({
   );
 }
 
+type HammaliBreakdownRow = { date: string; totalHammali: number; paidHammali: number; dueHammali: number };
+type ExtrasBreakdownRow = { date: string; totalExtras: number; paidExtras: number; dueExtras: number };
+
+/** A due line, marked as an approximate share when a buyer or crop filter has narrowed the total. */
+function DueLine({ label, amount, approximate, testId }: { label: string; amount: number; approximate: boolean; testId: string }) {
+  const { t } = useLanguage();
+  return (
+    <div className="text-xs text-red-500 dark:text-red-400 font-medium" data-testid={testId}>
+      {label}: ₹{Math.round(amount).toLocaleString("en-IN")}
+      {approximate && <span className="ml-1 text-[10px] text-muted-foreground font-normal">({t("stock.approxShare")})</span>}
+    </div>
+  );
+}
+
 function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
   cards: FarmerCard[];
   savedCardMap: Map<string, FarmerCard>;
@@ -3598,12 +3615,20 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
   buyersList: { id: number; name: string; phone?: string; aadhatCommissionPercent?: string | null; overallDue?: string; limitAmount?: number | null }[];
 }) {
   const { t } = useLanguage();
+  const { data: bhadaRows = [] } = useQuery<BhadaCardRow[]>({ queryKey: [BHADA_STATUS_KEY] });
+  const { data: hammaliRows = [] } = useQuery<HammaliBreakdownRow[]>({ queryKey: ["/api/hammali-breakdown"] });
+  const { data: extrasRows = [] } = useQuery<ExtrasBreakdownRow[]>({ queryKey: ["/api/extras-breakdown"] });
   let distinctFarmers = 0, totalLots = 0, totalTxns = 0;
   let farmerPayableTotal = 0, farmerDue = 0;
   let buyerReceivableTotal = 0, buyerDue = 0;
   let aadhatTotal = 0;
   let hammaliTotal = 0, extrasTotal = 0;
   let vehicleBhadaTotal = 0;
+  // Hammali and extras are settled per stock date; freight per farmer card (farmer + stock date). Keep
+  // the visible charge under each of those keys so it can be measured against what has been paid out.
+  const shownHammali = new Map<string, number>();
+  const shownExtras = new Map<string, number>();
+  const shownBhada = new Map<string, number>();
 
   for (const card of cards) {
     if (card.archived || !savedCardMap.has(card.id)) continue;
@@ -3629,15 +3654,26 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
           const bt = calcBidTotals(bid, cs, vbr, tbi, buyerAadhat);
           const ecs = bid.savedCharges || cs;
           const bidBags = parseInt(bid.numberOfBags) || 0;
-          hammaliTotal += Math.round((parseFloat(ecs.hammaliFarmerPerBag) || 0) * bidBags)
+          const bidHammali = Math.round((parseFloat(ecs.hammaliFarmerPerBag) || 0) * bidBags)
             + Math.round((parseFloat(ecs.hammaliBuyerPerBag) || 0) * bidBags);
-          extrasTotal += (parseFloat(bid.txn?.extraChargesFarmer || "0"))
+          const bidExtras = (parseFloat(bid.txn?.extraChargesFarmer || "0"))
             + (parseFloat(bid.txn?.extraChargesBuyer || "0"));
+          hammaliTotal += bidHammali;
+          extrasTotal += bidExtras;
+          const txnDate = bid.txnDate || card.date;
+          if (txnDate) {
+            addTo(shownHammali, txnDate, bidHammali);
+            addTo(shownExtras, txnDate, bidExtras);
+          }
           // Bhada is entered once per vehicle and split across its transactions by bag share. Sum the
           // UNROUNDED share and round once at the end, so a fully sold vehicle totals exactly the rate
           // entered -- the rounded per-transaction figures shown on each row can fall a rupee or two short
           // of it. Summing shares (never the rate itself) is also what keeps filtered views correct.
-          if (tbi > 0) vehicleBhadaTotal += (vbr * bidBags) / tbi;
+          if (tbi > 0) {
+            const bidBhada = (vbr * bidBags) / tbi;
+            vehicleBhadaTotal += bidBhada;
+            if (card.farmerId && card.date) addTo(shownBhada, `${card.farmerId}|${card.date}`, bidBhada);
+          }
           if (bid.farmerPaymentStatus !== "paid") {
             const farmerPaid = parseFloat(bid.farmerPaidAmount || "0");
             cardFarmerDue += Math.max(0, bt.farmerPayable - farmerPaid);
@@ -3651,6 +3687,22 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
     }
     farmerDue += cardFarmerDue;
   }
+
+  // The paid side comes from the Cash tab, so the totals it is measured against must come from the same
+  // place — otherwise a rounding difference here could show a due where nothing is owed.
+  const fullBhada = new Map<string, number>(), paidBhada = new Map<string, number>();
+  for (const r of bhadaRows) {
+    fullBhada.set(`${r.farmerId}|${r.date}`, r.totalBhada);
+    paidBhada.set(`${r.farmerId}|${r.date}`, r.paidBhada);
+  }
+  const fullHammali = new Map<string, number>(), paidHammali = new Map<string, number>();
+  for (const r of hammaliRows) { fullHammali.set(r.date, r.totalHammali); paidHammali.set(r.date, r.paidHammali); }
+  const fullExtras = new Map<string, number>(), paidExtras = new Map<string, number>();
+  for (const r of extrasRows) { fullExtras.set(r.date, r.totalExtras); paidExtras.set(r.date, r.paidExtras); }
+
+  const bhadaDue = scopeDue(fullBhada, shownBhada, paidBhada);
+  const hammaliDue = scopeDue(fullHammali, shownHammali, paidHammali);
+  const extrasDue = scopeDue(fullExtras, shownExtras, paidExtras);
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 mb-2" data-testid="stock-summary-bar">
@@ -3706,6 +3758,11 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
             ₹{Math.round(extrasTotal).toLocaleString("en-IN")}
           </span>
         </div>
+        <div className="flex items-center gap-2">
+          <DueLine label={t("stock.due")} amount={hammaliDue.due} approximate={hammaliDue.approximate} testId="text-hammali-due" />
+          <span className="text-muted-foreground text-xs">|</span>
+          <DueLine label={t("stock.due")} amount={extrasDue.due} approximate={extrasDue.approximate} testId="text-extras-due" />
+        </div>
       </div>
 
       <div className="rounded-xl border border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/30 px-4 py-3">
@@ -3715,6 +3772,7 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
         <div className="text-sm font-bold text-purple-700 dark:text-purple-300" data-testid="text-vehicle-bhada">
           ₹{Math.round(vehicleBhadaTotal).toLocaleString("en-IN")}
         </div>
+        <DueLine label={t("stock.due")} amount={bhadaDue.due} approximate={bhadaDue.approximate} testId="text-vehicle-bhada-due" />
       </div>
     </div>
   );
@@ -4768,7 +4826,7 @@ export default function StockPage() {
       setSavedCardMap(prev => new Map(prev).set(card.id, JSON.parse(JSON.stringify(savedNow))));
 
       queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
-              queryClient.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/bhada-breakdown") });
+              invalidateChargeBreakdowns();
       queryClient.invalidateQueries({ queryKey: ["/api/lots"] });
       queryClient.invalidateQueries({ queryKey: ["/api/bids"] });
       queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });
@@ -4835,7 +4893,7 @@ export default function StockPage() {
       try {
         await apiRequest("POST", "/api/lots/bulk-archive", { lotIds, isArchived: true });
         queryClient.invalidateQueries({ queryKey: ["/api/stock-cards"] });
-              queryClient.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith("/api/bhada-breakdown") });
+              invalidateChargeBreakdowns();
         queryClient.invalidateQueries({ queryKey: ["/api/farmers"] });
         queryClient.invalidateQueries({ queryKey: ["/api/farmers-with-dues"] });
         queryClient.invalidateQueries({ queryKey: ["/api/transactions"] });

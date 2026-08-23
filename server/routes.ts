@@ -2365,6 +2365,15 @@ export async function registerRoutes(
     }
   });
 
+  app.get("/api/extras-breakdown", requireAuth, async (req, res) => {
+    try {
+      const result = await storage.getExtrasBreakdown(req.user!.businessId);
+      res.json(result);
+    } catch (e: any) {
+      res.status(400).json({ message: e.message });
+    }
+  });
+
   app.get("/api/farmer-ledger/:farmerId", requireAuth, async (req, res) => {
     try {
       const result = await storage.getFarmerLedger(
@@ -2836,6 +2845,9 @@ export async function registerRoutes(
           hammaliCharges: t.hammaliCharges, hammaliBuyerPerBag: t.hammaliBuyerPerBag,
           extraChargesFarmer: t.extraChargesFarmer, extraChargesBuyer: t.extraChargesBuyer,
           vehicleBhadaRate: t.lot.vehicleBhadaRate, totalBagsInVehicle: t.lot.totalBagsInVehicle,
+          // Freight is settled per farmer card, which is the STOCK date -- a bill can be raised on a later
+          // day, so the bill date cannot be used to look up what has been paid on the card.
+          stockDate: t.lot.date,
           netWeight: t.netWeight, numberOfBags: t.numberOfBags,
           isReversed: t.isReversed,
         })),

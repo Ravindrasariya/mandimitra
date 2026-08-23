@@ -9,6 +9,22 @@ import { queryClient } from "@/lib/queryClient";
  * or two entry points drift and one of them leaves stale numbers on screen. Shared by the
  * Cash page and the Farmer Pay shortcut on the stock page so they cannot fall out of step.
  */
+/**
+ * The three charge positions shown on the Stock and Dashboard strips: freight per farmer card, hammali
+ * and extra charges per stock date. Editing a bill moves the amount owed just as recording a payment
+ * moves the amount paid, so both kinds of write must refresh all three or a due line goes stale.
+ */
+export function invalidateChargeBreakdowns() {
+  queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/hammali-breakdown"] });
+  queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/extras-breakdown"] });
+  // Two screens read this: the Cash picker (unpaid cards only) and the Stock register's freight badge
+  // (settled cards included). They use different keys, so match on the prefix or one of them goes stale.
+  queryClient.invalidateQueries({ refetchType: 'all', predicate: (query) => {
+    const key = query.queryKey[0];
+    return typeof key === "string" && key.startsWith("/api/bhada-breakdown");
+  }});
+}
+
 export function invalidateCashQueries() {
   queryClient.invalidateQueries({ refetchType: 'all', predicate: (query) => {
     const key = query.queryKey[0];
@@ -24,13 +40,7 @@ export function invalidateCashQueries() {
   }});
   queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/transactions"] });
   queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/transaction-aggregates"] });
-  queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/hammali-breakdown"] });
-  // Two screens read this: the Cash picker (unpaid cards only) and the Stock register's freight badge
-  // (settled cards included). They use different keys, so match on the prefix or one of them goes stale.
-  queryClient.invalidateQueries({ refetchType: 'all', predicate: (query) => {
-    const key = query.queryKey[0];
-    return typeof key === "string" && key.startsWith("/api/bhada-breakdown");
-  }});
+  invalidateChargeBreakdowns();
   queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/bank-accounts"] });
   queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/dashboard"] });
   queryClient.invalidateQueries({ refetchType: 'all', queryKey: ["/api/stock-cards"] });

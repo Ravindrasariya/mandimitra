@@ -1563,7 +1563,10 @@ export class DatabaseStorage implements IStorage {
     paidMandiCommission: number;
   }> {
     const [txAgg] = await db.select({
-      totalHammali: sql<number>`coalesce(sum(cast(${transactions.hammaliCharges} as numeric)), 0)`,
+      // Buyer-side hammali is charged per bag and is part of the same labour bill, so it must be counted
+      // here exactly as /api/hammali-breakdown and both summary strips count it. Leaving it out made the
+      // Cash tab's hammali due smaller than the due shown on the Stock and Dashboard tabs.
+      totalHammali: sql<number>`coalesce(sum(cast(${transactions.hammaliCharges} as numeric) + round(cast(coalesce(${transactions.hammaliBuyerPerBag}, '0') as numeric) * ${transactions.numberOfBags})), 0)`,
       totalExtraCharges: sql<number>`coalesce(sum(cast(${transactions.extraChargesFarmer} as numeric)) + sum(cast(${transactions.extraChargesBuyer} as numeric)), 0)`,
       totalMandiCommission: sql<number>`coalesce(sum(cast(${transactions.mandiCharges} as numeric)), 0)`,
     }).from(transactions).where(and(
@@ -1615,7 +1618,7 @@ export class DatabaseStorage implements IStorage {
   async getHammaliBreakdown(businessId: number): Promise<{ date: string; totalHammali: number; paidHammali: number; dueHammali: number }[]> {
     const txRows = await db.select({
       date: transactions.date,
-      total: sql<number>`coalesce(sum(cast(${transactions.hammaliCharges} as numeric) + cast(coalesce(${transactions.hammaliBuyerPerBag}, '0') as numeric) * ${transactions.numberOfBags}), 0)`,
+      total: sql<number>`coalesce(sum(cast(${transactions.hammaliCharges} as numeric) + round(cast(coalesce(${transactions.hammaliBuyerPerBag}, '0') as numeric) * ${transactions.numberOfBags})), 0)`,
     }).from(transactions).where(and(
       eq(transactions.businessId, businessId),
       eq(transactions.isReversed, false),
@@ -1703,6 +1706,57 @@ export class DatabaseStorage implements IStorage {
    * can show a "Paid" badge. `includePaid` switches between the two rather than letting each screen do its
    * own arithmetic, which is how the two would eventually disagree about what a card owes.
    */
+  /**
+   * Extra charges (tulai, bharai, khadi karai, thela bhada and the rest) owed and paid, per stock date.
+   *
+   * Unlike hammali, an Extra Charges payment carries no date allocation, so a payment cannot be tied to
+   * the day it settles. Payments are therefore applied oldest day first, the same way legacy hammali
+   * payments are: the per-day split is an allocation, while the overall total, paid and due are exact.
+   */
+  async getExtrasBreakdown(businessId: number): Promise<{ date: string; totalExtras: number; paidExtras: number; dueExtras: number }[]> {
+    const txRows = await db.select({
+      date: transactions.date,
+      total: sql<number>`coalesce(sum(cast(${transactions.extraChargesFarmer} as numeric) + cast(${transactions.extraChargesBuyer} as numeric)), 0)`,
+    }).from(transactions).where(and(
+      eq(transactions.businessId, businessId),
+      eq(transactions.isReversed, false),
+      eq(transactions.isArchived, false)
+    )).groupBy(transactions.date);
+
+    const paidEntries = await db.select({
+      amount: cashEntries.amount,
+    }).from(cashEntries).where(and(
+      eq(cashEntries.businessId, businessId),
+      eq(cashEntries.outflowType, "Extra Charges"),
+      eq(cashEntries.category, "outward"),
+      eq(cashEntries.isReversed, false),
+      eq(cashEntries.isArchived, false)
+    ));
+
+    const totalsByDate = new Map<string, number>();
+    for (const r of txRows) {
+      if (!r.date) continue;
+      const t = Number(r.total) || 0;
+      if (t > 0) totalsByDate.set(r.date, t);
+    }
+
+    let unallocated = paidEntries.reduce((sum, p) => sum + (parseFloat(p.amount || "0") || 0), 0);
+    const paidByDate = new Map<string, number>();
+    const sortedAsc = Array.from(totalsByDate.keys()).sort();
+    for (const d of sortedAsc) {
+      if (unallocated <= 0) break;
+      const alloc = Math.min(unallocated, totalsByDate.get(d) || 0);
+      paidByDate.set(d, alloc);
+      unallocated -= alloc;
+    }
+
+    return sortedAsc.reverse().map(d => {
+      const total = totalsByDate.get(d) || 0;
+      const paid = Math.min(total, paidByDate.get(d) || 0);
+      return { date: d, totalExtras: total, paidExtras: paid, dueExtras: Math.max(0, total - paid) };
+    });
+  }
+
   async getBhadaBreakdown(businessId: number, includePaid = false): Promise<{
     farmerId: number; farmerName: string; date: string;
     totalBhada: number; paidBhada: number; dueBhada: number;

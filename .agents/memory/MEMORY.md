@@ -13,3 +13,4 @@
 - [Query-param variants break invalidation](query-param-variant-invalidation.md) — giving an endpoint a second cache key makes every exact-key invalidation silently miss it.
 - [Live updates across server copies](live-update-fanout.md) — an in-memory push reaches one server copy; fan out through the database and back it with a pollable counter.
 - [Business switching and page-local state](business-switch-stale-data.md) — a mounted page must prove which business a response came from; refetching on switch is not enough.
+- [Charge dues are scope-based](charge-due-scopes.md) — labour/freight payouts settle per date (and farmer), never per buyer or crop; a filtered due can only be a proportional share.

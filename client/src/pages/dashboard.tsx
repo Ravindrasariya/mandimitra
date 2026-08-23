@@ -14,6 +14,11 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { LayoutDashboard, ChevronDown, Calendar, Users, Package, HandCoins, ShoppingBag, TrendingUp, Settings, Hammer, History, Truck } from "lucide-react";
 import type { BusinessChargeSettings } from "@shared/schema";
+import { scopeDue, addTo } from "@/lib/charge-dues";
+import { BHADA_STATUS_KEY, type BhadaCardRow } from "@/components/bhada-pay-dialog";
+
+type HammaliBreakdownRow = { date: string; totalHammali: number; paidHammali: number; dueHammali: number };
+type ExtrasBreakdownRow = { date: string; totalExtras: number; paidExtras: number; dueExtras: number };
 import {
   PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer,
   LineChart, Line, XAxis, YAxis, CartesianGrid,
@@ -22,11 +27,22 @@ import {
 type DashboardData = {
   businessName: string;
   lots: { id: number; lotId: string; crop: string; date: string; numberOfBags: number; remainingBags: number; farmerId: number; farmerName: string }[];
-  transactions: { id: number; transactionId: string; date: string; crop: string; lotId: string; farmerId: number; farmerName: string; buyerId: number; buyerName: string; totalPayableToFarmer: string; totalReceivableFromBuyer: string; paidAmount: string; farmerPaidAmount: string; mandiCharges: string; aadhatCharges: string; hammaliCharges: string; hammaliBuyerPerBag: string | null; extraChargesFarmer: string; extraChargesBuyer: string; vehicleBhadaRate: string | null; totalBagsInVehicle: number | null; netWeight: string; numberOfBags: number; isReversed: boolean }[];
+  transactions: { id: number; transactionId: string; date: string; crop: string; lotId: string; farmerId: number; farmerName: string; buyerId: number; buyerName: string; totalPayableToFarmer: string; totalReceivableFromBuyer: string; paidAmount: string; farmerPaidAmount: string; mandiCharges: string; aadhatCharges: string; hammaliCharges: string; hammaliBuyerPerBag: string | null; extraChargesFarmer: string; extraChargesBuyer: string; vehicleBhadaRate: string | null; totalBagsInVehicle: number | null; stockDate: string; netWeight: string; numberOfBags: number; isReversed: boolean }[];
   farmersWithDues: { id: number; name: string; totalPayable: string; totalDue: string; totalAdvance: string; advanceEntries: { date: string; amount: string }[] }[];
   buyersWithDues: { id: number; name: string; receivableDue: string; overallDue: string; openingBalance: string; isArchived: boolean }[];
   txAggregates: { totalHammali: number; totalExtraCharges: number; totalMandiCommission: number; paidHammali: number; paidExtraCharges: number; paidMandiCommission: number };
 };
+
+/** A due line, marked as an approximate share when a crop filter has narrowed the total. */
+function DashDueLine({ amount, approximate, testId }: { amount: number; approximate: boolean; testId: string }) {
+  const { t } = useLanguage();
+  return (
+    <div className="text-[11px] text-red-600 font-medium" data-testid={testId}>
+      {t("dash.due")}: ₹{amount.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+      {approximate && <span className="ml-1 text-[10px] text-muted-foreground font-normal">({t("stock.approxShare")})</span>}
+    </div>
+  );
+}
 
 const PIE_COLORS = ["#2563eb", "#f59e0b", "#10b981", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4", "#f97316", "#14532d", "#dc2626", "#7c3aed", "#0891b2", "#ca8a04", "#be185d", "#334155"];
 
@@ -73,6 +89,9 @@ export default function DashboardPage() {
     khadiKaraiFarmerPerBag: "0",
   });
 
+  const { data: bhadaRows = [] } = useQuery<BhadaCardRow[]>({ queryKey: [BHADA_STATUS_KEY] });
+  const { data: hammaliRows = [] } = useQuery<HammaliBreakdownRow[]>({ queryKey: ["/api/hammali-breakdown"] });
+  const { data: extrasRows = [] } = useQuery<ExtrasBreakdownRow[]>({ queryKey: ["/api/extras-breakdown"] });
   const { data, isLoading } = useQuery<DashboardData>({
     queryKey: ["/api/dashboard"],
   });
@@ -223,9 +242,21 @@ export default function DashboardPage() {
     const openingBalanceTotal = filteredBuyersWithDues.reduce((s, b) => s + parseFloat(b.openingBalance || "0"), 0);
     const totalReceivable = txnReceivable + openingBalanceTotal;
     const totalAadhat = filteredTxns.reduce((s, t) => s + parseFloat(t.aadhatCharges || "0"), 0);
-    const totalHammali = filteredTxns.reduce((s, t) =>
-      s + parseFloat(t.hammaliCharges || "0") + Math.round(parseFloat(t.hammaliBuyerPerBag || "0") * (t.numberOfBags || 0)), 0);
-    const totalExtraCharges = filteredTxns.reduce((s, t) => s + parseFloat(t.extraChargesFarmer || "0") + parseFloat(t.extraChargesBuyer || "0"), 0);
+    // Hammali and extras are settled per stock date, freight per farmer card (farmer + stock date), so
+    // the charge on screen is kept under those same keys and measured against what has been paid out.
+    const shownHammali = new Map<string, number>();
+    const shownExtras = new Map<string, number>();
+    const shownBhada = new Map<string, number>();
+    const totalHammali = filteredTxns.reduce((s, t) => {
+      const v = parseFloat(t.hammaliCharges || "0") + Math.round(parseFloat(t.hammaliBuyerPerBag || "0") * (t.numberOfBags || 0));
+      if (t.date) addTo(shownHammali, t.date, v);
+      return s + v;
+    }, 0);
+    const totalExtraCharges = filteredTxns.reduce((s, t) => {
+      const v = parseFloat(t.extraChargesFarmer || "0") + parseFloat(t.extraChargesBuyer || "0");
+      if (t.date) addTo(shownExtras, t.date, v);
+      return s + v;
+    }, 0);
     // Bhada is entered once per vehicle and split across that vehicle's transactions by bag share. Sum the
     // UNROUNDED share and round once at the end, so a fully sold vehicle totals exactly the rate entered --
     // the per-transaction figures stored against each bill are individually rounded and can fall a rupee or
@@ -233,16 +264,32 @@ export default function DashboardPage() {
     const totalVehicleBhada = filteredTxns.reduce((s, t) => {
       const bagsInVehicle = t.totalBagsInVehicle || 0;
       if (bagsInVehicle <= 0) return s;
-      return s + (parseFloat(t.vehicleBhadaRate || "0") * (t.numberOfBags || 0)) / bagsInVehicle;
+      const v = (parseFloat(t.vehicleBhadaRate || "0") * (t.numberOfBags || 0)) / bagsInVehicle;
+      if (t.farmerId && t.stockDate) addTo(shownBhada, `${t.farmerId}|${t.stockDate}`, v);
+      return s + v;
     }, 0);
 
     const farmerDue = filteredFarmersWithDues.reduce((s, f) => s + parseFloat(f.totalDue || "0"), 0);
     const buyerDue = filteredBuyersWithDues.reduce((s, b) => s + parseFloat(b.overallDue || "0"), 0);
 
-    const extraChargesDue = (data?.txAggregates?.totalExtraCharges || 0) - (data?.txAggregates?.paidExtraCharges || 0);
+    // The paid side comes from the Cash tab, so each scope is measured against the same totals the Cash
+    // tab works from; only the visible share of a scope is taken from the figures above.
+    const fullBhada = new Map<string, number>(), paidBhada = new Map<string, number>();
+    for (const r of bhadaRows) {
+      fullBhada.set(`${r.farmerId}|${r.date}`, r.totalBhada);
+      paidBhada.set(`${r.farmerId}|${r.date}`, r.paidBhada);
+    }
+    const fullHammali = new Map<string, number>(), paidHammali = new Map<string, number>();
+    for (const r of hammaliRows) { fullHammali.set(r.date, r.totalHammali); paidHammali.set(r.date, r.paidHammali); }
+    const fullExtras = new Map<string, number>(), paidExtras = new Map<string, number>();
+    for (const r of extrasRows) { fullExtras.set(r.date, r.totalExtras); paidExtras.set(r.date, r.paidExtras); }
 
-    return { farmersCount, lotsCount, txnCount, totalPayable, totalReceivable, totalAadhat, totalHammali, totalExtraCharges, totalVehicleBhada, farmerDue, buyerDue, extraChargesDue };
-  }, [filteredTxns, filteredLots, uniqueFarmerIds, filteredFarmersWithDues, filteredBuyersWithDues, data]);
+    const hammaliDue = scopeDue(fullHammali, shownHammali, paidHammali);
+    const extrasDue = scopeDue(fullExtras, shownExtras, paidExtras);
+    const bhadaDue = scopeDue(fullBhada, shownBhada, paidBhada);
+
+    return { farmersCount, lotsCount, txnCount, totalPayable, totalReceivable, totalAadhat, totalHammali, totalExtraCharges, totalVehicleBhada, farmerDue, buyerDue, hammaliDue, extrasDue, bhadaDue };
+  }, [filteredTxns, filteredLots, uniqueFarmerIds, filteredFarmersWithDues, filteredBuyersWithDues, data, bhadaRows, hammaliRows, extrasRows]);
 
   const cropDistribution = useMemo(() => {
     const map = new Map<string, number>();
@@ -534,6 +581,11 @@ export default function DashboardPage() {
               <span className="text-muted-foreground text-xs">|</span>
               <div className="text-sm font-bold text-purple-700 dark:text-purple-400">₹{summary.totalExtraCharges.toLocaleString("en-IN", { maximumFractionDigits: 0 })}</div>
             </div>
+            <div className="flex items-center gap-2">
+              <DashDueLine amount={summary.hammaliDue.due} approximate={summary.hammaliDue.approximate} testId="text-hammali-due" />
+              <span className="text-muted-foreground text-xs">|</span>
+              <DashDueLine amount={summary.extrasDue.due} approximate={summary.extrasDue.approximate} testId="text-extras-due" />
+            </div>
           </CardContent>
         </Card>
 
@@ -546,6 +598,7 @@ export default function DashboardPage() {
             <div className="text-sm font-bold text-purple-700 dark:text-purple-400" data-testid="text-vehicle-bhada">
               ₹{summary.totalVehicleBhada.toLocaleString("en-IN", { maximumFractionDigits: 0 })}
             </div>
+            <DashDueLine amount={summary.bhadaDue.due} approximate={summary.bhadaDue.approximate} testId="text-vehicle-bhada-due" />
           </CardContent>
         </Card>
       </div>

@@ -538,6 +538,7 @@ const translations: Record<string, Record<Language, string>> = {
   "stock.discardClose": { en: "Discard & Close", hi: "छोड़ें और बंद करें" },
   "stock.saveClose": { en: "Save & Close", hi: "सहेजें और बंद करें" },
   "stock.due": { en: "Due", hi: "बकाया" },
+  "stock.approxShare": { en: "approx. share", hi: "अनुमानित हिस्सा" },
   "stock.paid": { en: "Paid", hi: "भुगतान हुआ" },
   "stock.partialPaid": { en: "Partial Paid", hi: "आंशिक भुगतान" },
   "stock.totalBags": { en: "Total Bags", hi: "कुल थैले" },
