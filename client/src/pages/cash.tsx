@@ -1098,16 +1098,26 @@ export default function CashPage() {
 
     y = boxY + boxH + 8;
 
-    // Table column positions (proportions per spec)
-    // Date 12%, Party 35%, Mode 13%, Dr 13%, Cr 12%, Remarks 15%
+    // Table column positions. Party carries both the name and what the payment was for, so it takes the
+    // room Mode and Remarks do not need — Mode only ever says Cash, Online, Cheque or Transfer.
+    // Date 12%, Party 43%, Mode 10%, Dr 12%, Cr 11%, gap, Remarks 10%
+    const wParty = 0.43, wMode = 0.10, wDr = 0.12, wCr = 0.11, wRemarks = 0.10;
     const colDate = margin;
     const colParty = margin + contentW * 0.12;
-    const colMode = margin + contentW * 0.47;
-    const colDr = margin + contentW * 0.55;
-    const colCr = margin + contentW * 0.67;
-    const colRemarks = margin + contentW * 0.80;
+    const colMode = margin + contentW * 0.55;
+    const colDr = margin + contentW * 0.65;
+    const colCr = margin + contentW * 0.77;
+    const colRemarks = margin + contentW * 0.90;
     const rowH = 6;
     const headerH = 7;
+
+    /** Shorten text until it actually fits the column at the current font size. */
+    const fitText = (text: string, maxW: number) => {
+      if (!text || doc.getTextWidth(text) <= maxW) return text;
+      let cut = text;
+      while (cut.length > 1 && doc.getTextWidth(cut + "…") > maxW) cut = cut.slice(0, -1);
+      return cut + "…";
+    };
 
     const drawTableHeader = (startY: number) => {
       doc.setFillColor(22, 163, 74);
@@ -1119,8 +1129,8 @@ export default function CashPage() {
       doc.text("Date", colDate, tY);
       doc.text("Party", colParty, tY);
       doc.text("Mode", colMode, tY);
-      doc.text("Dr (Outflow)", colDr + contentW * 0.11 - 1, tY, { align: "right" });
-      doc.text("Cr (Inflow)", colCr + contentW * 0.10 - 1, tY, { align: "right" });
+      doc.text("Dr (Outflow)", colDr + contentW * wDr - 1, tY, { align: "right" });
+      doc.text("Cr (Inflow)", colCr + contentW * wCr - 1, tY, { align: "right" });
       doc.text("Remarks", colRemarks, tY);
       doc.setTextColor(0, 0, 0);
       return startY + headerH;
@@ -1149,8 +1159,15 @@ export default function CashPage() {
       totalDr += e.category === "transfer" ? amt : dr;
       totalCr += e.category === "transfer" ? amt : cr;
 
-      // Party label
+      // Party label.
+      //
+      // A name on its own does not say what the money was for: the same farmer appears for a harvest
+      // sale, an advance and a Freight/Bhada payout, and a buyer's name could be a receipt or anything
+      // else. So the name is always followed by the kind of payment. Where there is no separate party —
+      // hammali, extra charges, a general expense — the kind stands alone rather than being repeated.
       let party = "";
+      let partyName = "";
+      let partyKind = "";
       if (e.category === "transfer") {
         if (e.type === "cash_to_account") party = `Transfer: Cash → ${e.bankAccountId ? getAccountName(e.bankAccountId) : "Account"}`;
         else if (e.type === "account_to_cash") party = `Transfer: ${e.bankAccountId ? getAccountName(e.bankAccountId) : "Account"} → Cash`;
@@ -1158,11 +1175,12 @@ export default function CashPage() {
         else if (e.type === "account_to_account_in") party = `Transfer: ${e.partyName || ""} → ${e.bankAccountId ? getAccountName(e.bankAccountId) : ""}`;
         else party = "Transfer";
       } else {
-        party = e.partyName
+        partyName = e.partyName
           || (e.buyerId ? getBuyerName(e.buyerId) : "")
           || (e.farmerId ? getFarmerName(e.farmerId) : "")
-          || (e.category === "outward" ? (e.outflowType || "General Expense") : "")
-          || "General";
+          || "";
+        partyKind = e.outflowType || (e.category === "outward" ? "General Expense" : "General");
+        party = partyName && partyName !== partyKind ? `${partyName} - ${partyKind}` : partyKind;
       }
 
       // Mode label
@@ -1182,17 +1200,22 @@ export default function CashPage() {
       const dateStr = e.date ? format(new Date(e.date + "T00:00:00"), "dd/MM/yy") : "";
       doc.text(dateStr, colDate, y + rowH - 2);
 
-      const partyTrunc = party.length > 38 ? party.substring(0, 37) + "…" : party;
-      doc.text(partyTrunc, colParty, y + rowH - 2);
+      // What the payment was for must survive: the name is shortened first, and only a line with no
+      // room left at all loses part of the kind.
+      const partyMaxW = contentW * wParty - 2;
+      let partyText = party;
+      if (doc.getTextWidth(partyText) > partyMaxW && partyName && partyKind) {
+        const suffix = ` - ${partyKind}`;
+        partyText = fitText(partyName, partyMaxW - doc.getTextWidth(suffix)) + suffix;
+      }
+      doc.text(fitText(partyText, partyMaxW), colParty, y + rowH - 2);
 
-      const modeTrunc = mode.length > 14 ? mode.substring(0, 13) + "…" : mode;
-      doc.text(modeTrunc, colMode, y + rowH - 2);
+      doc.text(fitText(mode, contentW * wMode - 2), colMode, y + rowH - 2);
 
-      doc.text(dr > 0 ? fmtAmt(dr) : "-", colDr + contentW * 0.11 - 1, y + rowH - 2, { align: "right" });
-      doc.text(cr > 0 ? fmtAmt(cr) : "-", colCr + contentW * 0.10 - 1, y + rowH - 2, { align: "right" });
+      doc.text(dr > 0 ? fmtAmt(dr) : "-", colDr + contentW * wDr - 1, y + rowH - 2, { align: "right" });
+      doc.text(cr > 0 ? fmtAmt(cr) : "-", colCr + contentW * wCr - 1, y + rowH - 2, { align: "right" });
 
-      const remarksTrunc = (e.notes || "").length > 18 ? (e.notes || "").substring(0, 17) + "…" : (e.notes || "");
-      doc.text(remarksTrunc, colRemarks, y + rowH - 2);
+      doc.text(fitText(e.notes || "", contentW * wRemarks - 1), colRemarks, y + rowH - 2);
 
       doc.setDrawColor(220, 220, 220);
       doc.line(margin, y + rowH, pageW - margin, y + rowH);
@@ -1207,8 +1230,8 @@ export default function CashPage() {
     doc.setFontSize(8);
     doc.setTextColor(0, 0, 0);
     doc.text("Total", colParty, y + rowH - 1);
-    doc.text(fmtAmt(totalDr), colDr + contentW * 0.11 - 1, y + rowH - 1, { align: "right" });
-    doc.text(fmtAmt(totalCr), colCr + contentW * 0.10 - 1, y + rowH - 1, { align: "right" });
+    doc.text(fmtAmt(totalDr), colDr + contentW * wDr - 1, y + rowH - 1, { align: "right" });
+    doc.text(fmtAmt(totalCr), colCr + contentW * wCr - 1, y + rowH - 1, { align: "right" });
 
     y += rowH + 5;
     doc.setFont("helvetica", "normal");
