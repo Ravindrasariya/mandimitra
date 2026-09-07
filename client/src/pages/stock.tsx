@@ -56,6 +56,44 @@ const noScrollProps = {
   onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault(); },
 };
 
+// There is no <form> anywhere on this page, so Enter has no browser-native effect inside a text
+// cell -- it neither saves nor submits anything on its own. This only teaches it to do the one thing
+// Tab already does: move to the next field in DOM order (which matches tab order, since the page
+// assigns no custom tabIndex). Buttons are left alone entirely, so Enter on Save/Cancel/Add Bid/
+// Add Lot keeps the browser's own default of activating the focused button, exactly as it does today.
+const FOCUSABLE_SELECTOR = 'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+function focusNextFieldInOrder(current: HTMLElement, container: ParentNode) {
+  const all = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
+    .filter(el => el.offsetParent !== null || el === document.activeElement);
+  const idx = all.indexOf(current);
+  if (idx === -1) return;
+  for (let i = idx + 1; i < all.length; i++) {
+    const el = all[i];
+    if (el.offsetParent !== null) { el.focus(); return; }
+  }
+}
+
+const NON_ADVANCING_INPUT_TYPES = new Set(["checkbox", "radio", "file", "submit", "button", "reset"]);
+
+// Attached once, at the top of the page, so Enter behaves like Tab from any text/number field
+// underneath -- the lot grid, a bid's fields, the transaction charge fields, and the farmer card's
+// own fields alike -- without having to wire every individual input by hand. It only ever reacts to
+// a bare <input>: a <button> (Save, Cancel, Add Bid, Add Lot, a suggestion row, a crop button) is
+// untouched, so Enter keeps activating it exactly as it does today. A field's own handler runs first
+// (it is on the same element, deeper in the bubble path) -- if it already consumed the Enter, e.g.
+// picking a highlighted autocomplete suggestion, this never fires.
+function handleEnterAdvance(e: React.KeyboardEvent<HTMLDivElement>) {
+  if (e.key !== "Enter" || e.defaultPrevented) return;
+  const target = e.target;
+  if (!(target instanceof HTMLInputElement)) return;
+  if (NON_ADVANCING_INPUT_TYPES.has(target.type)) return;
+  e.preventDefault();
+  // Scoped to this container (the page's own scrollable content), not the whole document, so Enter
+  // can never jump out into the header, a dialog, or some other portal-rendered element.
+  focusNextFieldInOrder(target, e.currentTarget);
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type ChargeSettings = {
@@ -5330,7 +5368,7 @@ export default function StockPage() {
         <h1 className="text-lg font-bold">{t("stock.mandiStock")}</h1>
         <p className="text-xs text-muted-foreground">{t("stock.mandiStockDesc")}</p>
       </div>
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4" onKeyDown={handleEnterAdvance}>
         {loadingCards && (
           <div className="flex items-center justify-center py-12">
             <div className="text-sm text-muted-foreground">{t("stock.loadingStockEntries")}</div>
