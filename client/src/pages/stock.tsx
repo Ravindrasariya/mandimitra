@@ -517,6 +517,18 @@ const emptyLot = (date?: string): LotRow => ({
   bids: [emptyBid(date)],
 });
 
+// A brand-new lot's "# Bags" field is where the next number goes, so cursor should land there
+// straight away instead of sitting on the button that was just clicked. The field is looked up by
+// the lot's own id (not its position), since the list can be re-sorted or filtered right after.
+const focusLotBags = (lotId: string) => {
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const el = document.querySelector<HTMLInputElement>(`[data-focus-lot-id="${lotId}"]`);
+      el?.focus();
+    });
+  });
+};
+
 const hasLotUserData = (lot: LotRow): boolean =>
   [lot.numberOfBags, lot.variety, lot.bagMarka,
     ...lot.bids.flatMap(b => [b.buyerName, b.pricePerKg, b.numberOfBags, b.txn.netWeightInput]),
@@ -1596,6 +1608,7 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
               <Label className="text-xs text-muted-foreground">{t("stock.numBagsReq")}</Label>
               <Input
                 data-testid={`input-lot-bags-${index}`}
+                data-focus-lot-id={lot.id}
                 type="number" placeholder="0"
                 value={lot.numberOfBags}
                 onChange={e => setField("numberOfBags", e.target.value.replace(/\D/g, ""))}
@@ -1732,7 +1745,11 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, onBBChange, is
   const badgeCls = CROP_COLORS[group.crop] || "bg-muted border-border text-foreground";
   const farmerLabel = farmerName.trim() || t("stock.farmer");
 
-  const addLot = () => onChange({ ...group, lots: [...group.lots, emptyLot(farmerDate)] });
+  const addLot = () => {
+    const lot = emptyLot(farmerDate);
+    onChange({ ...group, lots: [...group.lots, lot] });
+    focusLotBags(lot.id);
+  };
   const updateLot = (idx: number, lot: LotRow) =>
     onChange({ ...group, lots: group.lots.map((l, i) => (i === idx ? lot : l)) });
   const isLastLot = group.lots.length === 1;
@@ -2447,6 +2464,7 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
     group.bbNumber = bbNumber;
     group.srNumber = srNumber;
     onChange({ ...card, cropGroups: [...card.cropGroups, group] });
+    focusLotBags(group.lots[0].id);
   };
   const updateGroup = (idx: number, g: CropGroup) =>
     onChange({ ...card, cropGroups: card.cropGroups.map((gg, i) => (i === idx ? g : gg)) });
