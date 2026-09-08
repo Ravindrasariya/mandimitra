@@ -120,13 +120,31 @@ function isNavigableInput(el: Element): el is HTMLInputElement {
   return el instanceof HTMLInputElement && !NON_ADVANCING_INPUT_TYPES.has(el.type) && el.type !== "date";
 }
 
-function getRowInputs(row: HTMLElement): HTMLInputElement[] {
+// A "stop" is a whole-row landing spot that is not a text field: a collapsed lot / bid bar, or an
+// Add Bid / Add Lot button. Up/Down land on it exactly like they land on a field, but it is the only
+// item in its row, so Left/Right simply have nowhere to go and stay put. Pressing Enter on it does
+// whatever the button already does (expand the section, add the row) -- see handleStopEnter.
+function isNavStop(el: Element | null): el is HTMLElement {
+  return el instanceof HTMLElement
+    && el.hasAttribute("data-nav-stop")
+    && el.offsetParent !== null
+    && !(el as HTMLButtonElement).disabled;
+}
+
+function getRowItems(row: HTMLElement): HTMLElement[] {
+  if (row.hasAttribute("data-nav-stop")) return isNavStop(row) ? [row] : [];
   return Array.from(row.querySelectorAll<HTMLElement>("input:not([disabled])"))
-    .filter(el => isNavigableInput(el) && el.offsetParent !== null) as HTMLInputElement[];
+    .filter(el => isNavigableInput(el) && el.offsetParent !== null);
 }
 
 function getAllNavRows(root: ParentNode): HTMLElement[] {
   return Array.from(root.querySelectorAll<HTMLElement>("[data-nav-row]")).filter(r => r.offsetParent !== null);
+}
+
+// Every place Up/Down can currently land, in page order. Used to spot what appeared after Enter
+// expanded a section or added a bid/lot, so focus can follow into the new content.
+function getAllNavItems(root: ParentNode): HTMLElement[] {
+  return getAllNavRows(root).flatMap(getRowItems);
 }
 
 // A <input type="number"> has no text-selection API at all -- browsers either throw
@@ -142,35 +160,40 @@ function isCaretAtEnd(el: HTMLInputElement): boolean {
   try { return el.selectionStart === el.value.length && el.selectionEnd === el.value.length; } catch { return true; }
 }
 
-function navigateField(current: HTMLInputElement, dir: ArrowDir, root: ParentNode) {
+function navigateField(current: HTMLElement, dir: ArrowDir, root: ParentNode) {
   const row = current.closest<HTMLElement>("[data-nav-row]");
   if (!row) return;
-  const rowInputs = getRowInputs(row);
-  const posInRow = rowInputs.indexOf(current);
+  const rowItems = getRowItems(row);
+  const posInRow = rowItems.indexOf(current);
   if (posInRow === -1) return;
 
   if (dir === "left" || dir === "right") {
     const targetIdx = dir === "left" ? posInRow - 1 : posInRow + 1;
-    if (targetIdx < 0 || targetIdx >= rowInputs.length) return; // edge of the row -- stay put
-    rowInputs[targetIdx].focus();
+    if (targetIdx < 0 || targetIdx >= rowItems.length) return; // edge of the row -- stay put
+    rowItems[targetIdx].focus();
     return;
   }
 
+  // Up/Down always leave the current row, whichever field within it the cursor happens to be in,
+  // and try to keep the same left-to-right position in the row they land on.
   const allRows = getAllNavRows(root);
-  const rowIdx = allRows.indexOf(row);
+  let rowIdx = allRows.indexOf(row);
   if (rowIdx === -1) return;
-  const targetRowIdx = dir === "up" ? rowIdx - 1 : rowIdx + 1;
-  if (targetRowIdx < 0 || targetRowIdx >= allRows.length) return;
-  const targetRowInputs = getRowInputs(allRows[targetRowIdx]);
-  if (targetRowInputs.length === 0) return;
-  targetRowInputs[Math.min(posInRow, targetRowInputs.length - 1)].focus();
+  const step = dir === "up" ? -1 : 1;
+  // Skip any row that currently has nothing to land on (e.g. a disabled Add Bid button).
+  for (let i = rowIdx + step; i >= 0 && i < allRows.length; i += step) {
+    const targetItems = getRowItems(allRows[i]);
+    if (targetItems.length === 0) continue;
+    targetItems[Math.min(posInRow, targetItems.length - 1)].focus();
+    return;
+  }
 }
 
 // Shared by both attachment points below: the delegated container handler, and noScrollProps (which
 // must call this directly for Up/Down, since it already calls preventDefault itself to stop the
 // number-input spinner -- letting that reach the container as an already-prevented event would
 // silently swallow the row jump on every field that uses noScrollProps).
-function navigateFieldFromEvent(target: HTMLInputElement, dir: ArrowDir) {
+function navigateFieldFromEvent(target: HTMLElement, dir: ArrowDir) {
   const root = target.closest<HTMLElement>("[data-stock-nav-root]") || document.body;
   navigateField(target, dir, root);
 }
@@ -181,8 +204,14 @@ function handleArrowNav(e: React.KeyboardEvent<HTMLDivElement>) {
   if (e.defaultPrevented) return;
   const dir = ARROW_DIRS[e.key];
   if (!dir) return;
-  const target = e.target;
-  if (!isNavigableInput(target as Element)) return;
+  const target = e.target as Element;
+  // A collapsed bar / Add button: it is a whole row on its own, so only Up/Down mean anything.
+  if (isNavStop(target)) {
+    e.preventDefault();
+    navigateFieldFromEvent(target, dir);
+    return;
+  }
+  if (!isNavigableInput(target)) return;
   const input = target as HTMLInputElement;
   // Left/Right only jump fields once the caret is already at the edge of the value in that
   // direction -- otherwise the arrow key is just moving the text cursor, which must keep working.
@@ -192,9 +221,27 @@ function handleArrowNav(e: React.KeyboardEvent<HTMLDivElement>) {
   navigateFieldFromEvent(input, dir);
 }
 
+// Enter on a stop is left entirely to the browser -- it activates the focused button, which expands
+// the collapsed lot/bid or appends a new bid/lot. All this adds is the follow-through: once React has
+// painted the result, focus moves into whatever newly appeared (the section's first field, or the new
+// bid's own collapsed bar), so entry keeps going without reaching for the mouse.
+function handleStopEnter(e: React.KeyboardEvent<HTMLDivElement>) {
+  if (e.key !== "Enter" || e.defaultPrevented) return;
+  const target = e.target as Element;
+  if (!isNavStop(target)) return;
+  const root = target.closest<HTMLElement>("[data-stock-nav-root]") || document.body;
+  const before = new Set(getAllNavItems(root));
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    const appeared = getAllNavItems(root).find(el => !before.has(el));
+    if (appeared) appeared.focus();
+  }));
+}
+
 function handleStockKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
   handleEnterAdvance(e);
-  if (!e.defaultPrevented) handleArrowNav(e);
+  if (e.defaultPrevented) return;
+  handleStopEnter(e);
+  handleArrowNav(e);
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -1466,9 +1513,10 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
       <div className="flex items-center bg-blue-100/60 border-b border-blue-200">
         <button
           type="button"
-          className="flex-1 flex items-center gap-2 px-3 py-1.5 hover:bg-blue-100 transition-colors text-left"
+          className="flex-1 flex items-center gap-2 px-3 py-1.5 hover:bg-blue-100 transition-colors text-left focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
           onClick={() => onChange({ ...bid, bidOpen: !bid.bidOpen })}
           data-testid={`button-toggle-bid-${bidIndex}`}
+          {...(!bid.bidOpen ? { "data-nav-row": "", "data-nav-stop": "" } : {})}
         >
           {bid.bidOpen
             ? <ChevronDown className="w-[18px] h-[18px] text-blue-500" strokeWidth={3} />
@@ -1714,9 +1762,10 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
       <div className="flex items-center bg-muted/30 border-b border-border">
         <button
           type="button"
-          className="flex-1 flex items-center gap-2 px-3 py-2 hover:bg-muted/50 transition-colors text-left"
+          className="flex-1 flex items-center gap-2 px-3 py-2 hover:bg-muted/50 transition-colors text-left focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
           onClick={() => onChange({ ...lot, lotOpen: !lot.lotOpen })}
           data-testid={`button-toggle-lot-${index}`}
+          {...(!lot.lotOpen ? { "data-nav-row": "", "data-nav-stop": "" } : {})}
         >
           {lot.lotOpen ? <ChevronDown className="w-[18px] h-[18px] text-muted-foreground" strokeWidth={3} /> : <ChevronRight className="w-[18px] h-[18px] text-muted-foreground" strokeWidth={3} />}
           <span className="text-xs font-bold text-foreground uppercase tracking-wide">{t("stock.lot")} #{index + 1}</span>
@@ -1816,8 +1865,10 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
               onClick={addBid}
               disabled={addBidDisabled}
               title={addBidDisabled ? t("stock.lotBagsFullyAllocated") : undefined}
-              className="w-full h-7 text-xs gap-1.5 border-dashed mt-2"
+              className="w-full h-7 text-xs gap-1.5 border-dashed mt-2 focus:ring-2 focus:ring-blue-500"
               data-testid="button-add-bid"
+              data-nav-row=""
+              data-nav-stop=""
             >
               <Plus className="w-3 h-3" /> {t("stock.addBid")}
             </Button>
@@ -2359,8 +2410,10 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, onBBChange, is
                 onClick={addLot}
                 disabled={addLotDisabled}
                 title={addLotDisabled ? t("stock.vehicleCapacityReached") : undefined}
-                className="w-full h-8 text-xs gap-1.5 border-dashed"
+                className="w-full h-8 text-xs gap-1.5 border-dashed focus:ring-2 focus:ring-blue-500"
                 data-testid={`button-add-lot-${group.crop.toLowerCase()}`}
+                data-nav-row=""
+                data-nav-stop=""
               >
                 <Plus className="w-3.5 h-3.5" /> {t("stock.addLotUnder")} {group.crop}
               </Button>
