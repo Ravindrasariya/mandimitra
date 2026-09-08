@@ -53,7 +53,15 @@ const toNum = (v: string) => v.replace(/[^0-9.]/g, "");
 
 const noScrollProps = {
   onWheel: (e: React.WheelEvent<HTMLInputElement>) => { e.currentTarget.blur(); },
-  onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault(); },
+  onKeyDown: (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "ArrowUp" || e.key === "ArrowDown") {
+      // Always blocked, so the browser's up/down number spinner never fires. Called directly rather
+      // than left to bubble, because by the time it reaches the delegated container handler this
+      // preventDefault would already look like "some other handler consumed it".
+      e.preventDefault();
+      navigateFieldFromEvent(e.currentTarget, e.key === "ArrowUp" ? "up" : "down");
+    }
+  },
 };
 
 // There is no <form> anywhere on this page, so Enter has no browser-native effect inside a text
@@ -92,6 +100,101 @@ function handleEnterAdvance(e: React.KeyboardEvent<HTMLDivElement>) {
   // Scoped to this container (the page's own scrollable content), not the whole document, so Enter
   // can never jump out into the header, a dialog, or some other portal-rendered element.
   focusNextFieldInOrder(target, e.currentTarget);
+}
+
+// ─── Arrow-key spreadsheet-style navigation ───────────────────────────────────
+//
+// Every "row" of fields the user is meant to arrow through -- a lot's own fields, a bid's fields, a
+// charge field row inside the weight/charges panel -- is marked with `data-nav-row` on its wrapping
+// element. Left/Right move between the text/number fields inside the current row; Up/Down move to
+// the field at (roughly) the same position in the row above/below, in document order -- which,
+// because the page nests bids inside their lot and lots inside their crop group, naturally walks
+// lot -> its bids -> next lot exactly as the fields are laid out on screen.
+//
+// This deliberately never touches a <select> trigger, a date field, or a currently-open autocomplete
+// suggestion list -- those already have their own meaning for arrow keys (Radix opening/changing a
+// selection, the browser stepping a date segment, or highlighting a suggestion) and must keep it.
+type ArrowDir = "up" | "down" | "left" | "right";
+
+function isNavigableInput(el: Element): el is HTMLInputElement {
+  return el instanceof HTMLInputElement && !NON_ADVANCING_INPUT_TYPES.has(el.type) && el.type !== "date";
+}
+
+function getRowInputs(row: HTMLElement): HTMLInputElement[] {
+  return Array.from(row.querySelectorAll<HTMLElement>("input:not([disabled])"))
+    .filter(el => isNavigableInput(el) && el.offsetParent !== null) as HTMLInputElement[];
+}
+
+function getAllNavRows(root: ParentNode): HTMLElement[] {
+  return Array.from(root.querySelectorAll<HTMLElement>("[data-nav-row]")).filter(r => r.offsetParent !== null);
+}
+
+// A <input type="number"> has no text-selection API at all -- browsers either throw
+// (InvalidStateError) or just return null for selectionStart/End, never a real caret position. There
+// is nothing for arrow keys to do inside one of these besides the spinner (already blocked above), so
+// Left/Right should always be free to move fields from a number input.
+function isCaretAtStart(el: HTMLInputElement): boolean {
+  if (el.type === "number") return true;
+  try { return el.selectionStart === 0 && el.selectionEnd === 0; } catch { return true; }
+}
+function isCaretAtEnd(el: HTMLInputElement): boolean {
+  if (el.type === "number") return true;
+  try { return el.selectionStart === el.value.length && el.selectionEnd === el.value.length; } catch { return true; }
+}
+
+function navigateField(current: HTMLInputElement, dir: ArrowDir, root: ParentNode) {
+  const row = current.closest<HTMLElement>("[data-nav-row]");
+  if (!row) return;
+  const rowInputs = getRowInputs(row);
+  const posInRow = rowInputs.indexOf(current);
+  if (posInRow === -1) return;
+
+  if (dir === "left" || dir === "right") {
+    const targetIdx = dir === "left" ? posInRow - 1 : posInRow + 1;
+    if (targetIdx < 0 || targetIdx >= rowInputs.length) return; // edge of the row -- stay put
+    rowInputs[targetIdx].focus();
+    return;
+  }
+
+  const allRows = getAllNavRows(root);
+  const rowIdx = allRows.indexOf(row);
+  if (rowIdx === -1) return;
+  const targetRowIdx = dir === "up" ? rowIdx - 1 : rowIdx + 1;
+  if (targetRowIdx < 0 || targetRowIdx >= allRows.length) return;
+  const targetRowInputs = getRowInputs(allRows[targetRowIdx]);
+  if (targetRowInputs.length === 0) return;
+  targetRowInputs[Math.min(posInRow, targetRowInputs.length - 1)].focus();
+}
+
+// Shared by both attachment points below: the delegated container handler, and noScrollProps (which
+// must call this directly for Up/Down, since it already calls preventDefault itself to stop the
+// number-input spinner -- letting that reach the container as an already-prevented event would
+// silently swallow the row jump on every field that uses noScrollProps).
+function navigateFieldFromEvent(target: HTMLInputElement, dir: ArrowDir) {
+  const root = target.closest<HTMLElement>("[data-stock-nav-root]") || document.body;
+  navigateField(target, dir, root);
+}
+
+const ARROW_DIRS: Record<string, ArrowDir> = { ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right" };
+
+function handleArrowNav(e: React.KeyboardEvent<HTMLDivElement>) {
+  if (e.defaultPrevented) return;
+  const dir = ARROW_DIRS[e.key];
+  if (!dir) return;
+  const target = e.target;
+  if (!isNavigableInput(target as Element)) return;
+  const input = target as HTMLInputElement;
+  // Left/Right only jump fields once the caret is already at the edge of the value in that
+  // direction -- otherwise the arrow key is just moving the text cursor, which must keep working.
+  if (dir === "left" && !isCaretAtStart(input)) return;
+  if (dir === "right" && !isCaretAtEnd(input)) return;
+  e.preventDefault();
+  navigateFieldFromEvent(input, dir);
+}
+
+function handleStockKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+  handleEnterAdvance(e);
+  if (!e.defaultPrevented) handleArrowNav(e);
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -1029,7 +1132,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
       {/* ── Net Weight ── */}
       <div className="space-y-1">
         <Label className="text-xs text-muted-foreground">{t("stock.netWeight")}</Label>
-        <div className="flex gap-2">
+        <div className="flex gap-2" data-nav-row>
           <Input
             data-testid="input-net-weight"
             type="text"
@@ -1063,7 +1166,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
         {txn.showWeightCalc && (
           <div className="bg-muted/50 rounded-md p-2 space-y-2 mt-1" data-testid="weight-calculator">
             <p className="text-xs font-semibold text-muted-foreground">{t("stock.sampleBagWeights")}</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2" data-nav-row>
               {txn.sampleWeights.map((w, idx) => (
                 <div key={idx} className="space-y-0.5 min-w-0">
                   <div className="flex items-center gap-1">
@@ -1138,7 +1241,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
               <span>{t("stock.freightAuto")}:</span><span>₹{freightFarmerTotal.toFixed(0)}</span>
             </div>
           )}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between" data-nav-row>
             <button
               type="button"
               className="flex items-center gap-0.5 text-xs hover:text-foreground text-muted-foreground"
@@ -1165,7 +1268,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
                 [t("stock.thelaBhada"), "extraThelaBhada", txn.extraThelaBhada],
                 [t("stock.others"), "extraOthers", txn.extraOthers],
               ] as [string, string, string][]).map(([label, field, val]) => (
-                <div key={field} className="flex items-center justify-between">
+                <div key={field} className="flex items-center justify-between" data-nav-row>
                   <span className="text-muted-foreground">{label}:</span>
                   <Input
                     data-testid={`input-${field}`}
@@ -1179,7 +1282,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
               ))}
             </div>
           )}
-          <div className="flex items-center justify-between border-t pt-1 mt-1">
+          <div className="flex items-center justify-between border-t pt-1 mt-1" data-nav-row>
             <span className="font-semibold">{t("stock.extraPerKg")}:</span>
             <Input
               data-testid="input-extra-per-kg-farmer"
@@ -1250,7 +1353,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
           <div className="flex justify-between"><span>{t("stock.muddatAnya")}:</span><span>{muddatAnyaBuyerPct}%</span></div>
           <div className="flex justify-between"><span>{t("stock.mandi")}:</span><span>{mandiBuyerPct}%</span></div>
           <div className="flex justify-between"><span>{t("stock.hammali")}:</span><span>₹{hammaliBuyerRate}/bag</span></div>
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between" data-nav-row>
             <span>{t("stock.extra")}:</span>
             <Input
               data-testid="input-extra-charges-buyer"
@@ -1261,7 +1364,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
               className="w-16 h-6 text-xs text-right p-1"
             />
           </div>
-          <div className="flex items-center justify-between border-t pt-1 mt-1">
+          <div className="flex items-center justify-between border-t pt-1 mt-1" data-nav-row>
             <span className="font-semibold">{t("stock.extraPerKg")}:</span>
             <Input
               data-testid="input-extra-per-kg-buyer"
@@ -1425,7 +1528,7 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2" data-nav-row>
             <div className="col-span-2 sm:col-span-1 relative">
               <Label className="text-xs text-muted-foreground">{t("stock.buyer")}</Label>
               <div className="relative">
@@ -1533,7 +1636,7 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
           )}
 
           {bid.paymentType === "Cash" && (
-            <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-200 rounded-md px-3 py-1.5">
+            <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-200 rounded-md px-3 py-1.5" data-nav-row>
               <span className="text-xs text-yellow-700 font-medium">{t("stock.cashAdvance")}</span>
               <Input
                 data-testid={`input-advance-amount-${bidIndex}`}
@@ -1641,7 +1744,7 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
 
       {lot.lotOpen && (
         <div className="p-3 space-y-3">
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" data-nav-row>
             <div>
               <Label className="text-xs text-muted-foreground">{t("stock.numBagsReq")}</Label>
               <Input
@@ -5368,7 +5471,7 @@ export default function StockPage() {
         <h1 className="text-lg font-bold">{t("stock.mandiStock")}</h1>
         <p className="text-xs text-muted-foreground">{t("stock.mandiStockDesc")}</p>
       </div>
-      <div className="flex-1 overflow-y-auto p-4 space-y-4" onKeyDown={handleEnterAdvance}>
+      <div className="flex-1 overflow-y-auto p-4 space-y-4" onKeyDown={handleStockKeyDown} data-stock-nav-root>
         {loadingCards && (
           <div className="flex items-center justify-center py-12">
             <div className="text-sm text-muted-foreground">{t("stock.loadingStockEntries")}</div>
