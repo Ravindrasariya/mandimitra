@@ -137,6 +137,32 @@ function getRowItems(row: HTMLElement): HTMLElement[] {
     .filter(el => isNavigableInput(el) && el.offsetParent !== null);
 }
 
+// A marked row can be a grid that wraps onto several visible lines (Farmer Details, Vehicle Info),
+// and how many fields fit on a line changes with the screen width. Rather than guess, group the
+// items by where they actually sit on screen, so Up/Down always steps to the line the eye expects.
+function getRowLines(items: HTMLElement[]): HTMLElement[][] {
+  const lines: HTMLElement[][] = [];
+  let lastTop: number | null = null;
+  for (const item of items) {
+    const top = item.getBoundingClientRect().top;
+    if (lastTop === null || Math.abs(top - lastTop) > 4) {
+      lines.push([item]);
+      lastTop = top;
+    } else {
+      lines[lines.length - 1].push(item);
+    }
+  }
+  return lines;
+}
+
+function locateInLines(lines: HTMLElement[][], el: HTMLElement): [number, number] {
+  for (let l = 0; l < lines.length; l++) {
+    const c = lines[l].indexOf(el);
+    if (c !== -1) return [l, c];
+  }
+  return [-1, -1];
+}
+
 function getAllNavRows(root: ParentNode): HTMLElement[] {
   return Array.from(root.querySelectorAll<HTMLElement>("[data-nav-row]")).filter(r => r.offsetParent !== null);
 }
@@ -174,17 +200,30 @@ function navigateField(current: HTMLElement, dir: ArrowDir, root: ParentNode) {
     return;
   }
 
-  // Up/Down always leave the current row, whichever field within it the cursor happens to be in,
-  // and try to keep the same left-to-right position in the row they land on.
-  const allRows = getAllNavRows(root);
-  let rowIdx = allRows.indexOf(row);
-  if (rowIdx === -1) return;
+  // Inside a grid that wraps onto several lines, Up/Down step line by line before leaving the row.
   const step = dir === "up" ? -1 : 1;
+  const lines = getRowLines(rowItems);
+  const [lineIdx, colIdx] = locateInLines(lines, current);
+  if (lineIdx === -1) return;
+  const nextLine = lines[lineIdx + step];
+  if (nextLine) {
+    nextLine[Math.min(colIdx, nextLine.length - 1)].focus();
+    return;
+  }
+
+  // Up/Down otherwise leave the current row, whichever field within it the cursor happens to be in,
+  // and try to keep the same left-to-right position on the line they land on.
+  const allRows = getAllNavRows(root);
+  const rowIdx = allRows.indexOf(row);
+  if (rowIdx === -1) return;
   // Skip any row that currently has nothing to land on (e.g. a disabled Add Bid button).
   for (let i = rowIdx + step; i >= 0 && i < allRows.length; i += step) {
     const targetItems = getRowItems(allRows[i]);
     if (targetItems.length === 0) continue;
-    targetItems[Math.min(posInRow, targetItems.length - 1)].focus();
+    const targetLines = getRowLines(targetItems);
+    // Coming from below, land on the target's *last* line, keeping the same column.
+    const line = dir === "up" ? targetLines[targetLines.length - 1] : targetLines[0];
+    line[Math.min(colIdx, line.length - 1)].focus();
     return;
   }
 }
@@ -1029,7 +1068,10 @@ function SectionToggle({ open, onToggle, icon, label, count, summary, badge }: {
     <button
       type="button"
       onClick={onToggle}
-      className="w-full flex items-start gap-2 px-3 py-2 rounded-md bg-muted/50 hover:bg-muted transition-colors text-sm font-medium text-left"
+      // While closed the bar is an arrow-key landing spot of its own (Enter opens it); once open its
+      // fields are the landing spots, so the bar steps out of the way.
+      {...(!open ? { "data-nav-row": "", "data-nav-stop": "" } : {})}
+      className="w-full flex items-start gap-2 px-3 py-2 rounded-md bg-muted/50 hover:bg-muted transition-colors text-sm font-medium text-left focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
     >
       {open ? <ChevronDown className="w-5 h-5 shrink-0 mt-0.5 text-muted-foreground" strokeWidth={3} /> : <ChevronRight className="w-5 h-5 shrink-0 mt-0.5 text-muted-foreground" strokeWidth={3} />}
       <span className="shrink-0 mt-0.5">{icon}</span>
@@ -2236,8 +2278,11 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, onBBChange, is
       {/* Header — click to collapse/expand */}
       <button
         type="button"
-        className={`w-full flex flex-col gap-1 px-4 py-2 ${headerCls} border-b hover:brightness-95 transition-all text-left`}
+        className={`w-full flex flex-col gap-1 px-4 py-2 ${headerCls} border-b hover:brightness-95 transition-all text-left focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500`}
         onClick={() => onChange({ ...group, groupOpen: !group.groupOpen })}
+        // Closed crop bar: a landing spot of its own, so Enter can open the crop even when its
+        // BB#/SR# boxes are locked. Once open, only the BB#/SR# row inside it is a stop.
+        {...(!group.groupOpen ? { "data-nav-row": "", "data-nav-stop": "" } : {})}
         data-testid={`button-toggle-group-${group.crop.toLowerCase()}`}
       >
         {/* Top row: title + action buttons */}
@@ -2245,7 +2290,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, onBBChange, is
           <div className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
             {group.groupOpen ? <ChevronDown className="w-5 h-5 shrink-0" strokeWidth={3} /> : <ChevronRight className="w-5 h-5 shrink-0" strokeWidth={3} />}
             <Wheat className="w-4 h-4 shrink-0" />
-            <span className="font-bold text-sm truncate flex items-center gap-1">
+            <span className="font-bold text-sm truncate flex items-center gap-1" data-nav-row>
               {bbSrLocked && <Lock className="w-3 h-3 shrink-0 text-muted-foreground" />}
               BB#<input
                 type="number"
@@ -2836,8 +2881,10 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
         )}
       </button>
 
+      {/* Arrow-key navigation stays inside the card the cursor is in: the nearest nav root wins,
+          so Up/Down can never wander into another farmer card or the page header. */}
       {card.cardOpen && !card.archived && (
-        <CardContent className="p-4 space-y-3">
+        <CardContent className="p-4 space-y-3" data-stock-nav-root="">
 
           {/* Farmer details */}
           <SectionToggle open={card.farmerOpen} onToggle={() => set("farmerOpen", !card.farmerOpen)}
@@ -2856,7 +2903,7 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
                   <span>{t("stock.conflictForFarmer")} <strong>{conflictCard.farmerName}</strong> {t("stock.conflictHasVehicleDetail").replace("{date}", card.date).replace("{vehicle}", conflictCard.vehicleNumber || "")}</span>
                 </div>
               )}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" data-nav-row>
                 <div className="relative">
                   <Label className="text-xs text-muted-foreground">{t("stock.farmerName")}</Label>
                   <Input data-testid="input-farmer-name" placeholder={t("stock.farmerNamePlaceholder")} value={card.farmerName}
@@ -2965,7 +3012,7 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
                   )}
                 </div>
               </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3" data-nav-row>
                 <div>
                   <Label className="text-xs text-muted-foreground">{t("stock.district")}</Label>
                   <Popover open={districtOpen} onOpenChange={setDistrictOpen}>
@@ -3037,7 +3084,7 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
               card.totalBagsInVehicle && `${card.totalBagsInVehicle} ${t("common.bags")}`,
             ].filter(Boolean) as string[]} />
           {card.vehicleOpen && (
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 pl-2">
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3 pl-2" data-nav-row>
               <div>
                 <Label className="text-xs text-muted-foreground">{t("stock.vehicleNumber")}</Label>
                 <Input data-testid="input-vehicle-number" placeholder={t("stock.vehiclePlaceholder")} value={card.vehicleNumber} onChange={e => set("vehicleNumber", e.target.value.toUpperCase())} className="h-8 text-sm" />
@@ -3129,12 +3176,14 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
                 {availableCrops.map(crop => (
                   <Button key={crop} type="button" variant="outline" size="sm"
                     onClick={() => addCrop(crop)}
-                    className={`h-8 gap-1.5 text-sm border-dashed font-medium ${
+                    className={`h-8 gap-1.5 text-sm border-dashed font-medium focus:ring-2 focus:ring-blue-500 ${
                       crop === "Potato" ? "border-violet-400 text-violet-600 hover:bg-violet-50" :
                       crop === "Onion"  ? "border-rose-400 text-rose-600 hover:bg-rose-50" :
                       "border-amber-400 text-amber-600 hover:bg-amber-50"
                     }`}
                     data-testid={`button-add-crop-${crop.toLowerCase()}`}
+                    data-nav-row=""
+                    data-nav-stop=""
                   >
                     <Plus className="w-3.5 h-3.5" />
                     {crop}
@@ -3153,8 +3202,10 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
           <div className="flex items-center justify-between pt-2 border-t border-border">
             <Button type="button" variant="outline" size="sm"
               onClick={onCancel}
-              className="h-8 text-sm gap-1.5 border-amber-500 text-amber-600 hover:bg-amber-50 hover:text-amber-700 dark:hover:bg-amber-950"
-              data-testid="button-cancel-entry">
+              className="h-8 text-sm gap-1.5 border-amber-500 text-amber-600 hover:bg-amber-50 hover:text-amber-700 dark:hover:bg-amber-950 focus:ring-2 focus:ring-blue-500"
+              data-testid="button-cancel-entry"
+              data-nav-row=""
+              data-nav-stop="">
               <X className="w-3.5 h-3.5" /> {t("common.cancel")}
             </Button>
             <div className="flex items-center gap-2">
@@ -3164,8 +3215,10 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
               <Button type="button"
                 onClick={onSave}
                 disabled={!isDirty || saving || conflictType === "error"}
-                className={`h-8 gap-1.5 text-sm transition-all ${isDirty && !saving && conflictType !== "error" ? "bg-primary text-primary-foreground" : "opacity-50"}`}
-                data-testid="button-save-entry">
+                className={`h-8 gap-1.5 text-sm transition-all focus:ring-2 focus:ring-blue-500 ${isDirty && !saving && conflictType !== "error" ? "bg-primary text-primary-foreground" : "opacity-50"}`}
+                data-testid="button-save-entry"
+                data-nav-row=""
+                data-nav-stop="">
                 {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />} {saving ? t("stock.saving") || "Saving..." : t("stock.saveEntry")}
               </Button>
             </div>
