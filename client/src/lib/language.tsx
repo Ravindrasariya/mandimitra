@@ -452,7 +452,7 @@ const translations: Record<string, Record<Language, string>> = {
   "stock.bhadaDue": { en: "Due", hi: "बाकी" },
   "stock.bhadaTotal": { en: "Total", hi: "कुल" },
   "stock.bhadaPaidAmount": { en: "Paid", hi: "भुगतान" },
-  "stock.weightCharges": { en: "Weight & Charges", hi: "वजन और शुल्क" },
+  "stock.weightCharges": { en: "Charges & Net Amount", hi: "शुल्क और शुद्ध राशि" },
   "stock.bidTxnDetails": { en: "Bid & Transaction Details", hi: "बोली और लेनदेन विवरण" },
   "stock.farmerCharges": { en: "Farmer Charges", hi: "किसान शुल्क" },
   "stock.buyerCharges": { en: "Buyer Charges", hi: "खरीदार शुल्क" },

@@ -1218,39 +1218,8 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
         {t("stock.weightCharges")}
       </div>
 
-      {/* ── Net Weight ── */}
+      {/* Net Weight itself now sits on the bid line above; only the calculator it opens lives here. */}
       <div className="space-y-1">
-        <Label className="text-xs text-muted-foreground">{t("stock.netWeight")}</Label>
-        <div className="flex gap-2" data-nav-row>
-          <Input
-            data-testid="input-net-weight"
-            type="text"
-            inputMode="decimal"
-            placeholder="0.00"
-            value={txn.netWeightInput}
-            onChange={e => set("netWeightInput", toNum(e.target.value))}
-            onFocus={e => e.currentTarget.select()}
-            {...noScrollProps}
-            className="h-8 text-sm flex-1"
-          />
-          <Button
-            type="button"
-            size="sm"
-            variant={txn.showWeightCalc ? "default" : "outline"}
-            className="h-8 whitespace-nowrap text-xs gap-1"
-            onClick={() => set("showWeightCalc", !txn.showWeightCalc)}
-            data-testid="button-calc-weight"
-          >
-            <Calculator className="w-3.5 h-3.5" /> {t("stock.calcWt")}
-          </Button>
-        </div>
-        {bags > 0 && (
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-xs text-muted-foreground">{t("stock.total")} — {bags} {t("common.bags")}</p>
-            {nw > 0 && <p data-testid="text-net-wt-avg" className="text-xs font-medium text-orange-500 dark:text-orange-400">{t("stock.avgWeight")}: {(nw / bags).toFixed(2)} kg</p>}
-          </div>
-        )}
-
         {/* ── Weight calculator ── */}
         {txn.showWeightCalc && (
           <div className="bg-muted/50 rounded-md p-2 space-y-2 mt-1" data-testid="weight-calculator">
@@ -1321,10 +1290,6 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
         {/* ── Farmer column ── */}
         <div className="bg-background rounded border border-border p-2 space-y-1">
           <p className="font-semibold text-muted-foreground">{t("stock.farmerCharges")}</p>
-          <div className="flex justify-between"><span>{t("stock.aadhat")}:</span><span>{aadhatFarmerPct}%</span></div>
-          <div className="flex justify-between"><span>{t("stock.muddatAnya")}:</span><span>{muddatAnyaFarmerPct}%</span></div>
-          <div className="flex justify-between"><span>{t("stock.mandi")}:</span><span>{mandiFarmerPct}%</span></div>
-          <div className="flex justify-between"><span>{t("stock.hammali")}:</span><span>₹{hammaliFarmerRate}/bag</span></div>
           {freightFarmerTotal > 0 && (
             <div className="flex justify-between text-muted-foreground">
               <span>{t("stock.freightAuto")}:</span><span>₹{freightFarmerTotal.toFixed(0)}</span>
@@ -1438,10 +1403,6 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
         {/* ── Buyer column ── */}
         <div className="bg-background rounded border border-border p-2 space-y-1">
           <p className="font-semibold text-muted-foreground">{t("stock.buyerCharges")}</p>
-          <div className="flex justify-between"><span>{t("stock.aadhat")}:</span><span>{aadhatBuyerPct}%</span></div>
-          <div className="flex justify-between"><span>{t("stock.muddatAnya")}:</span><span>{muddatAnyaBuyerPct}%</span></div>
-          <div className="flex justify-between"><span>{t("stock.mandi")}:</span><span>{mandiBuyerPct}%</span></div>
-          <div className="flex justify-between"><span>{t("stock.hammali")}:</span><span>₹{hammaliBuyerRate}/bag</span></div>
           <div className="flex items-center justify-between" data-nav-row>
             <span>{t("stock.extra")}:</span>
             <Input
@@ -1618,8 +1579,10 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2" data-nav-row>
-            <div className="col-span-2 sm:col-span-1 relative">
+          {/* Buyer keeps the width it needs for real names; the rest are tightened so Net Weight
+              fits on the same line instead of costing a whole section of its own below. */}
+          <div className="grid grid-cols-2 sm:grid-cols-12 gap-2" data-nav-row>
+            <div className="col-span-2 sm:col-span-3 relative">
               <Label className="text-xs text-muted-foreground">{t("stock.buyer")}</Label>
               <div className="relative">
                 <Input
@@ -1667,7 +1630,7 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
                 </div>
               )}
             </div>
-            <div>
+            <div className="sm:col-span-2">
               <Label className="text-xs text-muted-foreground">{t("stock.pricePerKg")}</Label>
               <Input
                 data-testid={`input-price-per-kg-${bidIndex}`}
@@ -1678,7 +1641,7 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
                 className="h-8 text-sm"
               />
             </div>
-            <div>
+            <div className="sm:col-span-1">
               <Label className="text-xs text-muted-foreground">{t("stock.numBags")}</Label>
               <Input
                 data-testid={`input-bid-bags-${bidIndex}`}
@@ -1694,7 +1657,42 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
                 </p>
               )}
             </div>
-            <div>
+            {/* Net Weight lives on the bid line now; the calculator it opens still renders inside the
+                charges section below, exactly as before. */}
+            <div className="sm:col-span-2">
+              <div className="flex items-center justify-between gap-1">
+                <Label className="text-xs text-muted-foreground truncate">{t("stock.netWeight")}</Label>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={bid.txn.showWeightCalc ? "default" : "outline"}
+                  className="h-5 w-5 p-0 shrink-0"
+                  title={t("stock.calcWt")}
+                  aria-label={t("stock.calcWt")}
+                  onClick={() => onChange({ ...bid, txn: { ...bid.txn, showWeightCalc: !bid.txn.showWeightCalc } })}
+                  data-testid="button-calc-weight"
+                >
+                  <Calculator className="w-3 h-3" />
+                </Button>
+              </div>
+              <Input
+                data-testid="input-net-weight"
+                type="text"
+                inputMode="decimal"
+                placeholder="0.00"
+                value={bid.txn.netWeightInput}
+                onChange={e => onChange({ ...bid, txn: { ...bid.txn, netWeightInput: toNum(e.target.value) } })}
+                onFocus={e => e.currentTarget.select()}
+                {...noScrollProps}
+                className="h-8 text-sm"
+              />
+              {bags > 0 && (parseFloat(bid.txn.netWeightInput) || 0) > 0 && (
+                <p data-testid="text-net-wt-avg" className="text-xs font-medium text-orange-500 dark:text-orange-400 mt-0.5 truncate">
+                  {t("stock.avgWeight")}: {((parseFloat(bid.txn.netWeightInput) || 0) / bags).toFixed(2)} kg
+                </p>
+              )}
+            </div>
+            <div className="sm:col-span-2">
               <Label className="text-xs text-muted-foreground">Haste</Label>
               <Input
                 data-testid={`input-haste-${bidIndex}`}
@@ -1704,7 +1702,7 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
                 className="h-8 text-sm"
               />
             </div>
-            <div>
+            <div className="sm:col-span-2">
               <Label className="text-xs text-muted-foreground">{t("stock.payment")}</Label>
               <Select value={bid.paymentType} onValueChange={v => onChange({ ...bid, paymentType: v })}>
                 <SelectTrigger data-testid={`select-payment-type-${bidIndex}`} className="h-8 text-sm">
