@@ -106,7 +106,8 @@ function handleEnterAdvance(e: React.KeyboardEvent<HTMLDivElement>) {
 //
 // Every "row" of fields the user is meant to arrow through -- a lot's own fields, a bid's fields, a
 // charge field row inside the weight/charges panel -- is marked with `data-nav-row` on its wrapping
-// element. Left/Right move between the text/number fields inside the current row; Up/Down move to
+// element. Left/Right move between the text/number fields inside the current row and carry on into
+// the next / previous row once they run off its end; Up/Down move to
 // the field at (roughly) the same position in the row above/below, in document order -- which,
 // because the page nests bids inside their lot and lots inside their crop group, naturally walks
 // lot -> its bids -> next lot exactly as the fields are laid out on screen.
@@ -122,8 +123,8 @@ function isNavigableInput(el: Element): el is HTMLInputElement {
 }
 
 // A "stop" is a whole-row landing spot that is not a text field: a collapsed lot / bid bar, or an
-// Add Bid / Add Lot button. Up/Down land on it exactly like they land on a field, but it is the only
-// item in its row, so Left/Right simply have nowhere to go and stay put. Pressing Enter on it does
+// Add Bid / Add Lot button. Up/Down land on it exactly like they land on a field; being the only
+// item in its row, Left/Right immediately carry on into the neighbouring row. Pressing Enter on it does
 // whatever the button already does (expand the section, add the row) -- see handleStopEnter.
 function isNavStop(el: Element | null): el is HTMLElement {
   return el instanceof HTMLElement
@@ -214,8 +215,23 @@ function navigateField(current: HTMLElement, dir: ArrowDir, root: ParentNode) {
 
   if (dir === "left" || dir === "right") {
     const targetIdx = dir === "left" ? posInRow - 1 : posInRow + 1;
-    if (targetIdx < 0 || targetIdx >= rowItems.length) return; // edge of the row -- stay put
-    rowItems[targetIdx].focus();
+    if (targetIdx >= 0 && targetIdx < rowItems.length) {
+      rowItems[targetIdx].focus();
+      return;
+    }
+    // Off the end of the row: carry straight on into the neighbouring row -- its first field going
+    // right, its last field going left -- skipping any row with nothing to land on. At the very
+    // first / very last field of the page there is nowhere to go, so focus simply stays put.
+    const rows = getAllNavRows(root);
+    const here = rows.indexOf(row);
+    if (here === -1) return;
+    const step = dir === "left" ? -1 : 1;
+    for (let i = here + step; i >= 0 && i < rows.length; i += step) {
+      const items = getRowItems(rows[i]);
+      if (items.length === 0) continue;
+      (dir === "left" ? items[items.length - 1] : items[0]).focus();
+      return;
+    }
     return;
   }
 
