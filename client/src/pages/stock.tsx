@@ -931,6 +931,7 @@ function calcBidTotals(bid: BidRow, cs: ChargeSettings, vehicleBhadaRate: number
   const buyerAdd = hbRate * bidBags + extraBuyer + aadhatBuyer + (buyerGross * mandiBPct) / 100 + muddatAnyaBuyer;
   return {
     bidBags,
+    farmerGross,
     farmerPayable: farmerGross - farmerDed,
     buyerReceivable: buyerGross + buyerAdd,
     aadhatBuyer,
@@ -1582,7 +1583,7 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
           {/* Buyer keeps the width it needs for real names; the rest are tightened so Net Weight
               fits on the same line instead of costing a whole section of its own below. */}
           {/* Buyer keeps extra width for long names; every other field shares one equal column. */}
-          <div className="grid grid-cols-2 sm:grid-cols-[minmax(0,1.6fr)_repeat(5,minmax(0,1fr))] gap-2 items-start" data-nav-row>
+          <div className="grid grid-cols-2 sm:grid-cols-[minmax(0,1.6fr)_repeat(6,minmax(0,1fr))] gap-2 items-start" data-nav-row>
             <div className="col-span-2 sm:col-span-1 min-w-0 relative">
               <div className="flex h-4 items-center"><Label className="text-xs text-muted-foreground truncate">{t("stock.buyer")}</Label></div>
               <div className="relative">
@@ -1695,6 +1696,18 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
                   {t("stock.avgWeight")}: {((parseFloat(bid.txn.netWeightInput) || 0) / bags).toFixed(2)} kg
                 </p>
               )}
+            </div>
+            {/* Read-only mirror of the Gross line in the charges block below: same
+                calcBidTotals figure, so it can never drift from what is saved. */}
+            <div className="min-w-0">
+              <div className="flex h-4 items-center"><Label className="text-xs text-muted-foreground truncate">{t("stock.grossAmount")}</Label></div>
+              <div
+                data-testid={`text-bid-gross-${bidIndex}`}
+                aria-readonly="true"
+                className="h-8 flex items-center justify-end rounded-md border border-input bg-muted/60 px-3 text-sm font-medium tabular-nums truncate"
+              >
+                ₹{(totals.hasData ? totals.farmerGross : 0).toFixed(0)}
+              </div>
             </div>
             <div className="min-w-0">
               <div className="flex h-4 items-center"><Label className="text-xs text-muted-foreground truncate">Haste</Label></div>

@@ -473,6 +473,7 @@ const translations: Record<string, Record<Language, string>> = {
   "stock.extra": { en: "Extra", hi: "अतिरिक्त" },
   "stock.extraPerKg": { en: "Extra ₹/Kg", hi: "अतिरिक्त ₹/किलो" },
   "stock.gross": { en: "Gross", hi: "कुल" },
+  "stock.grossAmount": { en: "Gross Amount", hi: "कुल राशि" },
   "stock.deductions": { en: "Deductions", hi: "कटौती" },
   "stock.additions": { en: "Additions", hi: "जोड़" },
   "stock.noDeductions": { en: "No deductions", hi: "कोई कटौती नहीं" },
