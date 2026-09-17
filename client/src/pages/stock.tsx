@@ -1581,9 +1581,10 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
 
           {/* Buyer keeps the width it needs for real names; the rest are tightened so Net Weight
               fits on the same line instead of costing a whole section of its own below. */}
-          <div className="grid grid-cols-2 sm:grid-cols-12 gap-2" data-nav-row>
-            <div className="col-span-2 sm:col-span-3 relative">
-              <Label className="text-xs text-muted-foreground">{t("stock.buyer")}</Label>
+          {/* Buyer keeps extra width for long names; every other field shares one equal column. */}
+          <div className="grid grid-cols-2 sm:grid-cols-[minmax(0,1.6fr)_repeat(5,minmax(0,1fr))] gap-2 items-start" data-nav-row>
+            <div className="col-span-2 sm:col-span-1 min-w-0 relative">
+              <div className="flex h-4 items-center"><Label className="text-xs text-muted-foreground truncate">{t("stock.buyer")}</Label></div>
               <div className="relative">
                 <Input
                   data-testid={`input-buyer-name-${bidIndex}`}
@@ -1630,8 +1631,8 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
                 </div>
               )}
             </div>
-            <div className="sm:col-span-2">
-              <Label className="text-xs text-muted-foreground">{t("stock.pricePerKg")}</Label>
+            <div className="min-w-0">
+              <div className="flex h-4 items-center"><Label className="text-xs text-muted-foreground truncate">{t("stock.pricePerKg")}</Label></div>
               <Input
                 data-testid={`input-price-per-kg-${bidIndex}`}
                 type="number" placeholder="0.00"
@@ -1641,8 +1642,8 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
                 className="h-8 text-sm"
               />
             </div>
-            <div className="sm:col-span-1">
-              <Label className="text-xs text-muted-foreground">{t("stock.numBags")}</Label>
+            <div className="min-w-0">
+              <div className="flex h-4 items-center"><Label className="text-xs text-muted-foreground truncate">{t("stock.numBags")}</Label></div>
               <Input
                 data-testid={`input-bid-bags-${bidIndex}`}
                 type="number" placeholder="0"
@@ -1659,21 +1660,24 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
             </div>
             {/* Net Weight lives on the bid line now; the calculator it opens still renders inside the
                 charges section below, exactly as before. */}
-            <div className="sm:col-span-2">
-              <div className="flex items-center justify-between gap-1">
+            <div className="min-w-0">
+              <div className="flex h-4 items-center justify-between gap-1">
                 <Label className="text-xs text-muted-foreground truncate">{t("stock.netWeight")}</Label>
-                <Button
+                {/* No button chrome: the label line must stay exactly as tall as a plain label,
+                    or this cell's input drops below the others. Active state shows as colour. */}
+                <button
                   type="button"
-                  size="sm"
-                  variant={bid.txn.showWeightCalc ? "default" : "outline"}
-                  className="h-5 w-5 p-0 shrink-0"
+                  className={`h-4 w-4 shrink-0 flex items-center justify-center transition-colors ${
+                    bid.txn.showWeightCalc ? "text-blue-600" : "text-muted-foreground hover:text-foreground"
+                  }`}
                   title={t("stock.calcWt")}
                   aria-label={t("stock.calcWt")}
+                  aria-pressed={bid.txn.showWeightCalc}
                   onClick={() => onChange({ ...bid, txn: { ...bid.txn, showWeightCalc: !bid.txn.showWeightCalc } })}
                   data-testid="button-calc-weight"
                 >
-                  <Calculator className="w-3 h-3" />
-                </Button>
+                  <Calculator className="w-3.5 h-3.5" />
+                </button>
               </div>
               <Input
                 data-testid="input-net-weight"
@@ -1692,8 +1696,8 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
                 </p>
               )}
             </div>
-            <div className="sm:col-span-2">
-              <Label className="text-xs text-muted-foreground">Haste</Label>
+            <div className="min-w-0">
+              <div className="flex h-4 items-center"><Label className="text-xs text-muted-foreground truncate">Haste</Label></div>
               <Input
                 data-testid={`input-haste-${bidIndex}`}
                 placeholder="KHUD"
@@ -1702,8 +1706,8 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
                 className="h-8 text-sm"
               />
             </div>
-            <div className="sm:col-span-2">
-              <Label className="text-xs text-muted-foreground">{t("stock.payment")}</Label>
+            <div className="min-w-0">
+              <div className="flex h-4 items-center"><Label className="text-xs text-muted-foreground truncate">{t("stock.payment")}</Label></div>
               <Select value={bid.paymentType} onValueChange={v => onChange({ ...bid, paymentType: v })}>
                 <SelectTrigger data-testid={`select-payment-type-${bidIndex}`} className="h-8 text-sm">
                   <SelectValue />
