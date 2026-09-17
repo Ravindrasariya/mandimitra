@@ -111,9 +111,10 @@ function handleEnterAdvance(e: React.KeyboardEvent<HTMLDivElement>) {
 // because the page nests bids inside their lot and lots inside their crop group, naturally walks
 // lot -> its bids -> next lot exactly as the fields are laid out on screen.
 //
-// This deliberately never touches a <select> trigger, a date field, or a currently-open autocomplete
-// suggestion list -- those already have their own meaning for arrow keys (Radix opening/changing a
-// selection, the browser stepping a date segment, or highlighting a suggestion) and must keep it.
+// A dropdown inside an entry row takes part too (see isNavSelect): closed, it is just another cell;
+// Down opens its list and from then on every key belongs to the list. Date fields and a currently-
+// open autocomplete suggestion list are still never touched -- the browser stepping a date segment
+// and highlighting a suggestion must keep working.
 type ArrowDir = "up" | "down" | "left" | "right";
 
 function isNavigableInput(el: Element): el is HTMLInputElement {
@@ -131,10 +132,28 @@ function isNavStop(el: Element | null): el is HTMLElement {
     && !(el as HTMLButtonElement).disabled;
 }
 
+// A dropdown trigger (Radix Select renders it as role="combobox") is a landing spot just like a
+// text field: the user must be able to arrow onto it, open it, pick, and carry on without the
+// keyboard dead-ending there. While its list is open every key belongs to the list, so navigation
+// checks isSelectOpen first.
+// Opt-in only (`data-nav-select` on the trigger) and only inside an entry row, so the page's own
+// filter dropdowns at the top of the register keep their untouched default key behaviour.
+function isNavSelect(el: Element | null): el is HTMLElement {
+  return el instanceof HTMLElement
+    && el.hasAttribute("data-nav-select")
+    && el.closest("[data-nav-row]") !== null
+    && el.offsetParent !== null
+    && !(el as HTMLButtonElement).disabled;
+}
+
+function isSelectOpen(el: HTMLElement): boolean {
+  return el.getAttribute("data-state") === "open" || el.getAttribute("aria-expanded") === "true";
+}
+
 function getRowItems(row: HTMLElement): HTMLElement[] {
   if (row.hasAttribute("data-nav-stop")) return isNavStop(row) ? [row] : [];
-  return Array.from(row.querySelectorAll<HTMLElement>("input:not([disabled])"))
-    .filter(el => isNavigableInput(el) && el.offsetParent !== null);
+  return Array.from(row.querySelectorAll<HTMLElement>("input:not([disabled]), [data-nav-select]"))
+    .filter(el => (isNavigableInput(el) || isNavSelect(el)) && el.offsetParent !== null);
 }
 
 // A marked row can be a grid that wraps onto several visible lines (Farmer Details, Vehicle Info),
@@ -250,6 +269,8 @@ function handleArrowNav(e: React.KeyboardEvent<HTMLDivElement>) {
     navigateFieldFromEvent(target, dir);
     return;
   }
+  // Dropdowns are handled in the capture phase above, before their own trigger consumes the key.
+  if (isNavSelect(target)) return;
   if (!isNavigableInput(target)) return;
   const input = target as HTMLInputElement;
   // Left/Right only jump fields once the caret is already at the edge of the value in that
@@ -274,6 +295,33 @@ function handleStopEnter(e: React.KeyboardEvent<HTMLDivElement>) {
     const appeared = getAllNavItems(root).find(el => !before.has(el));
     if (appeared) appeared.focus();
   }));
+}
+
+// Dropdown keys have to be taken in the capture phase: the dropdown's own trigger handler runs
+// first on the bubble path and already calls preventDefault for Enter / Up / Down, which would make
+// the shared handler below think another handler had consumed the key. Only a *closed* dropdown is
+// touched, and Down is always left alone so it still opens the list.
+function handleStockKeyDownCapture(e: React.KeyboardEvent<HTMLDivElement>) {
+  if (e.defaultPrevented) return;
+  const target = e.target as Element;
+  if (!isNavSelect(target) || isSelectOpen(target)) return;
+  if (e.key === "Enter") {
+    e.preventDefault();
+    focusNextFieldInOrder(target, e.currentTarget);
+    return;
+  }
+  const dir = ARROW_DIRS[e.key];
+  if (!dir) return;
+  if (dir === "down") {
+    // Down opens the list. A Radix Select trigger does that itself; the district search is a popover
+    // button, which only opens on click, so Down is turned into that click for it.
+    if (target.getAttribute("data-nav-select") !== "popover") return;
+    e.preventDefault();
+    (target as HTMLButtonElement).click();
+    return;
+  }
+  e.preventDefault();
+  navigateFieldFromEvent(target, dir);
 }
 
 function handleStockKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
@@ -1719,7 +1767,7 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
             <div className="min-w-0">
               <div className="flex h-4 items-center"><Label className="text-xs text-muted-foreground truncate">{t("stock.payment")}</Label></div>
               <Select value={bid.paymentType} onValueChange={v => onChange({ ...bid, paymentType: v })}>
-                <SelectTrigger data-testid={`select-payment-type-${bidIndex}`} className="h-8 text-sm">
+                <SelectTrigger data-nav-select data-testid={`select-payment-type-${bidIndex}`} className="h-8 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -1863,7 +1911,7 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
             <div>
               <Label className="text-xs text-muted-foreground">{t("stock.size")}</Label>
               <Select value={lot.size} onValueChange={v => setField("size", v)}>
-                <SelectTrigger data-testid={`select-size-${index}`} className="h-8 text-sm">
+                <SelectTrigger data-nav-select data-testid={`select-size-${index}`} className="h-8 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -3029,7 +3077,7 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
                   <Label className="text-xs text-muted-foreground">{t("stock.district")}</Label>
                   <Popover open={districtOpen} onOpenChange={setDistrictOpen}>
                     <PopoverTrigger asChild>
-                      <Button data-testid="select-district" variant="outline" role="combobox" aria-expanded={districtOpen} className="h-8 w-full justify-between text-sm font-normal">
+                      <Button data-nav-select="popover" data-testid="select-district" variant="outline" role="combobox" aria-expanded={districtOpen} className="h-8 w-full justify-between text-sm font-normal">
                         {card.district || <span className="text-muted-foreground">{t("stock.selectDistrict")}</span>}
                         <ChevronsUpDown className="ml-1 h-3.5 w-3.5 shrink-0 opacity-50" />
                       </Button>
@@ -3055,7 +3103,7 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
                 <div>
                   <Label className="text-xs text-muted-foreground">{t("stock.state")}</Label>
                   <Select value={card.state} onValueChange={v => set("state", v)}>
-                    <SelectTrigger data-testid="select-state" className="h-8 text-sm pl-1">
+                    <SelectTrigger data-nav-select data-testid="select-state" className="h-8 text-sm pl-1">
                       <SelectValue placeholder={t("stock.selectState")} />
                     </SelectTrigger>
                     <SelectContent>
@@ -3072,7 +3120,7 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
                 <div>
                   <Label className="text-xs text-muted-foreground">{t("stock.mode")}</Label>
                   <Select value={card.advanceMode} onValueChange={v => set("advanceMode", v)}>
-                    <SelectTrigger data-testid="select-advance-mode" className="h-8 text-sm">
+                    <SelectTrigger data-nav-select data-testid="select-advance-mode" className="h-8 text-sm">
                       <SelectValue placeholder={t("stock.selectMode")} />
                     </SelectTrigger>
                     <SelectContent>
@@ -5589,7 +5637,7 @@ export default function StockPage() {
         <h1 className="text-lg font-bold">{t("stock.mandiStock")}</h1>
         <p className="text-xs text-muted-foreground">{t("stock.mandiStockDesc")}</p>
       </div>
-      <div className="flex-1 overflow-y-auto p-4 space-y-4" onKeyDown={handleStockKeyDown} data-stock-nav-root>
+      <div className="flex-1 overflow-y-auto p-4 space-y-4" onKeyDownCapture={handleStockKeyDownCapture} onKeyDown={handleStockKeyDown} data-stock-nav-root>
         {loadingCards && (
           <div className="flex items-center justify-center py-12">
             <div className="text-sm text-muted-foreground">{t("stock.loadingStockEntries")}</div>
