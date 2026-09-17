@@ -1291,11 +1291,8 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
         {/* ── Farmer column ── */}
         <div className="bg-background rounded border border-border p-2 space-y-1">
           <p className="font-semibold text-muted-foreground">{t("stock.farmerCharges")}</p>
-          {freightFarmerTotal > 0 && (
-            <div className="flex justify-between text-muted-foreground">
-              <span>{t("stock.freightAuto")}:</span><span>₹{freightFarmerTotal.toFixed(0)}</span>
-            </div>
-          )}
+          {/* Freight is shown once, in the deductions list of the summary below. The old static
+              line here repeated the same number. */}
           <div className="flex items-center justify-between" data-nav-row>
             <button
               type="button"
