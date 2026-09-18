@@ -1694,17 +1694,6 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
               )}
             </div>
             <div className="min-w-0">
-              <div className="flex h-4 items-center"><Label className="text-xs text-muted-foreground truncate">{t("stock.pricePerKg")}</Label></div>
-              <Input
-                data-testid={`input-price-per-kg-${bidIndex}`}
-                type="number" placeholder="0.00"
-                value={bid.pricePerKg}
-                onChange={e => onChange({ ...bid, pricePerKg: toNum(e.target.value) })}
-                {...noScrollProps}
-                className="h-8 text-sm"
-              />
-            </div>
-            <div className="min-w-0">
               <div className="flex h-4 items-center"><Label className="text-xs text-muted-foreground truncate">{t("stock.numBags")}</Label></div>
               <Input
                 data-testid={`input-bid-bags-${bidIndex}`}
@@ -1719,6 +1708,17 @@ function BidSection({ bid, bidIndex, onChange, onRemove, canRemove, vehicleBhada
                   <AlertTriangle className="w-3 h-3" /> {t("stock.exceedsLotBags")}
                 </p>
               )}
+            </div>
+            <div className="min-w-0">
+              <div className="flex h-4 items-center"><Label className="text-xs text-muted-foreground truncate">{t("stock.pricePerKg")}</Label></div>
+              <Input
+                data-testid={`input-price-per-kg-${bidIndex}`}
+                type="number" placeholder="0.00"
+                value={bid.pricePerKg}
+                onChange={e => onChange({ ...bid, pricePerKg: toNum(e.target.value) })}
+                {...noScrollProps}
+                className="h-8 text-sm"
+              />
             </div>
             {/* Net Weight lives on the bid line now; the calculator it opens still renders inside the
                 charges section below, exactly as before. */}
