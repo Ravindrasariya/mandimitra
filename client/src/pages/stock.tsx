@@ -72,8 +72,10 @@ const noScrollProps = {
 const FOCUSABLE_SELECTOR = 'input:not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 function focusNextFieldInOrder(current: HTMLElement, container: ParentNode) {
+  // `data-skip-nav` marks rarely used fields (Extra ₹/Kg): reachable by click only, never a stop for Enter.
   const all = Array.from(container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR))
-    .filter(el => el.offsetParent !== null || el === document.activeElement);
+    .filter(el => (el.offsetParent !== null || el === document.activeElement)
+      && (el === current || !el.hasAttribute("data-skip-nav")));
   const idx = all.indexOf(current);
   if (idx === -1) return;
   for (let i = idx + 1; i < all.length; i++) {
@@ -1168,6 +1170,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
 }) {
   const { t } = useLanguage();
   const set = (field: keyof TxnState, val: any) => onChange({ ...txn, [field]: val });
+  const [showExtraPerKg, setShowExtraPerKg] = useState(false);
 
   const prevAutoRef = useRef({ bags, tulaiFRate: 0, kkFRate: 0 });
   const tulaiFRate = parseFloat(cs.tulaiFarmerPerBag) || 0;
@@ -1246,6 +1249,23 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
   const mandiBuyerPct = parseFloat(cs.mandiCommissionBuyerPercent) || 0;
   const muddatAnyaFarmerPct = parseFloat(cs.muddatAnyaFarmerPercent) || 0;
   const muddatAnyaBuyerPct = parseFloat(cs.muddatAnyaBuyerPercent) || 0;
+
+  // Display only: Extra ₹/Kg is rarely used, so it stays folded away and out of the keyboard flow.
+  // It opens on demand, and always shows when either side already holds a value.
+  const extraPerKgOpen = showExtraPerKg || epkFarmer > 0 || epkBuyer > 0;
+  const extraPerKgToggle = (
+    <button
+      type="button"
+      data-testid="button-toggle-extra-per-kg"
+      data-skip-nav
+      tabIndex={-1}
+      className="flex items-center gap-0.5 text-xs text-muted-foreground hover:text-foreground border-t pt-1 mt-1 w-full"
+      onClick={() => setShowExtraPerKg(v => !v)}
+    >
+      {extraPerKgOpen ? <ChevronDown className="w-4 h-4" strokeWidth={3} /> : <ChevronRight className="w-4 h-4" strokeWidth={3} />}
+      {t("stock.extraPerKg")}
+    </button>
+  );
 
   const freightFarmerTotal = totalBagsInVehicle > 0 ? Math.round((vehicleBhadaRate * bags) / totalBagsInVehicle) : 0;
 
@@ -1398,17 +1418,22 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
               ))}
             </div>
           )}
-          <div className="flex items-center justify-between border-t pt-1 mt-1" data-nav-row>
-            <span className="font-semibold">{t("stock.extraPerKg")}:</span>
-            <Input
-              data-testid="input-extra-per-kg-farmer"
-              type="text" inputMode="decimal"
-              value={txn.extraPerKgFarmer}
-              onChange={e => set("extraPerKgFarmer", toNum(e.target.value))}
-              onFocus={e => e.currentTarget.select()}
-              className="w-16 h-6 text-xs text-right p-1"
-            />
-          </div>
+          {extraPerKgToggle}
+          {extraPerKgOpen && (
+            <div className="flex items-center justify-between pt-1">
+              <span className="font-semibold">{t("stock.extraPerKg")}:</span>
+              <Input
+                data-testid="input-extra-per-kg-farmer"
+                data-skip-nav
+                tabIndex={-1}
+                type="text" inputMode="decimal"
+                value={txn.extraPerKgFarmer}
+                onChange={e => set("extraPerKgFarmer", toNum(e.target.value))}
+                onFocus={e => e.currentTarget.select()}
+                className="w-16 h-6 text-xs text-right p-1"
+              />
+            </div>
+          )}
 
           {nw > 0 && pricePerKg > 0 && (
             <div className="border-t pt-1.5 mt-1.5 bg-green-50 dark:bg-green-950/30 rounded-md p-2 -mx-0.5 space-y-0.5">
@@ -1476,17 +1501,22 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
               className="w-16 h-6 text-xs text-right p-1"
             />
           </div>
-          <div className="flex items-center justify-between border-t pt-1 mt-1" data-nav-row>
-            <span className="font-semibold">{t("stock.extraPerKg")}:</span>
-            <Input
-              data-testid="input-extra-per-kg-buyer"
-              type="text" inputMode="decimal"
-              value={txn.extraPerKgBuyer}
-              onChange={e => set("extraPerKgBuyer", toNum(e.target.value))}
-              onFocus={e => e.currentTarget.select()}
-              className="w-16 h-6 text-xs text-right p-1"
-            />
-          </div>
+          {extraPerKgToggle}
+          {extraPerKgOpen && (
+            <div className="flex items-center justify-between pt-1">
+              <span className="font-semibold">{t("stock.extraPerKg")}:</span>
+              <Input
+                data-testid="input-extra-per-kg-buyer"
+                data-skip-nav
+                tabIndex={-1}
+                type="text" inputMode="decimal"
+                value={txn.extraPerKgBuyer}
+                onChange={e => set("extraPerKgBuyer", toNum(e.target.value))}
+                onFocus={e => e.currentTarget.select()}
+                className="w-16 h-6 text-xs text-right p-1"
+              />
+            </div>
+          )}
 
           {nw > 0 && pricePerKg > 0 && (
             <div className="border-t pt-1.5 mt-1.5 bg-blue-50 dark:bg-blue-950/30 rounded-md p-2 -mx-0.5 space-y-0.5">
