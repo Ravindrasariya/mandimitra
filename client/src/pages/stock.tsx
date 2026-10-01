@@ -1170,7 +1170,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
 }) {
   const { t } = useLanguage();
   const set = (field: keyof TxnState, val: any) => onChange({ ...txn, [field]: val });
-  const [showExtraPerKg, setShowExtraPerKg] = useState(false);
+  const [showExtraPerKgBuyer, setShowExtraPerKgBuyer] = useState(false);
 
   const prevAutoRef = useRef({ bags, tulaiFRate: 0, kkFRate: 0 });
   const tulaiFRate = parseFloat(cs.tulaiFarmerPerBag) || 0;
@@ -1250,22 +1250,10 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
   const muddatAnyaFarmerPct = parseFloat(cs.muddatAnyaFarmerPercent) || 0;
   const muddatAnyaBuyerPct = parseFloat(cs.muddatAnyaBuyerPercent) || 0;
 
-  // Display only: Extra ₹/Kg is rarely used, so it stays folded away and out of the keyboard flow.
-  // It opens on demand, and always shows when either side already holds a value.
-  const extraPerKgOpen = showExtraPerKg || epkFarmer > 0 || epkBuyer > 0;
-  const extraPerKgToggle = (
-    <button
-      type="button"
-      data-testid="button-toggle-extra-per-kg"
-      data-skip-nav
-      tabIndex={-1}
-      className="flex items-center gap-0.5 text-xs text-muted-foreground hover:text-foreground border-t pt-1 mt-1 w-full"
-      onClick={() => setShowExtraPerKg(v => !v)}
-    >
-      {extraPerKgOpen ? <ChevronDown className="w-4 h-4" strokeWidth={3} /> : <ChevronRight className="w-4 h-4" strokeWidth={3} />}
-      {t("stock.extraPerKg")}
-    </button>
-  );
+  // Display only: Extra ₹/Kg is rarely used, so it sits inside each side's own "Extra:" fold-out and
+  // out of the keyboard flow. A side always shows its row when it already holds a value.
+  const extraPerKgFarmerOpen = !!txn.showExtraBreakdown || epkFarmer > 0;
+  const extraPerKgBuyerOpen = showExtraPerKgBuyer || epkBuyer > 0;
 
   const freightFarmerTotal = totalBagsInVehicle > 0 ? Math.round((vehicleBhadaRate * bags) / totalBagsInVehicle) : 0;
 
@@ -1418,10 +1406,9 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
               ))}
             </div>
           )}
-          {extraPerKgToggle}
-          {extraPerKgOpen && (
-            <div className="flex items-center justify-between pt-1">
-              <span className="font-semibold">{t("stock.extraPerKg")}:</span>
+          {extraPerKgFarmerOpen && (
+            <div className={`flex items-center justify-between ${txn.showExtraBreakdown ? "ml-2 border-l-2 border-muted pl-2" : ""}`}>
+              <span className="text-muted-foreground">{t("stock.extraPerKg")}:</span>
               <Input
                 data-testid="input-extra-per-kg-farmer"
                 data-skip-nav
@@ -1491,7 +1478,14 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
         <div className="bg-background rounded border border-border p-2 space-y-1">
           <p className="font-semibold text-muted-foreground">{t("stock.buyerCharges")}</p>
           <div className="flex items-center justify-between" data-nav-row>
-            <span>{t("stock.extra")}:</span>
+            <button
+              type="button"
+              className="flex items-center gap-0.5 text-xs hover:text-foreground"
+              onClick={() => setShowExtraPerKgBuyer(v => !v)}
+            >
+              {extraPerKgBuyerOpen ? <ChevronDown className="w-4 h-4" strokeWidth={3} /> : <ChevronRight className="w-4 h-4" strokeWidth={3} />}
+              {t("stock.extra")}:
+            </button>
             <Input
               data-testid="input-extra-charges-buyer"
               type="text" inputMode="decimal"
@@ -1501,10 +1495,9 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
               className="w-16 h-6 text-xs text-right p-1"
             />
           </div>
-          {extraPerKgToggle}
-          {extraPerKgOpen && (
-            <div className="flex items-center justify-between pt-1">
-              <span className="font-semibold">{t("stock.extraPerKg")}:</span>
+          {extraPerKgBuyerOpen && (
+            <div className="flex items-center justify-between ml-2 border-l-2 border-muted pl-2">
+              <span className="text-muted-foreground">{t("stock.extraPerKg")}:</span>
               <Input
                 data-testid="input-extra-per-kg-buyer"
                 data-skip-nav
