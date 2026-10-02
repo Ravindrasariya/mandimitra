@@ -129,6 +129,11 @@ export function generateFarmerReceiptHtml(sg: UnifiedSerialGroup, businessName?:
 
   // The one horizontal rule in the body: it closes off the produce rows above the total.
   const NET = `${CELL}border-top:1px solid #444;`;
+  const kulRakamRow = `<tr style="height:${ROW_H}">
+    <td style="${NET}">&nbsp;</td><td style="${NET}">&nbsp;</td><td style="${NET}">&nbsp;</td><td style="${NET}">&nbsp;</td>
+    <td style="${NET}text-align:right;font-weight:bold">कुल रकम</td>
+    <td style="${NET}font-weight:bold;font-size:1.05em;text-align:center">&#8377;${totalGross.toFixed(2)}</td>
+  </tr>`;
   const netPayableRow = `<tr style="height:${ROW_H}">
     <td style="${NET}">&nbsp;</td><td style="${NET}">&nbsp;</td><td style="${NET}">&nbsp;</td><td style="${NET}">&nbsp;</td>
     <td style="${NET}text-align:right;font-weight:bold">किसान को देय</td>
@@ -288,12 +293,13 @@ ${receiptHeaderImage ? letterheadHtml(receiptHeaderImage) : `<div style="text-al
   ${openingRows ? `<tbody>${openingRows}</tbody>` : ""}
   <tbody class="closing">
     ${closingRows}
+    ${kulRakamRow}
     ${netPayableRow}
   </tbody>
 </table>
 </div>
 
-<div style="display:flex;align-items:flex-end;margin-top:36px;font-size:13px">
+<div style="display:flex;align-items:flex-end;margin-top:2px;font-size:13px">
   <div style="flex:1"></div>
   <div style="flex:2;text-align:center">हमें सेवा का अवसर देने के लिए धन्यवाद।</div>
   <div style="flex:1;text-align:right">हस्ताक्षर</div>
