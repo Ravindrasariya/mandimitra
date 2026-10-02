@@ -2030,7 +2030,7 @@ function LotCard({ lot, index, onChange, onRemove, onRemoveBid, vehicleBhadaRate
 
 // ─── Crop group ───────────────────────────────────────────────────────────────
 
-function CropGroupSection({ group, onChange, onArchive, onDelete, onBBChange, isPersisted, vehicleBhadaRate, totalBagsInVehicle, totalAllocatedAllGroups, cs, farmerDate, farmerName, currentUsername, onSyncSaved, buyersList, farmerCard }: {
+function CropGroupSection({ group, onChange, onArchive, onDelete, onBBChange, isPersisted, vehicleBhadaRate, totalBagsInVehicle, totalAllocatedAllGroups, cs, farmerDate, farmerName, currentUsername, onSyncSaved, buyersList, farmerCard, autoPrint, onAutoPrintDone }: {
   group: CropGroup;
   onChange: (g: CropGroup) => void; onArchive: () => void; onDelete: () => void;
   onBBChange?: (newBB: string) => void;
@@ -2041,6 +2041,8 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, onBBChange, is
   onSyncSaved?: (updatedGroup: CropGroup) => void;
   buyersList: { id: number; name: string; phone?: string; aadhatCommissionPercent?: string | null; overallDue?: string; limitAmount?: number | null }[];
   farmerCard?: FarmerCard;
+  autoPrint?: boolean;
+  onAutoPrintDone?: () => void;
 }) {
   const { t } = useLanguage();
   const { toast } = useToast();
@@ -2280,6 +2282,17 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, onBBChange, is
       toast({ title: t("stock.receiptError"), description: err?.message, variant: "destructive" });
     } finally { setReceiptLoading(false); }
   };
+
+  // Launched once right after Save Entry for the first changed crop card: same farmer bill as the print icon.
+  const autoPrintFiredRef = useRef(false);
+  useEffect(() => {
+    if (!autoPrint) { autoPrintFiredRef.current = false; return; }
+    if (autoPrintFiredRef.current) return;
+    autoPrintFiredRef.current = true;
+    (async () => {
+      try { await handleFarmerReceipt("print"); } finally { onAutoPrintDone?.(); }
+    })();
+  }, [autoPrint]);
 
   const handleBuyerReceipt = async (buyerId: number, buyerName: string, action: "print" | "share") => {
     setReceiptLoading(true);
@@ -2611,13 +2624,15 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, onBBChange, is
 
 // ─── Farmer card ──────────────────────────────────────────────────────────────
 
-function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onSaveAndClose, onCancel, onArchive, onSyncSaved, cs, currentUsername, saving, allCards }: {
+function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onSaveAndClose, autoPrintGroupId, onAutoPrintDone, onCancel, onArchive, onSyncSaved, cs, currentUsername, saving, allCards }: {
   card: FarmerCard;
   savedCard: FarmerCard | null;
   unfilteredCard: FarmerCard;
   onChange: (c: FarmerCard) => void;
   onSave: () => void;
   onSaveAndClose: () => void;
+  autoPrintGroupId: string | null;
+  onAutoPrintDone: () => void;
   saving?: boolean;
   onCancel: () => void;
   onArchive: () => void;
@@ -3262,6 +3277,8 @@ function FarmerCardComp({ card, savedCard, unfilteredCard, onChange, onSave, onS
                 farmerName={card.farmerName}
                 currentUsername={currentUsername}
                 farmerCard={card}
+                autoPrint={autoPrintGroupId === group.id}
+                onAutoPrintDone={onAutoPrintDone}
                 onSyncSaved={(updatedGroup) => {
                   const updatedCard = { ...card, cropGroups: card.cropGroups.map((g, i) => i === idx ? updatedGroup : g) };
                   onSyncSaved(updatedCard);
@@ -4574,6 +4591,13 @@ export default function StockPage() {
       return { ...card, touched };
     }));
 
+  const [autoPrint, setAutoPrint] = useState<{ cardId: string; groupId: string; collapseAfter: boolean } | null>(null);
+  const finishAutoPrint = () => {
+    const done = autoPrint;
+    setAutoPrint(null);
+    if (done?.collapseAfter) setCards(prev => prev.map(c => (c.id === done.cardId ? { ...c, cardOpen: false } : c)));
+  };
+
   const saveCard = async (idx: number, collapseAfter = false) => {
     const txnFailures: { label: string; reason: string }[] = [];
     let card = cards[idx];
@@ -5167,16 +5191,17 @@ export default function StockPage() {
       const savedCard = savedCardMap.get(card.id);
       const isFirstSave = !savedCard;
       const now = format(new Date(), "dd/MM/yyyy HH:mm");
+      const changedGroupIds = new Set<string>();
       const updatedCard: FarmerCard = {
         ...card,
         farmerId: currentFarmerId,
-        cardOpen: collapseAfter ? false : card.cardOpen,
+        cardOpen: card.cardOpen,
         savedAt: now,
         cropGroups: finalGroups.map(g => {
           const withPersisted = { ...g, persisted: true };
-          if (isFirstSave) return withPersisted;
+          if (isFirstSave) { changedGroupIds.add(g.id); return withPersisted; }
           const savedGroup = savedCard!.cropGroups.find(sg => sg.id === g.id);
-          if (!savedGroup) return withPersisted;
+          if (!savedGroup) { changedGroupIds.add(g.id); return withPersisted; }
           const allDiffChanges = diffCropGroup(savedGroup, g, t);
           const alreadyLogged = new Set(
             g.editHistory
@@ -5185,10 +5210,29 @@ export default function StockPage() {
           );
           const changes = allDiffChanges.filter(c => !(c.kind === "deleted" && alreadyLogged.has(c.path)));
           if (changes.length === 0) return { ...withPersisted, editHistory: g.editHistory };
+          changedGroupIds.add(g.id);
           return { ...withPersisted, editHistory: [...g.editHistory, { timestamp: now, username: currentUsername, changes }] };
         }),
       };
 
+      // Auto-print the farmer bill of the first changed crop card, in the same top-to-bottom order the
+      // crop cards are shown in. Only cards that hold saved transactions have a bill to print.
+      const printGroup = updatedCard.cropGroups
+        .filter(g => !g.archived && changedGroupIds.has(g.id) && g.lots.some(l => l.dbId && l.bids.some(b => b.txnDbId)))
+        .sort((a, b) => {
+          const bbA = parseInt(a.bbNumber); const bbB = parseInt(b.bbNumber);
+          const bA = isNaN(bbA) ? Infinity : bbA; const bB = isNaN(bbB) ? Infinity : bbB;
+          if (bA !== bB) return bA - bB;
+          const srA = parseInt(a.srNumber); const srB = parseInt(b.srNumber);
+          return (isNaN(srA) ? Infinity : srA) - (isNaN(srB) ? Infinity : srB);
+        })[0];
+      // The card stays open until its bill has been launched, then collapses if this was Save & Close.
+      updatedCard.cardOpen = collapseAfter && !printGroup ? false : card.cardOpen;
+      if (printGroup && txnFailures.length === 0) {
+        setAutoPrint({ cardId: card.id, groupId: printGroup.id, collapseAfter });
+      } else if (printGroup) {
+        updatedCard.cardOpen = collapseAfter ? false : card.cardOpen;
+      }
       const savedNow = { ...updatedCard, touched: false };
       setCards(prev => prev.map((c, i) => (i === idx ? savedNow : c)));
       setSavedCardMap(prev => new Map(prev).set(card.id, JSON.parse(JSON.stringify(savedNow))));
@@ -5845,6 +5889,8 @@ export default function StockPage() {
               onChange={mergeBack}
               onSave={() => saveCard(idx)}
               onSaveAndClose={() => saveCard(idx, true)}
+              autoPrintGroupId={autoPrint?.cardId === card.id ? autoPrint.groupId : null}
+              onAutoPrintDone={finishAutoPrint}
               onCancel={() => cancelCard(idx)}
               onArchive={() => archiveCard(idx)}
               onSyncSaved={c => setSavedCardMap(prev => {
