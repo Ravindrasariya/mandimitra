@@ -3553,7 +3553,7 @@ function StockFilterBar({
   buyerFilter, setBuyerFilter,
   cropFilter, setCropFilter,
   buyersList,
-  onExportStockCsv, onExportTxnCsv,
+  onExportFarmerCsv, onExportStockCsv, onExportTxnCsv,
   canPrintOverallBill, onPrintAllBuyerReceipt,
   canPrintBidCopy, onPrintBidCopy,
   canPrintAadhatNakal, onPrintAadhatNakal,
@@ -3576,6 +3576,7 @@ function StockFilterBar({
   cropFilter: string;
   setCropFilter: (v: string) => void;
   buyersList: { id: number; name: string; phone?: string; aadhatCommissionPercent?: string | null }[];
+  onExportFarmerCsv: () => void;
   onExportStockCsv: () => void;
   onExportTxnCsv: () => void;
   canPrintOverallBill: boolean;
@@ -3934,6 +3935,9 @@ function StockFilterBar({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
+          <DropdownMenuItem onClick={onExportFarmerCsv} data-testid="menu-farmer-csv">
+            {t("stock.farmerCsv")}
+          </DropdownMenuItem>
           <DropdownMenuItem onClick={onExportStockCsv} data-testid="menu-stock-csv">
             {t("stock.stockCsv")}
           </DropdownMenuItem>
@@ -5567,6 +5571,50 @@ export default function StockPage() {
     return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s;
   };
 
+  const exportFarmerCsv = () => {
+    const headers = [
+      "Date", "Farmer Name", "Phone", "Village", "Tehsil", "District",
+      "Vehicle #", "Driver Name", "Driver Contact",
+      "Total # of Bags", "Total Bags in Vehicle", "Total Bhada (₹)",
+      "Farmer Advance (₹)", "Advance Mode",
+    ];
+    const rows: string[] = [];
+    for (const card of filteredCards) {
+      if (card.archived || !savedCardMap.has(card.id)) continue;
+      let bags = 0;
+      let hasLot = false;
+      for (const g of card.cropGroups) {
+        if (g.archived) continue;
+        for (const lot of g.lots) {
+          if (!lot.dbId) continue;
+          hasLot = true;
+          bags += parseInt(lot.numberOfBags) || 0;
+        }
+      }
+      if (!hasLot) continue;
+      // Same proportional share the Stock CSV uses per lot, summed: equals the vehicle freight when the
+      // farmer fills the vehicle, and only their share when the vehicle is split between farmers.
+      const vbr = parseFloat(card.vehicleBhadaRate) || 0;
+      const tbi = parseInt(card.totalBagsInVehicle) || 0;
+      const bhada = tbi > 0 ? ((vbr * bags) / tbi).toFixed(2) : "0";
+      rows.push([
+        card.date, card.farmerName, card.farmerPhone, card.village, card.tehsil, card.district,
+        card.vehicleNumber, card.driverName, card.driverContact,
+        bags, card.totalBagsInVehicle || "", bhada,
+        card.advanceAmount || "", card.advanceMode || "",
+      ].map(escCSV).join(","));
+    }
+    if (rows.length === 0) { toast({ title: t("stock.noDataExport"), variant: "destructive" }); return; }
+    const csv = [headers.join(","), ...rows].join("\n");
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `farmers_${format(new Date(), "yyyy-MM-dd")}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const exportStockCsv = () => {
     const headers = [
       "BB#", "SR#", "Lot ID", "Date", "Crop", "Variety", "Size", "Bag Marka",
@@ -5694,6 +5742,7 @@ export default function StockPage() {
             buyerFilter={buyerFilter} setBuyerFilter={setBuyerFilter}
             cropFilter={cropFilter} setCropFilter={setCropFilter}
             buyersList={pageBuyersList}
+            onExportFarmerCsv={exportFarmerCsv}
             onExportStockCsv={exportStockCsv}
             onExportTxnCsv={exportTxnCsv}
             canPrintOverallBill={canPrintOverallBill}

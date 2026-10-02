@@ -591,6 +591,7 @@ const translations: Record<string, Record<Language, string>> = {
   "stock.nDays": { en: "Days", hi: "दिन" },
   "stock.allCrops": { en: "All Crops", hi: "सभी फसलें" },
   "stock.clear": { en: "Clear", hi: "साफ़ करें" },
+  "stock.farmerCsv": { en: "Farmer CSV", hi: "किसान CSV" },
   "stock.stockCsv": { en: "Stock CSV", hi: "स्टॉक CSV" },
   "stock.txnCsv": { en: "Txn CSV", hi: "लेनदेन CSV" },
   "stock.lotsTxns": { en: "Lots / Txns", hi: "लॉट / लेनदेन" },
