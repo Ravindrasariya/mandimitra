@@ -76,26 +76,36 @@ ${bodyContent}
 /**
  * Print-only layout for the farmer bill: an A4 landscape sheet with the bill at A5 size on the left
  * half and the right half blank, so the sheet can be torn and fed back for the next farmer.
- * The bill is still laid out at A4-portrait width, then shrunk evenly with zoom (which, unlike a
- * transform, also shrinks the space it occupies, so pages break at the right place).
+ * The bill is laid out at A4-portrait size inside a fixed box, then shrunk with a transform, which
+ * every browser (Chrome, Edge, Firefox, Safari) applies when printing. A fixed A5-sized outer box
+ * keeps the bill and the payment slip together on one page.
+ * A bill long enough to need extra sheets can't be transformed across pages, so it flows at the
+ * reduced size via zoom where supported (Chrome/Edge) and otherwise at full size.
  * Never use for share/PDF: those render the unwrapped bill.
  */
 export function wrapFarmerA5Print(html: string): string {
   const headMatch = html.match(/<head[^>]*>([\s\S]*?)<\/head>/i);
   const headContent = headMatch ? headMatch[1] : "";
   const bodyContent = extractBodyHtml(html);
+  const isLong = /class="page-wrapper[^"]*\blong\b/.test(bodyContent);
+
+  const layout = isLong
+    ? `.a5-inner { width: 210mm; padding: 5mm; box-sizing: border-box; zoom: 0.70711; }
+.a5-inner .page-wrapper.long { min-height: 0 !important; }`
+    : `html, body { height: 209mm !important; overflow: hidden !important; }
+.a5-outer { width: 148.5mm; height: 209mm; }
+.a5-inner { width: 210mm; min-height: 297mm; padding: 5mm; box-sizing: border-box; transform: scale(0.70711); transform-origin: top left; }
+.a5-inner .page-wrapper { min-height: calc(297mm - 37mm) !important; }`;
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8">
 ${headContent}
 <style>
 @page { size: A4 landscape; margin: 0 !important; }
 html, body { margin: 0 !important; padding: 0 !important; }
-.a5-left-half { width: 210mm; padding: 5mm; box-sizing: border-box; zoom: 0.70711; }
-.a5-left-half .page-wrapper { min-height: calc(297mm - 37mm) !important; }
-.a5-left-half .page-wrapper.long { min-height: 0 !important; }
+${layout}
 </style>
 </head><body>
-<div class="a5-left-half">${bodyContent}</div>
+<div class="a5-outer"><div class="a5-inner">${bodyContent}</div></div>
 </body></html>`;
 }
 
