@@ -73,6 +73,32 @@ ${bodyContent}
 </body></html>`;
 }
 
+/**
+ * Print-only layout for the farmer bill: an A4 landscape sheet with the bill at A5 size on the left
+ * half and the right half blank, so the sheet can be torn and fed back for the next farmer.
+ * The bill is still laid out at A4-portrait width, then shrunk evenly with zoom (which, unlike a
+ * transform, also shrinks the space it occupies, so pages break at the right place).
+ * Never use for share/PDF: those render the unwrapped bill.
+ */
+export function wrapFarmerA5Print(html: string): string {
+  const headMatch = html.match(/<head[^>]*>([\s\S]*?)<\/head>/i);
+  const headContent = headMatch ? headMatch[1] : "";
+  const bodyContent = extractBodyHtml(html);
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8">
+${headContent}
+<style>
+@page { size: A4 landscape; margin: 0 !important; }
+html, body { margin: 0 !important; padding: 0 !important; }
+.a5-left-half { width: 210mm; padding: 5mm; box-sizing: border-box; zoom: 0.70711; }
+.a5-left-half .page-wrapper { min-height: calc(297mm - 37mm) !important; }
+.a5-left-half .page-wrapper.long { min-height: 0 !important; }
+</style>
+</head><body>
+<div class="a5-left-half">${bodyContent}</div>
+</body></html>`;
+}
+
 export async function printReceipt(html: string, fileName?: string) {
   const prevTitle = document.title;
   if (fileName) document.title = fileName.replace(/\.[^.]+$/, "");
