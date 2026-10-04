@@ -57,9 +57,11 @@ export function generateFarmerReceiptHtml(sg: UnifiedSerialGroup, businessName?:
     const nw = parseFloat(t.netWeight || "0");
     const ppk = parseFloat(t.pricePerKg || "0");
     const epk = parseFloat((t as any).extraPerKgFarmer || "0");
-    return s + nw * (ppk + epk);
+    // Rounded per lot, exactly as the stock entry does, so the printed total matches the app.
+    return s + Math.round(nw * (ppk + epk));
   }, 0);
-  const netPayable = totalGross - totalShownDeductions;
+  const netPayable = Math.round(totalGross - totalShownDeductions);
+  const rs = (n: number) => Math.round(n).toFixed(0);
 
   // Column rules only. The pre-printed bill book draws no horizontal lines through the body, and
   // without them the flex-stretched rows can differ slightly in height without it being visible --
@@ -78,13 +80,13 @@ export function generateFarmerReceiptHtml(sg: UnifiedSerialGroup, businessName?:
     const epk = parseFloat((t as any).extraPerKgFarmer || "0");
     const rate = ppk + epk;
     const ratePerQ = (rate * 100).toFixed(0);
-    const gross = nw * rate;
+    const gross = Math.round(nw * rate);
     const crop = t.lot?.crop || firstLot?.crop || "";
     return `${td(cropHindi[crop] || crop, "text-align:center")}
       ${td(String(t.numberOfBags || 0), "text-align:center")}
       ${td(ratePerQ, "text-align:center")}
       ${td(nw.toFixed(2), "text-align:center")}
-      ${td(gross.toFixed(2), "text-align:center")}`;
+      ${td(gross.toFixed(0), "text-align:center")}`;
   });
 
   // Keep the ruled table a sensible size on light receipts so the space freed up for the
@@ -106,7 +108,7 @@ export function generateFarmerReceiptHtml(sg: UnifiedSerialGroup, businessName?:
   // Same size as the column headings above -- these read as headings for the amounts under them.
   const kLabel = (text: string) => `<div>${text}</div>`;
   const kValue = (amount: number, bold = false) =>
-    `<div style="${bold ? "font-weight:bold;text-decoration:underline;" : ""}">&#8377;${amount.toFixed(2)}</div>`;
+    `<div style="${bold ? "font-weight:bold;text-decoration:underline;" : ""}">&#8377;${rs(amount)}</div>`;
   const kharchSlots = [
     "", kLabel("भाड़ा"), kValue(totalFreight),
     "", kLabel("हम्माली तुलाई"), kValue(hammaliAndExtras),
@@ -132,12 +134,12 @@ export function generateFarmerReceiptHtml(sg: UnifiedSerialGroup, businessName?:
   const kulRakamRow = `<tr style="height:${ROW_H}">
     <td style="${NET}">&nbsp;</td><td style="${NET}">&nbsp;</td><td style="${NET}">&nbsp;</td><td style="${NET}">&nbsp;</td>
     <td style="${NET}text-align:right;font-weight:bold">कुल रकम</td>
-    <td style="${NET}font-weight:bold;font-size:1.05em;text-align:center">&#8377;${totalGross.toFixed(2)}</td>
+    <td style="${NET}font-weight:bold;font-size:1.05em;text-align:center">&#8377;${rs(totalGross)}</td>
   </tr>`;
   const netPayableRow = `<tr style="height:${ROW_H}">
     <td style="${NET}">&nbsp;</td><td style="${NET}">&nbsp;</td><td style="${NET}">&nbsp;</td><td style="${NET}">&nbsp;</td>
     <td style="${NET}text-align:right;font-weight:bold">किसान को देय</td>
-    <td style="${NET}font-weight:bold;font-size:1.05em;text-align:center">&#8377;${netPayable.toFixed(2)}</td>
+    <td style="${NET}font-weight:bold;font-size:1.05em;text-align:center">&#8377;${rs(netPayable)}</td>
   </tr>`;
 
   const th = (label: string) =>
@@ -153,7 +155,7 @@ export function generateFarmerReceiptHtml(sg: UnifiedSerialGroup, businessName?:
   // Only print charges that actually apply, so a receipt with no deductions
   // does not hand the farmer a row of zeroes.
   const chargeList = (entries: [string, number][], sep: string) =>
-    entries.filter(([, v]) => v > 0).map(([l, v]) => `${l} <span class="bold">${v.toFixed(2)}</span>`).join(sep);
+    entries.filter(([, v]) => v > 0).map(([l, v]) => `${l} <span class="bold">${rs(v)}</span>`).join(sep);
   const slipCharges = chargeList([
     ["हम्माली", totalHammali], ["तुलाई", totalTulai], ["भराई", totalBharai], ["खड़ी कराई", totalKhadiKarai],
   ], " &nbsp; ");
@@ -184,17 +186,17 @@ export function generateFarmerReceiptHtml(sg: UnifiedSerialGroup, businessName?:
     </tr>
     <tr>
       <td colspan="3">${slipFarmerLine}</td>
-      <td style="text-align:right"><span class="bold">कुल योग :</span> ${totalGross.toFixed(2)}</td>
+      <td style="text-align:right"><span class="bold">कुल योग :</span> ${rs(totalGross)}</td>
     </tr>
     <tr>
       <td colspan="3" style="padding-top:6px">
         <span class="bold">प्रवेश क्रमांक :</span>${slipCharges ? ` &nbsp;&nbsp; ${slipCharges}` : ""}
       </td>
-      <td style="text-align:right; vertical-align:middle"><span class="bold">कुल खर्च :</span> ${totalShownDeductions.toFixed(2)}</td>
+      <td style="text-align:right; vertical-align:middle"><span class="bold">कुल खर्च :</span> ${rs(totalShownDeductions)}</td>
     </tr>
     <tr>
       <td colspan="3">${slipBhada}</td>
-      <td style="text-align:right"><span class="bold">नेट रकम :</span> ${netPayable.toFixed(2)}</td>
+      <td style="text-align:right"><span class="bold">नेट रकम :</span> ${rs(netPayable)}</td>
     </tr>
   </table>
 
@@ -388,27 +390,23 @@ export function applyFarmerTemplate(tmpl: string, sg: UnifiedSerialGroup, busine
   const totalThelaBhada = allTxns.reduce((s, t) => s + parseFloat((t as any).extraThelaBhadaFarmer || "0"), 0);
   const totalFreight = allTxns.reduce((s, t) => s + parseFloat(t.freightCharges || "0"), 0);
   const hammaliAndExtras = totalHammali + totalTulai + totalBharai + totalKhadiKarai;
-  const totalAadhat = allTxns.reduce((s, t) => {
-    const gross = parseFloat(t.netWeight || "0") * (parseFloat(t.pricePerKg || "0") + parseFloat((t as any).extraPerKgFarmer || "0"));
-    return s + gross * parseFloat(t.aadhatFarmerPercent || "0") / 100;
-  }, 0);
-  const totalMandi = allTxns.reduce((s, t) => {
-    const gross = parseFloat(t.netWeight || "0") * (parseFloat(t.pricePerKg || "0") + parseFloat((t as any).extraPerKgFarmer || "0"));
-    return s + gross * parseFloat(t.mandiFarmerPercent || "0") / 100;
-  }, 0);
+  const lotGross = (t: any) => Math.round(parseFloat(t.netWeight || "0") * (parseFloat(t.pricePerKg || "0") + parseFloat(t.extraPerKgFarmer || "0")));
+  const totalAadhat = allTxns.reduce((s, t) => s + lotGross(t) * parseFloat(t.aadhatFarmerPercent || "0") / 100, 0);
+  const totalMandi = allTxns.reduce((s, t) => s + lotGross(t) * parseFloat(t.mandiFarmerPercent || "0") / 100, 0);
   const farmerAdvance = parseFloat(firstLot?.farmerAdvanceAmount || "0");
   const totalDeduction = hammaliAndExtras + totalThelaBhada + totalFreight + totalAadhat + totalMandi;
-  const totalGross = allTxns.reduce((s, t) => s + parseFloat(t.netWeight || "0") * (parseFloat(t.pricePerKg || "0") + parseFloat((t as any).extraPerKgFarmer || "0")), 0);
+  const totalGross = allTxns.reduce((s, t) => s + lotGross(t), 0);
   const totalNetWeight = allTxns.reduce((s, t) => s + parseFloat(t.netWeight || "0"), 0);
   const netPayable = totalGross - totalDeduction;
+  const rs = (n: number) => Math.round(n).toFixed(0);
 
   const dataRows = allTxns.map(t => {
     const nw = parseFloat(t.netWeight || "0");
     const epk = parseFloat((t as any).extraPerKgFarmer || "0");
     const rate = parseFloat(t.pricePerKg || "0") + epk;
-    const gross = nw * rate;
+    const gross = lotGross(t);
     const crop = t.lot?.crop || firstLot?.crop || "";
-    return `<tr><td>${(cropLabel[crop] || crop)} Pkt</td><td>${t.numberOfBags || 0}</td><td>${nw.toFixed(2)}</td><td>${(rate * 100).toFixed(2)}</td><td>${gross.toFixed(2)}</td></tr>`;
+    return `<tr><td>${(cropLabel[crop] || crop)} Pkt</td><td>${t.numberOfBags || 0}</td><td>${nw.toFixed(2)}</td><td>${(rate * 100).toFixed(2)}</td><td>${gross.toFixed(0)}</td></tr>`;
   });
   const MIN_PRODUCE_ROWS = 6;
   const blankRowCount = Math.max(0, MIN_PRODUCE_ROWS - dataRows.length);
@@ -442,19 +440,19 @@ export function applyFarmerTemplate(tmpl: string, sg: UnifiedSerialGroup, busine
     "{{VEHICLE_NUMBER}}": firstLot?.vehicleNumber || "",
     "{{TOTAL_BAGS}}": String(sg.totalBags),
     "{{NET_WEIGHT}}": totalNetWeight.toFixed(2),
-    "{{GROSS_AMOUNT}}": totalGross.toFixed(2),
-    "{{HAMMALI}}": totalHammali.toFixed(2),
-    "{{TULAI}}": totalTulai.toFixed(2),
-    "{{BHARAI}}": totalBharai.toFixed(2),
-    "{{KHADI_KARAI}}": totalKhadiKarai.toFixed(2),
-    "{{THELA_BHADA}}": totalThelaBhada.toFixed(2),
-    "{{HAMMALI_AND_EXTRAS}}": hammaliAndExtras.toFixed(2),
-    "{{AADHAT}}": totalAadhat.toFixed(2),
-    "{{MANDI_CHARGES}}": totalMandi.toFixed(2),
-    "{{FREIGHT}}": totalFreight.toFixed(2),
-    "{{ADVANCE}}": farmerAdvance.toFixed(2),
-    "{{TOTAL_DEDUCTION}}": totalDeduction.toFixed(2),
-    "{{NET_PAYABLE}}": netPayable.toFixed(2),
+    "{{GROSS_AMOUNT}}": rs(totalGross),
+    "{{HAMMALI}}": rs(totalHammali),
+    "{{TULAI}}": rs(totalTulai),
+    "{{BHARAI}}": rs(totalBharai),
+    "{{KHADI_KARAI}}": rs(totalKhadiKarai),
+    "{{THELA_BHADA}}": rs(totalThelaBhada),
+    "{{HAMMALI_AND_EXTRAS}}": rs(hammaliAndExtras),
+    "{{AADHAT}}": rs(totalAadhat),
+    "{{MANDI_CHARGES}}": rs(totalMandi),
+    "{{FREIGHT}}": rs(totalFreight),
+    "{{ADVANCE}}": rs(farmerAdvance),
+    "{{TOTAL_DEDUCTION}}": rs(totalDeduction),
+    "{{NET_PAYABLE}}": rs(netPayable),
     "{{CROP}}": firstLot?.crop || "",
     "{{CROP_BAGS_LABEL}}": `(${firstLot?.crop || ""} - ${sg.totalBags})`,
     "{{TXN_ROWS_HTML}}": txnRowsHtml,
