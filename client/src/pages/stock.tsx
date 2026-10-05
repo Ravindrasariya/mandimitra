@@ -5387,7 +5387,7 @@ export default function StockPage() {
               aadhatBuyerPercent: parseFloat(bid.savedCharges?.aadhatCommissionBuyerPercent ?? cs.aadhatCommissionBuyerPercent ?? "0"),
               muddatAnyaBuyerPercent: parseFloat(bid.savedCharges?.muddatAnyaBuyerPercent ?? cs.muddatAnyaBuyerPercent ?? "0"),
               mandiBuyerPercent: parseFloat(bid.savedCharges?.mandiCommissionBuyerPercent ?? cs.mandiCommissionBuyerPercent ?? "0"),
-              buyerReceivable: savedBid?.savedBuyerReceivable ?? 0,
+              buyerReceivable: bid.savedBuyerReceivable ?? savedBid?.savedBuyerReceivable ?? calcBidTotals(bid, cs, vbr, tbi, buyerData?.aadhatCommissionPercent != null && buyerData.aadhatCommissionPercent !== "" ? parseFloat(buyerData.aadhatCommissionPercent) || 0 : null).buyerReceivable,
               licenceNo: buyerData?.licenceNo ?? "",
               farmerName: card.farmerName,
               farmerPayable: bid.savedFarmerPayable ?? 0,
