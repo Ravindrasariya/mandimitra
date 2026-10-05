@@ -471,6 +471,7 @@ const translations: Record<string, Record<Language, string>> = {
   "stock.freight": { en: "Freight", hi: "भाड़ा" },
   "stock.freightAuto": { en: "Freight (auto)", hi: "भाड़ा (स्वचालित)" },
   "stock.extra": { en: "Extra", hi: "अतिरिक्त" },
+  "stock.extraPerKgNegativeRate": { en: "Extra/kg cannot make the rate negative", hi: "अतिरिक्त/किलो से भाव ऋणात्मक नहीं हो सकता" },
   "stock.extraPerKg": { en: "Extra ₹/Kg", hi: "अतिरिक्त ₹/किलो" },
   "stock.gross": { en: "Gross", hi: "कुल" },
   "stock.grossAmount": { en: "Gross Amount", hi: "कुल राशि" },

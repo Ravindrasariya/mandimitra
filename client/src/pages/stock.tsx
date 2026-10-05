@@ -50,6 +50,12 @@ import type { Lot, Farmer, Transaction, Bid, Buyer, ReceiptTemplate } from "@sha
 
 const capFirst = (s: string) => s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
 const toNum = (v: string) => v.replace(/[^0-9.]/g, "");
+// Extra/kg may be negative (a discount on the rate): allow one leading minus sign.
+const toSignedNum = (v: string) => {
+  const neg = v.trimStart().startsWith("-");
+  const digits = v.replace(/[^0-9.]/g, "");
+  return neg ? `-${digits}` : digits;
+};
 
 const noScrollProps = {
   onWheel: (e: React.WheelEvent<HTMLInputElement>) => { e.currentTarget.blur(); },
@@ -1252,8 +1258,8 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
 
   // Display only: Extra ₹/Kg is rarely used, so it sits inside each side's own "Extra:" fold-out and
   // out of the keyboard flow. A side always shows its row when it already holds a value.
-  const extraPerKgFarmerOpen = !!txn.showExtraBreakdown || epkFarmer > 0;
-  const extraPerKgBuyerOpen = showExtraPerKgBuyer || epkBuyer > 0;
+  const extraPerKgFarmerOpen = !!txn.showExtraBreakdown || epkFarmer !== 0;
+  const extraPerKgBuyerOpen = showExtraPerKgBuyer || epkBuyer !== 0;
 
   const freightFarmerTotal = totalBagsInVehicle > 0 ? Math.round((vehicleBhadaRate * bags) / totalBagsInVehicle) : 0;
 
@@ -1341,19 +1347,22 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
         )}
       </div>
 
-      {nw > 0 && pricePerKg > 0 && (epkFarmer > 0 || epkBuyer > 0) && (
+      {nw > 0 && pricePerKg > 0 && (epkFarmer !== 0 || epkBuyer !== 0) && (
         <div className="bg-muted/40 rounded-md px-3 py-2 text-xs space-y-1" data-testid="txn-bid-rate-header">
-          {epkFarmer > 0 && (
+          {epkFarmer !== 0 && (
             <div className="flex justify-between gap-1 text-green-600">
               <span className="min-w-0 flex-1">{t("stock.farmerRate")} ({pricePerKg.toFixed(2)} + {epkFarmer.toFixed(2)}):</span>
               <span className="shrink-0 font-medium">₹{(pricePerKg + epkFarmer).toFixed(2)}/kg</span>
             </div>
           )}
-          {epkBuyer > 0 && (
+          {epkBuyer !== 0 && (
             <div className="flex justify-between gap-1 text-blue-600">
               <span className="min-w-0 flex-1">{t("stock.buyerRate")} ({pricePerKg.toFixed(2)} + {epkBuyer.toFixed(2)}):</span>
               <span className="shrink-0 font-medium">₹{(pricePerKg + epkBuyer).toFixed(2)}/kg</span>
             </div>
+          )}
+          {(pricePerKg + epkFarmer < 0 || pricePerKg + epkBuyer < 0) && (
+            <p className="text-destructive font-medium" data-testid="text-negative-rate-warning">{t("stock.extraPerKgNegativeRate")}</p>
           )}
         </div>
       )}
@@ -1415,7 +1424,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
                 tabIndex={-1}
                 type="text" inputMode="decimal"
                 value={txn.extraPerKgFarmer}
-                onChange={e => set("extraPerKgFarmer", toNum(e.target.value))}
+                onChange={e => set("extraPerKgFarmer", toSignedNum(e.target.value))}
                 onFocus={e => e.currentTarget.select()}
                 className="w-16 h-6 text-xs text-right p-1"
               />
@@ -1504,7 +1513,7 @@ function TxnSection({ txn, onChange, bags, pricePerKg, vehicleBhadaRate, totalBa
                 tabIndex={-1}
                 type="text" inputMode="decimal"
                 value={txn.extraPerKgBuyer}
-                onChange={e => set("extraPerKgBuyer", toNum(e.target.value))}
+                onChange={e => set("extraPerKgBuyer", toSignedNum(e.target.value))}
                 onFocus={e => e.currentTarget.select()}
                 className="w-16 h-6 text-xs text-right p-1"
               />
@@ -4942,6 +4951,16 @@ export default function StockPage() {
 
             let bidDbId = bid.bidDbId;
             const nw = parseFloat(bid.txn.netWeightInput) || 0;
+
+            // A negative Extra/kg is allowed, but never so large that the rate itself goes negative.
+            {
+              const ppkRate = parseFloat(bid.pricePerKg) || 0;
+              const epkFRate = parseFloat(bid.txn.extraPerKgFarmer) || 0;
+              const epkBRate = parseFloat(bid.txn.extraPerKgBuyer) || 0;
+              if (ppkRate + epkFRate < 0 || ppkRate + epkBRate < 0) {
+                throw new SaveBlockedError(t("stock.saveBlocked"), `${t("stock.extraPerKgNegativeRate")} (${bid.buyerName})`);
+              }
+            }
 
             // Validate and payment-guard BEFORE any write for this bid. The bid row is PATCHed
             // ahead of its transaction, so checking later would let a blocked save persist a new
