@@ -4068,12 +4068,9 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
             vehicleBhadaTotal += bidBhada;
             if (card.farmerId && card.date) addTo(shownBhada, `${card.farmerId}|${card.date}`, bidBhada);
           }
-          if (bid.farmerPaymentStatus !== "paid") {
-            const farmerPaid = parseFloat(bid.farmerPaidAmount || "0");
-            // A negative payable (charges before a sale is entered) counts as-is so Due matches Payable;
-            // only an overpayment is clamped to zero.
-            cardFarmerDue += farmerPaid > 0 ? Math.max(0, bt.farmerPayable - farmerPaid) : bt.farmerPayable - farmerPaid;
-          }
+          // Farmer is paid for the whole card (farmer + stock date) together, so a small negative bill
+          // nets against the card's other bills; the card total is floored at zero below.
+          cardFarmerDue += bt.farmerPayable - parseFloat(bid.farmerPaidAmount || "0");
           if (bid.paymentStatus !== "paid") {
             const buyerPaid = parseFloat(bid.paidAmount || "0");
             buyerDue += Math.max(0, bt.buyerReceivable - buyerPaid);
@@ -4081,7 +4078,7 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
         }
       }
     }
-    farmerDue += cardFarmerDue;
+    farmerDue += Math.max(0, cardFarmerDue);
   }
 
   // The paid side comes from the Cash tab, so the totals it is measured against must come from the same
