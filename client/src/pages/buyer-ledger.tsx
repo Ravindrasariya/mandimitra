@@ -133,14 +133,14 @@ function generateBuyerPaanaHtml(
 </body></html>`;
 }
 
-function generateBuyerListPrintHtml(buyers: BuyerWithDues[], summary: { total: number; withDues: number; totalOverallDue: number; totalReceivableDue: number; duesOver15: number; duesOver30: number; totalAdvance: number }, receiptHeaderImage?: string | null) {
-  const rows = buyers.map(b => `<tr>
+function generateBuyerListPrintHtml(buyers: BuyerWithDues[], summary: { total: number; withDues: number; totalOverallDue: number; totalReceivableDue: number; duesOver15: number; duesOver30: number; totalAdvance: number }, receiptHeaderImage?: string | null, duesByBuyer?: Map<number, { receivable: number; overall: number }>, filterLabel?: string) {
+  const rows = buyers.map(b => { const d = duesByBuyer?.get(b.id); return `<tr>
 <td style="padding:6px 10px;border:1px solid #ddd">${b.buyerId}</td>
 <td style="padding:6px 10px;border:1px solid #ddd">${b.name}</td>
 <td style="padding:6px 10px;border:1px solid #ddd">${b.phone || "-"}</td>
-<td style="padding:6px 10px;border:1px solid #ddd;text-align:right">${formatIndianCurrency(b.overallDue)}</td>
-<td style="padding:6px 10px;border:1px solid #ddd;text-align:right">${formatIndianCurrency(b.receivableDue)}</td>
-</tr>`).join("");
+<td style="padding:6px 10px;border:1px solid #ddd;text-align:right">${formatIndianCurrency(d ? d.overall : b.overallDue)}</td>
+<td style="padding:6px 10px;border:1px solid #ddd;text-align:right">${formatIndianCurrency(d ? d.receivable : b.receivableDue)}</td>
+</tr>`; }).join("");
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Buyer Ledger</title>
 <style>body{font-family:Arial,sans-serif;margin:20px}table{border-collapse:collapse;width:100%}th{background:#f3f4f6;padding:8px 10px;border:1px solid #ddd;text-align:left}
@@ -149,6 +149,7 @@ function generateBuyerListPrintHtml(buyers: BuyerWithDues[], summary: { total: n
 @media print{body{margin:5mm}}</style></head><body>
 ${letterheadHtml(receiptHeaderImage)}
 <h2 style="text-align:center;margin-bottom:5px">Buyer Ledger</h2>
+${filterLabel ? `<div style="text-align:center;font-size:0.85em;color:#555">${filterLabel}</div>` : ""}
 <div class="summary">
 <div class="summary-card"><div style="font-size:0.8em;color:#666">Total Buyers</div><div style="font-size:1.3em;font-weight:bold">${summary.total}</div></div>
 <div class="summary-card"><div style="font-size:0.8em;color:#666">With Dues</div><div style="font-size:1.3em;font-weight:bold;color:#dc2626">${summary.withDues}</div></div>
@@ -915,7 +916,13 @@ export default function BuyerLedgerPage() {
   };
 
   const handlePrintList = () => {
-    const html = generateBuyerListPrintHtml(sortedBuyers, summary, user?.receiptHeaderImage);
+    const monthNames = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    const parts: string[] = [];
+    if (yearFilter !== "all") parts.push(`Year: ${yearFilter}`);
+    if (selectedMonths.length > 0) parts.push(`Month: ${[...selectedMonths].sort((a, b) => +a - +b).map(m => monthNames[+m - 1]).join(", ")}`);
+    if (selectedDays.length > 0) parts.push(`Day: ${[...selectedDays].sort((a, b) => +a - +b).join(", ")}`);
+    if (cropFilter !== "all") parts.push(`Crop: ${cropFilter}`);
+    const html = generateBuyerListPrintHtml(sortedBuyers, summary, user?.receiptHeaderImage, filteredDuesByBuyer, parts.join(" | "));
     printReceipt(html);
   };
 
