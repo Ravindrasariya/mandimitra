@@ -4070,7 +4070,9 @@ function StockSummaryBar({ cards, savedCardMap, cs, buyersList }: {
           }
           if (bid.farmerPaymentStatus !== "paid") {
             const farmerPaid = parseFloat(bid.farmerPaidAmount || "0");
-            cardFarmerDue += Math.max(0, bt.farmerPayable - farmerPaid);
+            // A negative payable (charges before a sale is entered) counts as-is so Due matches Payable;
+            // only an overpayment is clamped to zero.
+            cardFarmerDue += farmerPaid > 0 ? Math.max(0, bt.farmerPayable - farmerPaid) : bt.farmerPayable - farmerPaid;
           }
           if (bid.paymentStatus !== "paid") {
             const buyerPaid = parseFloat(bid.paidAmount || "0");
@@ -5630,7 +5632,7 @@ export default function StockPage() {
 
   const escCSV = (val: any) => {
     let s = String(val ?? "");
-    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+    if (/^[=+\-@\t\r]/.test(s) && !(typeof val === "number" || /^-?\d+(\.\d+)?$/.test(s))) s = "'" + s;
     return s.includes(",") || s.includes('"') || s.includes("\n") ? `"${s.replace(/"/g, '""')}"` : s;
   };
 
