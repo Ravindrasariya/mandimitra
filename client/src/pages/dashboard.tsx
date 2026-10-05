@@ -269,8 +269,13 @@ export default function DashboardPage() {
       return s + v;
     }, 0);
 
-    const farmerDue = filteredFarmersWithDues.reduce((s, f) => s + parseFloat(f.totalDue || "0"), 0);
-    const buyerDue = filteredBuyersWithDues.reduce((s, b) => s + parseFloat(b.overallDue || "0"), 0);
+    // Due counts only the transactions inside the filter (a person's all-time balance would drag in
+    // other dates). A negative amount counts as-is; only an overpayment is clamped to zero.
+    const unpaid = (amount: number, paid: number) => paid > 0 ? Math.max(0, amount - paid) : amount - paid;
+    const farmerDue = filteredTxns.reduce((s, t) => s + unpaid(parseFloat(t.totalPayableToFarmer || "0"), parseFloat(t.farmerPaidAmount || "0")), 0);
+    // Buyer opening balance is part of Receivable, so its still-unpaid part is part of Due.
+    const buyerOpeningDue = filteredBuyersWithDues.reduce((s, b) => s + Math.max(0, parseFloat(b.overallDue || "0") - parseFloat(b.receivableDue || "0")), 0);
+    const buyerDue = filteredTxns.reduce((s, t) => s + unpaid(parseFloat(t.totalReceivableFromBuyer || "0"), parseFloat(t.paidAmount || "0")), 0) + buyerOpeningDue;
 
     // The paid side comes from the Cash tab, so each scope is measured against the same totals the Cash
     // tab works from; only the visible share of a scope is taken from the figures above.
