@@ -27,7 +27,7 @@ import { format } from "date-fns";
 import { CROPS, SIZES, DISTRICTS } from "@shared/schema";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Command, CommandInput, CommandList, CommandEmpty, CommandItem, CommandGroup } from "@/components/ui/command";
-import { printReceipt, wrapFarmerA5Print, shareReceiptAsImage, generateBidCopyHtml, wrapWithDuplicate, wrapPortraitSingle, type BidCropSection } from "@/lib/receiptUtils";
+import { printReceipt, shareReceiptAsImage, generateBidCopyHtml, wrapWithDuplicate, wrapPortraitSingle, type BidCropSection } from "@/lib/receiptUtils";
 import {
   generateFarmerReceiptHtml, generateBuyerReceiptHtml, generateCombinedBuyerReceiptHtml,
   generateAllBuyerReceiptHtml,
@@ -2274,7 +2274,7 @@ function CropGroupSection({ group, onChange, onArchive, onDelete, onBBChange, is
       const monthName = monthNames[parseInt(mo, 10) - 1] || mo;
       const farmerFileName = `${firstName} Ji - ${crop}-${ordinal(day)}${monthName}.pdf`;
       if (action === "print") {
-        await printReceipt(wrapFarmerA5Print(html), farmerFileName);
+        await printReceipt(html, farmerFileName);
       } else {
         await shareReceiptAsImage(html, farmerFileName);
       }
