@@ -653,7 +653,8 @@ table{width:100%;border-collapse:collapse;margin:6px 0}
 th{padding:6px;border:1px solid #ccc;background:#f5f5f5;text-align:right}
 th:first-child{text-align:left}
 .totals-row td{font-weight:bold;font-size:17px;background:#f0f0f0;padding:5px;border:1px solid #ccc}
-tbody tr:not(.totals-row) td,.summary-row:not(.total){-webkit-text-stroke:0.3px #333;text-shadow:0 0 0.4px #333}
+th,tbody td{font-size:17px}
+.summary{font-size:17px}
 @media print{body{margin:6mm}.no-print{display:none!important}}
 </style></head><body>
 ${receiptHeaderImage ? letterheadHtml(receiptHeaderImage) : `<div style="display:flex;justify-content:flex-end;font-size:12px;margin-bottom:1px">${businessPhone ? `&#9742; ${businessPhone}` : ""}</div>
