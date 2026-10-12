@@ -639,7 +639,7 @@ export function generateAllBuyerReceiptHtml(entries: BuyerLotEntry[], businessNa
   <td style="padding:6px;border:1px solid #ccc;text-align:right">${r.bags}</td>
   <td style="padding:6px;border:1px solid #ccc;text-align:right">${r.nw.toFixed(2)}</td>
   <td style="padding:6px;border:1px solid #ccc;text-align:right">${r.rate.toFixed(2)}</td>
-  <td style="padding:6px;border:1px solid #ccc;text-align:right">${r.gross.toFixed(2)}</td>
+  <td style="padding:6px;border:1px solid #ccc;text-align:right">${r.gross.toFixed(0)}</td>
 </tr>`).join("");
 
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>Buyer Receipt</title>
@@ -685,17 +685,17 @@ ${rowsHtml}
   <td style="text-align:right">${totalBags}</td>
   <td style="text-align:right">${totalNw.toFixed(2)}</td>
   <td style="text-align:right">-</td>
-  <td style="text-align:right">${totalGross.toFixed(2)}</td>
+  <td style="text-align:right">${totalGross.toFixed(0)}</td>
 </tr>
 </tbody>
 </table>
 <div class="summary">
 ${totalHammali > 0 ? `<div class="summary-row"><span>Hammali (${totalBags} bags):</span><span>Rs.${totalHammali.toFixed(2)}</span></div>` : ""}
 ${totalExtra > 0 ? `<div class="summary-row"><span>Extra Charges:</span><span>Rs.${totalExtra.toFixed(2)}</span></div>` : ""}
-${!hideAadhat && totalAadhat > 0 ? `<div class="summary-row"><span>Aadhat:</span><span>Rs.${totalAadhat.toFixed(2)}</span></div>` : ""}
-${!hideAadhat && totalMuddatAnya > 0 ? `<div class="summary-row"><span>Muddat + Anya:</span><span>Rs.${totalMuddatAnya.toFixed(2)}</span></div>` : ""}
-${!hideAadhat && totalMandi > 0 ? `<div class="summary-row"><span>Mandi (${mandiPct}%):</span><span>Rs.${totalMandi.toFixed(2)}</span></div>` : ""}
-${!hideAadhat ? `<div class="summary-row total"><span>Total Receivable from Buyer:</span><span>Rs.${grandTotal.toFixed(2)}</span></div>` : ""}
+${!hideAadhat && totalAadhat > 0 ? `<div class="summary-row"><span>Aadhat:</span><span>Rs.${totalAadhat.toFixed(0)}</span></div>` : ""}
+${!hideAadhat && totalMuddatAnya > 0 ? `<div class="summary-row"><span>Muddat + Anya:</span><span>Rs.${totalMuddatAnya.toFixed(0)}</span></div>` : ""}
+${!hideAadhat && totalMandi > 0 ? `<div class="summary-row"><span>Mandi (${mandiPct}%):</span><span>Rs.${totalMandi.toFixed(0)}</span></div>` : ""}
+${!hideAadhat ? `<div class="summary-row total"><span>Total Receivable from Buyer:</span><span>Rs.${grandTotal.toFixed(0)}</span></div>` : ""}
 </div>
 <div style="text-align:right;margin-top:32px;font-size:13px;color:#333">
   <div style="display:inline-block;border-top:1px solid #555;padding-top:4px;min-width:150px;text-align:center">Signature</div>
