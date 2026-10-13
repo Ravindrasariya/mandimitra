@@ -132,8 +132,10 @@ export function generateFarmerReceiptHtml(sg: UnifiedSerialGroup, businessName?:
   // The one horizontal rule in the body: it closes off the produce rows above the total.
   const NET = `${CELL}border-top:1px solid #444;`;
   const totalBagsAll = allTxns.reduce((sum, t) => sum + (t.numberOfBags || 0), 0);
+  const totalCrops = Array.from(new Set(allTxns.map(t => t.lot?.crop || firstLot?.crop || "").filter(Boolean)))
+    .map(c => cropHindi[c] || c).join(", ");
   const kulRakamRow = `<tr style="height:${ROW_H}">
-    <td style="${NET}">&nbsp;</td><td style="${NET}text-align:center;font-weight:bold">${totalBagsAll}</td><td style="${NET}">&nbsp;</td><td style="${NET}">&nbsp;</td>
+    <td style="${NET}text-align:center;font-weight:bold">${esc(totalCrops) || "&nbsp;"}</td><td style="${NET}text-align:center;font-weight:bold">${totalBagsAll}</td><td style="${NET}">&nbsp;</td><td style="${NET}">&nbsp;</td>
     <td style="${NET}text-align:right;font-weight:bold">कुल रकम</td>
     <td style="${NET}font-weight:bold;font-size:1.05em;text-align:center">&#8377;${rs(totalGross)}</td>
   </tr>`;
