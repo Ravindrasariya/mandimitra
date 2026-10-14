@@ -4600,9 +4600,20 @@ export default function StockPage() {
     }));
 
   const [autoPrint, setAutoPrint] = useState<{ cardId: string; groupId: string; collapseAfter: boolean } | null>(null);
+  const newEntryButtonRef = useRef<HTMLButtonElement>(null);
+  // After a save the cursor goes back to "+ New Farmer Entry" so the next entry can start from the keyboard.
+  const focusNewEntryButton = () => {
+    setTimeout(() => {
+      const btn = newEntryButtonRef.current;
+      if (!btn) return;
+      btn.scrollIntoView({ block: "nearest" });
+      btn.focus();
+    }, 150);
+  };
   const finishAutoPrint = () => {
     const done = autoPrint;
     setAutoPrint(null);
+    focusNewEntryButton();
     if (done?.collapseAfter) setCards(prev => prev.map(c => (c.id === done.cardId ? { ...c, cardOpen: false } : c)));
   };
 
@@ -5279,6 +5290,8 @@ export default function StockPage() {
       }});
 
       setCards(prev => sortCardsByMaxSr([...prev]));
+      // When a bill is about to print, focus moves once the print dialog closes (see finishAutoPrint).
+      if (!(printGroup && txnFailures.length === 0)) focusNewEntryButton();
       if (txnFailures.length > 0) {
         setPartialSaveFailures(txnFailures);
       } else {
@@ -5818,7 +5831,7 @@ export default function StockPage() {
         {!loadingCards && <StockSummaryBar cards={filteredCards} savedCardMap={savedCardMap} cs={cs} buyersList={pageBuyersList} />}
         {!loadingCards && (
           <div className="flex justify-start">
-            <Button type="button" onClick={addCard} data-testid="button-add-farmer-entry" className="gap-2">
+            <Button type="button" ref={newEntryButtonRef} onClick={addCard} data-testid="button-add-farmer-entry" className="gap-2">
               <Plus className="w-4 h-4" /> {t("stock.newFarmerEntry")}
             </Button>
           </div>
