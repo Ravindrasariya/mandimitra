@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, type ReactNode } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient, getQueryFn } from "./queryClient";
 import { startLiveUpdates } from "./live-updates";
+import { cacheLetterhead } from "./receiptUtils";
 
 const AUTH_CHANNEL_NAME = "mandi-mitra-auth";
 type AuthChannelMessage = { type: "business-switched"; businessId: number };
@@ -70,6 +71,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) return;
     return startLiveUpdates();
   }, [user?.id, user?.businessId]);
+
+  // Keep a copy of the business letterhead in this browser so printing never has to wait on the network.
+  useEffect(() => {
+    if (user?.receiptHeaderImage) void cacheLetterhead(user.receiptHeaderImage);
+  }, [user?.businessId, user?.receiptHeaderImage]);
 
   const loginMutation = useMutation({
     mutationFn: async ({ username, password, captchaToken }: { username: string; password: string; captchaToken?: string }) => {

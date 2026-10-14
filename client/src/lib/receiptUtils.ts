@@ -1,5 +1,10 @@
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
+import { toast } from "@/hooks/use-toast";
+
+function notifyHeaderNotLoaded() {
+  toast({ title: "Header image could not be loaded", description: "Printing without the header. Check your connection and print again.", variant: "destructive" });
+}
 
 function extractBodyHtml(html: string): string {
   const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
@@ -102,6 +107,7 @@ export async function printReceipt(html: string, fileName?: string) {
   window.addEventListener("afterprint", cleanup, { once: true });
 
   await new Promise<void>(resolve => setTimeout(resolve, 300));
+  if (doc && !(await waitForImages(doc))) notifyHeaderNotLoaded();
   iframe.contentWindow?.focus();
   iframe.contentWindow?.print();
 
@@ -279,6 +285,7 @@ async function renderReceiptPdf(html: string, fileName: string): Promise<{ pdfBl
   document.body.appendChild(container);
 
   await new Promise(resolve => setTimeout(resolve, 300));
+  if (!(await waitForImages(container))) notifyHeaderNotLoaded();
 
   const fullHeight = bodyWrapper.scrollHeight;
 
@@ -325,7 +332,82 @@ export async function downloadReceiptAsPdf(html: string, fileName: string): Prom
  * proportions so it is never stretched. Returns an empty string when no letterhead is set, so callers
  * can fall back to their existing text header.
  */
+// The letterhead is a file on the server. Each upload gets a new file name, so the file path is a
+// safe cache key: a new upload (or another business's letterhead) is simply a different key.
+const LETTERHEAD_KEY_PREFIX = "mandi-mitra-letterhead:";
+const letterheadMemory = new Map<string, string>();
+const letterheadInflight = new Map<string, Promise<string | null>>();
+
+function getCachedLetterhead(src: string): string | null {
+  const inMemory = letterheadMemory.get(src);
+  if (inMemory) return inMemory;
+  try {
+    const stored = localStorage.getItem(LETTERHEAD_KEY_PREFIX + src);
+    if (stored) {
+      letterheadMemory.set(src, stored);
+      return stored;
+    }
+  } catch {}
+  return null;
+}
+
+// Downloads the letterhead once and keeps a copy in this browser, so later bills embed it directly
+// and need no network for the header. Safe to call repeatedly.
+export function cacheLetterhead(src?: string | null): Promise<string | null> {
+  if (!src) return Promise.resolve(null);
+  const cached = getCachedLetterhead(src);
+  if (cached) return Promise.resolve(cached);
+  const running = letterheadInflight.get(src);
+  if (running) return running;
+  const job = (async () => {
+    try {
+      const res = await fetch(src);
+      if (!res.ok) return null;
+      const blob = await res.blob();
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = () => reject(reader.error);
+        reader.readAsDataURL(blob);
+      });
+      letterheadMemory.set(src, dataUrl);
+      try {
+        // Drop copies of older letterheads so the browser's storage does not fill up.
+        Object.keys(localStorage)
+          .filter(k => k.startsWith(LETTERHEAD_KEY_PREFIX) && k !== LETTERHEAD_KEY_PREFIX + src)
+          .forEach(k => localStorage.removeItem(k));
+        localStorage.setItem(LETTERHEAD_KEY_PREFIX + src, dataUrl);
+      } catch {}
+      return dataUrl;
+    } catch {
+      return null;
+    } finally {
+      letterheadInflight.delete(src);
+    }
+  })();
+  letterheadInflight.set(src, job);
+  return job;
+}
+
 export function letterheadHtml(src?: string | null): string {
   if (!src) return "";
-  return `<div style="text-align:center;margin-bottom:8px"><img src="${escHtml(src)}" style="display:block;width:100%;max-width:100%;height:auto" /></div>`;
+  const cached = getCachedLetterhead(src);
+  if (!cached) void cacheLetterhead(src);
+  return `<div style="text-align:center;margin-bottom:8px"><img src="${escHtml(cached || src)}" style="display:block;width:100%;max-width:100%;height:auto" /></div>`;
+}
+
+// Resolves once every picture inside root has finished loading (or failed), or after timeoutMs.
+// Returns false if it gave up waiting on a picture that was still loading.
+async function waitForImages(root: ParentNode, timeoutMs = 10000): Promise<boolean> {
+  const pending = Array.from(root.querySelectorAll("img")).filter(img => !img.complete);
+  if (pending.length === 0) return true;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<false>(resolve => { timer = setTimeout(() => resolve(false), timeoutMs); });
+  const loaded = Promise.all(pending.map(img => new Promise<void>(resolve => {
+    img.addEventListener("load", () => resolve(), { once: true });
+    img.addEventListener("error", () => resolve(), { once: true });
+  }))).then(() => true as const);
+  const ok = await Promise.race([loaded, timeout]);
+  if (timer) clearTimeout(timer);
+  return ok;
 }
