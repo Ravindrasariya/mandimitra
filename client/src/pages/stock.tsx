@@ -5256,11 +5256,11 @@ export default function StockPage() {
           return (isNaN(srA) ? Infinity : srA) - (isNaN(srB) ? Infinity : srB);
         })[0];
       // The card stays open until its bill has been launched, then collapses if this was Save & Close.
-      updatedCard.cardOpen = collapseAfter && !printGroup ? false : card.cardOpen;
+      // The card only folds away after a fully successful save; partial failures leave it open to fix.
+      const collapseNow = collapseAfter && txnFailures.length === 0;
+      updatedCard.cardOpen = collapseNow && !printGroup ? false : card.cardOpen;
       if (printGroup && txnFailures.length === 0) {
         setAutoPrint({ cardId: card.id, groupId: printGroup.id, collapseAfter });
-      } else if (printGroup) {
-        updatedCard.cardOpen = collapseAfter ? false : card.cardOpen;
       }
       const savedNow = { ...updatedCard, touched: false };
       setCards(prev => prev.map((c, i) => (i === idx ? savedNow : c)));
@@ -5918,7 +5918,7 @@ export default function StockPage() {
               savedCard={savedCardMap.get(card.id) ?? null}
               unfilteredCard={cards[idx]}
               onChange={mergeBack}
-              onSave={() => saveCard(idx)}
+              onSave={() => saveCard(idx, true)}
               onSaveAndClose={() => saveCard(idx, true)}
               autoPrintGroupId={autoPrint?.cardId === card.id ? autoPrint.groupId : null}
               onAutoPrintDone={finishAutoPrint}
