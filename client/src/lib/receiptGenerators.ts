@@ -74,19 +74,33 @@ export function generateFarmerReceiptHtml(sg: UnifiedSerialGroup, businessName?:
 
   // The five produce columns of each row. खर्च is filled in separately below: it runs down the side
   // of these rows rather than belonging to any one of them.
-  const produceCells = allTxns.map(t => {
+  // One row per lot: when a lot was sold to several buyers the farmer sees a single combined line.
+  // Printing only -- the per-sale amounts are rounded first, so the row still adds up to कुल रकम.
+  type LotRow = { crop: string; bags: number; nw: number; gross: number; rates: Set<string> };
+  const lotRows = new Map<string, LotRow>();
+  allTxns.forEach((t, idx) => {
     const nw = parseFloat(t.netWeight || "0");
     const ppk = parseFloat(t.pricePerKg || "0");
     const epk = parseFloat((t as any).extraPerKgFarmer || "0");
     const rate = ppk + epk;
-    const ratePerQ = (rate * 100).toFixed(0);
-    const gross = Math.round(nw * rate);
-    const crop = t.lot?.crop || firstLot?.crop || "";
-    return `${td(cropHindi[crop] || crop, "text-align:center")}
-      ${td(String(t.numberOfBags || 0), "text-align:center")}
+    const key = String((t as any).lotId ?? t.lot?.id ?? `txn-${idx}`);
+    const row = lotRows.get(key) ?? { crop: t.lot?.crop || firstLot?.crop || "", bags: 0, nw: 0, gross: 0, rates: new Set<string>() };
+    row.bags += t.numberOfBags || 0;
+    row.nw += nw;
+    row.gross += Math.round(nw * rate);
+    row.rates.add(rate.toFixed(4));
+    lotRows.set(key, row);
+  });
+  const produceCells = Array.from(lotRows.values()).map(r => {
+    // Same rate on every sale: show it. Different rates: show the weighted average.
+    const ratePerQ = r.rates.size === 1
+      ? (parseFloat(Array.from(r.rates)[0]) * 100).toFixed(0)
+      : (r.nw > 0 ? (r.gross / r.nw) * 100 : 0).toFixed(0);
+    return `${td(cropHindi[r.crop] || r.crop, "text-align:center")}
+      ${td(String(r.bags), "text-align:center")}
       ${td(ratePerQ, "text-align:center")}
-      ${td(nw.toFixed(2), "text-align:center")}
-      ${td(gross.toFixed(0), "text-align:center")}`;
+      ${td(r.nw.toFixed(2), "text-align:center")}
+      ${td(r.gross.toFixed(0), "text-align:center")}`;
   });
 
   // Keep the ruled table a sensible size on light receipts so the space freed up for the
